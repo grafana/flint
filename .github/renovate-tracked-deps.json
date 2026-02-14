@@ -1,9 +1,12 @@
 {
-	".github/workflows/lint.yml": {
-		"github-actions": ["actions/checkout", "jdx/mise-action", "ubuntu"]
-	},
-	"mise.toml": {
-		"mise": ["lychee", "node", "npm:renovate"],
-		"regex": ["ghcr.io/super-linter/super-linter"]
-	}
+  "mise.toml": {
+    "mise": [
+      "lychee",
+      "node",
+      "npm:renovate"
+    ],
+    "regex": [
+      "ghcr.io/super-linter/super-linter"
+    ]
+  }
 }

@@ -9,29 +9,28 @@ Shared [mise](https://mise.jdx.dev/) lint task scripts for
 
 ## Usage
 
+⚠️ **Important**: Always pin to a specific version tag (e.g., `v0.1.0`), never use `main`. The main branch may contain breaking changes. See [CHANGELOG.md](CHANGELOG.md) for version history.
+
 Reference individual task scripts via HTTP remote tasks in your `mise.toml`:
 
 ```toml
 # Shared lint tasks from flint
 [tasks."lint:super-linter"]
 description = "Run Super-Linter on the repository"
-file = "https://raw.githubusercontent.com/grafana/flint/v1.0.0/tasks/lint/super-linter.sh"
+file = "https://raw.githubusercontent.com/grafana/flint/v0.1.0/tasks/lint/super-linter.sh"
 [tasks."lint:links"]
 description = "Lint links in all files"
-file = "https://raw.githubusercontent.com/grafana/flint/v1.0.0/tasks/lint/links.sh"
+file = "https://raw.githubusercontent.com/grafana/flint/v0.1.0/tasks/lint/links.sh"
 [tasks."lint:local-links"]
 description = "Lint links in local files"
-file = "https://raw.githubusercontent.com/grafana/flint/v1.0.0/tasks/lint/local-links.sh"
+file = "https://raw.githubusercontent.com/grafana/flint/v0.1.0/tasks/lint/local-links.sh"
 [tasks."lint:links-in-modified-files"]
 description = "Lint links in modified files"
 hide = true
-file = "https://raw.githubusercontent.com/grafana/flint/v1.0.0/tasks/lint/links-in-modified-files.sh"
+file = "https://raw.githubusercontent.com/grafana/flint/v0.1.0/tasks/lint/links-in-modified-files.sh"
 [tasks."lint:renovate-deps"]
 description = "Verify renovate-tracked-deps.json is up to date"
-file = "https://raw.githubusercontent.com/grafana/flint/v1.0.0/tasks/lint/renovate-deps.py"
-[tasks."generate:renovate-tracked-deps"]
-description = "Generate renovate-tracked-deps.json from Renovate's local analysis"
-file = "https://raw.githubusercontent.com/grafana/flint/v1.0.0/tasks/generate/renovate-tracked-deps.py"
+file = "https://raw.githubusercontent.com/grafana/flint/v0.1.0/tasks/lint/renovate-deps.py"
 ```
 
 Then wire up the top-level `lint` and `fix` tasks (add any project-specific
@@ -43,8 +42,8 @@ description = "Run all lints"
 depends = ["lint:super-linter", "lint:local-links", "lint:links-in-modified-files", "lint:renovate-deps"]
 
 [tasks.fix]
-description = "Auto-fix lint issues, regenerate tracked deps, then verify"
-run = "AUTOFIX=true mise run lint:super-linter && mise run generate:renovate-tracked-deps && mise run lint"
+description = "Auto-fix lint issues and regenerate tracked deps"
+run = "AUTOFIX=true mise run lint"
 ```
 
 ## Required environment variables
@@ -62,19 +61,39 @@ Set these in your `mise.toml`:
 | `SUPER_LINTER_ENV_FILE` | `.github/config/super-linter.env` | Path to the Super-Linter env file |
 | `LYCHEE_CONFIG` | `.github/config/lychee.toml` | Path to the lychee config file |
 | `LYCHEE_CONFIG_CHANGE_PATTERN` | `^(\.github/config/lychee\.toml\|\.mise/tasks/lint/.*\|mise\.toml)$` | Regex for files whose change triggers a full link check |
-| `AUTOFIX` | unset | Set to `true` to enable Super-Linter auto-fix mode |
+| `AUTOFIX` | unset | Set to `true` to enable auto-fix mode (Super-Linter fixes, renovate-deps regeneration) |
 | `RENOVATE_TRACKED_DEPS_EXCLUDE` | unset | Comma-separated Renovate managers to exclude (e.g. `github-actions,github-runners`) |
 
 ## Provided tasks
 
-| Task | Description |
-|------|-------------|
-| `lint:super-linter` | Run Super-Linter via Docker/Podman |
-| `lint:links` | Check links in all files with lychee |
-| `lint:local-links` | Check local file links with lychee |
-| `lint:links-in-modified-files` | Check links only in files modified vs base branch |
-| `lint:renovate-deps` | Verify `renovate-tracked-deps.json` is up to date |
-| `generate:renovate-tracked-deps` | Generate `renovate-tracked-deps.json` from Renovate's local analysis |
+| Task | Description | AUTOFIX Support |
+|------|-------------|-----------------|
+| `lint:super-linter` | Run Super-Linter via Docker/Podman | ✅ Enables `FIX_*` vars |
+| `lint:links` | Check links in all files with lychee | ❌ Ignored |
+| `lint:local-links` | Check local file links with lychee | ❌ Ignored |
+| `lint:links-in-modified-files` | Check links only in files modified vs base branch | ❌ Ignored |
+| `lint:renovate-deps` | Verify `renovate-tracked-deps.json` is up to date | ✅ Regenerates file |
+
+## How AUTOFIX Works
+
+All lint scripts support the `AUTOFIX` environment variable for a unified fix workflow:
+
+**Check mode** (default):
+```bash
+mise run lint              # Check all linters, fail on issues
+mise run lint:super-linter # Check code style, fail on issues
+mise run lint:renovate-deps # Verify tracked deps, fail if out of date
+```
+
+**Fix mode** (`AUTOFIX=true`):
+```bash
+mise run fix               # Auto-fix all fixable issues
+# Or run individual linters:
+AUTOFIX=true mise run lint:super-linter   # Apply code fixes
+AUTOFIX=true mise run lint:renovate-deps  # Regenerate tracked deps
+```
+
+Linters that don't support autofix (like lychee link checker) silently ignore the `AUTOFIX` variable and run normally. This allows you to run all lints with `AUTOFIX=true` without errors.
 
 ## Per-repo configuration (not included)
 
@@ -88,3 +107,9 @@ Each consuming repo must provide its own:
   remappings
 - **Renovate config** (`.github/renovate.json5`) and committed snapshot
   (`.github/renovate-tracked-deps.json`)
+
+## Versioning
+
+This project uses [Semantic Versioning](https://semver.org/). Breaking changes will be documented in [CHANGELOG.md](CHANGELOG.md) and will result in a major version bump.
+
+**Always pin to a specific version** in your `mise.toml` file URLs. Never reference `main` directly as it may contain unreleased breaking changes.

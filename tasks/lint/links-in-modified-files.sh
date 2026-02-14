@@ -8,6 +8,8 @@ set -euo pipefail
 #USAGE flag "--head <head>" help="head commit to compare against"
 #USAGE flag "--lychee-args <args>" help="extra arguments to pass to lychee"
 
+# Note: AUTOFIX env var is ignored - lychee does not support autofix
+
 # shellcheck disable=SC2154 # usage_* vars are set by mise
 base="${usage_base:-origin/${GITHUB_BASE_REF:-main}}"
 head="${usage_head:-${GITHUB_HEAD_SHA:-HEAD}}"

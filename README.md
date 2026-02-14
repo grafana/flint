@@ -133,7 +133,9 @@ To let Renovate automatically update the pinned flint version in your
       customType: "regex",
       description: "Update raw.githubusercontent.com version tags in mise.toml",
       managerFilePatterns: ["/^mise\\.toml$/"],
-      matchStrings: ["https://raw\\.githubusercontent\\.com/(?<depName>[^/]+/[^/]+)/(?<currentValue>v[^/]+)/"],
+      matchStrings: [
+        "https://raw\\.githubusercontent\\.com/(?<depName>[^/]+/[^/]+)/(?<currentValue>v[^/]+)/",
+      ],
       datasourceTemplate: "github-tags",
     },
   ],

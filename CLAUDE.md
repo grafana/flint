@@ -51,6 +51,19 @@ Since these are remote task scripts consumed by other repos:
    - Link linters: Verify they run normally and don't output warnings
 4. For Renovate scripts, ensure they handle missing deps gracefully
 
+## Linting
+
+```bash
+# Auto-fix and verify (recommended dev workflow)
+mise run fix
+
+# Verify only (same command used in CI)
+mise run lint
+```
+
+After running `fix`, always review the changed files before committing —
+auto-fixes may produce unexpected results.
+
 ## Adding New Linters
 
 When adding new lint scripts, follow these patterns:

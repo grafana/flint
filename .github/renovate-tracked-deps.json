@@ -1,1 +1,6 @@
-{}
+{
+	"mise.toml": {
+		"mise": ["lychee", "node", "npm:renovate"],
+		"regex": ["ghcr.io/super-linter/super-linter"]
+	}
+}

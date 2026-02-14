@@ -97,6 +97,30 @@ AUTOFIX=true mise run lint:renovate-deps  # Regenerate tracked deps
 
 Linters that don't support autofix (like lychee link checker) silently ignore the `AUTOFIX` variable and run normally. This allows you to run all lints with `AUTOFIX=true` without errors.
 
+## Renovate Tracked Deps Linter
+
+### Why this exists
+
+Renovate silently stops tracking a dependency when it can no longer parse the version reference (typo in a comment annotation, unsupported syntax, moved file, etc.). When that happens, the dependency freezes in place with no PR and no dashboard entry — it simply disappears from Renovate's radar.
+
+The Dependency Dashboard catches _known_ dependencies that are pending or in error, but it cannot show you a dependency that Renovate no longer sees at all. This linter closes that gap by keeping a committed snapshot of every dependency Renovate tracks and failing CI when the two diverge.
+
+### How it works
+
+The `lint:renovate-deps` task runs Renovate locally in `--platform=local` mode, parses its debug log for the `packageFiles with updates` message, and generates a dependency list (grouped by file and manager). It then diffs this against the committed `.github/renovate-tracked-deps.json`:
+
+- If they match → linter passes
+- If they differ → linter fails with a unified diff showing which dependencies were added or removed
+- With `AUTOFIX=true` → automatically regenerates and updates the committed file
+
+### Typical workflow
+
+- **A dependency disappears** (e.g., someone removes a `# renovate:` comment or changes a file that Renovate was matching) → CI fails, showing the removed dependency in the diff. The author can then decide whether the removal was intentional or accidental.
+
+- **A new dependency is added** → CI fails because the committed snapshot is stale. Run `mise run fix` (or `AUTOFIX=true mise run lint:renovate-deps`) to regenerate and update the file, then commit.
+
+- **Routine regeneration** → After any change to `renovate.json5`, Dockerfiles, `go.mod`, `package.json`, or other files Renovate scans, the linter will detect the change and require regeneration.
+
 ## Per-repo configuration (not included)
 
 Each consuming repository must provide its own:

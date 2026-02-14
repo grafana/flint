@@ -1,5 +1,7 @@
 # flint
 
+Reusable mise lint task scripts for Super-Linter, lychee link checking, and Renovate dependency tracking.
+
 Shared [mise](https://mise.jdx.dev/) lint task scripts for
 [Super-Linter](https://github.com/super-linter/super-linter),
 [lychee](https://lychee.cli.rs/), and

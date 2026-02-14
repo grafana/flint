@@ -1,16 +1,35 @@
-# lint-tasks
+# flint
 
-Shared [mise](https://mise.jdx.dev/) task scripts for linting with
-[Super-Linter](https://github.com/super-linter/super-linter) and
-[lychee](https://lychee.cli.rs/).
+Shared [mise](https://mise.jdx.dev/) lint task scripts for
+[Super-Linter](https://github.com/super-linter/super-linter),
+[lychee](https://lychee.cli.rs/), and
+[Renovate tracked-deps](https://docs.renovatebot.com/) verification.
 
 ## Usage
 
-Add the shared tasks to your project's `mise.toml`:
+Reference individual task scripts via HTTP remote tasks in your `mise.toml`:
 
 ```toml
-[task_config]
-includes = ["git::https://github.com/grafana/lint-tasks.git//tasks?ref=v1.0.0"]
+# Shared lint tasks from flint
+[tasks."lint:super-linter"]
+description = "Run Super-Linter on the repository"
+file = "https://raw.githubusercontent.com/grafana/flint/v1.0.0/tasks/lint/super-linter.sh"
+[tasks."lint:links"]
+description = "Lint links in all files"
+file = "https://raw.githubusercontent.com/grafana/flint/v1.0.0/tasks/lint/links.sh"
+[tasks."lint:local-links"]
+description = "Lint links in local files"
+file = "https://raw.githubusercontent.com/grafana/flint/v1.0.0/tasks/lint/local-links.sh"
+[tasks."lint:links-in-modified-files"]
+description = "Lint links in modified files"
+hide = true
+file = "https://raw.githubusercontent.com/grafana/flint/v1.0.0/tasks/lint/links-in-modified-files.sh"
+[tasks."lint:renovate-deps"]
+description = "Verify renovate-tracked-deps.json is up to date"
+file = "https://raw.githubusercontent.com/grafana/flint/v1.0.0/tasks/lint/renovate-deps.py"
+[tasks."generate:renovate-tracked-deps"]
+description = "Generate renovate-tracked-deps.json from Renovate's local analysis"
+file = "https://raw.githubusercontent.com/grafana/flint/v1.0.0/tasks/generate/renovate-tracked-deps.py"
 ```
 
 Then wire up the top-level `lint` and `fix` tasks (add any project-specific
@@ -19,11 +38,11 @@ subtasks to the `depends` list):
 ```toml
 [tasks.lint]
 description = "Run all lints"
-depends = ["lint:super-linter", "lint:local-links", "lint:links-in-modified-files"]
+depends = ["lint:super-linter", "lint:local-links", "lint:links-in-modified-files", "lint:renovate-deps"]
 
 [tasks.fix]
-description = "Auto-fix lint issues then verify"
-run = "AUTOFIX=true mise run lint:super-linter && mise run lint"
+description = "Auto-fix lint issues, regenerate tracked deps, then verify"
+run = "AUTOFIX=true mise run lint:super-linter && mise run generate:renovate-tracked-deps && mise run lint"
 ```
 
 ## Required environment variables
@@ -42,6 +61,7 @@ Set these in your `mise.toml`:
 | `LYCHEE_CONFIG` | `.github/config/lychee.toml` | Path to the lychee config file |
 | `LYCHEE_CONFIG_CHANGE_PATTERN` | `^(\.github/config/lychee\.toml\|\.mise/tasks/lint/.*\|mise\.toml)$` | Regex for files whose change triggers a full link check |
 | `AUTOFIX` | unset | Set to `true` to enable Super-Linter auto-fix mode |
+| `RENOVATE_TRACKED_DEPS_EXCLUDE` | unset | Comma-separated Renovate managers to exclude (e.g. `github-actions,github-runners`) |
 
 ## Provided tasks
 
@@ -51,6 +71,8 @@ Set these in your `mise.toml`:
 | `lint:links` | Check links in all files with lychee |
 | `lint:local-links` | Check local file links with lychee |
 | `lint:links-in-modified-files` | Check links only in files modified vs base branch |
+| `lint:renovate-deps` | Verify `renovate-tracked-deps.json` is up to date |
+| `generate:renovate-tracked-deps` | Generate `renovate-tracked-deps.json` from Renovate's local analysis |
 
 ## Per-repo configuration (not included)
 
@@ -62,3 +84,5 @@ Each consuming repo must provide its own:
   `.yaml-lint.yml`, `.editorconfig`, etc.
 - **Lychee config** (`.github/config/lychee.toml`) — exclusions, timeouts,
   remappings
+- **Renovate config** (`.github/renovate.json5`) and committed snapshot
+  (`.github/renovate-tracked-deps.json`)

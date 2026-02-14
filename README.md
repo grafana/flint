@@ -121,6 +121,28 @@ The `lint:renovate-deps` task runs Renovate locally in `--platform=local` mode, 
 
 - **Routine regeneration** → After any change to `renovate.json5`, Dockerfiles, `go.mod`, `package.json`, or other files Renovate scans, the linter will detect the change and require regeneration.
 
+## Automatic version updates with Renovate
+
+To let Renovate automatically update the pinned flint version in your
+`mise.toml`, add this custom manager to your `renovate.json5`:
+
+```json5
+{
+  customManagers: [
+    {
+      customType: "regex",
+      description: "Update raw.githubusercontent.com version tags in mise.toml",
+      managerFilePatterns: ["/^mise\\.toml$/"],
+      matchStrings: ["https://raw\\.githubusercontent\\.com/(?<depName>[^/]+/[^/]+)/(?<currentValue>v[^/]+)/"],
+      datasourceTemplate: "github-tags",
+    },
+  ],
+}
+```
+
+This matches all `raw.githubusercontent.com` URLs in `mise.toml` and updates
+the version tag (e.g., `v0.1.0`) when a new release is published.
+
 ## Per-repo configuration (not included)
 
 Each consuming repository must provide its own:

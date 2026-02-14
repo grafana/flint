@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-This repository contains reusable mise task scripts for linting. These scripts are designed to be consumed as HTTP remote tasks in other repositories' `mise.toml` files, not run directly in this repo.
+This repository contains reusable mise task scripts for linting. These scripts are designed to be consumed as HTTP remote tasks in other repositories' `mise.toml` files, not run directly in this repository.
 
 ## Architecture
 
@@ -21,6 +21,7 @@ All task scripts follow these conventions:
 ### Script Categories
 
 **`tasks/lint/`** - Linting validators:
+
 - `super-linter.sh`: Runs Super-Linter via Docker/Podman, auto-detects runtime, handles SELinux on Fedora
 - `links.sh`, `local-links.sh`: Run lychee link checker with different scopes
 - `links-in-modified-files.sh`: Smart link linting that checks config changes and only lints modified files
@@ -28,7 +29,7 @@ All task scripts follow these conventions:
 
 ### Key Design Decisions
 
-1. **Container runtime detection**: `super-linter.sh` tries podman first (with SELinux "z" mount flag), falls back to docker
+1. **Container runtime detection**: `super-linter.sh` tries podman first (with SELinux "z" mount flag), falls back to Docker
 2. **AUTOFIX mode**: All lint scripts support the `AUTOFIX` environment variable for unified fix workflows:
    - `super-linter.sh`: Filters out `FIX_*` env vars unless `AUTOFIX=true`, enabling Super-Linter's built-in fixers
    - `renovate-deps.py`: Automatically regenerates and updates `.github/renovate-tracked-deps.json` when `AUTOFIX=true`
@@ -42,7 +43,7 @@ All task scripts follow these conventions:
 
 Since these are remote task scripts consumed by other repos:
 
-1. Test changes by pointing a consuming repo's `mise.toml` to a local file path or git branch
+1. Test changes by pointing a consuming repo's `mise.toml` to a local file path or Git branch
 2. Verify scripts work with both Docker and Podman
 3. Test with and without `AUTOFIX=true`:
    - `super-linter.sh`: Verify `FIX_*` vars are filtered correctly

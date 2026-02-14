@@ -22,11 +22,7 @@ if _repo_root_env is None:
 REPO_ROOT = Path(_repo_root_env)
 COMMITTED = REPO_ROOT / ".github" / "renovate-tracked-deps.json"
 
-EXCLUDED_MANAGERS = {
-    m.strip()
-    for m in os.environ.get("RENOVATE_TRACKED_DEPS_EXCLUDE", "").split(",")
-    if m.strip()
-}
+EXCLUDED_MANAGERS = {m.strip() for m in os.environ.get("RENOVATE_TRACKED_DEPS_EXCLUDE", "").split(",") if m.strip()}  # pylint: disable=line-too-long  # noqa: E501
 
 
 def run_renovate(tmpdir):
@@ -54,8 +50,7 @@ def run_renovate(tmpdir):
         )
     if result.returncode != 0:
         print(
-            f"ERROR: Renovate failed (exit {result.returncode})."
-            f" See log: {log_path}",
+            f"ERROR: Renovate failed (exit {result.returncode}). See log: {log_path}",
             file=sys.stderr,
         )
         sys.exit(result.returncode)
@@ -141,9 +136,7 @@ def main():
                     f.write("\n")
                 print("renovate-tracked-deps.json has been updated.")
             else:
-                print(
-                    "ERROR: renovate-tracked-deps.json is out of date.", file=sys.stderr
-                )
+                print("ERROR: renovate-tracked-deps.json is out of date.", file=sys.stderr)
                 print(
                     "Run 'mise run lint:renovate-deps' with AUTOFIX=true to update.",
                     file=sys.stderr,

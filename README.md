@@ -50,35 +50,36 @@ run = "AUTOFIX=true mise run lint"
 
 Set these in your `mise.toml`:
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `SUPER_LINTER_VERSION` | yes | Super-Linter image tag (e.g. `v8.4.0@sha256:...`) |
+| Variable               | Required | Description                                       |
+| ---------------------- | -------- | ------------------------------------------------- |
+| `SUPER_LINTER_VERSION` | yes      | Super-Linter image tag (e.g. `v8.4.0@sha256:...`) |
 
 ## Optional environment variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SUPER_LINTER_ENV_FILE` | `.github/config/super-linter.env` | Path to the Super-Linter env file |
-| `LYCHEE_CONFIG` | `.github/config/lychee.toml` | Path to the lychee config file |
-| `LYCHEE_CONFIG_CHANGE_PATTERN` | `^(\.github/config/lychee\.toml\|\.mise/tasks/lint/.*\|mise\.toml)$` | Regex for files whose change triggers a full link check |
-| `AUTOFIX` | unset | Set to `true` to enable auto-fix mode (Super-Linter fixes, renovate-deps regeneration) |
-| `RENOVATE_TRACKED_DEPS_EXCLUDE` | unset | Comma-separated Renovate managers to exclude (e.g. `github-actions,github-runners`) |
+| Variable                        | Default                                                              | Description                                                                           |
+| ------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `SUPER_LINTER_ENV_FILE`         | `.github/config/super-linter.env`                                    | Path to the Super-Linter env file                                                     |
+| `LYCHEE_CONFIG`                 | `.github/config/lychee.toml`                                         | Path to the lychee config file                                                        |
+| `LYCHEE_CONFIG_CHANGE_PATTERN`  | `^(\.github/config/lychee\.toml\|\.mise/tasks/lint/.*\|mise\.toml)$` | Regular expression for files whose change triggers a full link check                  |
+| `AUTOFIX`                       | unset                                                                | Set to `true` to enable autofix mode (Super-Linter fixes, renovate-deps regeneration) |
+| `RENOVATE_TRACKED_DEPS_EXCLUDE` | unset                                                                | Comma-separated Renovate managers to exclude (e.g. `github-actions,github-runners`)   |
 
 ## Provided tasks
 
-| Task | Description | AUTOFIX Support |
-|------|-------------|-----------------|
-| `lint:super-linter` | Run Super-Linter via Docker/Podman | ✅ Enables `FIX_*` vars |
-| `lint:links` | Check links in all files with lychee | ❌ Ignored |
-| `lint:local-links` | Check local file links with lychee | ❌ Ignored |
-| `lint:links-in-modified-files` | Check links only in files modified vs base branch | ❌ Ignored |
-| `lint:renovate-deps` | Verify `renovate-tracked-deps.json` is up to date | ✅ Regenerates file |
+| Task                           | Description                                       | AUTOFIX Support         |
+| ------------------------------ | ------------------------------------------------- | ----------------------- |
+| `lint:super-linter`            | Run Super-Linter via Docker/Podman                | ✅ Enables `FIX_*` vars |
+| `lint:links`                   | Check links in all files with lychee              | ❌ Ignored              |
+| `lint:local-links`             | Check local file links with lychee                | ❌ Ignored              |
+| `lint:links-in-modified-files` | Check links only in files modified vs base branch | ❌ Ignored              |
+| `lint:renovate-deps`           | Verify `renovate-tracked-deps.json` is up to date | ✅ Regenerates file     |
 
 ## How AUTOFIX Works
 
 All lint scripts support the `AUTOFIX` environment variable for a unified fix workflow:
 
 **Check mode** (default):
+
 ```bash
 mise run lint              # Check all linters, fail on issues
 mise run lint:super-linter # Check code style, fail on issues
@@ -86,6 +87,7 @@ mise run lint:renovate-deps # Verify tracked deps, fail if out of date
 ```
 
 **Fix mode** (`AUTOFIX=true`):
+
 ```bash
 mise run fix               # Auto-fix all fixable issues
 # Or run individual linters:
@@ -97,7 +99,7 @@ Linters that don't support autofix (like lychee link checker) silently ignore th
 
 ## Per-repo configuration (not included)
 
-Each consuming repo must provide its own:
+Each consuming repository must provide its own:
 
 - **Super-Linter env file** (`.github/config/super-linter.env`) — which
   validators to enable, which `FIX_*` vars to set

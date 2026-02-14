@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Initial release of flint lint task scripts
 - Super-Linter integration with Docker/Podman auto-detection
 - Lychee link checking (all files, local files, modified files)

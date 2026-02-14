@@ -22,11 +22,7 @@ if _repo_root_env is None:
 REPO_ROOT = Path(_repo_root_env)
 COMMITTED = REPO_ROOT / ".github" / "renovate-tracked-deps.json"
 
-EXCLUDED_MANAGERS = {
-    m.strip()
-    for m in os.environ.get("RENOVATE_TRACKED_DEPS_EXCLUDE", "").split(",")
-    if m.strip()
-}
+EXCLUDED_MANAGERS = {m.strip() for m in os.environ.get("RENOVATE_TRACKED_DEPS_EXCLUDE", "").split(",") if m.strip()}  # pylint: disable=line-too-long  # noqa: E501
 
 
 def run_renovate(tmpdir):
@@ -117,13 +113,22 @@ def main():
         generated_data = extract_deps(log_path)
 
         if not COMMITTED.exists():
-            print(f"ERROR: {COMMITTED} does not exist.", file=sys.stderr)
-            print(
-                "Run 'mise run lint:renovate-deps' with AUTOFIX=true to create it.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        committed_data = json.loads(COMMITTED.read_text())
+            if autofix:
+                print("AUTOFIX=true: Creating renovate-tracked-deps.json...")
+                with open(COMMITTED, "w", encoding="utf-8") as f:
+                    json.dump(generated_data, f, indent=2)
+                    f.write("\n")
+                print("renovate-tracked-deps.json has been created.")
+                committed_data = generated_data
+            else:
+                print(f"ERROR: {COMMITTED} does not exist.", file=sys.stderr)
+                print(
+                    "Run 'mise run lint:renovate-deps' with AUTOFIX=true to create it.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+        else:
+            committed_data = json.loads(COMMITTED.read_text())
 
         if committed_data == generated_data:
             print("renovate-tracked-deps.json is up to date.")

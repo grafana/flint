@@ -15,9 +15,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renovate tracked-deps verification and generation
 - Unified AUTOFIX environment variable pattern across all linters
 
-## [0.1.0] - YYYY-MM-DD
-
-Initial release.
-
-[Unreleased]: https://github.com/grafana/flint/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/grafana/flint/releases/tag/v0.1.0
+[Unreleased]: https://github.com/grafana/flint/commits/main

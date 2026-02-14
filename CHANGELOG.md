@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-02-14
+
 ### Added
 
 - Initial release of flint lint task scripts
@@ -15,4 +17,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renovate tracked-deps verification and generation
 - Unified AUTOFIX environment variable pattern across all linters
 
-[Unreleased]: https://github.com/grafana/flint/commits/main
+[Unreleased]: https://github.com/grafana/flint/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/grafana/flint/releases/tag/v0.1.0

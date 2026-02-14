@@ -22,7 +22,11 @@ if _repo_root_env is None:
 REPO_ROOT = Path(_repo_root_env)
 COMMITTED = REPO_ROOT / ".github" / "renovate-tracked-deps.json"
 
-EXCLUDED_MANAGERS = {m.strip() for m in os.environ.get("RENOVATE_TRACKED_DEPS_EXCLUDE", "").split(",") if m.strip()}  # pylint: disable=line-too-long  # noqa: E501
+EXCLUDED_MANAGERS = {
+    m.strip()
+    for m in os.environ.get("RENOVATE_TRACKED_DEPS_EXCLUDE", "").split(",")
+    if m.strip()
+}
 
 
 def run_renovate(tmpdir):
@@ -112,6 +116,13 @@ def main():
         log_path = run_renovate(tmpdir)
         generated_data = extract_deps(log_path)
 
+        if not COMMITTED.exists():
+            print(f"ERROR: {COMMITTED} does not exist.", file=sys.stderr)
+            print(
+                "Run 'mise run lint:renovate-deps' with AUTOFIX=true to create it.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         committed_data = json.loads(COMMITTED.read_text())
 
         if committed_data == generated_data:

@@ -112,7 +112,23 @@ def main():
         log_path = run_renovate(tmpdir)
         generated_data = extract_deps(log_path)
 
-        committed_data = json.loads(COMMITTED.read_text())
+        if not COMMITTED.exists():
+            if autofix:
+                print("AUTOFIX=true: Creating renovate-tracked-deps.json...")
+                with open(COMMITTED, "w", encoding="utf-8") as f:
+                    json.dump(generated_data, f, indent=2)
+                    f.write("\n")
+                print("renovate-tracked-deps.json has been created.")
+                committed_data = generated_data
+            else:
+                print(f"ERROR: {COMMITTED} does not exist.", file=sys.stderr)
+                print(
+                    "Run 'mise run lint:renovate-deps' with AUTOFIX=true to create it.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+        else:
+            committed_data = json.loads(COMMITTED.read_text())
 
         if committed_data == generated_data:
             print("renovate-tracked-deps.json is up to date.")

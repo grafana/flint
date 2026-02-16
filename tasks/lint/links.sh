@@ -54,9 +54,9 @@ build_remap_args() {
 	local head_url="https://github.com/${head_repo}"
 
 	echo "--remap"
-	echo "${base_url}/blob/${base_ref}/(.*) ${head_url}/blob/${head_ref}/\$1"
+	echo "^${base_url}/blob/${base_ref}/(.*)$ ${head_url}/blob/${head_ref}/\$1"
 	echo "--remap"
-	echo "${base_url}/tree/${base_ref}/(.*) ${head_url}/tree/${head_ref}/\$1"
+	echo "^${base_url}/tree/${base_ref}/(.*)$ ${head_url}/tree/${head_ref}/\$1"
 }
 
 run_lychee() {

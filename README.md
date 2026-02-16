@@ -31,7 +31,7 @@ Add whichever tasks you need as HTTP remote tasks in your `mise.toml`:
 description = "Run Super-Linter on the repository"
 file = "https://raw.githubusercontent.com/grafana/flint/v0.1.0/tasks/lint/super-linter.sh"
 [tasks."lint:links"]
-description = "Lint links in files"
+description = "Check for broken links in changed files + all local links"
 file = "https://raw.githubusercontent.com/grafana/flint/v0.1.0/tasks/lint/links.sh"
 [tasks."lint:renovate-deps"]
 description = "Verify renovate-tracked-deps.json is up to date"
@@ -74,29 +74,19 @@ When autofix is not enabled, all `FIX_*` lines are filtered out of the env file 
 
 ### `lint:links`
 
-Checks links with [lychee](https://lychee.cli.rs/). By default it checks **local file links in modified files only** (compared to a base branch), which keeps CI fast while still catching broken internal links on every PR.
+Checks links with [lychee](https://lychee.cli.rs/). By default it runs two checks: **all links (local + remote) in modified files** and **local file links in all files**. This keeps CI fast while catching both broken remote links in changed content and broken internal links across the whole repository.
 
 **Flags:**
 
 | Flag                   | Description                                                                          |
 | ---------------------- | ------------------------------------------------------------------------------------ |
-| `--all-files`          | Check all files, not just modified ones                                              |
-| `--include-remote`     | Also check remote links (default checks local file links only)                       |
+| `--full`               | Check all links (local + remote) in all files (single run)                           |
 | `--base <ref>`         | Base branch to compare against (default: `origin/$GITHUB_BASE_REF` or `origin/main`) |
 | `--head <ref>`         | Head commit to compare against (default: `$GITHUB_HEAD_SHA` or `HEAD`)               |
 | `--lychee-args <args>` | Extra arguments to pass to lychee                                                    |
-| `<file>...`            | Files to check (default: `.`; only used with `--all-files`)                          |
+| `<file>...`            | Files to check (default: `.`; only used with `--full`)                               |
 
-**Flag combinations:**
-
-| Flags                          | Behavior                      |
-| ------------------------------ | ----------------------------- |
-| _(none)_                       | Local links in modified files |
-| `--all-files`                  | Local links in all files      |
-| `--include-remote`             | All links in modified files   |
-| `--all-files --include-remote` | All links in all files        |
-
-When running in modified-files mode (the default), if a config change is detected (matching `LYCHEE_CONFIG_CHANGE_PATTERN`), the script falls back to checking all files.
+When running in default mode, if a config change is detected (matching `LYCHEE_CONFIG_CHANGE_PATTERN`), the script falls back to `--full` behavior.
 
 **Environment variables:**
 
@@ -108,10 +98,8 @@ When running in modified-files mode (the default), if a config change is detecte
 **Examples:**
 
 ```bash
-mise run lint:links                          # Local links in modified files (default)
-mise run lint:links --all-files              # Local links in all files
-mise run lint:links --include-remote         # All links in modified files
-mise run lint:links --all-files --include-remote  # All links in all files
+mise run lint:links                # All links in modified files + local links in all files (default)
+mise run lint:links --full         # All links in all files
 ```
 
 ### `lint:renovate-deps`

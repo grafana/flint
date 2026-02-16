@@ -23,7 +23,7 @@ All task scripts follow these conventions:
 **`tasks/lint/`** - Linting validators:
 
 - `super-linter.sh`: Runs Super-Linter via Docker/Podman, auto-detects runtime, handles SELinux on Fedora
-- `links.sh`: Runs lychee link checker with `--local-only` (local file links) and `--modified-only` (diff-based checking) flags
+- `links.sh`: Runs lychee link checker with two default checks (all links in modified files + local links in all files) and a `--full` flag for comprehensive checking
 - `renovate-deps.py`: Verifies `.github/renovate-tracked-deps.json` is up to date by running Renovate locally and parsing its debug logs. With `AUTOFIX=true`, automatically regenerates and updates the file
 
 ### Key Design Decisions
@@ -34,7 +34,7 @@ All task scripts follow these conventions:
    - `renovate-deps.py`: Automatically regenerates and updates `.github/renovate-tracked-deps.json` when autofix is enabled
    - `links.sh`: Silently ignores the `AUTOFIX` env var (lychee has no autofix capability; no `--autofix` flag is exposed)
    - The `AUTOFIX` env var is how the `fix` meta-task propagates autofix through the dependency chain
-3. **Diff-based link checking**: `links.sh` checks only modified local links by default (use `--all-files` and `--include-remote` to widen scope), falls back to all files when config changes
+3. **Diff-based link checking**: `links.sh` runs two checks by default (all links in modified files + local links in all files), use `--full` to check all links in all files; falls back to `--full` when config changes
 4. **Renovate exclusions**: `RENOVATE_TRACKED_DEPS_EXCLUDE` allows skipping managers like `github-actions,github-runners`
 5. **Consuming repos provide config**: Scripts reference config files (`.github/config/super-linter.env`, `.github/config/lychee.toml`) that consuming repos must provide
 

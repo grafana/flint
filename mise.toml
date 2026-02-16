@@ -14,7 +14,7 @@ description = "Run Super-Linter on the repository"
 file = "tasks/lint/super-linter.sh"
 
 [tasks."lint:links"]
-description = "Lint links in files"
+description = "Check for broken links in changed files + all local links"
 file = "tasks/lint/links.sh"
 
 [tasks."lint:renovate-deps"]

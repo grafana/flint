@@ -53,6 +53,8 @@ Since these are remote task scripts consumed by other repos:
 
 ## Linting
 
+**Always run `mise run fix` before committing changes.** This ensures all files pass CI linting (Biome formatting, shellcheck, etc.). Review the auto-fixed files before committing — auto-fixes may produce unexpected results.
+
 ```bash
 # Auto-fix and verify (recommended dev workflow)
 mise run fix
@@ -60,9 +62,6 @@ mise run fix
 # Verify only (same command used in CI)
 mise run lint
 ```
-
-After running `fix`, always review the changed files before committing —
-auto-fixes may produce unexpected results.
 
 ## Adding New Linters
 

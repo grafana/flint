@@ -25,7 +25,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ fromJSON(steps.release-please.outputs.pr).number }}
         run: |
-          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body \
-            "> [!IMPORTANT]
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "> [!IMPORTANT]
           > CI checks don't trigger automatically on release-please PRs (created with \`GITHUB_TOKEN\`).
           > Please **close and reopen** this PR to start CI."

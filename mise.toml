@@ -14,16 +14,8 @@ description = "Run Super-Linter on the repository"
 file = "tasks/lint/super-linter.sh"
 
 [tasks."lint:links"]
-description = "Lint links in all files"
+description = "Check for broken links in changed files + all local links"
 file = "tasks/lint/links.sh"
-
-[tasks."lint:local-links"]
-description = "Lint links in local files"
-file = "tasks/lint/local-links.sh"
-
-[tasks."lint:links-in-modified-files"]
-description = "Lint links in modified files"
-file = "tasks/lint/links-in-modified-files.sh"
 
 [tasks."lint:renovate-deps"]
 description = "Verify renovate-tracked-deps.json is up to date"
@@ -31,7 +23,7 @@ file = "tasks/lint/renovate-deps.py"
 
 [tasks."lint"]
 description = "Run all lints"
-depends = ["lint:super-linter", "lint:local-links", "lint:links-in-modified-files", "lint:renovate-deps"]
+depends = ["lint:super-linter", "lint:links", "lint:renovate-deps"]
 
 [tasks.fix]
 description = "Auto-fix lint issues and regenerate tracked deps"

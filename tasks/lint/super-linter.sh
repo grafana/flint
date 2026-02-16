@@ -3,6 +3,13 @@
 
 set -euo pipefail
 
+#USAGE flag "--autofix" help="Enable autofix mode (enables FIX_* vars from the env file)"
+
+# shellcheck disable=SC2154 # usage_autofix is set by mise
+if [ "${usage_autofix:-}" = "true" ]; then
+	AUTOFIX=true
+fi
+
 # check for required env vars, otherwise exit with error
 if [ -z "${SUPER_LINTER_VERSION:-}" ]; then
 	echo "SUPER_LINTER_VERSION environment variable is not set. Exiting."

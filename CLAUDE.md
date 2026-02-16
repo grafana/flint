@@ -75,7 +75,7 @@ When adding new lint scripts, follow these patterns:
 
 This repository uses [Conventional Commits](https://www.conventionalcommits.org/) format, enforced by commitlint via Super-Linter. All commit messages must follow this format:
 
-```
+```text
 type(optional scope): description
 ```
 

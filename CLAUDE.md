@@ -71,6 +71,16 @@ When adding new lint scripts, follow these patterns:
 3. **Consistent behavior**: Ensure the script works the same whether `AUTOFIX` is set or not for check-only tools
 4. **Document support**: Update README.md table to show whether AUTOFIX is supported
 
+## Commit Messages
+
+This repository uses [Conventional Commits](https://www.conventionalcommits.org/) format, enforced by commitlint via Super-Linter. All commit messages must follow this format:
+
+```
+type(optional scope): description
+```
+
+Common types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`
+
 ## Script Conventions
 
 - Shell scripts use `set -euo pipefail` for safety

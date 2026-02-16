@@ -73,7 +73,7 @@ When adding new lint scripts, follow these patterns:
 
 ## Commit Messages
 
-This repository uses [Conventional Commits](https://www.conventionalcommits.org/) format, enforced by commitlint via Super-Linter. All commit messages must follow this format:
+This repository uses [Conventional Commits](https://www.conventionalcommits.org/) format for PR titles (enforced by CI). Since we use squash merges, the PR title becomes the commit message on main. PR titles must follow this format:
 
 ```text
 type(optional scope): description

@@ -21,22 +21,24 @@ A toolbox of reusable [mise](https://mise.jdx.dev/) lint task scripts. Pick the 
 
 ## Usage
 
-⚠️ **Important**: Always pin to a specific version tag (e.g., `v0.1.0`), never use `main`. The main branch may contain breaking changes. See [CHANGELOG.md](CHANGELOG.md) for version history.
+⚠️ **Important**: Always pin to a specific version, never use `main`. The main branch may contain breaking changes. See [CHANGELOG.md](CHANGELOG.md) for version history.
 
-Add whichever tasks you need as HTTP remote tasks in your `mise.toml`:
+Add whichever tasks you need as HTTP remote tasks in your `mise.toml`, pinned to the commit SHA of a release tag with a version comment:
 
 ```toml
-# Pick the tasks you need from flint
+# Pick the tasks you need from flint (https://github.com/grafana/flint)
 [tasks."lint:super-linter"]
 description = "Run Super-Linter on the repository"
-file = "https://raw.githubusercontent.com/grafana/flint/v0.1.0/tasks/lint/super-linter.sh"
+file = "https://raw.githubusercontent.com/grafana/flint/30090d5540807f330a94420ad11b57ba93eaaa84/tasks/lint/super-linter.sh" # v0.3.0
 [tasks."lint:links"]
 description = "Check for broken links in changed files + all local links"
-file = "https://raw.githubusercontent.com/grafana/flint/v0.1.0/tasks/lint/links.sh"
+file = "https://raw.githubusercontent.com/grafana/flint/30090d5540807f330a94420ad11b57ba93eaaa84/tasks/lint/links.sh" # v0.3.0
 [tasks."lint:renovate-deps"]
 description = "Verify renovate-tracked-deps.json is up to date"
-file = "https://raw.githubusercontent.com/grafana/flint/v0.1.0/tasks/lint/renovate-deps.py"
+file = "https://raw.githubusercontent.com/grafana/flint/30090d5540807f330a94420ad11b57ba93eaaa84/tasks/lint/renovate-deps.py" # v0.3.0
 ```
+
+The SHA pin ensures the URL is immutable (tag-based URLs can change if a tag is force-pushed), and the `# v0.3.0` comment tells Renovate which version is currently pinned.
 
 Then wire up top-level `lint` and `fix` tasks that reference whichever tasks
 you adopted (add any project-specific subtasks to the `depends` list):
@@ -172,7 +174,7 @@ Linters that don't support autofix (like lychee link checker) silently ignore th
 Flint provides a [Renovate shareable preset](https://docs.renovatebot.com/config-presets/)
 with custom managers that automatically update:
 
-- **Pinned flint versions** in `mise.toml` (`raw.githubusercontent.com` URLs)
+- **SHA-pinned flint versions** in `mise.toml` (`raw.githubusercontent.com` URLs with commit SHA and version comment)
 - **`_VERSION` variables** in `mise.toml` (e.g., `SUPER_LINTER_VERSION`)
 
 Add this to your `renovate.json5`:
@@ -195,7 +197,7 @@ Each task expects certain config files that your repository must provide. You on
 
 This project uses [Semantic Versioning](https://semver.org/). Breaking changes will be documented in [CHANGELOG.md](CHANGELOG.md) and will result in a major version bump.
 
-**Always pin to a specific version** in your `mise.toml` file URLs. Never reference `main` directly as it may contain unreleased breaking changes.
+**Always pin to a specific commit SHA** in your `mise.toml` file URLs with a version comment (e.g., `# v0.3.0`). Never reference `main` directly as it may contain unreleased breaking changes. To find the commit SHA for a release tag, run `git rev-parse v0.3.0`.
 
 ## Releasing
 

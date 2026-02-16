@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/grafana/flint/compare/v0.3.0...v0.4.0) (2026-02-16)
+
+
+### Features
+
+* **renovate:** support SHA-pinned URLs in Renovate preset ([#21](https://github.com/grafana/flint/issues/21)) ([4fd1f28](https://github.com/grafana/flint/commit/4fd1f28c2ced164e15c8663e5fc3ac28f9217ca8))
+
 ## [0.3.0](https://github.com/grafana/flint/compare/v0.2.0...v0.3.0) (2026-02-16)
 
 

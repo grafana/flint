@@ -17,6 +17,8 @@
     labels: ["automerge-security-update"],
   },
   osvVulnerabilityAlerts: true,
+  // Kept inline (not via "local>.") because renovate-deps.py runs with
+  // --platform=local which cannot resolve local presets.
   customManagers: [
     {
       customType: "regex",

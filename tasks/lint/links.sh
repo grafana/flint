@@ -13,14 +13,66 @@ LYCHEE_CONFIG="${LYCHEE_CONFIG:-.github/config/lychee.toml}"
 
 eval "lychee_args=(${usage_lychee_args:-})"
 
+# Build --remap args to redirect base-branch GitHub URLs to the PR branch.
+# This ensures links like /blob/main/README.md resolve on the PR branch.
+build_remap_args() {
+	local repo base_ref head_ref head_repo
+
+	# Resolve repo name
+	if [ -n "${GITHUB_REPOSITORY:-}" ]; then
+		repo="$GITHUB_REPOSITORY"
+	else
+		local remote_url
+		remote_url=$(git config --get remote.origin.url 2>/dev/null) || return 0
+		# Extract owner/repo from HTTPS or SSH URLs
+		repo=$(echo "$remote_url" | sed -n 's|.*github\.com[:/]\(.*\)\.git$|\1|p; s|.*github\.com[:/]\(.*\)$|\1|p' | head -1)
+		[ -n "$repo" ] || return 0
+	fi
+
+	# Resolve base branch
+	if [ -n "${GITHUB_BASE_REF:-}" ]; then
+		base_ref="$GITHUB_BASE_REF"
+	else
+		base_ref=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||') || true
+		base_ref="${base_ref:-main}"
+	fi
+
+	# Resolve head branch
+	if [ -n "${GITHUB_HEAD_REF:-}" ]; then
+		head_ref="$GITHUB_HEAD_REF"
+	else
+		head_ref=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || return 0
+	fi
+
+	# Skip if on the base branch (no point remapping main → main)
+	[ "$head_ref" != "$base_ref" ] || return 0
+
+	# Resolve head repo (for forks; only matters in CI)
+	head_repo="${PR_HEAD_REPO:-$repo}"
+
+	local base_url="https://github.com/${repo}"
+	local head_url="https://github.com/${head_repo}"
+
+	echo "--remap"
+	echo "${base_url}/blob/${base_ref}/(.*) ${head_url}/blob/${head_ref}/\$1"
+	echo "--remap"
+	echo "${base_url}/tree/${base_ref}/(.*) ${head_url}/tree/${head_ref}/\$1"
+}
+
 run_lychee() {
 	local description="$1"
 	shift
+
+	local remap_args=()
+	while IFS= read -r line; do
+		[ -n "$line" ] && remap_args+=("$line")
+	done < <(build_remap_args)
 
 	echo "==> $description"
 	# shellcheck disable=SC2154 # lychee_args is set via eval above
 	lychee --config "$LYCHEE_CONFIG" \
 		"${lychee_args[@]+"${lychee_args[@]}"}" \
+		"${remap_args[@]+"${remap_args[@]}"}" \
 		"$@"
 }
 

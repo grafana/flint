@@ -169,27 +169,19 @@ Linters that don't support autofix (like lychee link checker) silently ignore th
 
 ## Automatic version updates with Renovate
 
-To let Renovate automatically update the pinned flint version in your
-`mise.toml`, add this custom manager to your `renovate.json5`:
+Flint provides a [Renovate shareable preset](https://docs.renovatebot.com/config-presets/)
+with custom managers that automatically update:
+
+- **Pinned flint versions** in `mise.toml` (`raw.githubusercontent.com` URLs)
+- **`_VERSION` variables** in `mise.toml` (e.g., `SUPER_LINTER_VERSION`)
+
+Add this to your `renovate.json5`:
 
 ```json5
 {
-  customManagers: [
-    {
-      customType: "regex",
-      description: "Update raw.githubusercontent.com version tags in mise.toml",
-      managerFilePatterns: ["/^mise\\.toml$/"],
-      matchStrings: [
-        "https://raw\\.githubusercontent\\.com/(?<depName>[^/]+/[^/]+)/(?<currentValue>v[^/]+)/",
-      ],
-      datasourceTemplate: "github-tags",
-    },
-  ],
+  extends: ["github>grafana/flint"],
 }
 ```
-
-This matches all `raw.githubusercontent.com` URLs in `mise.toml` and updates
-the version tag (e.g., `v0.1.0`) when a new release is published.
 
 ## Per-repo configuration
 

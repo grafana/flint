@@ -17,5 +17,7 @@ remap = [
 exclude = [
   # Google Docs links are often rate-limited and not critical to validate in this repository,
   # so we exclude them to avoid false positives and improve performance
-  "https://docs.google.com/.*"
+  "https://docs.google.com/.*",
+  # Release Please generates compare links for future releases that 404 until the release is published
+  "https://github.com/.*/compare/.*"
 ]

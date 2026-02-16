@@ -51,6 +51,10 @@ description = "Auto-fix lint issues and regenerate tracked deps"
 run = "AUTOFIX=true mise run lint"
 ```
 
+## Example
+
+See [grafana/docker-otel-lgtm](https://github.com/grafana/docker-otel-lgtm) for a real-world example of a repository using flint. Its [CONTRIBUTING.md](https://github.com/grafana/docker-otel-lgtm/blob/main/CONTRIBUTING.md) describes the developer workflow, and its [mise.toml](https://github.com/grafana/docker-otel-lgtm/blob/main/mise.toml) shows how the tasks are wired up.
+
 ## Tasks
 
 ### `lint:super-linter`

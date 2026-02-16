@@ -200,3 +200,9 @@ Each task expects certain config files that your repository must provide. You on
 This project uses [Semantic Versioning](https://semver.org/). Breaking changes will be documented in [CHANGELOG.md](CHANGELOG.md) and will result in a major version bump.
 
 **Always pin to a specific version** in your `mise.toml` file URLs. Never reference `main` directly as it may contain unreleased breaking changes.
+
+## Releasing
+
+Releases are automated via [Release Please](https://github.com/googleapis/release-please). When conventional commits land on `main`, Release Please opens (or updates) a release PR with a changelog.
+
+> **Note:** CI checks don't trigger automatically on release-please PRs because they are created with `GITHUB_TOKEN`. To run CI, either click **Update branch** or **close and reopen** the PR.

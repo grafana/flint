@@ -1,4 +1,13 @@
-# flint
+<p align="center">
+  <img src=".idea/icon.svg" width="128" height="128" alt="flint logo">
+</p>
+
+<h1 align="center">flint</h1>
+
+<p align="center">
+  <a href="https://github.com/grafana/flint/actions/workflows/lint.yml"><img src="https://github.com/grafana/flint/actions/workflows/lint.yml/badge.svg" alt="Lint"></a>
+  <a href="https://github.com/grafana/flint/releases"><img src="https://img.shields.io/github/v/release/grafana/flint" alt="GitHub Release"></a>
+</p>
 
 A toolbox of reusable [mise](https://mise.jdx.dev/) lint task scripts. Pick the ones you need — each task is independent and can be adopted on its own.
 
@@ -75,7 +84,6 @@ Checks links with [lychee](https://lychee.cli.rs/). By default it checks **local
 | `--include-remote`     | Also check remote links (default checks local file links only)                       |
 | `--base <ref>`         | Base branch to compare against (default: `origin/$GITHUB_BASE_REF` or `origin/main`) |
 | `--head <ref>`         | Head commit to compare against (default: `$GITHUB_HEAD_SHA` or `HEAD`)               |
-| `--autofix`            | Ignored (lychee does not support autofix)                                            |
 | `--lychee-args <args>` | Extra arguments to pass to lychee                                                    |
 | `<file>...`            | Files to check (default: `.`; only used with `--all-files`)                          |
 
@@ -146,7 +154,7 @@ The `lint:renovate-deps` task runs Renovate locally in `--platform=local` mode, 
 
 ## How AUTOFIX Works
 
-All lint scripts accept an `--autofix` flag. Autofix can also be enabled via the `AUTOFIX=true` environment variable, which is how the `fix` meta-task propagates it through the dependency chain.
+Lint scripts that support fixing accept an `--autofix` flag. Autofix can also be enabled via the `AUTOFIX=true` environment variable, which is how the `fix` meta-task propagates it through the dependency chain.
 
 **Check mode** (default):
 
@@ -165,7 +173,7 @@ mise run lint:super-linter --autofix          # Apply code fixes
 mise run lint:renovate-deps --autofix         # Regenerate tracked deps
 ```
 
-Linters that don't support autofix (like lychee link checker) accept but ignore the `--autofix` flag. This allows `AUTOFIX=true` to propagate to all linters without errors.
+Linters that don't support autofix (like lychee link checker) silently ignore the `AUTOFIX` environment variable.
 
 ## Automatic version updates with Renovate
 

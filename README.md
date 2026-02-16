@@ -1,20 +1,23 @@
 # flint
 
-Reusable mise lint task scripts for Super-Linter, lychee link checking, and Renovate dependency tracking.
+A toolbox of reusable [mise](https://mise.jdx.dev/) lint task scripts. Pick the ones you need — each task is independent and can be adopted on its own.
 
-Shared [mise](https://mise.jdx.dev/) lint task scripts for
-[Super-Linter](https://github.com/super-linter/super-linter),
-[lychee](https://lychee.cli.rs/), and
-[Renovate tracked-deps](https://docs.renovatebot.com/) verification.
+**Available tasks:**
+
+| Task                 | Tool                                                          |
+| -------------------- | ------------------------------------------------------------- |
+| `lint:super-linter`  | [Super-Linter](https://github.com/super-linter/super-linter)  |
+| `lint:links`         | [lychee](https://lychee.cli.rs/)                              |
+| `lint:renovate-deps` | [Renovate](https://docs.renovatebot.com/) dependency tracking |
 
 ## Usage
 
 ⚠️ **Important**: Always pin to a specific version tag (e.g., `v0.1.0`), never use `main`. The main branch may contain breaking changes. See [CHANGELOG.md](CHANGELOG.md) for version history.
 
-Reference individual task scripts via HTTP remote tasks in your `mise.toml`:
+Add whichever tasks you need as HTTP remote tasks in your `mise.toml`:
 
 ```toml
-# Shared lint tasks from flint
+# Pick the tasks you need from flint
 [tasks."lint:super-linter"]
 description = "Run Super-Linter on the repository"
 file = "https://raw.githubusercontent.com/grafana/flint/v0.1.0/tasks/lint/super-linter.sh"
@@ -26,8 +29,8 @@ description = "Verify renovate-tracked-deps.json is up to date"
 file = "https://raw.githubusercontent.com/grafana/flint/v0.1.0/tasks/lint/renovate-deps.py"
 ```
 
-Then wire up the top-level `lint` and `fix` tasks (add any project-specific
-subtasks to the `depends` list):
+Then wire up top-level `lint` and `fix` tasks that reference whichever tasks
+you adopted (add any project-specific subtasks to the `depends` list):
 
 ```toml
 [tasks.lint]
@@ -45,15 +48,20 @@ run = "AUTOFIX=true mise run lint"
 
 Runs [Super-Linter](https://github.com/super-linter/super-linter) via Docker or Podman. Auto-detects the container runtime (prefers Podman, falls back to Docker) and handles SELinux bind-mount flags on Fedora.
 
+**Flags:**
+
+| Flag        | Description                                                  |
+| ----------- | ------------------------------------------------------------ |
+| `--autofix` | Enable autofix mode (enables `FIX_*` vars from the env file) |
+
+When autofix is not enabled, all `FIX_*` lines are filtered out of the env file before running Super-Linter.
+
 **Environment variables:**
 
-| Variable                | Default                           | Required | Description                                            |
-| ----------------------- | --------------------------------- | -------- | ------------------------------------------------------ |
-| `SUPER_LINTER_VERSION`  | —                                 | yes      | Super-Linter image tag (e.g. `v8.4.0@sha256:...`)      |
-| `SUPER_LINTER_ENV_FILE` | `.github/config/super-linter.env` | no       | Path to the Super-Linter env file                      |
-| `AUTOFIX`               | unset                             | no       | Set to `true` to enable `FIX_*` vars from the env file |
-
-When `AUTOFIX` is not `true`, all `FIX_*` lines are filtered out of the env file before running Super-Linter.
+| Variable                | Default                           | Required | Description                                       |
+| ----------------------- | --------------------------------- | -------- | ------------------------------------------------- |
+| `SUPER_LINTER_VERSION`  | —                                 | yes      | Super-Linter image tag (e.g. `v8.4.0@sha256:...`) |
+| `SUPER_LINTER_ENV_FILE` | `.github/config/super-linter.env` | no       | Path to the Super-Linter env file                 |
 
 ### `lint:links`
 
@@ -67,6 +75,7 @@ Checks links with [lychee](https://lychee.cli.rs/). By default it checks **local
 | `--include-remote`     | Also check remote links (default checks local file links only)                       |
 | `--base <ref>`         | Base branch to compare against (default: `origin/$GITHUB_BASE_REF` or `origin/main`) |
 | `--head <ref>`         | Head commit to compare against (default: `$GITHUB_HEAD_SHA` or `HEAD`)               |
+| `--autofix`            | Ignored (lychee does not support autofix)                                            |
 | `--lychee-args <args>` | Extra arguments to pass to lychee                                                    |
 | `<file>...`            | Files to check (default: `.`; only used with `--all-files`)                          |
 
@@ -83,12 +92,10 @@ When running in modified-files mode (the default), if a config change is detecte
 
 **Environment variables:**
 
-| Variable                       | Default                                                              | Description                                             |
-| ------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------- |
-| `LYCHEE_CONFIG`                | `.github/config/lychee.toml`                                         | Path to the lychee config file                          |
+| Variable                       | Default                                                              | Description                                                          |
+| ------------------------------ | -------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `LYCHEE_CONFIG`                | `.github/config/lychee.toml`                                         | Path to the lychee config file                                       |
 | `LYCHEE_CONFIG_CHANGE_PATTERN` | `^(\.github/config/lychee\.toml\|\.mise/tasks/lint/.*\|mise\.toml)$` | Regular expression for files whose change triggers a full link check |
-
-**AUTOFIX:** Ignored — lychee does not support autofix.
 
 **Examples:**
 
@@ -103,12 +110,17 @@ mise run lint:links --all-files --include-remote  # All links in all files
 
 Verifies `.github/renovate-tracked-deps.json` is up to date by running Renovate locally and parsing its debug logs.
 
+**Flags:**
+
+| Flag        | Description                                            |
+| ----------- | ------------------------------------------------------ |
+| `--autofix` | Automatically regenerate and update the committed file |
+
 **Environment variables:**
 
 | Variable                        | Default | Description                                                                         |
 | ------------------------------- | ------- | ----------------------------------------------------------------------------------- |
 | `RENOVATE_TRACKED_DEPS_EXCLUDE` | unset   | Comma-separated Renovate managers to exclude (e.g. `github-actions,github-runners`) |
-| `AUTOFIX`                       | unset   | Set to `true` to automatically regenerate and update the committed file             |
 
 #### Why this exists
 
@@ -134,7 +146,7 @@ The `lint:renovate-deps` task runs Renovate locally in `--platform=local` mode, 
 
 ## How AUTOFIX Works
 
-All lint scripts support the `AUTOFIX` environment variable for a unified fix workflow:
+All lint scripts accept an `--autofix` flag. Autofix can also be enabled via the `AUTOFIX=true` environment variable, which is how the `fix` meta-task propagates it through the dependency chain.
 
 **Check mode** (default):
 
@@ -144,16 +156,16 @@ mise run lint:super-linter # Check code style, fail on issues
 mise run lint:renovate-deps # Verify tracked deps, fail if out of date
 ```
 
-**Fix mode** (`AUTOFIX=true`):
+**Fix mode:**
 
 ```bash
-mise run fix               # Auto-fix all fixable issues
+mise run fix                                  # Auto-fix all fixable issues
 # Or run individual linters:
-AUTOFIX=true mise run lint:super-linter   # Apply code fixes
-AUTOFIX=true mise run lint:renovate-deps  # Regenerate tracked deps
+mise run lint:super-linter --autofix          # Apply code fixes
+mise run lint:renovate-deps --autofix         # Regenerate tracked deps
 ```
 
-Linters that don't support autofix (like lychee link checker) silently ignore the `AUTOFIX` variable and run normally. This allows you to run all lints with `AUTOFIX=true` without errors.
+Linters that don't support autofix (like lychee link checker) accept but ignore the `--autofix` flag. This allows `AUTOFIX=true` to propagate to all linters without errors.
 
 ## Automatic version updates with Renovate
 
@@ -179,18 +191,13 @@ To let Renovate automatically update the pinned flint version in your
 This matches all `raw.githubusercontent.com` URLs in `mise.toml` and updates
 the version tag (e.g., `v0.1.0`) when a new release is published.
 
-## Per-repo configuration (not included)
+## Per-repo configuration
 
-Each consuming repository must provide its own:
+Each task expects certain config files that your repository must provide. You only need the files for the tasks you adopt:
 
-- **Super-Linter env file** (`.github/config/super-linter.env`) — which
-  validators to enable, which `FIX_*` vars to set
-- **Linter config files** — `.golangci.yaml`, `.markdownlint.yaml`,
-  `.yaml-lint.yml`, `.editorconfig`, etc.
-- **Lychee config** (`.github/config/lychee.toml`) — exclusions, timeouts,
-  remappings
-- **Renovate config** (`.github/renovate.json5`) and committed snapshot
-  (`.github/renovate-tracked-deps.json`)
+- **`lint:super-linter`** — Super-Linter env file (`.github/config/super-linter.env`) to select which validators to enable and which `FIX_*` vars to set, plus any linter config files (`.golangci.yaml`, `.markdownlint.yaml`, `.yaml-lint.yml`, `.editorconfig`, etc.)
+- **`lint:links`** — Lychee config (`.github/config/lychee.toml`) for exclusions, timeouts, remappings
+- **`lint:renovate-deps`** — Renovate config (`.github/renovate.json5`) and committed snapshot (`.github/renovate-tracked-deps.json`)
 
 ## Versioning
 

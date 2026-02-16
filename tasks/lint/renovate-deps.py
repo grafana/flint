@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # pylint: disable=invalid-name,duplicate-code
 # [MISE] description="Verify renovate-tracked-deps.json is up to date"
+# [USAGE] flag "--autofix" help="Automatically regenerate and update the committed file"
 """Verify renovate-tracked-deps.json is up to date."""
 
 import difflib
@@ -106,7 +107,7 @@ def extract_deps(log_path):
 
 def main():
     """Verify renovate-tracked-deps.json is up to date."""
-    autofix = os.environ.get("AUTOFIX", "").lower() == "true"
+    autofix = os.environ.get("AUTOFIX", "").lower() == "true" or os.environ.get("usage_autofix") == "true"  # pylint: disable=line-too-long  # noqa: E501
 
     with tempfile.TemporaryDirectory() as tmpdir:
         log_path = run_renovate(tmpdir)

@@ -7,7 +7,6 @@ set -euo pipefail
 #USAGE flag "--include-remote" help="Also check remote links (default checks local file links only)"
 #USAGE flag "--base <base>" help="base branch to compare against (for modified-files mode)"
 #USAGE flag "--head <head>" help="head commit to compare against (for modified-files mode)"
-#USAGE flag "--autofix" help="Ignored (lychee does not support autofix)"
 #USAGE flag "--lychee-args <args>" help="extra arguments to pass to lychee"
 #USAGE arg "<file>" var=#true help="files to check" default="."
 

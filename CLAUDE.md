@@ -29,10 +29,10 @@ All task scripts follow these conventions:
 ### Key Design Decisions
 
 1. **Container runtime detection**: `super-linter.sh` tries podman first (with SELinux "z" mount flag), falls back to Docker
-2. **AUTOFIX mode**: All lint scripts accept `--autofix` flag and `AUTOFIX` env var for unified fix workflows:
+2. **AUTOFIX mode**: Lint scripts that support fixing accept `--autofix` flag and `AUTOFIX` env var for unified fix workflows:
    - `super-linter.sh`: Filters out `FIX_*` env vars unless autofix is enabled
    - `renovate-deps.py`: Automatically regenerates and updates `.github/renovate-tracked-deps.json` when autofix is enabled
-   - `links.sh`: Accepts but ignores `--autofix` (lychee has no autofix capability)
+   - `links.sh`: Silently ignores the `AUTOFIX` env var (lychee has no autofix capability; no `--autofix` flag is exposed)
    - The `AUTOFIX` env var is how the `fix` meta-task propagates autofix through the dependency chain
 3. **Diff-based link checking**: `links.sh` checks only modified local links by default (use `--all-files` and `--include-remote` to widen scope), falls back to all files when config changes
 4. **Renovate exclusions**: `RENOVATE_TRACKED_DEPS_EXCLUDE` allows skipping managers like `github-actions,github-runners`

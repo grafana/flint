@@ -81,7 +81,7 @@ type(optional scope): description
 
 Common types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`
 
-**Release impact:** This repository uses [release-please](https://github.com/googleapis/release-please). Only `feat` and `fix` types trigger a new release. Use `docs:`, `ci:`, or `chore:` for changes that don't affect consumers (documentation, CI workflows, repository config). Misusing `fix:` for non-functional changes creates unnecessary releases.
+**Release impact:** This repository uses [release-please](https://github.com/googleapis/release-please). By default, `feat:` and `fix:` trigger new releases, and `breaking:` (or `feat!:` / `fix!:` or commits with a `BREAKING CHANGE` footer) trigger a major version bump. Use `docs:`, `ci:`, or `chore:` for changes that don't affect consumers (documentation, CI workflows, repository config). Misusing `fix:` or `breaking:` for non-functional changes creates unnecessary releases.
 
 ## Script Conventions
 

@@ -107,7 +107,11 @@ def extract_deps(log_path):
 
 def main():
     """Verify renovate-tracked-deps.json is up to date."""
-    autofix = os.environ.get("AUTOFIX", "").lower() == "true" or os.environ.get("usage_autofix") == "true"  # pylint: disable=line-too-long  # noqa: E501
+
+    def is_true(var):
+        return os.environ.get(var, "").lower() == "true"
+
+    autofix = is_true("AUTOFIX") or is_true("usage_autofix")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         log_path = run_renovate(tmpdir)
@@ -115,7 +119,7 @@ def main():
 
         if not COMMITTED.exists():
             if autofix:
-                print("AUTOFIX=true: Creating renovate-tracked-deps.json...")
+                print("Autofix: Creating renovate-tracked-deps.json...")
                 with open(COMMITTED, "w", encoding="utf-8") as f:
                     json.dump(generated_data, f, indent=2)
                     f.write("\n")
@@ -124,7 +128,7 @@ def main():
             else:
                 print(f"ERROR: {COMMITTED} does not exist.", file=sys.stderr)
                 print(
-                    "Run 'mise run lint:renovate-deps' with AUTOFIX=true to create it.",
+                    "Run 'mise run lint:renovate-deps --autofix' to create it.",
                     file=sys.stderr,
                 )
                 sys.exit(1)
@@ -147,7 +151,7 @@ def main():
             print("".join(diff))
 
             if autofix:
-                print("AUTOFIX=true: Updating renovate-tracked-deps.json...")
+                print("Autofix: Updating renovate-tracked-deps.json...")
                 with open(COMMITTED, "w", encoding="utf-8") as f:
                     json.dump(generated_data, f, indent=2)
                     f.write("\n")

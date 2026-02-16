@@ -130,7 +130,7 @@ The `lint:renovate-deps` task runs Renovate locally in `--platform=local` mode, 
 
 - If they match → linter passes
 - If they differ → linter fails with a unified diff showing which dependencies were added or removed
-- With `AUTOFIX=true` → automatically regenerates and updates the committed file
+- With `--autofix` flag (or `AUTOFIX=true` env var) → automatically regenerates and updates the committed file
 
 #### Typical workflow
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/grafana/flint/compare/v0.2.0...v0.2.1) (2026-02-16)
+
+
+### Bug Fixes
+
+* replace broken release-please PR comment with docs ([#12](https://github.com/grafana/flint/issues/12)) ([817b37d](https://github.com/grafana/flint/commit/817b37df94fcd6be43fa61594d94e9988d3c6c8d))
+
 ## [0.2.0](https://github.com/grafana/flint/compare/v0.1.0...v0.2.0) (2026-02-16)
 
 

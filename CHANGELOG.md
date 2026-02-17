@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/grafana/flint/compare/v0.4.0...v0.5.0) (2026-02-17)
+
+
+### Features
+
+* **super-linter:** default to slim image ([#24](https://github.com/grafana/flint/issues/24)) ([c8eeab8](https://github.com/grafana/flint/commit/c8eeab82e5db39f0cf8b57a5ee7ac1fc7106a1b0))
+
 ## [0.4.0](https://github.com/grafana/flint/compare/v0.3.0...v0.4.0) (2026-02-16)
 
 

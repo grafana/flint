@@ -25,6 +25,12 @@
 			"matchPackageNames": ["renovate"],
 			"description": "Only update renovate once a week",
 			"schedule": ["before 6am on Monday"]
+		},
+		{
+			"matchPackageNames": ["ghcr.io/super-linter/super-linter"],
+			"matchCurrentValue": "/^slim-/",
+			"description": "Use regex versioning for slim Super-Linter tags (slim-v8.4.0)",
+			"versioning": "regex:^slim-v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
 		}
 	]
 }

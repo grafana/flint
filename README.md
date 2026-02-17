@@ -130,6 +130,15 @@ controls which Super-Linter image is pulled. **Renovate**, via the
 flint preset, opens PRs to bump both the flint script URL and the
 `SUPER_LINTER_VERSION` value when new versions are available.
 
+**Slim vs full image:** Super-Linter publishes a slim image
+(`slim-v8.4.0`) that is ~2 GB smaller than the full image. The slim
+image excludes Rust, .NET/C#, PowerShell, and ARM template linters.
+Flint defaults to the slim image. To use the full image instead, set
+`SUPER_LINTER_VERSION` to the non-prefixed tag (e.g.
+`v8.4.0@sha256:...`) and update the Renovate `depName` comment
+accordingly (drop the `versioning` override so Renovate uses standard
+Docker versioning).
+
 **Flags:**
 
 | Flag        | Description                                                  |
@@ -143,10 +152,10 @@ the env file before running Super-Linter.
 
 <!-- editorconfig-checker-disable -->
 
-| Variable                | Default                           | Required | Description                                       |
-| ----------------------- | --------------------------------- | -------- | ------------------------------------------------- |
-| `SUPER_LINTER_VERSION`  | —                                 | yes      | Super-Linter image tag (e.g. `v8.4.0@sha256:...`) |
-| `SUPER_LINTER_ENV_FILE` | `.github/config/super-linter.env` | no       | Path to the Super-Linter env file                 |
+| Variable                | Default                           | Required | Description                                                                                   |
+| ----------------------- | --------------------------------- | -------- | --------------------------------------------------------------------------------------------- |
+| `SUPER_LINTER_VERSION`  | —                                 | yes      | Super-Linter image tag (e.g. `slim-v8.4.0@sha256:...` for slim, `v8.4.0@sha256:...` for full) |
+| `SUPER_LINTER_ENV_FILE` | `.github/config/super-linter.env` | no       | Path to the Super-Linter env file                                                             |
 
 <!-- editorconfig-checker-enable -->
 

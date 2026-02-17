@@ -16,7 +16,11 @@ All task scripts follow these conventions:
 - **Metadata**: Shell scripts use `#MISE` comments for metadata; Python scripts use `# [MISE]` comments
 - **Usage args**: Shell scripts use `#USAGE` comments to define CLI arguments that mise parses
 - **Exit behavior**: Scripts exit with non-zero on errors for CI integration
-- **AUTOFIX mode**: All lint scripts check the `AUTOFIX` environment variable. When `AUTOFIX=true`, linters that support fixing issues will automatically apply fixes; linters without fix capabilities silently ignore it. This allows consuming repos to run all lints with `AUTOFIX=true` via a single task (e.g., `mise run fix`) without needing per-linter configuration
+- **AUTOFIX mode**: All lint scripts check the `AUTOFIX` environment variable.
+  When `AUTOFIX=true`, linters that support fixing issues will automatically
+  apply fixes; linters without fix capabilities silently ignore it. This allows
+  consuming repos to run all lints with `AUTOFIX=true` via a single task
+  (e.g., `mise run fix`) without needing per-linter configuration
 
 ### Script Categories
 

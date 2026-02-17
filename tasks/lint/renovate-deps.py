@@ -23,7 +23,8 @@ if _repo_root_env is None:
 REPO_ROOT = Path(_repo_root_env)
 COMMITTED = REPO_ROOT / ".github" / "renovate-tracked-deps.json"
 
-EXCLUDED_MANAGERS = {m.strip() for m in os.environ.get("RENOVATE_TRACKED_DEPS_EXCLUDE", "").split(",") if m.strip()}  # pylint: disable=line-too-long  # noqa: E501
+_exclude_env = os.environ.get("RENOVATE_TRACKED_DEPS_EXCLUDE", "")
+EXCLUDED_MANAGERS = {m.strip() for m in _exclude_env.split(",") if m.strip()}
 
 
 def run_renovate(tmpdir):

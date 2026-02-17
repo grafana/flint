@@ -96,7 +96,8 @@ is_config_modified() {
 
 	# Pattern for detecting config changes that should trigger a full lint.
 	# Consuming repos can override this via LYCHEE_CONFIG_CHANGE_PATTERN.
-	local config_change_pattern="${LYCHEE_CONFIG_CHANGE_PATTERN:-^(\.github/config/lychee\.toml|\.mise/tasks/lint/.*|mise\.toml)$}"
+	local default_pattern='^(\.github/config/lychee\.toml|\.mise/tasks/lint/.*|mise\.toml)$'
+	local config_change_pattern="${LYCHEE_CONFIG_CHANGE_PATTERN:-$default_pattern}"
 
 	local config_modified
 	# shellcheck disable=SC2086 # intentional: head may expand to empty

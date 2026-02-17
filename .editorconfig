@@ -7,5 +7,8 @@ indent_size = 2
 [*.{sh,py}]
 max_line_length = 120
 
+[*.py]
+indent_size = 4
+
 [{CLAUDE.md,.editorconfig,super-linter.env,lychee.toml,renovate.json5,default.json,mise.toml}]
 max_line_length = 300

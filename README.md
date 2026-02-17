@@ -1,10 +1,10 @@
+<!-- editorconfig-checker-disable -->
 <p align="center">
   <img src=".idea/icon.svg" width="128" height="128" alt="flint logo">
 </p>
 
 <h1 align="center">flint</h1>
 
-<!-- editorconfig-checker-disable -->
 <p align="center">
   <a href="https://github.com/grafana/flint/actions/workflows/lint.yml"><img src="https://github.com/grafana/flint/actions/workflows/lint.yml/badge.svg" alt="Lint"></a>
   <a href="https://github.com/grafana/flint/releases"><img src="https://img.shields.io/github/v/release/grafana/flint" alt="GitHub Release"></a>

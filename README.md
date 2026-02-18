@@ -75,13 +75,13 @@ pinned to the commit SHA of a release tag with a version comment:
 # Pick the tasks you need from flint (https://github.com/grafana/flint)
 [tasks."lint:super-linter"]
 description = "Run Super-Linter on the repository"
-file = "https://raw.githubusercontent.com/grafana/flint/30090d5540807f330a94420ad11b57ba93eaaa84/tasks/lint/super-linter.sh" # v0.3.0
+file = "https://raw.githubusercontent.com/grafana/flint/5bb3726cfe3305072457c0c4fa85dce5ca154680/tasks/lint/super-linter.sh" # v0.6.0
 [tasks."lint:links"]
 description = "Check for broken links in changed files + all local links"
-file = "https://raw.githubusercontent.com/grafana/flint/30090d5540807f330a94420ad11b57ba93eaaa84/tasks/lint/links.sh" # v0.3.0
+file = "https://raw.githubusercontent.com/grafana/flint/5bb3726cfe3305072457c0c4fa85dce5ca154680/tasks/lint/links.sh" # v0.6.0
 [tasks."lint:renovate-deps"]
 description = "Verify renovate-tracked-deps.json is up to date"
-file = "https://raw.githubusercontent.com/grafana/flint/30090d5540807f330a94420ad11b57ba93eaaa84/tasks/lint/renovate-deps.py" # v0.3.0
+file = "https://raw.githubusercontent.com/grafana/flint/5bb3726cfe3305072457c0c4fa85dce5ca154680/tasks/lint/renovate-deps.py" # v0.6.0
 ```
 
 <!-- editorconfig-checker-enable -->
@@ -379,10 +379,10 @@ Breaking changes will be documented in [CHANGELOG.md](CHANGELOG.md)
 and will result in a major version bump.
 
 **Always pin to a specific commit SHA** in your `mise.toml` file
-URLs with a version comment (e.g., `# v0.3.0`). Never reference
+URLs with a version comment (e.g., `# v0.6.0`). Never reference
 `main` directly as it may contain unreleased breaking changes. To
 find the commit SHA for a release tag, run
-`git rev-parse v0.3.0`.
+`git rev-parse v0.6.0`.
 
 ## Releasing
 

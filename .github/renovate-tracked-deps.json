@@ -1,4 +1,9 @@
 {
+  "README.md": {
+    "regex": [
+      "grafana/flint"
+    ]
+  },
   "mise.toml": {
     "mise": [
       "lychee",

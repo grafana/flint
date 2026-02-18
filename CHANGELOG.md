@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/grafana/flint/compare/v0.5.0...v0.6.0) (2026-02-18)
+
+
+### Features
+
+* **links:** add GitHub URL remaps for line-number and fragment anchors ([#28](https://github.com/grafana/flint/issues/28)) ([5b59065](https://github.com/grafana/flint/commit/5b590653fbd24963fba8e99e409b9977ec2410fc))
+
 ## [0.5.0](https://github.com/grafana/flint/compare/v0.4.0...v0.5.0) (2026-02-17)
 
 

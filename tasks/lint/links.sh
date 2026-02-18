@@ -15,7 +15,26 @@ eval "lychee_args=(${usage_lychee_args:-})"
 
 # Build --remap args to redirect base-branch GitHub URLs to the PR branch.
 # This ensures links like /blob/main/README.md resolve on the PR branch.
+#
+# GitHub blob/tree URLs with line-number anchors (#L123) are rendered by
+# JavaScript, so lychee (which fetches static HTML) can never verify the
+# fragment. We strip the fragment and check the file exists instead.
+#
+# For other fragment URLs (#section), we remap to raw.githubusercontent.com
+# which lets lychee verify the fragment against the raw file content (workaround for
+# https://github.com/lycheeverse/lychee/issues/1729).
+#
+# Lychee uses first-match-wins for remaps, so order matters:
+#   1. Line-number anchors → strip fragment, remap to head branch
+#   2. Other fragments     → remap to raw.githubusercontent.com
+#   3. No fragment         → remap to head branch (existing behavior)
+#
+# Set LYCHEE_SKIP_GITHUB_REMAPS=true to skip the GitHub-specific remaps
+# emitted by this function (escape hatch if they cause unexpected behavior;
+# does not affect remaps defined in the lychee config file).
 build_remap_args() {
+	[ "${LYCHEE_SKIP_GITHUB_REMAPS:-}" != "true" ] || return 0
+
 	local repo base_ref head_ref head_repo
 
 	# Resolve repo name
@@ -53,10 +72,30 @@ build_remap_args() {
 	local base_url="https://github.com/${repo}"
 	local head_url="https://github.com/${head_repo}"
 
+	# /blob/ URLs — three rules, order matters (first-match-wins):
+
+	# 1. Line-number anchors (#L123): strip fragment, remap to head branch
 	echo "--remap"
-	echo "^${base_url}/blob/${base_ref}/(.*)$ ${head_url}/blob/${head_ref}/\$1"
+	echo "^${base_url}/blob/${base_ref}/(.*?)#L[0-9]+\$ ${head_url}/blob/${head_ref}/\$1"
+
+	# 2. Other fragment URLs (#section): remap to raw.githubusercontent.com
+	#    so lychee can verify the fragment in raw content
 	echo "--remap"
-	echo "^${base_url}/tree/${base_ref}/(.*)$ ${head_url}/tree/${head_ref}/\$1"
+	echo "^${base_url}/blob/${base_ref}/(.*#.*)\$ https://raw.githubusercontent.com/${head_repo}/${head_ref}/\$1"
+
+	# 3. Non-fragment URLs: branch-remap only (existing behavior)
+	echo "--remap"
+	echo "^${base_url}/blob/${base_ref}/(.*)\$ ${head_url}/blob/${head_ref}/\$1"
+
+	# /tree/ URLs — two rules:
+
+	# 1. Line-number anchors: strip fragment, remap to head branch
+	echo "--remap"
+	echo "^${base_url}/tree/${base_ref}/(.*?)#L[0-9]+\$ ${head_url}/tree/${head_ref}/\$1"
+
+	# 2. Non-fragment URLs: branch-remap only
+	echo "--remap"
+	echo "^${base_url}/tree/${base_ref}/(.*)\$ ${head_url}/tree/${head_ref}/\$1"
 }
 
 run_lychee() {

@@ -191,6 +191,32 @@ When running in default mode, if a config change is detected
 (matching `LYCHEE_CONFIG_CHANGE_PATTERN`), the script falls back
 to `--full` behavior.
 
+**GitHub URL remaps:**
+
+When running on a PR branch, the script automatically remaps GitHub
+`/blob/<base-branch>/` and `/tree/<base-branch>/` URLs so that links
+to the base branch resolve against the PR branch instead. This
+ensures that links like `/blob/main/README.md` don't break when
+the file was added or moved in the PR.
+
+For `/blob/` URLs, three ordered remap rules are applied
+(lychee uses first-match-wins):
+
+1. **Line-number anchors** (`#L123`): GitHub renders these with
+   JavaScript, so lychee can never verify the fragment. The anchor
+   is stripped and the file is checked on the PR branch.
+2. **Other fragment URLs** (`#section`): Remapped to
+   `raw.githubusercontent.com` where lychee can verify the fragment
+   in the raw file content (workaround for
+   [lychee#1729](https://github.com/lycheeverse/lychee/issues/1729)).
+3. **Non-fragment URLs**: Remapped from the base branch to the PR
+   branch (the original behavior).
+
+For `/tree/` URLs, rules 1 and 3 apply (no raw remap needed).
+
+Set `LYCHEE_SKIP_GITHUB_REMAPS=true` to disable all GitHub-specific
+remaps as an escape hatch if they cause unexpected behavior.
+
 **Environment variables:**
 
 <!-- editorconfig-checker-disable -->
@@ -199,6 +225,7 @@ to `--full` behavior.
 | ------------------------------ | -------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | `LYCHEE_CONFIG`                | `.github/config/lychee.toml`                                         | Path to the lychee config file                                       |
 | `LYCHEE_CONFIG_CHANGE_PATTERN` | `^(\.github/config/lychee\.toml\|\.mise/tasks/lint/.*\|mise\.toml)$` | Regular expression for files whose change triggers a full link check |
+| `LYCHEE_SKIP_GITHUB_REMAPS`    | unset                                                                | Set to `true` to disable all GitHub URL remaps                       |
 
 <!-- editorconfig-checker-enable -->
 

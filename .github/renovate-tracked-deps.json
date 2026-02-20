@@ -1,4 +1,9 @@
 {
+  ".github/workflows/lint.yml": {
+    "regex": [
+      "mise"
+    ]
+  },
   "README.md": {
     "regex": [
       "grafana/flint"

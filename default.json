@@ -18,6 +18,20 @@
 				"https://raw\\.githubusercontent\\.com/(?<depName>[^/]+/[^/]+)/(?<currentDigest>[a-f0-9]{40})/.*#\\s*(?<currentValue>v\\S+)"
 			],
 			"datasourceTemplate": "github-tags"
+		},
+		{
+			"customType": "regex",
+			"description": "Update mise version in GitHub Actions workflows",
+			"managerFilePatterns": [
+				"/(^|/)(workflow-templates|\\.(?:github|gitea|forgejo)/(?:workflows|actions))/.+\\.ya?ml$/",
+				"/(^|/)action\\.ya?ml$/"
+			],
+			"datasourceTemplate": "github-release-attachments",
+			"packageNameTemplate": "jdx/mise",
+			"depNameTemplate": "mise",
+			"matchStrings": [
+				"jdx/mise-action.*\\n\\s*with:\\s*\\n\\s*version: [\"']?(?<currentValue>v[.\\d]+)[\"']?\\s*\\n\\s*sha256: [\"']?(?<currentDigest>\\w+)[\"']?"
+			]
 		}
 	],
 	"packageRules": [
@@ -25,6 +39,12 @@
 			"matchPackageNames": ["renovate"],
 			"description": "Only update renovate once a week",
 			"schedule": ["before 6am on Monday"]
+		},
+		{
+			"matchPackageNames": ["jdx/mise"],
+			"groupName": "mise",
+			"description": "Only update mise once a week",
+			"schedule": ["before 4am on Monday"]
 		},
 		{
 			"matchPackageNames": ["ghcr.io/super-linter/super-linter"],

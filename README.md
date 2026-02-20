@@ -103,6 +103,20 @@ description = "Auto-fix lint issues and regenerate tracked deps"
 run = "AUTOFIX=true mise run lint"
 ```
 
+
+Finally, extend the flint [Renovate preset](#automatic-version-updates-with-renovate)
+in your `renovate.json5` to keep flint and its tools up to date:
+
+```json5
+{
+  extends: ["github>grafana/flint"],
+}
+```
+
+Without this, SHA-pinned flint URLs and tool versions (e.g.,
+`SUPER_LINTER_VERSION`) in `mise.toml` will never receive automated
+updates.
+
 ## Example
 
 See [grafana/docker-otel-lgtm][example-repo] for a real-world example
@@ -371,6 +385,9 @@ provide. You only need the files for the tasks you adopt:
 - **`lint:renovate-deps`** — Renovate config
   (`.github/renovate.json5`) and committed snapshot
   (`.github/renovate-tracked-deps.json`)
+- **Renovate preset** — Add `"github>grafana/flint"` to your
+  `renovate.json5` `extends` array to enable automatic updates of
+  flint URLs and tool versions
 
 ## Versioning
 

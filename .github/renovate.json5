@@ -49,7 +49,7 @@
       matchPackageNames: ["jdx/mise"],
       groupName: "mise",
       description: "Only update mise once a week",
-      schedule: ["before 4am on monday"],
+      schedule: ["before 4am on Monday"],
     },
     {
       matchPackageNames: ["ghcr.io/super-linter/super-linter"],

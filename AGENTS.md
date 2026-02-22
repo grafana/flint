@@ -143,7 +143,8 @@ Only `feat:` and `fix:` trigger new releases, and breaking
 changes (`feat!:` / `fix!:` or commits with a
 `BREAKING CHANGE` footer) trigger a major version bump.
 Use `docs:`, `ci:`, or `chore:` for changes that don't
-affect consumers (documentation, CI workflows, repo config).
+affect consumers (documentation, CI workflows, repository
+config).
 Misusing `fix:` for non-functional changes creates
 unnecessary releases.
 

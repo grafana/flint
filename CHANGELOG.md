@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/grafana/flint/compare/v0.6.0...v0.6.1) (2026-02-22)
+
+
+### Bug Fixes
+
+* **release-please:** fix footer not appearing on release PRs ([#40](https://github.com/grafana/flint/issues/40)) ([d7a55e4](https://github.com/grafana/flint/commit/d7a55e4a2ea3754afb84c5c31eeb742b374c21e0))
+
 ## [0.6.0](https://github.com/grafana/flint/compare/v0.5.0...v0.6.0) (2026-02-18)
 
 

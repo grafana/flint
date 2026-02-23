@@ -33,9 +33,10 @@ but the JS-rendered fragment is skipped.
 <!-- editorconfig-checker-enable -->
 - [lychee main.rs#L1](https://github.com/lycheeverse/lychee/blob/master/lychee-bin/src/main.rs#L1)
 
-## Issue comment anchors — excluded globally
+## Issue comment anchors — fragment stripped globally
 
 Issue comment anchors are rendered by JavaScript and cannot be
-verified by lychee.
+verified by lychee. The fragment is stripped so the issue/PR page
+is still checked.
 
 - [example issue comment](https://github.com/grafana/flint/issues/1#issuecomment-1)

@@ -20,3 +20,22 @@ these links verify that each remap rule works correctly during CI.
 ## Tree URLs — remapped to PR branch
 
 - [tasks/lint directory](https://github.com/grafana/flint/tree/main/tasks/lint)
+
+## External repository line-number anchors — fragment stripped globally
+
+These test the global remap that strips line-number anchors from ANY
+GitHub repository (not just the current one). The file is still checked,
+but the JS-rendered fragment is skipped.
+
+<!-- editorconfig-checker-disable -->
+
+- [okhttp build.gradle#L144-L153](https://github.com/square/okhttp/blob/96a2118dd447ebc28a64d9b11a431ca642edc441/build.gradle#L144-L153)
+<!-- editorconfig-checker-enable -->
+- [lychee main.rs#L1](https://github.com/lycheeverse/lychee/blob/master/lychee-bin/src/main.rs#L1)
+
+## Issue comment anchors — excluded globally
+
+Issue comment anchors are rendered by JavaScript and cannot be
+verified by lychee.
+
+- [example issue comment](https://github.com/grafana/flint/issues/1#issuecomment-1)

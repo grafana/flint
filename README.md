@@ -227,8 +227,23 @@ For `/blob/` URLs, three ordered remap rules are applied
 
 For `/tree/` URLs, rules 1 and 3 apply (no raw remap needed).
 
+**Global GitHub URL handling:**
+
+In addition to the PR-specific remaps above, the script handles
+two patterns that affect ALL GitHub URLs (any repository):
+
+- **Line-number anchors** (`#L123`, `#L10-L20`): Stripped from
+  any GitHub `/blob/` URL. The file is still checked, but the
+  JS-rendered line-number fragment is skipped. This means
+  consuming repos don't need to exclude these in their
+  `lychee.toml`.
+- **Issue comment anchors** (`#issuecomment-*`): Excluded
+  entirely. These are JS-rendered and cannot be verified by
+  lychee.
+
 Set `LYCHEE_SKIP_GITHUB_REMAPS=true` to disable all GitHub-specific
-remaps as an escape hatch if they cause unexpected behavior.
+remaps and exclusions as an escape hatch if they cause unexpected
+behavior.
 
 **Environment variables:**
 

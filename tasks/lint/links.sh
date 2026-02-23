@@ -98,20 +98,48 @@ build_remap_args() {
 	echo "^${base_url}/tree/${base_ref}/(.*)\$ ${head_url}/tree/${head_ref}/\$1"
 }
 
+# Build global --remap and --exclude args for GitHub URLs that lychee
+# cannot verify regardless of repository.
+#
+# These rules apply to ALL GitHub repos (not just the current one):
+#   - Line-number anchors (#L123, #L10-L20): rendered by JavaScript,
+#     lychee cannot verify them. We strip the fragment so the file
+#     itself is still checked.
+#   - Issue comment anchors (#issuecomment-*): rendered by JavaScript,
+#     lychee cannot verify them.
+#
+# Set LYCHEE_SKIP_GITHUB_REMAPS=true to skip these (same escape hatch
+# as for the repo-specific remaps above).
+build_global_github_args() {
+	[ "${LYCHEE_SKIP_GITHUB_REMAPS:-}" != "true" ] || return 0
+
+	# Strip line-number anchors from /blob/ URLs (still checks the file exists)
+	echo "--remap"
+	# shellcheck disable=SC2016 # single quotes are intentional: these are regex capture groups, not shell vars
+	echo '^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#L[0-9]+.*$ https://github.com/$1/blob/$2/$3'
+
+	# Exclude issue comment anchors (JS-rendered, not in static HTML)
+	echo "--exclude"
+	echo '^https://github.com/.*#issuecomment-.*$'
+}
+
 run_lychee() {
 	local description="$1"
 	shift
 
-	local remap_args=()
+	local extra_args=()
 	while IFS= read -r line; do
-		[ -n "$line" ] && remap_args+=("$line")
+		[ -n "$line" ] && extra_args+=("$line")
 	done < <(build_remap_args)
+	while IFS= read -r line; do
+		[ -n "$line" ] && extra_args+=("$line")
+	done < <(build_global_github_args)
 
 	echo "==> $description"
 	# shellcheck disable=SC2154 # lychee_args is set via eval above
 	lychee --config "$LYCHEE_CONFIG" \
 		"${lychee_args[@]+"${lychee_args[@]}"}" \
-		"${remap_args[@]+"${remap_args[@]}"}" \
+		"${extra_args[@]+"${extra_args[@]}"}" \
 		"$@"
 }
 

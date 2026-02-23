@@ -237,13 +237,12 @@ two patterns that affect ALL GitHub URLs (any repository):
   JS-rendered line-number fragment is skipped. This means
   consuming repos don't need to exclude these in their
   `lychee.toml`.
-- **Issue comment anchors** (`#issuecomment-*`): Excluded
-  entirely. These are JS-rendered and cannot be verified by
-  lychee.
+- **Issue comment anchors** (`#issuecomment-*`): The fragment
+  is stripped so the issue/PR page is still checked, but the
+  JS-rendered comment anchor is skipped.
 
 Set `LYCHEE_SKIP_GITHUB_REMAPS=true` to disable all GitHub-specific
-remaps and exclusions as an escape hatch if they cause unexpected
-behavior.
+remaps as an escape hatch if they cause unexpected behavior.
 
 **Environment variables:**
 

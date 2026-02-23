@@ -106,7 +106,11 @@ build_remap_args() {
 #     lychee cannot verify them. We strip the fragment so the file
 #     itself is still checked.
 #   - Issue comment anchors (#issuecomment-*): rendered by JavaScript,
-#     lychee cannot verify them.
+#     lychee cannot verify them. The fragment is stripped so the
+#     issue/PR page itself is still checked.
+#
+# We use --remap (not --exclude) because CLI --exclude overrides
+# config file excludes in lychee, rather than merging with them.
 #
 # Set LYCHEE_SKIP_GITHUB_REMAPS=true to skip these (same escape hatch
 # as for the repo-specific remaps above).
@@ -118,9 +122,13 @@ build_global_github_args() {
 	# shellcheck disable=SC2016 # single quotes are intentional: these are regex capture groups, not shell vars
 	echo '^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#L[0-9]+.*$ https://github.com/$1/blob/$2/$3'
 
-	# Exclude issue comment anchors (JS-rendered, not in static HTML)
-	echo "--exclude"
-	echo '^https://github.com/.*#issuecomment-.*$'
+	# Strip issue comment anchors (JS-rendered, not in static HTML).
+	# The issue page is still checked, just not the fragment.
+	# We use --remap instead of --exclude because CLI --exclude
+	# overrides (rather than merges with) config file excludes.
+	echo "--remap"
+	# shellcheck disable=SC2016 # single quotes are intentional
+	echo '^https://github.com/([^/]+/[^/]+)/(issues|pull)/([0-9]+)#issuecomment-.*$ https://github.com/$1/$2/$3'
 }
 
 run_lychee() {

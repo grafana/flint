@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0](https://github.com/grafana/flint/compare/v0.6.0...v0.7.0) (2026-02-23)
+
+
+### Features
+
+* handle line-number anchors and issue comments globally ([#56](https://github.com/grafana/flint/issues/56)) ([cf751df](https://github.com/grafana/flint/commit/cf751df1093a06d8dfac60c9918ef129944494e4))
+
+
+### Bug Fixes
+
+* **release-please:** fix footer not appearing on release PRs ([#40](https://github.com/grafana/flint/issues/40)) ([d7a55e4](https://github.com/grafana/flint/commit/d7a55e4a2ea3754afb84c5c31eeb742b374c21e0))
+* use remap instead of exclude for issue comment anchors ([#58](https://github.com/grafana/flint/issues/58)) ([656f355](https://github.com/grafana/flint/commit/656f355db5280a86c885da957f34193d1efc800e))
+
 ## [0.6.0](https://github.com/grafana/flint/compare/v0.5.0...v0.6.0) (2026-02-18)
 
 

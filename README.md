@@ -253,7 +253,7 @@ from your `lychee.toml` because flint handles them at runtime via
 - **GitHub blob remap for lychee#1729** (e.g.
   `"https://github.com/(.*?)/(.*?)/blob/(.*?)/(.*#.*)$ https://raw.githubusercontent.com/$1/$2/$3/$4"`)
   — flint remaps fragment URLs to `raw.githubusercontent.com` for
-  the current repo's base branch, and strips line-number anchors
+  the current PR's head branch, and strips line-number anchors
   globally.
 - **`#issuecomment-*` excludes** (e.g.
   `'^https://github.com/.*#issuecomment-.*$'`) — flint strips the

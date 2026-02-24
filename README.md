@@ -244,6 +244,28 @@ two patterns that affect ALL GitHub URLs (any repository):
 Set `LYCHEE_SKIP_GITHUB_REMAPS=true` to disable all GitHub-specific
 remaps as an escape hatch if they cause unexpected behavior.
 
+**Lychee config cleanup:**
+
+When adopting `lint:links`, you can remove the following entries
+from your `lychee.toml` because flint handles them at runtime via
+`--remap` arguments:
+
+- **GitHub blob remap for lychee#1729** (e.g.
+  `"https://github.com/(.*?)/(.*?)/blob/(.*?)/(.*#.*)$ https://raw.githubusercontent.com/$1/$2/$3/$4"`)
+  — flint remaps fragment URLs to `raw.githubusercontent.com` for
+  the current repo's base branch, and strips line-number anchors
+  globally.
+- **`#issuecomment-*` excludes** (e.g.
+  `'^https://github.com/.*#issuecomment-.*$'`) — flint strips the
+  fragment via remap so the issue/PR page is still checked.
+- **`#L\d+` line-number excludes** (e.g.
+  `'^https://github.com/.+/blob/.+#L\d+'`) — flint strips the
+  fragment via remap so the file is still checked.
+
+Note: flint uses `--remap` (not `--exclude`) for these because
+lychee's CLI `--exclude` flags override config file excludes rather
+than merging with them.
+
 **Environment variables:**
 
 <!-- editorconfig-checker-disable -->

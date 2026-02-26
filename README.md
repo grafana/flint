@@ -75,13 +75,13 @@ pinned to the commit SHA of a release tag with a version comment:
 # Pick the tasks you need from flint (https://github.com/grafana/flint)
 [tasks."lint:super-linter"]
 description = "Run Super-Linter on the repository"
-file = "https://raw.githubusercontent.com/grafana/flint/5bb3726cfe3305072457c0c4fa85dce5ca154680/tasks/lint/super-linter.sh" # v0.6.0
+file = "https://raw.githubusercontent.com/grafana/flint/8822bdc543f28f2c7dd1f697af4df6d89768c507/tasks/lint/super-linter.sh" # v0.7.0
 [tasks."lint:links"]
 description = "Check for broken links in changed files + all local links"
-file = "https://raw.githubusercontent.com/grafana/flint/5bb3726cfe3305072457c0c4fa85dce5ca154680/tasks/lint/links.sh" # v0.6.0
+file = "https://raw.githubusercontent.com/grafana/flint/8822bdc543f28f2c7dd1f697af4df6d89768c507/tasks/lint/links.sh" # v0.7.0
 [tasks."lint:renovate-deps"]
 description = "Verify renovate-tracked-deps.json is up to date"
-file = "https://raw.githubusercontent.com/grafana/flint/5bb3726cfe3305072457c0c4fa85dce5ca154680/tasks/lint/renovate-deps.py" # v0.6.0
+file = "https://raw.githubusercontent.com/grafana/flint/8822bdc543f28f2c7dd1f697af4df6d89768c507/tasks/lint/renovate-deps.py" # v0.7.0
 ```
 
 <!-- editorconfig-checker-enable -->

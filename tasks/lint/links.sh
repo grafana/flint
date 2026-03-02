@@ -75,9 +75,9 @@ build_remap_args() {
 
 	# /blob/ URLs — four rules, order matters (first-match-wins):
 
-	# 1. Line-number anchors (#L123): strip fragment, remap to head branch
+	# 1. Line-number anchors (#L123, #L10-L20): strip fragment, remap to head branch
 	echo "--remap"
-	echo "^${base_url}/blob/${base_ref}/(.*?)#L[0-9]+\$ ${head_url}/blob/${head_ref}/\$1"
+	echo "^${base_url}/blob/${base_ref}/(.*?)#L[0-9]+.*\$ ${head_url}/blob/${head_ref}/\$1"
 
 	# 2. Scroll to Text Fragment anchors (#:~:text=...): browser-only,
 	#    strip fragment, remap to head branch
@@ -95,9 +95,9 @@ build_remap_args() {
 
 	# /tree/ URLs — two rules:
 
-	# 1. Line-number anchors: strip fragment, remap to head branch
+	# 1. Line-number anchors (#L123, #L10-L20): strip fragment, remap to head branch
 	echo "--remap"
-	echo "^${base_url}/tree/${base_ref}/(.*?)#L[0-9]+\$ ${head_url}/tree/${head_ref}/\$1"
+	echo "^${base_url}/tree/${base_ref}/(.*?)#L[0-9]+.*\$ ${head_url}/tree/${head_ref}/\$1"
 
 	# 2. Non-fragment URLs: branch-remap only
 	echo "--remap"

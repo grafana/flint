@@ -212,20 +212,23 @@ to the base branch resolve against the PR branch instead. This
 ensures that links like `/blob/main/README.md` don't break when
 the file was added or moved in the PR.
 
-For `/blob/` URLs, three ordered remap rules are applied
+For `/blob/` URLs, four ordered remap rules are applied
 (lychee uses first-match-wins):
 
-1. **Line-number anchors** (`#L123`): GitHub renders these with
-   JavaScript, so lychee can never verify the fragment. The anchor
+1. **Line-number anchors** (`#L123`, `#L10-L20`): GitHub renders
+   these with JavaScript, so lychee can never verify the fragment.
+   The anchor is stripped and the file is checked on the PR branch.
+2. **[Scroll to Text Fragment][stf] anchors** (`#:~:text=...`):
+   Browser-only feature, not present in static HTML. The anchor
    is stripped and the file is checked on the PR branch.
-2. **Other fragment URLs** (`#section`): Remapped to
+3. **Other fragment URLs** (`#section`): Remapped to
    `raw.githubusercontent.com` where lychee can verify the fragment
    in the raw file content (workaround for
    [lychee#1729](https://github.com/lycheeverse/lychee/issues/1729)).
-3. **Non-fragment URLs**: Remapped from the base branch to the PR
+4. **Non-fragment URLs**: Remapped from the base branch to the PR
    branch (the original behavior).
 
-For `/tree/` URLs, rules 1 and 3 apply (no raw remap needed).
+For `/tree/` URLs, rules 1 and 4 apply (no raw remap needed).
 
 **Global GitHub URL handling:**
 
@@ -237,6 +240,9 @@ two patterns that affect ALL GitHub URLs (any repository):
   JS-rendered line-number fragment is skipped. This means
   consuming repos don't need to exclude these in their
   `lychee.toml`.
+- **Scroll to Text Fragment anchors** (`#:~:text=...`): Stripped
+  from any GitHub `/blob/` URL. These are a browser-only feature
+  not present in static HTML.
 - **Issue comment anchors** (`#issuecomment-*`): The fragment
   is stripped so the issue/PR page is still checked, but the
   JS-rendered comment anchor is skipped.
@@ -254,11 +260,14 @@ via `--remap` arguments:
   [lychee#1729](https://github.com/lycheeverse/lychee/issues/1729)**
   — flint remaps fragment URLs to `raw.githubusercontent.com`
   for the current PR's head branch, and strips line-number
-  anchors globally.
+  and Scroll to Text Fragment anchors globally.
 - **`#issuecomment-*` excludes** — flint strips the fragment
   via remap so the issue/PR page is still checked.
-- **`#L\d+` line-number excludes** — flint strips the fragment
-  via remap so the file is still checked.
+- **`#L\d+` / `#L\d+-L\d+` line-number excludes** — flint strips
+  the fragment via remap so the file is still checked.
+- **`#:~:text=...` [Scroll to Text Fragment][stf] excludes** —
+  flint strips the fragment via remap so the file is still
+  checked.
 
 Note: flint uses `--remap` (not `--exclude`) for these because
 lychee's CLI `--exclude` flags override config file excludes
@@ -444,3 +453,5 @@ When conventional commits land on `main`, Release Please opens
 > **Note:** CI checks don't trigger automatically on release-please
 > PRs because they are created with `GITHUB_TOKEN`. To run CI,
 > either click **Update branch** or **close and reopen** the PR.
+
+[stf]: https://developer.mozilla.org/en-US/docs/Web/URI/Fragment/Text_fragments

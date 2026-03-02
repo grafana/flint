@@ -4,10 +4,22 @@ These links exercise the GitHub URL remap rules in `tasks/lint/links.sh`.
 On PR branches, lychee rewrites `blob/main/` URLs to the PR branch —
 these links verify that each remap rule works correctly during CI.
 
-## Line-number anchors (`#L123`) — fragment stripped, file checked on PR branch
+## Line-number anchors (`#L123`, `#L10-L20`) — fragment stripped, file checked on PR branch
 
 - [README.md#L1](https://github.com/grafana/flint/blob/main/README.md#L1)
 - [links.sh#L6](https://github.com/grafana/flint/blob/main/tasks/lint/links.sh#L6)
+- [links.sh#L6-L10](https://github.com/grafana/flint/blob/main/tasks/lint/links.sh#L6-L10)
+
+## Scroll to Text Fragment anchors (`#:~:text=...`) — fragment stripped, file checked on PR branch
+
+<!-- editorconfig-checker-disable -->
+
+- [links.sh text fragment](https://github.com/grafana/flint/blob/main/tasks/lint/links.sh#:~:text=build_remap_args)
+<!-- editorconfig-checker-enable -->
+
+## External Scroll to Text Fragment anchors — fragment stripped globally
+
+- [okhttp text fragment](https://github.com/square/okhttp/blob/master/README.md#:~:text=OkHttp)
 
 ## Section fragments (`#section`) — remapped to raw.githubusercontent.com
 

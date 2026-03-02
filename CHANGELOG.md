@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/grafana/flint/compare/v0.7.0...v0.7.1) (2026-03-02)
+
+
+### Bug Fixes
+
+* strip Scroll to Text Fragment anchors in link checks ([#86](https://github.com/grafana/flint/issues/86)) ([b630cdf](https://github.com/grafana/flint/commit/b630cdfdd53c67f2e1f744ff89787fe18342e389))
+
 ## [0.7.0](https://github.com/grafana/flint/compare/v0.6.0...v0.7.0) (2026-02-23)
 
 

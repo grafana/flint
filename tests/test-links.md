@@ -12,7 +12,9 @@ these links verify that each remap rule works correctly during CI.
 
 ## Scroll to Text Fragment anchors (`#:~:text=...`) — fragment stripped, file checked on PR branch
 
+<!-- editorconfig-checker-disable -->
 - [links.sh text fragment](https://github.com/grafana/flint/blob/main/tasks/lint/links.sh#:~:text=build_remap_args)
+<!-- editorconfig-checker-enable -->
 
 ## External Scroll to Text Fragment anchors — fragment stripped globally
 

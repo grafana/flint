@@ -9,6 +9,14 @@ these links verify that each remap rule works correctly during CI.
 - [README.md#L1](https://github.com/grafana/flint/blob/main/README.md#L1)
 - [links.sh#L6](https://github.com/grafana/flint/blob/main/tasks/lint/links.sh#L6)
 
+## Scroll to Text Fragment anchors (`#:~:text=...`) — fragment stripped, file checked on PR branch
+
+- [links.sh text fragment](https://github.com/grafana/flint/blob/main/tasks/lint/links.sh#:~:text=build_remap_args)
+
+## External Scroll to Text Fragment anchors — fragment stripped globally
+
+- [okhttp text fragment](https://github.com/square/okhttp/blob/master/README.md#:~:text=OkHttp)
+
 ## Section fragments (`#section`) — remapped to raw.githubusercontent.com
 
 - [CHANGELOG.md heading](https://github.com/grafana/flint/blob/main/CHANGELOG.md#changelog)

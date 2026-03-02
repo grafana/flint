@@ -25,9 +25,10 @@ eval "lychee_args=(${usage_lychee_args:-})"
 # https://github.com/lycheeverse/lychee/issues/1729).
 #
 # Lychee uses first-match-wins for remaps, so order matters:
-#   1. Line-number anchors → strip fragment, remap to head branch
-#   2. Other fragments     → remap to raw.githubusercontent.com
-#   3. No fragment         → remap to head branch (existing behavior)
+#   1. Line-number anchors      → strip fragment, remap to head branch
+#   2. Scroll to Text Fragments → strip fragment, remap to head branch
+#   3. Other fragments           → remap to raw.githubusercontent.com
+#   4. No fragment               → remap to head branch (existing behavior)
 #
 # Set LYCHEE_SKIP_GITHUB_REMAPS=true to skip the GitHub-specific remaps
 # emitted by this function (escape hatch if they cause unexpected behavior;
@@ -72,18 +73,23 @@ build_remap_args() {
 	local base_url="https://github.com/${repo}"
 	local head_url="https://github.com/${head_repo}"
 
-	# /blob/ URLs — three rules, order matters (first-match-wins):
+	# /blob/ URLs — four rules, order matters (first-match-wins):
 
 	# 1. Line-number anchors (#L123): strip fragment, remap to head branch
 	echo "--remap"
 	echo "^${base_url}/blob/${base_ref}/(.*?)#L[0-9]+\$ ${head_url}/blob/${head_ref}/\$1"
 
-	# 2. Other fragment URLs (#section): remap to raw.githubusercontent.com
+	# 2. Scroll to Text Fragment anchors (#:~:text=...): browser-only,
+	#    strip fragment, remap to head branch
+	echo "--remap"
+	echo "^${base_url}/blob/${base_ref}/(.*?)#:~:text=.*\$ ${head_url}/blob/${head_ref}/\$1"
+
+	# 3. Other fragment URLs (#section): remap to raw.githubusercontent.com
 	#    so lychee can verify the fragment in raw content
 	echo "--remap"
 	echo "^${base_url}/blob/${base_ref}/(.*#.*)\$ https://raw.githubusercontent.com/${head_repo}/${head_ref}/\$1"
 
-	# 3. Non-fragment URLs: branch-remap only (existing behavior)
+	# 4. Non-fragment URLs: branch-remap only (existing behavior)
 	echo "--remap"
 	echo "^${base_url}/blob/${base_ref}/(.*)\$ ${head_url}/blob/${head_ref}/\$1"
 
@@ -105,6 +111,9 @@ build_remap_args() {
 #   - Line-number anchors (#L123, #L10-L20): rendered by JavaScript,
 #     lychee cannot verify them. We strip the fragment so the file
 #     itself is still checked.
+#   - Scroll to Text Fragment anchors (#:~:text=...): browser-only,
+#     lychee cannot verify them. We strip the fragment so the file
+#     itself is still checked.
 #   - Issue comment anchors (#issuecomment-*): rendered by JavaScript,
 #     lychee cannot verify them. The fragment is stripped so the
 #     issue/PR page itself is still checked.
@@ -121,6 +130,11 @@ build_global_github_args() {
 	echo "--remap"
 	# shellcheck disable=SC2016 # single quotes are intentional: these are regex capture groups, not shell vars
 	echo '^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#L[0-9]+.*$ https://github.com/$1/blob/$2/$3'
+
+	# Strip Scroll to Text Fragment anchors from /blob/ URLs (browser-only, not in static HTML)
+	echo "--remap"
+	# shellcheck disable=SC2016 # single quotes are intentional: these are regex capture groups, not shell vars
+	echo '^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#:~:text=.*$ https://github.com/$1/blob/$2/$3'
 
 	# Strip issue comment anchors (JS-rendered, not in static HTML).
 	# The issue page is still checked, just not the fragment.

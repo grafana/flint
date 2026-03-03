@@ -10,6 +10,17 @@ if [ "${usage_autofix:-}" = "true" ]; then
 	AUTOFIX=true
 fi
 
+_on_exit() {
+	local ec=$?
+	rm -f "${_FILTERED_ENV_FILE:-}"
+	if [ $ec -ne 0 ] && [ "${AUTOFIX:-}" != "true" ]; then
+		# shellcheck disable=SC2016 # backticks are intentional: literal formatting, not command substitution
+		printf '\n💡 Try `mise run fix` to auto-fix lint issues, then re-run `mise run lint` to verify.\n'
+	fi
+	exit $ec
+}
+trap _on_exit EXIT
+
 # check for required env vars, otherwise exit with error
 if [ -z "${SUPER_LINTER_VERSION:-}" ]; then
 	echo "SUPER_LINTER_VERSION environment variable is not set. Exiting."
@@ -40,10 +51,9 @@ fi
 ENV_FILE="${SUPER_LINTER_ENV_FILE:-.github/config/super-linter.env}"
 if [ "${AUTOFIX:-}" != "true" ]; then
 	# Filter out FIX_* and comment lines when not auto-fixing
-	FILTERED_ENV_FILE=$(mktemp)
-	trap 'rm -f "$FILTERED_ENV_FILE"' EXIT
-	grep -v '^#' "$ENV_FILE" | grep -v '^FIX_' >"$FILTERED_ENV_FILE"
-	ENV_FILE="$FILTERED_ENV_FILE"
+	_FILTERED_ENV_FILE=$(mktemp)
+	grep -v '^#' "$ENV_FILE" | grep -v '^FIX_' >"$_FILTERED_ENV_FILE"
+	ENV_FILE="$_FILTERED_ENV_FILE"
 fi
 
 $RUNTIME image pull -q --platform linux/amd64 "ghcr.io/super-linter/super-linter:${SUPER_LINTER_VERSION}" >/dev/null

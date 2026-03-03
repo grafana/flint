@@ -132,6 +132,11 @@ def main():
                     "Run 'mise run lint:renovate-deps --autofix' to create it.",
                     file=sys.stderr,
                 )
+                print(
+                    "\n💡 Try `mise run fix` to auto-fix lint issues,"
+                    " then re-run `mise run lint` to verify.",
+                    file=sys.stderr,
+                )
                 sys.exit(1)
         else:
             committed_data = json.loads(COMMITTED.read_text())
@@ -161,6 +166,11 @@ def main():
                 print("ERROR: renovate-tracked-deps.json is out of date.", file=sys.stderr)
                 print(
                     "Run 'mise run lint:renovate-deps' with AUTOFIX=true to update.",
+                    file=sys.stderr,
+                )
+                print(
+                    "\n💡 Try `mise run fix` to auto-fix lint issues,"
+                    " then re-run `mise run lint` to verify.",
                     file=sys.stderr,
                 )
                 sys.exit(1)

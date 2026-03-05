@@ -10,10 +10,14 @@ if [ "${usage_autofix:-}" = "true" ]; then
 	AUTOFIX=true
 fi
 
+_LINTER_RAN=false
+
 _on_exit() {
 	local ec=$?
-	rm -f "${_FILTERED_ENV_FILE:-}"
-	if [ $ec -ne 0 ] && [ "${AUTOFIX:-}" != "true" ]; then
+	if [ -n "${_FILTERED_ENV_FILE:-}" ]; then
+		rm -f -- "$_FILTERED_ENV_FILE"
+	fi
+	if [ $ec -ne 0 ] && [ "$_LINTER_RAN" = "true" ] && [ "${AUTOFIX:-}" != "true" ]; then
 		# shellcheck disable=SC2016 # backticks are intentional: literal formatting, not command substitution
 		printf '\n💡 Try `mise run fix` to auto-fix lint issues, then re-run `mise run lint` to verify.\n'
 	fi
@@ -58,6 +62,7 @@ fi
 
 $RUNTIME image pull -q --platform linux/amd64 "ghcr.io/super-linter/super-linter:${SUPER_LINTER_VERSION}" >/dev/null
 
+_LINTER_RAN=true
 $RUNTIME container run --rm --platform linux/amd64 \
 	-e RUN_LOCAL=true \
 	-e DEFAULT_BRANCH=main \

@@ -133,8 +133,7 @@ def main():
                     file=sys.stderr,
                 )
                 print(
-                    "\n💡 Try `mise run fix` to auto-fix lint issues,"  # fmt: skip
-                    " then re-run `mise run lint` to verify.",
+                    "\n💡 Try `mise run fix` to auto-fix lint issues, then re-run `mise run lint` to verify.",
                     file=sys.stderr,
                 )
                 sys.exit(1)
@@ -169,8 +168,7 @@ def main():
                     file=sys.stderr,
                 )
                 print(
-                    "\n💡 Try `mise run fix` to auto-fix lint issues,"  # fmt: skip
-                    " then re-run `mise run lint` to verify.",
+                    "\n💡 Try `mise run fix` to auto-fix lint issues, then re-run `mise run lint` to verify.",
                     file=sys.stderr,
                 )
                 sys.exit(1)

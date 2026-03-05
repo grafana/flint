@@ -133,8 +133,7 @@ def main():
                     file=sys.stderr,
                 )
                 print(
-                    "\n💡 Try `mise run fix` to auto-fix lint issues,"
-                    " then re-run `mise run lint` to verify.",
+                    "\n💡 Try `mise run fix` to auto-fix lint issues, then re-run `mise run lint` to verify.",
                     file=sys.stderr,
                 )
                 sys.exit(1)
@@ -163,16 +162,13 @@ def main():
                     f.write("\n")
                 print("renovate-tracked-deps.json has been updated.")
             else:
-                print(
-                    "ERROR: renovate-tracked-deps.json is out of date.", file=sys.stderr
-                )
+                print("ERROR: renovate-tracked-deps.json is out of date.", file=sys.stderr)
                 print(
                     "Run 'mise run lint:renovate-deps' with AUTOFIX=true to update.",
                     file=sys.stderr,
                 )
                 print(
-                    "\n💡 Try `mise run fix` to auto-fix lint issues,"
-                    " then re-run `mise run lint` to verify.",
+                    "\n💡 Try `mise run fix` to auto-fix lint issues, then re-run `mise run lint` to verify.",
                     file=sys.stderr,
                 )
                 sys.exit(1)

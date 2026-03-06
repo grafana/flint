@@ -114,7 +114,10 @@ if [ "$NATIVE" = "true" ]; then
 			merge_base=$(git merge-base "origin/${base_branch}" HEAD 2>/dev/null || echo "")
 			if [ -n "$merge_base" ]; then
 				# Files changed in the PR + uncommitted changes
-				{ git diff --name-only --diff-filter=d "$merge_base"...HEAD; git diff --name-only --diff-filter=d; } | sort -u
+				{
+					git diff --name-only --diff-filter=d "$merge_base"...HEAD
+					git diff --name-only --diff-filter=d
+				} | sort -u
 			else
 				# No merge base found (e.g. shallow clone), fall back to all files
 				git ls-files

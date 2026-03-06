@@ -416,6 +416,35 @@ mise run lint:renovate-deps --autofix         # Regenerate tracked deps
 Linters that don't support autofix (like lychee link checker)
 silently ignore the `AUTOFIX` environment variable.
 
+## Pre-commit hook
+
+Flint provides a `pre-commit` task that runs native linters with
+autofix on every commit — fast feedback without the container
+overhead. To set it up:
+
+```bash
+mise run setup:pre-commit-hook
+```
+
+This generates a `.git/hooks/pre-commit` that runs
+`mise run pre-commit`, which uses `--native --autofix` to fix
+formatting issues before the commit completes.
+
+**For consuming repos**, add these tasks to your `mise.toml`:
+
+```toml
+[tasks.pre-commit]
+description = "Pre-commit hook: native lint with autofix"
+depends = ["setup:native-lint-tools"]
+run = "mise run lint:super-linter -- --native --autofix"
+
+[tasks."setup:pre-commit-hook"]
+description = "Install git pre-commit hook"
+run = "mise generate git-pre-commit --write --task=pre-commit"
+```
+
+Then run `mise run setup:pre-commit-hook` once per clone.
+
 ## Automatic version updates with Renovate
 
 Flint provides a [Renovate shareable preset](https://docs.renovatebot.com/config-presets/)

@@ -41,3 +41,12 @@ depends = ["lint:super-linter", "lint:links", "lint:renovate-deps"]
 [tasks.fix]
 description = "Auto-fix lint issues and regenerate tracked deps"
 run = "AUTOFIX=true mise run lint"
+
+[tasks.pre-commit]
+description = "Pre-commit hook: native lint with autofix"
+depends = ["setup:native-lint-tools"]
+run = "mise run lint:super-linter -- --native --autofix"
+
+[tasks."setup:pre-commit-hook"]
+description = "Install git pre-commit hook that runs native linting"
+run = "mise generate git-pre-commit --write --task=pre-commit"

@@ -259,11 +259,12 @@ if [ "$NATIVE" = "true" ]; then
 		fi
 	done
 
+	if [ ${#_skipped[@]} -gt 0 ]; then
+		printf '⚠️  Skipped (tool not found): %s\n' "${_skipped[*]}"
+	fi
+
 	if [ ${#_failed[@]} -gt 0 ]; then
 		printf '\n❌ Native lint failed: %s\n' "${_failed[*]}"
-		if [ ${#_skipped[@]} -gt 0 ]; then
-			printf '⚠️  Skipped (tool not found): %s\n' "${_skipped[*]}"
-		fi
 		exit 1
 	fi
 

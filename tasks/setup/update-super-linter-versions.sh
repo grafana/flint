@@ -37,7 +37,8 @@ _from_version() {
 # Fetch a pip requirements file and extract the pinned version
 _pip_version() {
 	local pkg="$1"
-	gh api "repos/${REPO}/contents/dependencies/python/${pkg}.txt?ref=${TAG}" -q '.content' | base64 -d | sed "s/${pkg}==//"
+	gh api "repos/${REPO}/contents/dependencies/python/${pkg}.txt?ref=${TAG}" \
+		-q '.content' | base64 -d | sed "s/${pkg}==//"
 }
 
 # Fetch package-lock.json once and extract npm package versions

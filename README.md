@@ -157,9 +157,32 @@ Docker versioning).
 | Flag        | Description                                                  |
 | ----------- | ------------------------------------------------------------ |
 | `--autofix` | Enable autofix mode (enables `FIX_*` vars from the env file) |
+| `--native`  | Run linters natively instead of via container                |
 
 When autofix is not enabled, all `FIX_*` lines are filtered out of
 the env file before running Super-Linter.
+
+**Native mode:**
+
+The `--native` flag runs a **subset** of linters directly on
+the host for fast local feedback. It is not a full replacement
+for the Super-Linter container — CI should always use the
+container for comprehensive checks.
+
+Native mode reads the same `super-linter.env` file and follows
+Super-Linter's default logic for determining which linters are
+enabled: if any `VALIDATE_*=true` is set, only those linters run;
+otherwise all linters run unless explicitly `VALIDATE_*=false`.
+`FILTER_REGEX_EXCLUDE` is respected. `FIX_*` variables are honored
+when `--autofix` is also set.
+
+Supported native linters (subset of super-linter): `shellcheck`,
+`shfmt`, `markdownlint`, `prettier`, `editorconfig-checker`,
+`actionlint`, `hadolint`, `golangci-lint`, `ruff`, `codespell`,
+`biome`. Tools must be installed separately (e.g., via
+`mise run setup:native-lint-tools`). Missing tools and unsupported
+`VALIDATE_*` flags are skipped with a warning. Linter configs must
+be at standard project-root locations (not `.github/linters/`).
 
 **Environment variables:**
 

@@ -13,6 +13,19 @@ SUPER_LINTER_VERSION="slim-v8.4.0@sha256:8421cd4687937ac32a829539d03de51a147c164
 description = "Run Super-Linter on the repository"
 file = "tasks/lint/super-linter.sh"
 
+[tasks."lint:super-linter-native"]
+description = "Run linters natively (fast, for local dev)"
+depends = ["setup:native-lint-tools"]
+run = "mise run lint:super-linter -- --native"
+
+[tasks."setup:native-lint-tools"]
+description = "Install native lint tools matching the pinned super-linter version"
+file = "tasks/setup/native-lint-tools.sh"
+
+[tasks."setup:update-super-linter-versions"]
+description = "Generate super-linter version mapping from the super-linter repo"
+file = "tasks/setup/update-super-linter-versions.sh"
+
 [tasks."lint:links"]
 description = "Check for broken links in changed files + all local links"
 file = "tasks/lint/links.sh"
@@ -28,3 +41,12 @@ depends = ["lint:super-linter", "lint:links", "lint:renovate-deps"]
 [tasks.fix]
 description = "Auto-fix lint issues and regenerate tracked deps"
 run = "AUTOFIX=true mise run lint"
+
+[tasks.pre-commit]
+description = "Pre-commit hook: native lint with autofix"
+depends = ["setup:native-lint-tools"]
+run = "mise run lint:super-linter -- --native --autofix"
+
+[tasks."setup:pre-commit-hook"]
+description = "Install git pre-commit hook that runs native linting"
+run = "mise generate git-pre-commit --write --task=pre-commit"

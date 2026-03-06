@@ -158,6 +158,7 @@ Docker versioning).
 | ----------- | ------------------------------------------------------------ |
 | `--autofix` | Enable autofix mode (enables `FIX_*` vars from the env file) |
 | `--native`  | Run linters natively instead of via container                |
+| `--full`    | Lint all files instead of only changed files                 |
 
 When autofix is not enabled, all `FIX_*` lines are filtered out of
 the env file before running Super-Linter.

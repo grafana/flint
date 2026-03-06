@@ -104,18 +104,18 @@ if [ "$NATIVE" = "true" ]; then
 		fi
 	}
 
+	# Compute merge base once for changed-file detection and golangci-lint diff mode
+	_BASE_BRANCH="${DEFAULT_BRANCH:-main}"
+	_MERGE_BASE=$(git merge-base "origin/${_BASE_BRANCH}" HEAD 2>/dev/null || echo "")
+
 	_list_files() {
 		if [ "$LINT_ALL" = "true" ]; then
 			git ls-files
 		else
-			# Lint only files changed compared to the default branch
-			local base_branch="${DEFAULT_BRANCH:-main}"
-			local merge_base
-			merge_base=$(git merge-base "origin/${base_branch}" HEAD 2>/dev/null || echo "")
-			if [ -n "$merge_base" ]; then
+			if [ -n "$_MERGE_BASE" ]; then
 				# Files changed in the PR + uncommitted changes
 				{
-					git diff --name-only --diff-filter=d "$merge_base"...HEAD
+					git diff --name-only --diff-filter=d "$_MERGE_BASE"...HEAD
 					git diff --name-only --diff-filter=d
 				} | sort -u
 			else
@@ -126,13 +126,13 @@ if [ "$NATIVE" = "true" ]; then
 	}
 
 	# Cache the file list once (avoids re-running git commands per linter)
-	_CACHED_FILES=$(_list_files | _filter_files)
+	mapfile -t _CACHED_FILES < <(_list_files | _filter_files)
 
 	_find_files() {
 		local patterns="$*"
-		[ -z "$_CACHED_FILES" ] && return
+		[ ${#_CACHED_FILES[@]} -eq 0 ] && return
 		# shellcheck disable=SC2086 # intentional word splitting of patterns
-		echo "$_CACHED_FILES" | while IFS= read -r file; do
+		for file in "${_CACHED_FILES[@]}"; do
 			for pattern in $patterns; do
 				# shellcheck disable=SC2254 # glob pattern matching is intentional
 				case "$file" in
@@ -216,7 +216,12 @@ if [ "$NATIVE" = "true" ]; then
 		linter_failed=false
 
 		if [ "$patterns" = "SELF" ]; then
-			# Tool handles its own file discovery
+			# Tool handles its own file discovery; add diff flags when not linting all files
+			if [ "$LINT_ALL" != "true" ] && [ -n "$_MERGE_BASE" ]; then
+				if [[ "$cmd_template" == golangci-lint* ]]; then
+					cmd_template+=" --new-from-rev=$_MERGE_BASE"
+				fi
+			fi
 			if ! eval "$cmd_template"; then
 				linter_failed=true
 			fi

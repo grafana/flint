@@ -40,7 +40,9 @@ All task scripts follow these conventions:
   auto-detects runtime, handles SELinux on Fedora.
   `--native` flag runs a **subset** of linters directly
   on the host for fast local feedback (not a full
-  replacement for the container — CI uses the full set)
+  replacement for the container — CI uses the full set).
+  `--full` flag lints all files instead of only changed
+  files (applies to both native and container modes)
 - `links.sh`: Runs lychee link checker with two default
   checks (all links in modified files + local links in all
   files) and a `--full` flag for comprehensive checking

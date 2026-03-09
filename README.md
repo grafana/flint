@@ -75,13 +75,13 @@ pinned to the commit SHA of a release tag with a version comment:
 # Pick the tasks you need from flint (https://github.com/grafana/flint)
 [tasks."lint:super-linter"]
 description = "Run Super-Linter on the repository"
-file = "https://raw.githubusercontent.com/grafana/flint/8822bdc543f28f2c7dd1f697af4df6d89768c507/tasks/lint/super-linter.sh" # v0.7.0
+file = "https://raw.githubusercontent.com/grafana/flint/0ac131d7832bd8964f6ca9e5af73207dca6a85ba/tasks/lint/super-linter.sh" # v0.7.1
 [tasks."lint:links"]
 description = "Check for broken links in changed files + all local links"
-file = "https://raw.githubusercontent.com/grafana/flint/8822bdc543f28f2c7dd1f697af4df6d89768c507/tasks/lint/links.sh" # v0.7.0
+file = "https://raw.githubusercontent.com/grafana/flint/0ac131d7832bd8964f6ca9e5af73207dca6a85ba/tasks/lint/links.sh" # v0.7.1
 [tasks."lint:renovate-deps"]
 description = "Verify renovate-tracked-deps.json is up to date"
-file = "https://raw.githubusercontent.com/grafana/flint/8822bdc543f28f2c7dd1f697af4df6d89768c507/tasks/lint/renovate-deps.py" # v0.7.0
+file = "https://raw.githubusercontent.com/grafana/flint/0ac131d7832bd8964f6ca9e5af73207dca6a85ba/tasks/lint/renovate-deps.py" # v0.7.1
 ```
 
 <!-- editorconfig-checker-enable -->
@@ -201,8 +201,11 @@ version is available.
 <!-- editorconfig-checker-enable -->
 
 When running in default mode, if a config change is detected
-(matching `LYCHEE_CONFIG_CHANGE_PATTERN`), the script falls back
-to `--full` behavior.
+(matching `LYCHEE_CONFIG_CHANGE_PATTERN` or lychee-related changes
+in `mise.toml`), the script falls back to `--full` behavior.
+Changes to `mise.toml` are content-aware: only lychee-related
+lines (e.g. version or task config) trigger a full check, not
+unrelated tool version bumps.
 
 **GitHub URL remaps:**
 
@@ -277,11 +280,11 @@ rather than merging with them.
 
 <!-- editorconfig-checker-disable -->
 
-| Variable                       | Default                                                              | Description                                                          |
-| ------------------------------ | -------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `LYCHEE_CONFIG`                | `.github/config/lychee.toml`                                         | Path to the lychee config file                                       |
-| `LYCHEE_CONFIG_CHANGE_PATTERN` | `^(\.github/config/lychee\.toml\|\.mise/tasks/lint/.*\|mise\.toml)$` | Regular expression for files whose change triggers a full link check |
-| `LYCHEE_SKIP_GITHUB_REMAPS`    | unset                                                                | Set to `true` to disable all GitHub URL remaps                       |
+| Variable                       | Default                                                  | Description                                                                    |
+| ------------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `LYCHEE_CONFIG`                | `.github/config/lychee.toml`                             | Path to the lychee config file                                                 |
+| `LYCHEE_CONFIG_CHANGE_PATTERN` | `^(\.github/config/lychee\.toml\|\.mise/tasks/lint/.*)$` | Files whose change triggers a full link check (`mise.toml` checked separately) |
+| `LYCHEE_SKIP_GITHUB_REMAPS`    | unset                                                    | Set to `true` to disable all GitHub URL remaps                                 |
 
 <!-- editorconfig-checker-enable -->
 

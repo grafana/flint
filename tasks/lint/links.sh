@@ -13,22 +13,23 @@ LYCHEE_CONFIG="${LYCHEE_CONFIG:-.github/config/lychee.toml}"
 
 eval "lychee_args=(${usage_lychee_args:-})"
 
-# Build --remap args to redirect base-branch GitHub URLs to the PR branch.
-# This ensures links like /blob/main/README.md resolve on the PR branch.
+# Build --remap args to redirect base-branch GitHub blob URLs to
+# raw.githubusercontent.com on the PR branch. This avoids GitHub's
+# API rate limiting (429) and ensures links like /blob/main/README.md
+# resolve on the PR branch.
 #
-# GitHub blob/tree URLs with line-number anchors (#L123) are rendered by
-# JavaScript, so lychee (which fetches static HTML) can never verify the
-# fragment. We strip the fragment and check the file exists instead.
+# Blob URLs are remapped to raw.githubusercontent.com which serves
+# files without rate limiting and lets lychee verify fragments against
+# raw content (workaround for lycheeverse/lychee#1729).
 #
-# For other fragment URLs (#section), we remap to raw.githubusercontent.com
-# which lets lychee verify the fragment against the raw file content (workaround for
-# https://github.com/lycheeverse/lychee/issues/1729).
+# Tree URLs stay on github.com (raw doesn't serve directories).
 #
 # Lychee uses first-match-wins for remaps, so order matters:
-#   1. Line-number anchors      → strip fragment, remap to head branch
-#   2. Scroll to Text Fragments → strip fragment, remap to head branch
-#   3. Other fragments           → remap to raw.githubusercontent.com
-#   4. No fragment               → remap to head branch (existing behavior)
+#   1. Line-number anchors      → strip fragment, remap to raw
+#   2. Scroll to Text Fragments → strip fragment, remap to raw
+#   3. All other /blob/ URLs    → remap to raw
+#   4. /tree/ line anchors      → strip fragment, remap to head branch
+#   5. /tree/ URLs              → remap to head branch
 #
 # Set LYCHEE_SKIP_GITHUB_REMAPS=true to skip the GitHub-specific remaps
 # emitted by this function (escape hatch if they cause unexpected behavior;
@@ -71,31 +72,28 @@ build_remap_args() {
 	head_repo="${PR_HEAD_REPO:-$repo}"
 
 	local base_url="https://github.com/${repo}"
+	local raw_head="https://raw.githubusercontent.com/${head_repo}/${head_ref}"
+
+	# /blob/ URLs — remap to raw.githubusercontent.com on the head branch.
+	# Lychee applies remaps in a single pass (no chaining), so we must
+	# target raw directly here rather than relying on the global rules.
+
+	# 1. Line-number anchors (#L123, #L10-L20): strip fragment, remap to raw
+	echo "--remap"
+	echo "^${base_url}/blob/${base_ref}/(.*?)#L[0-9]+.*\$ ${raw_head}/\$1"
+
+	# 2. Scroll to Text Fragment anchors (#:~:text=...): strip fragment, remap to raw
+	echo "--remap"
+	echo "^${base_url}/blob/${base_ref}/(.*?)#:~:text=.*\$ ${raw_head}/\$1"
+
+	# 3. All other /blob/ URLs (with or without fragments): remap to raw
+	echo "--remap"
+	echo "^${base_url}/blob/${base_ref}/(.*)\$ ${raw_head}/\$1"
+
+	# /tree/ URLs — can't use raw (no directory listing), keep on github.com
 	local head_url="https://github.com/${head_repo}"
 
-	# /blob/ URLs — four rules, order matters (first-match-wins):
-
-	# 1. Line-number anchors (#L123, #L10-L20): strip fragment, remap to head branch
-	echo "--remap"
-	echo "^${base_url}/blob/${base_ref}/(.*?)#L[0-9]+.*\$ ${head_url}/blob/${head_ref}/\$1"
-
-	# 2. Scroll to Text Fragment anchors (#:~:text=...): browser-only,
-	#    strip fragment, remap to head branch
-	echo "--remap"
-	echo "^${base_url}/blob/${base_ref}/(.*?)#:~:text=.*\$ ${head_url}/blob/${head_ref}/\$1"
-
-	# 3. Other fragment URLs (#section): remap to raw.githubusercontent.com
-	#    so lychee can verify the fragment in raw content
-	echo "--remap"
-	echo "^${base_url}/blob/${base_ref}/(.*#.*)\$ https://raw.githubusercontent.com/${head_repo}/${head_ref}/\$1"
-
-	# 4. Non-fragment URLs: branch-remap only (existing behavior)
-	echo "--remap"
-	echo "^${base_url}/blob/${base_ref}/(.*)\$ ${head_url}/blob/${head_ref}/\$1"
-
-	# /tree/ URLs — two rules:
-
-	# 1. Line-number anchors (#L123, #L10-L20): strip fragment, remap to head branch
+	# 1. Line-number anchors: strip fragment, remap to head branch
 	echo "--remap"
 	echo "^${base_url}/tree/${base_ref}/(.*?)#L[0-9]+.*\$ ${head_url}/tree/${head_ref}/\$1"
 
@@ -104,19 +102,24 @@ build_remap_args() {
 	echo "^${base_url}/tree/${base_ref}/(.*)\$ ${head_url}/tree/${head_ref}/\$1"
 }
 
-# Build global --remap and --exclude args for GitHub URLs that lychee
-# cannot verify regardless of repository.
+# Build global --remap args for GitHub URLs.
 #
-# These rules apply to ALL GitHub repos (not just the current one):
-#   - Line-number anchors (#L123, #L10-L20): rendered by JavaScript,
-#     lychee cannot verify them. We strip the fragment so the file
-#     itself is still checked.
-#   - Scroll to Text Fragment anchors (#:~:text=...): browser-only,
-#     lychee cannot verify them. We strip the fragment so the file
-#     itself is still checked.
-#   - Issue comment anchors (#issuecomment-*): rendered by JavaScript,
-#     lychee cannot verify them. The fragment is stripped so the
-#     issue/PR page itself is still checked.
+# Blob URLs are remapped to raw.githubusercontent.com to avoid
+# GitHub's API rate limiting (429). raw.githubusercontent.com
+# serves files without rate limiting and returns 404 for missing
+# files, so link validity is still verified.
+#
+# Fragment handling (first-match-wins, so order matters):
+#   - Line-number anchors (#L123, #L10-L20): JS-rendered, strip
+#     and remap to raw
+#   - Scroll to Text Fragment (#:~:text=...): browser-only, strip
+#     and remap to raw
+#   - Other fragments (#section): keep fragment, remap to raw
+#     (lychee can verify fragments in raw content)
+#   - No fragment: remap to raw
+#
+# Issue/PR comment anchors are stripped separately (these can't
+# be remapped to raw).
 #
 # We use --remap (not --exclude) because CLI --exclude overrides
 # config file excludes in lychee, rather than merging with them.
@@ -126,20 +129,28 @@ build_remap_args() {
 build_global_github_args() {
 	[ "${LYCHEE_SKIP_GITHUB_REMAPS:-}" != "true" ] || return 0
 
-	# Strip line-number anchors from /blob/ URLs (still checks the file exists)
+	# /blob/ URLs → raw.githubusercontent.com (avoids GitHub rate limiting)
+
+	# 1. Line-number anchors (#L123, #L10-L20): strip fragment, remap to raw
 	echo "--remap"
 	# shellcheck disable=SC2016 # single quotes are intentional: these are regex capture groups, not shell vars
-	echo '^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#L[0-9]+.*$ https://github.com/$1/blob/$2/$3'
+	echo '^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#L[0-9]+.*$ https://raw.githubusercontent.com/$1/$2/$3'
 
-	# Strip Scroll to Text Fragment anchors from /blob/ URLs (browser-only, not in static HTML)
+	# 2. Scroll to Text Fragment anchors: strip fragment, remap to raw
 	echo "--remap"
-	# shellcheck disable=SC2016 # single quotes are intentional: these are regex capture groups, not shell vars
-	echo '^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#:~:text=.*$ https://github.com/$1/blob/$2/$3'
+	# shellcheck disable=SC2016 # single quotes are intentional
+	echo '^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#:~:text=.*$ https://raw.githubusercontent.com/$1/$2/$3'
 
-	# Strip issue comment anchors (JS-rendered, not in static HTML).
-	# The issue page is still checked, just not the fragment.
-	# We use --remap instead of --exclude because CLI --exclude
-	# overrides (rather than merges with) config file excludes.
+	# 3. Other fragments (#section): keep fragment, remap to raw
+	echo "--remap"
+	# shellcheck disable=SC2016 # single quotes are intentional
+	echo '^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*)$ https://raw.githubusercontent.com/$1/$2/$3'
+
+	# 4. No fragment: remap to raw (caught by rule 3 above, but kept
+	#    explicit for clarity — lychee uses first-match-wins)
+
+	# Issue/PR comment anchors (JS-rendered, can't use raw for these).
+	# Strip the fragment so the issue/PR page itself is still checked.
 	echo "--remap"
 	# shellcheck disable=SC2016 # single quotes are intentional
 	echo '^https://github.com/([^/]+/[^/]+)/(issues|pull)/([0-9]+)#issuecomment-.*$ https://github.com/$1/$2/$3'

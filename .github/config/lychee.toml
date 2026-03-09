@@ -2,8 +2,10 @@
 # See https://lychee.cli.rs/config/
 
 timeout = 30
-retry_wait_time = 5
-max_retries = 6
+# Keep retries low to avoid compounding 429 rate limiting —
+# aggressive retries generate more requests, triggering more 429s.
+retry_wait_time = 10
+max_retries = 2
 max_concurrency = 4
 
 # Check link anchors

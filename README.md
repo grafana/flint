@@ -225,11 +225,8 @@ version is available.
 <!-- editorconfig-checker-enable -->
 
 When running in default mode, if a config change is detected
-(matching `LYCHEE_CONFIG_CHANGE_PATTERN` or lychee-related changes
-in `mise.toml`), the script falls back to `--full` behavior.
-Changes to `mise.toml` are content-aware: only lychee-related
-lines (e.g. version or task config) trigger a full check, not
-unrelated tool version bumps.
+(matching `LYCHEE_CONFIG_CHANGE_PATTERN`), the script falls back
+to `--full` behavior.
 
 **GitHub URL remaps:**
 
@@ -307,7 +304,7 @@ rather than merging with them.
 | Variable                       | Default                                                              | Description                                                          |
 | ------------------------------ | -------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | `LYCHEE_CONFIG`                | `.github/config/lychee.toml`                                         | Path to the lychee config file                                       |
-| `LYCHEE_CONFIG_CHANGE_PATTERN` | `^(\.github/config/lychee\.toml\|\.mise/tasks/lint/.*)$` | Regular expression for files whose change triggers a full link check. Changes to `mise.toml` are always checked separately for lychee-related content |
+| `LYCHEE_CONFIG_CHANGE_PATTERN` | `^(\.github/config/lychee\.toml\|\.mise/tasks/lint/.*\|mise\.toml)$` | Regular expression for files whose change triggers a full link check |
 | `LYCHEE_SKIP_GITHUB_REMAPS`    | unset                                                                | Set to `true` to disable all GitHub URL remaps                       |
 
 <!-- editorconfig-checker-enable -->

@@ -185,9 +185,7 @@ is_config_modified() {
 
 	# Pattern for detecting config changes that should trigger a full lint.
 	# Consuming repos can override this via LYCHEE_CONFIG_CHANGE_PATTERN.
-	# Note: mise.toml is handled separately below to avoid false positives
-	# from unrelated tool version bumps.
-	local default_pattern='^(\.github/config/lychee\.toml|\.mise/tasks/lint/.*)$'
+	local default_pattern='^(\.github/config/lychee\.toml|\.mise/tasks/lint/.*|mise\.toml)$'
 	local config_change_pattern="${LYCHEE_CONFIG_CHANGE_PATTERN:-$default_pattern}"
 
 	local config_modified
@@ -195,18 +193,7 @@ is_config_modified() {
 	config_modified=$(git diff --name-only --merge-base "$base" $head |
 		grep -E "$config_change_pattern" || true)
 
-	if [ -n "$config_modified" ]; then
-		return 0
-	fi
-
-	# For mise.toml, only trigger on lychee-related changes (version or task config),
-	# not on unrelated tool version bumps.
-	local lychee_changes
-	# shellcheck disable=SC2086 # intentional: head may expand to empty
-	lychee_changes=$(git diff --merge-base "$base" $head -- mise.toml |
-		grep -iE '^\+.*lychee|^-.*lychee' || true)
-
-	[ -n "$lychee_changes" ]
+	[ -n "$config_modified" ]
 }
 
 # shellcheck disable=SC2154 # usage_full is set by mise

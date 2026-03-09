@@ -280,11 +280,11 @@ rather than merging with them.
 
 <!-- editorconfig-checker-disable -->
 
-| Variable                       | Default                                                  | Description                                                                                |
-| ------------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `LYCHEE_CONFIG`                | `.github/config/lychee.toml`                             | Path to the lychee config file                                                             |
-| `LYCHEE_CONFIG_CHANGE_PATTERN` | `^(\.github/config/lychee\.toml\|\.mise/tasks/lint/.*)$` | Regex for files whose change triggers a full link check. `mise.toml` is checked separately |
-| `LYCHEE_SKIP_GITHUB_REMAPS`    | unset                                                    | Set to `true` to disable all GitHub URL remaps                                             |
+| Variable                       | Default                                                  | Description                                                                    |
+| ------------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `LYCHEE_CONFIG`                | `.github/config/lychee.toml`                             | Path to the lychee config file                                                 |
+| `LYCHEE_CONFIG_CHANGE_PATTERN` | `^(\.github/config/lychee\.toml\|\.mise/tasks/lint/.*)$` | Files whose change triggers a full link check (`mise.toml` checked separately) |
+| `LYCHEE_SKIP_GITHUB_REMAPS`    | unset                                                    | Set to `true` to disable all GitHub URL remaps                                 |
 
 <!-- editorconfig-checker-enable -->
 

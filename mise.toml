@@ -1,6 +1,6 @@
 [tools]
 lychee = "0.22.0"
-node = "24.14.0"
+node = "24.13.0"
 "npm:renovate" = "43.58.0"
 
 [env]

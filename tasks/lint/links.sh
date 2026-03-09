@@ -199,6 +199,12 @@ is_config_modified() {
 		return 0
 	fi
 
+	# Skip the mise.toml content check when the consumer overrides
+	# LYCHEE_CONFIG_CHANGE_PATTERN — they've taken full control.
+	if [ -n "${LYCHEE_CONFIG_CHANGE_PATTERN:-}" ]; then
+		return 1
+	fi
+
 	# For mise.toml, only trigger on lychee-related changes (version or task config),
 	# not on unrelated tool version bumps.
 	local lychee_changes

@@ -426,7 +426,8 @@ provide. You only need the files for the tasks you adopt:
   `.editorconfig`, etc.)
 - **`lint:links`** — Lychee config
   (`.github/config/lychee.toml`) for exclusions, timeouts,
-  remappings
+  remappings. **Recommended:** set `max_concurrency = 2` to
+  avoid GitHub 429 rate limiting on full checks
 - **`lint:renovate-deps`** — Renovate config
   (`.github/renovate.json5`) and committed snapshot
   (`.github/renovate-tracked-deps.json`)

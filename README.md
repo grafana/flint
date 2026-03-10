@@ -179,17 +179,17 @@ when `--autofix` is also set.
 
 Supported native linters (subset of super-linter):
 
-- `shellcheck`
-- `shfmt`
+- `actionlint`
+- `biome`
+- `codespell`
+- `editorconfig-checker`
+- `golangci-lint`
+- `hadolint`
 - `markdownlint`
 - `prettier`
-- `editorconfig-checker`
-- `actionlint`
-- `hadolint`
-- `golangci-lint`
 - `ruff`
-- `codespell`
-- `biome`
+- `shellcheck`
+- `shfmt`
 
 Tools must be installed separately (e.g., via
 `mise run setup:native-lint-tools`). Missing tools and unsupported

@@ -129,11 +129,10 @@ if [ "$NATIVE" = "true" ]; then
 	mapfile -t _CACHED_FILES < <(_list_files | _filter_files)
 
 	_find_files() {
-		local patterns="$*"
+		local -a patterns=("$@")
 		[ ${#_CACHED_FILES[@]} -eq 0 ] && return
-		# shellcheck disable=SC2086 # intentional word splitting of patterns
 		for file in "${_CACHED_FILES[@]}"; do
-			for pattern in $patterns; do
+			for pattern in "${patterns[@]}"; do
 				# shellcheck disable=SC2254 # glob pattern matching is intentional
 				case "$file" in
 				$pattern) echo "$file" ;;
@@ -227,8 +226,8 @@ if [ "$NATIVE" = "true" ]; then
 			fi
 		else
 			# Find matching files
-			# shellcheck disable=SC2086 # intentional word splitting of patterns
-			mapfile -t files < <(_find_files $patterns)
+			read -ra pattern_arr <<<"$patterns"
+			mapfile -t files < <(_find_files "${pattern_arr[@]}")
 
 			# mapfile produces a single empty element when input is empty
 			if [ ${#files[@]} -eq 0 ] || [[ ${#files[@]} -eq 1 && -z "${files[0]}" ]]; then

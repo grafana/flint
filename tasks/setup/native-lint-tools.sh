@@ -32,6 +32,8 @@ fi
 rm -f .mise.super-linter-*.toml
 
 FLINT_REPO="${FLINT_REPO:-grafana/flint}"
+# Fetching from main is safe: version mappings are keyed by super-linter version
+# (e.g. v8.4.0.toml) and their content is stable once committed.
 FLINT_REF="${FLINT_REF:-main}"
 
 echo "Fetching tool versions for super-linter ${VERSION}..."

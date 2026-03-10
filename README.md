@@ -177,10 +177,21 @@ otherwise all linters run unless explicitly `VALIDATE_*=false`.
 `FILTER_REGEX_EXCLUDE` is respected. `FIX_*` variables are honored
 when `--autofix` is also set.
 
-Supported native linters (subset of super-linter): `shellcheck`,
-`shfmt`, `markdownlint`, `prettier`, `editorconfig-checker`,
-`actionlint`, `hadolint`, `golangci-lint`, `ruff`, `codespell`,
-`biome`. Tools must be installed separately (e.g., via
+Supported native linters (subset of super-linter):
+
+- `shellcheck`
+- `shfmt`
+- `markdownlint`
+- `prettier`
+- `editorconfig-checker`
+- `actionlint`
+- `hadolint`
+- `golangci-lint`
+- `ruff`
+- `codespell`
+- `biome`
+
+Tools must be installed separately (e.g., via
 `mise run setup:native-lint-tools`). Missing tools and unsupported
 `VALIDATE_*` flags are skipped with a warning. Linter configs must
 be at standard project-root locations (not `.github/linters/`).

@@ -13,23 +13,26 @@ LYCHEE_CONFIG="${LYCHEE_CONFIG:-.github/config/lychee.toml}"
 
 eval "lychee_args=(${usage_lychee_args:-})"
 
-# Build --remap args to redirect base-branch GitHub blob URLs to
-# raw.githubusercontent.com on the PR branch. This avoids GitHub's
-# API rate limiting (429) and ensures links like /blob/main/README.md
-# resolve on the PR branch.
+# Build --remap args to redirect base-branch GitHub blob/tree URLs
+# so lychee can verify them without hitting GitHub's API rate limits.
 #
-# Blob URLs are remapped to raw.githubusercontent.com which serves
-# files without rate limiting and lets lychee verify fragments against
-# raw content (workaround for lycheeverse/lychee#1729).
+# Same-repo PRs (base and head are in the same repo):
+#   Remap to local file paths (file://$PWD/path) so lychee checks the
+#   working tree directly — no HTTP requests to GitHub at all.
 #
-# Tree URLs stay on github.com (raw doesn't serve directories).
+# Fork PRs (head repo differs from base repo):
+#   Remap blob URLs to raw.githubusercontent.com which serves files
+#   without rate limiting and lets lychee verify fragments against
+#   raw content (workaround for lycheeverse/lychee#1729).
+#   Tree URLs stay on github.com (raw doesn't serve directories).
 #
-# Lychee uses first-match-wins for remaps, so order matters:
-#   1. Line-number anchors      → strip fragment, remap to raw
-#   2. Scroll to Text Fragments → strip fragment, remap to raw
-#   3. All other /blob/ URLs    → remap to raw
-#   4. /tree/ line anchors      → strip fragment, remap to head branch
-#   5. /tree/ URLs              → remap to head branch
+# Fragment handling (first-match-wins, so order matters):
+#   1. Line-number anchors (#L123)      → strip fragment
+#   2. Scroll to Text Fragments         → strip fragment
+#   3. Section fragments (#section)     → local file (same-repo) or raw (fork)
+#   4. No fragment                      → remap directly
+#   5. /tree/ line anchors              → strip fragment
+#   6. /tree/ URLs                      → remap directly
 #
 # Set LYCHEE_SKIP_GITHUB_REMAPS=true to skip the GitHub-specific remaps
 # emitted by this function (escape hatch if they cause unexpected behavior;
@@ -72,34 +75,67 @@ build_remap_args() {
 	head_repo="${PR_HEAD_REPO:-$repo}"
 
 	local base_url="https://github.com/${repo}"
-	local raw_head="https://raw.githubusercontent.com/${head_repo}/${head_ref}"
 
-	# /blob/ URLs — remap to raw.githubusercontent.com on the head branch.
-	# Lychee applies remaps in a single pass (no chaining), so we must
-	# target raw directly here rather than relying on the global rules.
+	if [ "$head_repo" = "$repo" ]; then
+		# Same-repo PR: remap to local file paths for zero HTTP requests.
+		# The working tree IS the PR branch, so local files are correct.
 
-	# 1. Line-number anchors (#L123, #L10-L20): strip fragment, remap to raw
-	echo "--remap"
-	echo "^${base_url}/blob/${base_ref}/(.*?)#L[0-9]+.*\$ ${raw_head}/\$1"
+		# /blob/ URLs — three rules, order matters (first-match-wins):
 
-	# 2. Scroll to Text Fragment anchors (#:~:text=...): strip fragment, remap to raw
-	echo "--remap"
-	echo "^${base_url}/blob/${base_ref}/(.*?)#:~:text=.*\$ ${raw_head}/\$1"
+		# 1. Line-number anchors (#L123, #L10-L20): strip fragment, check file locally
+		echo "--remap"
+		echo "^${base_url}/blob/${base_ref}/(.*?)#L[0-9]+.*\$ file://${PWD}/\$1"
 
-	# 3. All other /blob/ URLs (with or without fragments): remap to raw
-	echo "--remap"
-	echo "^${base_url}/blob/${base_ref}/(.*)\$ ${raw_head}/\$1"
+		# 2. Scroll to Text Fragment anchors (#:~:text=...): strip fragment, check file locally
+		echo "--remap"
+		echo "^${base_url}/blob/${base_ref}/(.*?)#:~:text=.*\$ file://${PWD}/\$1"
 
-	# /tree/ URLs — can't use raw (no directory listing), keep on github.com
-	local head_url="https://github.com/${head_repo}"
+		# 3. Other fragment URLs (#section) and no-fragment: check locally
+		#    (lychee can verify fragments in local files)
+		echo "--remap"
+		echo "^${base_url}/blob/${base_ref}/(.*)\$ file://${PWD}/\$1"
 
-	# 1. Line-number anchors: strip fragment, remap to head branch
-	echo "--remap"
-	echo "^${base_url}/tree/${base_ref}/(.*?)#L[0-9]+.*\$ ${head_url}/tree/${head_ref}/\$1"
+		# /tree/ URLs — local directory check:
 
-	# 2. Non-fragment URLs: branch-remap only
-	echo "--remap"
-	echo "^${base_url}/tree/${base_ref}/(.*)\$ ${head_url}/tree/${head_ref}/\$1"
+		# 4. Line-number anchors on tree URLs: strip fragment, check directory locally
+		echo "--remap"
+		echo "^${base_url}/tree/${base_ref}/(.*?)#L[0-9]+.*\$ file://${PWD}/\$1"
+
+		# 5. Non-fragment tree URLs: check directory locally
+		echo "--remap"
+		echo "^${base_url}/tree/${base_ref}/(.*)\$ file://${PWD}/\$1"
+	else
+		# Fork PR: can't check locally (different repo), use HTTP remaps.
+		# Blob URLs go to raw.githubusercontent.com to avoid rate limiting.
+		local raw_head="https://raw.githubusercontent.com/${head_repo}/${head_ref}"
+		local head_url="https://github.com/${head_repo}"
+
+		# /blob/ URLs — remap to raw.githubusercontent.com on the head branch.
+		# Lychee applies remaps in a single pass (no chaining), so we must
+		# target raw directly here rather than relying on the global rules.
+
+		# 1. Line-number anchors (#L123, #L10-L20): strip fragment, remap to raw
+		echo "--remap"
+		echo "^${base_url}/blob/${base_ref}/(.*?)#L[0-9]+.*\$ ${raw_head}/\$1"
+
+		# 2. Scroll to Text Fragment anchors (#:~:text=...): strip fragment, remap to raw
+		echo "--remap"
+		echo "^${base_url}/blob/${base_ref}/(.*?)#:~:text=.*\$ ${raw_head}/\$1"
+
+		# 3. All other /blob/ URLs (with or without fragments): remap to raw
+		echo "--remap"
+		echo "^${base_url}/blob/${base_ref}/(.*)\$ ${raw_head}/\$1"
+
+		# /tree/ URLs — can't use raw (no directory listing), keep on github.com
+
+		# 4. Line-number anchors: strip fragment, remap to head branch
+		echo "--remap"
+		echo "^${base_url}/tree/${base_ref}/(.*?)#L[0-9]+.*\$ ${head_url}/tree/${head_ref}/\$1"
+
+		# 5. Non-fragment tree URLs: remap to head branch
+		echo "--remap"
+		echo "^${base_url}/tree/${base_ref}/(.*)\$ ${head_url}/tree/${head_ref}/\$1"
+	fi
 }
 
 # Build global --remap args for GitHub URLs.

@@ -19,6 +19,18 @@ fi
 VERSION="${SUPER_LINTER_VERSION#slim-}"
 VERSION="${VERSION%%@*}"
 
+FLINT_REPO="${FLINT_REPO:-grafana/flint}"
+
+# Derive FLINT_REF from the flint SHA pinned in mise.toml task URLs.
+# Consuming repos pin flint tasks to a specific commit SHA, e.g.:
+#   file = "https://raw.githubusercontent.com/grafana/flint/<sha>/tasks/..."
+# This ensures the version mapping matches the flint version in use.
+# Falls back to "main" for flint itself (where tasks are local file paths).
+if [ -z "${FLINT_REF:-}" ]; then
+	FLINT_REF=$(grep -oP "raw\\.githubusercontent\\.com/${FLINT_REPO}/\\K[a-f0-9]{40}" mise.toml 2>/dev/null | head -1)
+	FLINT_REF="${FLINT_REF:-main}"
+fi
+
 ENV_NAME="super-linter-${VERSION}"
 LOCAL_TOML=".mise.${ENV_NAME}.toml"
 
@@ -30,11 +42,6 @@ fi
 
 # Clean up old versions
 rm -f .mise.super-linter-*.toml
-
-FLINT_REPO="${FLINT_REPO:-grafana/flint}"
-# Fetching from main is safe: version mappings are keyed by super-linter version
-# (e.g. v8.4.0.toml) and their content is stable once committed.
-FLINT_REF="${FLINT_REF:-main}"
 
 echo "Fetching tool versions for super-linter ${VERSION}..."
 REMOTE_URL="https://raw.githubusercontent.com/${FLINT_REPO}/${FLINT_REF}/super-linter-versions/${VERSION}.toml"

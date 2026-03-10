@@ -27,7 +27,9 @@ FLINT_REPO="${FLINT_REPO:-grafana/flint}"
 # This ensures the version mapping matches the flint version in use.
 # Falls back to "main" for flint itself (where tasks are local file paths).
 if [ -z "${FLINT_REF:-}" ]; then
-	FLINT_REF=$(grep -oP "raw\\.githubusercontent\\.com/${FLINT_REPO}/\\K[a-f0-9]{40}" mise.toml 2>/dev/null | head -1)
+	FLINT_REF=$(grep -oP \
+		"raw\\.githubusercontent\\.com/${FLINT_REPO}/\\K[a-f0-9]{40}" \
+		mise.toml 2>/dev/null | head -1 || true)
 	FLINT_REF="${FLINT_REF:-main}"
 fi
 
@@ -43,14 +45,21 @@ fi
 # Clean up old versions
 rm -f .mise.super-linter-*.toml
 
-echo "Fetching tool versions for super-linter ${VERSION}..."
-REMOTE_URL="https://raw.githubusercontent.com/${FLINT_REPO}/${FLINT_REF}/super-linter-versions/${VERSION}.toml"
+VERSION_FILE="super-linter-versions/${VERSION}.toml"
 
-if ! curl -fsSL "$REMOTE_URL" -o "$LOCAL_TOML"; then
-	echo "Failed to fetch version mapping from ${REMOTE_URL}"
-	echo "No version mapping available for super-linter ${VERSION}."
-	rm -f "$LOCAL_TOML"
-	exit 1
+# Use local file if available (flint itself), otherwise fetch from GitHub
+if [ -f "$VERSION_FILE" ]; then
+	cp "$VERSION_FILE" "$LOCAL_TOML"
+else
+	echo "Fetching tool versions for super-linter ${VERSION}..."
+	REMOTE_URL="https://raw.githubusercontent.com/${FLINT_REPO}/${FLINT_REF}/${VERSION_FILE}"
+
+	if ! curl -fsSL "$REMOTE_URL" -o "$LOCAL_TOML"; then
+		echo "Failed to fetch version mapping from ${REMOTE_URL}"
+		echo "No version mapping available for super-linter ${VERSION}."
+		rm -f "$LOCAL_TOML"
+		exit 1
+	fi
 fi
 
 echo "Installing native lint tools..."

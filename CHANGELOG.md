@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.8.0](https://github.com/grafana/flint/compare/v0.7.1...v0.8.0) (2026-03-11)
+
+
+### Features
+
+* add native linting mode and version mapping infrastructure ([#93](https://github.com/grafana/flint/issues/93)) ([24b06da](https://github.com/grafana/flint/commit/24b06da3eeeb97722cf280b5815c75c3ec31f134))
+
+
+### Bug Fixes
+
+* add 'mise run fix' hint to lint failure output ([#90](https://github.com/grafana/flint/issues/90)) ([5b4ad5d](https://github.com/grafana/flint/commit/5b4ad5d2a2fc53e0d11de924b183adb4fb4f5a90))
+* improve link checker reliability against GitHub rate limiting ([#95](https://github.com/grafana/flint/issues/95)) ([7a5282d](https://github.com/grafana/flint/commit/7a5282de91df8a67dad3fd6ac8fc2b082434d8df))
+* remap same-repo GitHub URLs to local file paths ([#100](https://github.com/grafana/flint/issues/100)) ([b4feadd](https://github.com/grafana/flint/commit/b4feaddd9af690574eaefc112f465b556bf9c345))
+
 ## [0.7.1](https://github.com/grafana/flint/compare/v0.7.0...v0.7.1) (2026-03-02)
 
 

@@ -138,54 +138,58 @@ build_remap_args() {
 	fi
 }
 
-# Build global --remap args for GitHub URLs.
+# Build global --remap args for cross-repo GitHub URLs.
 #
-# Blob URLs are remapped to raw.githubusercontent.com to avoid
-# GitHub's API rate limiting (429). raw.githubusercontent.com
-# serves files without rate limiting and returns 404 for missing
-# files, so link validity is still verified.
+# GitHub serves blob pages as React apps, so lychee can't verify
+# #section fragments against the HTML (lycheeverse/lychee#1729).
+# Remapping to raw.githubusercontent.com gives lychee actual file
+# content where fragments resolve. This also avoids GitHub's web
+# rate limits (429s), since raw.githubusercontent.com is unmetered.
 #
-# Fragment handling (first-match-wins, so order matters):
-#   - Line-number anchors (#L123, #L10-L20): JS-rendered, strip
-#     and remap to raw
-#   - Scroll to Text Fragment (#:~:text=...): browser-only, strip
-#     and remap to raw
-#   - Other fragments (#section): keep fragment, remap to raw
-#     (lychee can verify fragments in raw content)
-#   - No fragment: remap to raw
+# Only paths with a file extension (dot in last component) are
+# remapped — directory paths like /blob/main/some-dir have no
+# fragments and return 404 on raw.
 #
-# Issue/PR comment anchors are stripped separately (these can't
-# be remapped to raw).
+# Decision tree for GitHub URLs:
 #
-# We use --remap (not --exclude) because CLI --exclude overrides
-# config file excludes in lychee, rather than merging with them.
+#   Same-repo /blob/ or /tree/?
+#   ├─ Yes → build_remap_args() above
+#   │   ├─ Same-origin PR → file:// (local checkout)
+#   │   └─ Fork PR → raw.githubusercontent.com (head branch)
+#   └─ No (cross-repo) → this function
+#       ├─ /blob/ with file extension → raw (fragment + rate limit)
+#       ├─ /blob/ without extension → leave for GitHub (directory)
+#       └─ issue/PR #comment anchor → strip fragment, keep on GitHub
 #
 # Set LYCHEE_SKIP_GITHUB_REMAPS=true to skip these (same escape hatch
 # as for the repo-specific remaps above).
 build_global_github_args() {
 	[ "${LYCHEE_SKIP_GITHUB_REMAPS:-}" != "true" ] || return 0
 
-	# /blob/ URLs → raw.githubusercontent.com (avoids GitHub rate limiting)
+	# /blob/ URLs → raw.githubusercontent.com (enables fragment checking
+	# and avoids web rate limits). Only match paths where the last
+	# component contains a dot (file extension), skipping directories.
+
+	local gh='https://github.com'
+	local raw='https://raw.githubusercontent.com'
+	# editorconfig-checker-disable
+	local blob='([^/]+/[^/]+)/blob/([^/]+)/(.*\.[^/#]+)'
 
 	# 1. Line-number anchors (#L123, #L10-L20): strip fragment, remap to raw
 	echo "--remap"
-	# shellcheck disable=SC2016 # single quotes are intentional: these are regex capture groups, not shell vars
-	echo '^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#L[0-9]+.*$ https://raw.githubusercontent.com/$1/$2/$3'
+	echo "^${gh}/${blob}#L[0-9]+.*\$ ${raw}/\$1/\$2/\$3"
 
 	# 2. Scroll to Text Fragment anchors: strip fragment, remap to raw
 	echo "--remap"
-	# shellcheck disable=SC2016 # single quotes are intentional
-	echo '^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#:~:text=.*$ https://raw.githubusercontent.com/$1/$2/$3'
+	echo "^${gh}/${blob}#:~:text=.*\$ ${raw}/\$1/\$2/\$3"
 
-	# 3. Other fragments (#section): keep fragment, remap to raw
+	# 3. All other /blob/ URLs with file extension: remap to raw
+	#    (preserves #section fragments so lychee can verify them)
 	echo "--remap"
-	# shellcheck disable=SC2016 # single quotes are intentional
-	echo '^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*)$ https://raw.githubusercontent.com/$1/$2/$3'
+	echo "^${gh}/${blob}(.*)\$ ${raw}/\$1/\$2/\$3\$4"
+	# editorconfig-checker-enable
 
-	# 4. No fragment: remap to raw (caught by rule 3 above, but kept
-	#    explicit for clarity — lychee uses first-match-wins)
-
-	# Issue/PR comment anchors (JS-rendered, can't use raw for these).
+	# Issue/PR comment anchors (JS-rendered, can't verify fragments).
 	# Strip the fragment so the issue/PR page itself is still checked.
 	echo "--remap"
 	# shellcheck disable=SC2016 # single quotes are intentional

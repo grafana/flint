@@ -514,17 +514,4 @@ find the commit SHA for a release tag, run
 
 See [RELEASING.md](RELEASING.md).
 
-**After merging a release that bumps `SUPER_LINTER_VERSION`:**
-regenerate the native lint tool version mapping and commit it:
-
-```bash
-mise run setup:update-super-linter-versions
-git add super-linter-versions/
-git commit -m "chore: regenerate super-linter version mapping"
-```
-
-<!-- TODO: automate this via Renovate postUpgradeTasks once
-     grafana/grafana-renovate-config supports `mise run` commands
-     (see https://github.com/grafana/grafana-renovate-config/pull/65) -->
-
 [stf]: https://developer.mozilla.org/en-US/docs/Web/URI/Fragment/Text_fragments

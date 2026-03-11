@@ -104,55 +104,20 @@ build_remap_args() {
 
 # Build global --remap args for GitHub URLs.
 #
-# Blob URLs are remapped to raw.githubusercontent.com to avoid
-# GitHub's API rate limiting (429). raw.githubusercontent.com
-# serves files without rate limiting and returns 404 for missing
-# files, so link validity is still verified.
+# Only handles JS-rendered fragments that lychee can't verify.
+# Cross-repo /blob/ URLs are NOT remapped to raw.githubusercontent.com
+# because we can't distinguish files from directories — directories
+# return 404 on raw, causing false failures.
+# Same-repo /blob/ remaps are handled by build_remap_args() above.
 #
-# Fragment handling (first-match-wins, so order matters):
-#   - Line-number anchors (#L123, #L10-L20): JS-rendered, strip
-#     and remap to raw
-#   - Scroll to Text Fragment (#:~:text=...): browser-only, strip
-#     and remap to raw
-#   - Other fragments (#section): keep fragment, remap to raw
-#     (lychee can verify fragments in raw content)
-#   - No fragment: remap to raw
-#
-# Issue/PR comment anchors are stripped separately (these can't
-# be remapped to raw).
-#
-# We use --remap (not --exclude) because CLI --exclude overrides
-# config file excludes in lychee, rather than merging with them.
-#
-# Set LYCHEE_SKIP_GITHUB_REMAPS=true to skip these (same escape hatch
-# as for the repo-specific remaps above).
+# Set LYCHEE_SKIP_GITHUB_REMAPS=true to skip these.
 build_global_github_args() {
 	[ "${LYCHEE_SKIP_GITHUB_REMAPS:-}" != "true" ] || return 0
 
-	# /blob/ URLs → raw.githubusercontent.com (avoids GitHub rate limiting)
-
-	# 1. Line-number anchors (#L123, #L10-L20): strip fragment, remap to raw
-	echo "--remap"
-	# shellcheck disable=SC2016 # single quotes are intentional: these are regex capture groups, not shell vars
-	echo '^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#L[0-9]+.*$ https://raw.githubusercontent.com/$1/$2/$3'
-
-	# 2. Scroll to Text Fragment anchors: strip fragment, remap to raw
-	echo "--remap"
-	# shellcheck disable=SC2016 # single quotes are intentional
-	echo '^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#:~:text=.*$ https://raw.githubusercontent.com/$1/$2/$3'
-
-	# 3. Other fragments (#section): keep fragment, remap to raw
-	echo "--remap"
-	# shellcheck disable=SC2016 # single quotes are intentional
-	echo '^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*)$ https://raw.githubusercontent.com/$1/$2/$3'
-
-	# 4. No fragment: remap to raw (caught by rule 3 above, but kept
-	#    explicit for clarity — lychee uses first-match-wins)
-
-	# Issue/PR comment anchors (JS-rendered, can't use raw for these).
+	# Issue/PR comment anchors (JS-rendered, can't verify fragments).
 	# Strip the fragment so the issue/PR page itself is still checked.
 	echo "--remap"
-	# shellcheck disable=SC2016 # single quotes are intentional
+	# shellcheck disable=SC2016 # single quotes are intentional: these are regex capture groups, not shell vars
 	echo '^https://github.com/([^/]+/[^/]+)/(issues|pull)/([0-9]+)#issuecomment-.*$ https://github.com/$1/$2/$3'
 }
 

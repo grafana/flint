@@ -157,9 +157,44 @@ Docker versioning).
 | Flag        | Description                                                  |
 | ----------- | ------------------------------------------------------------ |
 | `--autofix` | Enable autofix mode (enables `FIX_*` vars from the env file) |
+| `--native`  | Run linters natively instead of via container                |
+| `--full`    | Lint all files instead of only changed files                 |
 
 When autofix is not enabled, all `FIX_*` lines are filtered out of
 the env file before running Super-Linter.
+
+**Native mode:**
+
+The `--native` flag runs a **subset** of linters directly on
+the host for fast local feedback. It is not a full replacement
+for the Super-Linter container — CI should always use the
+container for comprehensive checks.
+
+Native mode reads the same `super-linter.env` file and follows
+Super-Linter's default logic for determining which linters are
+enabled: if any `VALIDATE_*=true` is set, only those linters run;
+otherwise all linters run unless explicitly `VALIDATE_*=false`.
+`FILTER_REGEX_EXCLUDE` is respected. `FIX_*` variables are honored
+when `--autofix` is also set.
+
+Supported native linters (subset of super-linter):
+
+- `actionlint`
+- `biome`
+- `codespell`
+- `editorconfig-checker`
+- `golangci-lint`
+- `hadolint`
+- `markdownlint`
+- `prettier`
+- `ruff`
+- `shellcheck`
+- `shfmt`
+
+Tools must be installed separately (e.g., via
+`mise run setup:native-lint-tools`). Missing tools and unsupported
+`VALIDATE_*` flags are skipped with a warning. Linter configs must
+be at standard project-root locations (not `.github/linters/`).
 
 **Environment variables:**
 
@@ -396,6 +431,35 @@ mise run lint:renovate-deps --autofix         # Regenerate tracked deps
 Linters that don't support autofix (like lychee link checker)
 silently ignore the `AUTOFIX` environment variable.
 
+## Pre-commit hook
+
+Flint provides a `pre-commit` task that runs native linters with
+autofix on every commit — fast feedback without the container
+overhead. To set it up:
+
+```bash
+mise run setup:pre-commit-hook
+```
+
+This generates a `.git/hooks/pre-commit` that runs
+`mise run pre-commit`, which uses `--native --autofix` to fix
+formatting issues before the commit completes.
+
+**For consuming repos**, add these tasks to your `mise.toml`:
+
+```toml
+[tasks.pre-commit]
+description = "Pre-commit hook: native lint with autofix"
+depends = ["setup:native-lint-tools"]
+run = "mise run lint:super-linter -- --native --autofix"
+
+[tasks."setup:pre-commit-hook"]
+description = "Install git pre-commit hook"
+run = "mise generate git-pre-commit --write --task=pre-commit"
+```
+
+Then run `mise run setup:pre-commit-hook` once per clone.
+
 ## Automatic version updates with Renovate
 
 Flint provides a [Renovate shareable preset](https://docs.renovatebot.com/config-presets/)
@@ -448,13 +512,6 @@ find the commit SHA for a release tag, run
 
 ## Releasing
 
-Releases are automated via
-[Release Please](https://github.com/googleapis/release-please).
-When conventional commits land on `main`, Release Please opens
-(or updates) a release PR with a changelog.
-
-> **Note:** CI checks don't trigger automatically on release-please
-> PRs because they are created with `GITHUB_TOKEN`. To run CI,
-> either click **Update branch** or **close and reopen** the PR.
+See [RELEASING.md](RELEASING.md).
 
 [stf]: https://developer.mozilla.org/en-US/docs/Web/URI/Fragment/Text_fragments

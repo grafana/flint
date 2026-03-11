@@ -37,7 +37,12 @@ All task scripts follow these conventions:
 **`tasks/lint/`** - Linting validators:
 
 - `super-linter.sh`: Runs Super-Linter via Docker/Podman,
-  auto-detects runtime, handles SELinux on Fedora
+  auto-detects runtime, handles SELinux on Fedora.
+  `--native` flag runs a **subset** of linters directly
+  on the host for fast local feedback (not a full
+  replacement for the container — CI uses the full set).
+  `--full` flag lints all files instead of only changed
+  files (applies to both native and container modes)
 - `links.sh`: Runs lychee link checker with two default
   checks (all links in modified files + local links in all
   files) and a `--full` flag for comprehensive checking
@@ -51,7 +56,9 @@ All task scripts follow these conventions:
 
 1. **Container runtime detection**: `super-linter.sh` tries
    podman first (with SELinux "z" mount flag),
-   falls back to Docker
+   falls back to Docker. With `--native`, the container
+   runtime is bypassed entirely and linters run directly
+   on the host
 2. **AUTOFIX mode**: Lint scripts that support fixing accept
    `--autofix` flag and `AUTOFIX` env var for unified fix
    workflows:
@@ -101,13 +108,54 @@ This ensures all files pass CI linting (Biome formatting,
 shellcheck, etc.). Review the auto-fixed files before
 committing — auto-fixes may produce unexpected results.
 
+A pre-commit hook can automate this — run
+`mise run setup:pre-commit-hook` once per clone to install
+it. The hook runs native linters with autofix on every
+commit.
+
 ```bash
 # Auto-fix and verify (recommended dev workflow)
 mise run fix
 
 # Verify only (same command used in CI)
 mise run lint
+
+# Install pre-commit hook (one-time setup)
+mise run setup:pre-commit-hook
 ```
+
+## Native Mode Tips
+
+For faster native linting, consider switching
+`super-linter.env` from a deny-list
+(`VALIDATE_X=false` for each unwanted linter) to an
+allow-list (only `VALIDATE_X=true` for linters you
+want). Super-linter's logic — and native mode — treats
+any explicit `VALIDATE_*=true` as "only run these".
+This avoids noise from linters like `golangci-lint`
+running on non-Go repos.
+
+After updating the super-linter version in `mise.toml`,
+run `mise run setup:native-lint-tools` on the host to
+install matching tool versions. Tools not installed are
+skipped with a warning in native mode.
+
+**Config files:** Native mode requires linter configs at
+standard locations (project root), not in
+`.github/linters/` (super-linter's convention). The
+script errors if `.github/linters/` exists. All
+supported linters auto-discover their config:
+`shellcheck`→`.shellcheckrc`,
+`markdownlint`→`.markdownlint.json`,
+`editorconfig-checker`→`.ecrc`,
+`actionlint`→`.github/actionlint.yml`,
+`hadolint`→`.hadolint.yaml`,
+`golangci-lint`→`.golangci.yml`,
+`ruff`→`ruff.toml`/`pyproject.toml`,
+`codespell`→`.codespellrc`/`pyproject.toml`,
+`biome`→`biome.json`,
+`prettier`→`.prettierrc`,
+`shfmt`→`.editorconfig`.
 
 ## Adding New Linters
 

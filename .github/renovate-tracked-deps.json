@@ -1,9 +1,4 @@
 {
-  ".github/workflows/generate-super-linter-versions.yml": {
-    "regex": [
-      "mise"
-    ]
-  },
   ".github/workflows/lint.yml": {
     "regex": [
       "mise"

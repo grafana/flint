@@ -512,13 +512,6 @@ find the commit SHA for a release tag, run
 
 ## Releasing
 
-Releases are automated via
-[Release Please](https://github.com/googleapis/release-please).
-When conventional commits land on `main`, Release Please opens
-(or updates) a release PR with a changelog.
-
-> **Note:** CI checks don't trigger automatically on release-please
-> PRs because they are created with `GITHUB_TOKEN`. To run CI,
-> either click **Update branch** or **close and reopen** the PR.
+See [RELEASING.md](RELEASING.md).
 
 [stf]: https://developer.mozilla.org/en-US/docs/Web/URI/Fragment/Text_fragments

@@ -1,0 +1,54 @@
+---
+name: Generate Super-Linter Versions
+
+on:
+  push:
+    branches:
+      - "grafanarenovatebot/**"
+    paths:
+      - "mise.toml"
+
+permissions: {}
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.ref }}
+          # zizmor: ignore[artipacked] -- needs credentials to push
+          persist-credentials: true
+      - uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3.6.3
+        with:
+          version: v2026.3.3
+          sha256: ed251b4588512ab64e2372fd3dacffd6bad574ae9e20c311fb864ff65c2a6c8a
+      - name: Check if SUPER_LINTER_VERSION changed
+        id: check
+        run: |
+          git fetch origin main
+          if git diff origin/main -- mise.toml | grep -q 'SUPER_LINTER_VERSION'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Generate version mapping
+        if: steps.check.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: mise run setup:update-super-linter-versions
+      - name: Commit and push
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git diff --quiet && exit 0
+          UNEXPECTED=$(git diff --name-only | grep -v '^super-linter-versions/' || true)
+          if [[ -n "$UNEXPECTED" ]]; then
+            echo "::error::Unexpected files changed:"
+            echo "$UNEXPECTED"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 'super-linter-versions/*.toml'
+          git commit -m "chore: regenerate super-linter version mapping"
+          git push

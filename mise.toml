@@ -1,7 +1,7 @@
 [tools]
 lychee = "0.22.0"
 node = "24.14.0"
-"npm:renovate" = "43.59.3"
+"npm:renovate" = "43.59.5"
 
 [env]
 RENOVATE_TRACKED_DEPS_EXCLUDE="github-actions,github-runners"

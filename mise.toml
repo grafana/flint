@@ -16,7 +16,7 @@ file = "tasks/lint/super-linter.sh"
 [tasks."lint:super-linter-native"]
 description = "Run linters natively (fast, for local dev)"
 depends = ["setup:native-lint-tools"]
-run = "mise run lint:super-linter -- --native"
+run = [{ task = "lint:super-linter", env = { NATIVE = "true" } }]
 
 [tasks."setup:native-lint-tools"]
 description = "Install native lint tools matching the pinned super-linter version"
@@ -42,10 +42,14 @@ depends = ["lint:super-linter", "lint:links", "lint:renovate-deps"]
 description = "Auto-fix lint issues and regenerate tracked deps"
 run = "AUTOFIX=true mise run lint"
 
+[tasks.native-lint]
+description = "Run lints natively (no container)"
+run = "NATIVE=true mise run lint"
+
 [tasks.pre-commit]
-description = "Pre-commit hook: native lint with autofix"
+description = "Pre-commit hook: native lint"
 depends = ["setup:native-lint-tools"]
-run = "mise run lint:super-linter -- --native --autofix"
+run = [{ task = "lint:super-linter", env = { NATIVE = "true" } }]
 
 [tasks."setup:pre-commit-hook"]
 description = "Install git pre-commit hook that runs native linting"

@@ -101,6 +101,10 @@ depends = ["lint:super-linter", "lint:links", "lint:renovate-deps"]
 [tasks.fix]
 description = "Auto-fix lint issues and regenerate tracked deps"
 run = "AUTOFIX=true mise run lint"
+
+[tasks.native-lint]
+description = "Run lints natively (no container)"
+run = "NATIVE=true mise run lint"
 ```
 
 Finally, extend the flint [Renovate preset](#automatic-version-updates-with-renovate)
@@ -159,6 +163,11 @@ Docker versioning).
 | `--autofix` | Enable autofix mode (enables `FIX_*` vars from the env file) |
 | `--native`  | Run linters natively instead of via container                |
 | `--full`    | Lint all files instead of only changed files                 |
+
+`--autofix` and `--native` can also be set via the `AUTOFIX=true`
+and `NATIVE=true` environment variables respectively. This is how
+the `fix` and `native-lint` meta-tasks propagate them through the
+`depends` chain.
 
 When autofix is not enabled, all `FIX_*` lines are filtered out of
 the env file before running Super-Linter.
@@ -405,11 +414,13 @@ committed `.github/renovate-tracked-deps.json`:
   scans, the linter will detect the change and require
   regeneration.
 
-## How AUTOFIX Works
+## How AUTOFIX and NATIVE Work
 
-Lint scripts that support fixing accept an `--autofix` flag. Autofix
-can also be enabled via the `AUTOFIX=true` environment variable, which
-is how the `fix` meta-task propagates it through the dependency chain.
+Lint scripts accept `--autofix` and `--native` flags. Both can also be
+set as environment variables (`AUTOFIX=true`, `NATIVE=true`), which is
+how the `fix` and `native-lint` meta-tasks propagate them through the
+`depends` chain — mise's `depends` cannot forward CLI flags, but env
+vars flow through naturally.
 
 **Check mode** (default):
 
@@ -431,27 +442,40 @@ mise run lint:renovate-deps --autofix         # Regenerate tracked deps
 Linters that don't support autofix (like lychee link checker)
 silently ignore the `AUTOFIX` environment variable.
 
+**Native mode:**
+
+```bash
+mise run native-lint                          # All lints, natively (no container)
+# Or run directly:
+NATIVE=true mise run lint                     # Same effect
+mise run lint:super-linter -- --native        # Single task with CLI flag
+```
+
+Native mode is useful in environments where Docker/Podman is
+unavailable (e.g., inside containers, CI hooks). Tasks that don't
+use a container (like `lint:links`) ignore the `NATIVE` variable.
+
 ## Pre-commit hook
 
-Flint provides a `pre-commit` task that runs native linters with
-autofix on every commit — fast feedback without the container
-overhead. To set it up:
+Flint provides a `pre-commit` task that runs native linters on
+every commit — fast feedback without the container overhead. To
+set it up:
 
 ```bash
 mise run setup:pre-commit-hook
 ```
 
 This generates a `.git/hooks/pre-commit` that runs
-`mise run pre-commit`, which uses `--native --autofix` to fix
-formatting issues before the commit completes.
+`mise run pre-commit`, which uses native mode for fast checks
+without requiring a container.
 
 **For consuming repos**, add these tasks to your `mise.toml`:
 
 ```toml
 [tasks.pre-commit]
-description = "Pre-commit hook: native lint with autofix"
+description = "Pre-commit hook: native lint"
 depends = ["setup:native-lint-tools"]
-run = "mise run lint:super-linter -- --native --autofix"
+run = [{ task = "lint:super-linter", env = { NATIVE = "true" } }]
 
 [tasks."setup:pre-commit-hook"]
 description = "Install git pre-commit hook"

@@ -420,11 +420,12 @@ committed `.github/renovate-tracked-deps.json`:
 
 ## How AUTOFIX and NATIVE Work
 
-Lint scripts accept `--autofix` and `--native` flags. Both can also be
-set as environment variables (`AUTOFIX=true`, `NATIVE=true`), which is
-how the `fix` and `native-lint` meta-tasks propagate them through the
-`depends` chain — mise's `depends` cannot forward CLI flags, but env
-vars flow through naturally.
+`lint:super-linter` accepts `--autofix` and `--native` flags.
+Both can also be set as environment variables (`AUTOFIX=true`,
+`NATIVE=true`), which is how the `fix` and `native-lint`
+meta-tasks propagate them — mise's `depends` cannot forward CLI
+flags, but env vars flow through naturally. Tasks that don't
+recognize these variables simply ignore them.
 
 **Check mode** (default):
 
@@ -452,7 +453,7 @@ silently ignore the `AUTOFIX` environment variable.
 mise run native-lint                          # Fast lints, natively (no container)
 # Or run directly:
 NATIVE=true mise run lint:fast                # Same effect
-mise run lint:super-linter -- --native        # Single task with CLI flag
+mise run lint:super-linter --native            # Single task with CLI flag
 ```
 
 Native mode is useful in environments where Docker/Podman is

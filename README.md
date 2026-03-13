@@ -94,9 +94,13 @@ Then wire up top-level `lint` and `fix` tasks that reference whichever tasks
 you adopted (add any project-specific subtasks to the `depends` list):
 
 ```toml
+[tasks."lint:fast"]
+description = "Run fast lints (no Renovate)"
+depends = ["lint:super-linter", "lint:links"]
+
 [tasks.lint]
 description = "Run all lints"
-depends = ["lint:super-linter", "lint:links", "lint:renovate-deps"]
+depends = ["lint:fast", "lint:renovate-deps"]
 
 [tasks.fix]
 description = "Auto-fix lint issues and regenerate tracked deps"
@@ -104,7 +108,7 @@ run = "AUTOFIX=true mise run lint"
 
 [tasks.native-lint]
 description = "Run lints natively (no container)"
-run = "NATIVE=true mise run lint"
+run = "NATIVE=true mise run lint:fast"
 ```
 
 Finally, extend the flint [Renovate preset](#automatic-version-updates-with-renovate)
@@ -445,15 +449,18 @@ silently ignore the `AUTOFIX` environment variable.
 **Native mode:**
 
 ```bash
-mise run native-lint                          # All lints, natively (no container)
+mise run native-lint                          # Fast lints, natively (no container)
 # Or run directly:
-NATIVE=true mise run lint                     # Same effect
+NATIVE=true mise run lint:fast                # Same effect
 mise run lint:super-linter -- --native        # Single task with CLI flag
 ```
 
 Native mode is useful in environments where Docker/Podman is
-unavailable (e.g., inside containers, CI hooks). Tasks that don't
-use a container (like `lint:links`) ignore the `NATIVE` variable.
+unavailable (e.g., inside containers, CI hooks). `native-lint`
+targets `lint:fast` (super-linter + links), skipping
+`lint:renovate-deps` which requires the Renovate CLI. Tasks
+that don't use a container (like `lint:links`) ignore the
+`NATIVE` variable.
 
 ## Pre-commit hook
 
@@ -475,7 +482,7 @@ without requiring a container.
 [tasks.pre-commit]
 description = "Pre-commit hook: native lint"
 depends = ["setup:native-lint-tools"]
-run = [{ task = "lint:super-linter", env = { NATIVE = "true" } }]
+run = "NATIVE=true mise run lint:fast"
 
 [tasks."setup:pre-commit-hook"]
 description = "Install git pre-commit hook"

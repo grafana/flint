@@ -34,9 +34,13 @@ file = "tasks/lint/links.sh"
 description = "Verify renovate-tracked-deps.json is up to date"
 file = "tasks/lint/renovate-deps.py"
 
+[tasks."lint:fast"]
+description = "Run fast lints (no Renovate)"
+depends = ["lint:super-linter", "lint:links"]
+
 [tasks."lint"]
 description = "Run all lints"
-depends = ["lint:super-linter", "lint:links", "lint:renovate-deps"]
+depends = ["lint:fast", "lint:renovate-deps"]
 
 [tasks.fix]
 description = "Auto-fix lint issues and regenerate tracked deps"
@@ -44,12 +48,12 @@ run = "AUTOFIX=true mise run lint"
 
 [tasks.native-lint]
 description = "Run lints natively (no container)"
-run = "NATIVE=true mise run lint"
+run = "NATIVE=true mise run lint:fast"
 
 [tasks.pre-commit]
 description = "Pre-commit hook: native lint"
 depends = ["setup:native-lint-tools"]
-run = [{ task = "lint:super-linter", env = { NATIVE = "true" } }]
+run = "NATIVE=true mise run lint:fast"
 
 [tasks."setup:pre-commit-hook"]
 description = "Install git pre-commit hook that runs native linting"

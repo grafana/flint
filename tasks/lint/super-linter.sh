@@ -185,7 +185,8 @@ if [ "$NATIVE" = "true" ]; then
 
 	_LINTER_RAN=true
 	_failed=()
-	_skipped=()
+	_skipped_flags=()
+	_skipped_tools=()
 
 	for def in "${LINTER_DEFS[@]}"; do
 		IFS='|' read -r flag tool check_cmd fix_cmd patterns <<<"$def"
@@ -195,7 +196,8 @@ if [ "$NATIVE" = "true" ]; then
 		fi
 
 		if ! command -v "$tool" >/dev/null 2>&1; then
-			_skipped+=("$flag")
+			_skipped_flags+=("$flag")
+			_skipped_tools+=("$tool")
 			continue
 		fi
 
@@ -263,11 +265,11 @@ if [ "$NATIVE" = "true" ]; then
 		fi
 	done
 
-	if [ ${#_skipped[@]} -gt 0 ]; then
-		printf '\n❌ Missing native lint tools: %s\n' "${_skipped[*]}"
+	if [ ${#_skipped_tools[@]} -gt 0 ]; then
+		printf '\n❌ Missing native lint tools: %s\n' "${_skipped_tools[*]}"
 		# shellcheck disable=SC2016 # backticks are intentional: literal formatting, not command substitution
 		printf '   Run `mise run setup:native-lint-tools` to install them.\n'
-		_failed+=("${_skipped[@]}")
+		_failed+=("${_skipped_flags[@]}")
 	fi
 
 	if [ ${#_failed[@]} -gt 0 ]; then

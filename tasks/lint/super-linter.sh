@@ -264,7 +264,10 @@ if [ "$NATIVE" = "true" ]; then
 	done
 
 	if [ ${#_skipped[@]} -gt 0 ]; then
-		printf '⚠️  Skipped (tool not found): %s\n' "${_skipped[*]}"
+		printf '\n❌ Missing native lint tools: %s\n' "${_skipped[*]}"
+		# shellcheck disable=SC2016 # backticks are intentional: literal formatting, not command substitution
+		printf '   Run `mise run setup:native-lint-tools` to install them.\n'
+		_failed+=("${_skipped[@]}")
 	fi
 
 	if [ ${#_failed[@]} -gt 0 ]; then

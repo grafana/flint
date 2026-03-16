@@ -10,18 +10,16 @@ fi
 
 cd "${MISE_PROJECT_ROOT}"
 
-if [ -z "${SUPER_LINTER_VERSION:-}" ]; then
-	echo "SUPER_LINTER_VERSION environment variable is not set. Exiting."
-	exit 1
+REPO="super-linter/super-linter"
+TAG="${1:-}"
+
+if [ -z "$TAG" ]; then
+	TAG=$(gh api "repos/${REPO}/releases/latest" -q '.tag_name')
+	echo "Latest super-linter release: ${TAG}"
 fi
 
-# Extract clean version (strip slim- prefix and @sha256 digest)
-VERSION="${SUPER_LINTER_VERSION#slim-}"
-VERSION="${VERSION%%@*}"
-
-REPO="super-linter/super-linter"
-TAG="${VERSION}"
-OUTPUT="super-linter-versions/${VERSION}.toml"
+# Strip slim- prefix if passed (slim and fat use the same tool versions)
+TAG="${TAG#slim-}"
 
 echo "Extracting tool versions for super-linter ${TAG}..."
 
@@ -66,6 +64,8 @@ ruff=$(_pip_version "ruff")
 codespell=$(_pip_version "codespell")
 
 mkdir -p super-linter-versions
+
+OUTPUT="super-linter-versions/${TAG}.toml"
 
 cat >"$OUTPUT" <<EOF
 # Tool versions matching super-linter ${TAG}

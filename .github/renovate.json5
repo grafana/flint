@@ -48,7 +48,7 @@
     },
     {
       matchPackageNames: ["renovate"],
-      description: ["Only update renovate once a week"],
+      description: "Only update renovate once a week",
       schedule: ["before 4am on Monday"],
     },
     {

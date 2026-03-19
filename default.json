@@ -47,6 +47,12 @@
 			"schedule": ["before 4am on Monday"]
 		},
 		{
+			"matchPackageNames": ["grafana/flint"],
+			"groupName": "flint",
+			"description": "Only update flint once a week",
+			"schedule": ["before 4am on Monday"]
+		},
+		{
 			"matchPackageNames": ["ghcr.io/super-linter/super-linter"],
 			"matchCurrentValue": "/^slim-/",
 			"description": "Use regex versioning for slim Super-Linter tags (slim-v8.4.0)",

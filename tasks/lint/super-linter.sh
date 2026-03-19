@@ -13,7 +13,10 @@ if [ "${usage_autofix:-}" = "true" ]; then
 fi
 
 # shellcheck disable=SC2154 # usage_native is set by mise
-NATIVE="${usage_native:-false}"
+if [ "${usage_native:-}" = "true" ]; then
+	NATIVE=true
+fi
+NATIVE="${NATIVE:-false}"
 
 # shellcheck disable=SC2154 # usage_full is set by mise
 LINT_ALL="${usage_full:-false}"

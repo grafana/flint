@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/grafana/flint/compare/v0.9.0...v0.9.1) (2026-03-19)
+
+
+### Bug Fixes
+
+* activate mise environment in native lint mode ([#123](https://github.com/grafana/flint/issues/123)) ([d0fec45](https://github.com/grafana/flint/commit/d0fec4574c1905efb22e7e75bcca7ba7c2db64cf))
+
 ## [0.9.0](https://github.com/grafana/flint/compare/v0.8.0...v0.9.0) (2026-03-19)
 
 

@@ -61,7 +61,9 @@ if [ "$NATIVE" = "true" ]; then
 	if [ -n "$_SL_ENV_TOML" ]; then
 		_SL_ENV_NAME="${_SL_ENV_TOML#.mise.}"
 		_SL_ENV_NAME="${_SL_ENV_NAME%.toml}"
-		eval "$(mise env -E "$_SL_ENV_NAME")"
+		# Allow failure so the script falls through to the "Missing native lint tools"
+		# message instead of exiting with a confusing mise error.
+		eval "$(mise env -E "$_SL_ENV_NAME" 2>/dev/null)" || true
 	fi
 
 	# Native mode expects linter configs at the project root (standard tool locations).

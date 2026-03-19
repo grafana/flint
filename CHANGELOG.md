@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.0](https://github.com/grafana/flint/compare/v0.8.0...v0.9.0) (2026-03-19)
+
+
+### Features
+
+* support NATIVE env var for container-free linting ([#107](https://github.com/grafana/flint/issues/107)) ([0a8193d](https://github.com/grafana/flint/commit/0a8193d5b0c264430b7a78c56a0fe0418173ff37))
+
+
+### Bug Fixes
+
+* decouple version mapping generation from pinned super-linter version ([#112](https://github.com/grafana/flint/issues/112)) ([5370e77](https://github.com/grafana/flint/commit/5370e77a864084c146502f9c265792d035517376))
+* fail native lint when enabled tools are missing ([#111](https://github.com/grafana/flint/issues/111)) ([163bb6b](https://github.com/grafana/flint/commit/163bb6b31e558af4a977c94cf8489311a085fc54))
+* tighten markdownlint config for native mode ([#106](https://github.com/grafana/flint/issues/106)) ([6ef25b2](https://github.com/grafana/flint/commit/6ef25b2fd3f3887e4be9918317526ddc77b65575))
+
 ## [0.8.0](https://github.com/grafana/flint/compare/v0.7.1...v0.8.0) (2026-03-11)
 
 

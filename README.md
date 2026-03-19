@@ -453,7 +453,7 @@ silently ignore the `AUTOFIX` environment variable.
 mise run native-lint                          # Fast lints, natively (no container)
 # Or run directly:
 NATIVE=true mise run lint:fast                # Same effect
-mise run lint:super-linter --native            # Single task with CLI flag
+mise run lint:super-linter --native           # Single task with CLI flag
 ```
 
 Native mode is useful in environments where Docker/Podman is

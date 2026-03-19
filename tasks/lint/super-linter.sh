@@ -55,6 +55,15 @@ ENV_FILE="${SUPER_LINTER_ENV_FILE:-.github/config/super-linter.env}"
 
 # --- Native mode ---
 if [ "$NATIVE" = "true" ]; then
+	# Activate the mise environment created by setup:native-lint-tools so that
+	# installed tools (shfmt, actionlint, codespell, etc.) are on PATH.
+	_SL_ENV_TOML=$(compgen -G ".mise.super-linter-*.toml" | head -1 || true)
+	if [ -n "$_SL_ENV_TOML" ]; then
+		_SL_ENV_NAME="${_SL_ENV_TOML#.mise.}"
+		_SL_ENV_NAME="${_SL_ENV_NAME%.toml}"
+		eval "$(mise env -E "$_SL_ENV_NAME")"
+	fi
+
 	# Native mode expects linter configs at the project root (standard tool locations).
 	# Super-linter's .github/linters/ convention is not supported.
 	LINTER_RULES_PATH="${LINTER_RULES_PATH:-.github/linters}"

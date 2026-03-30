@@ -67,7 +67,6 @@ mkdir -p super-linter-versions
 
 OUTPUT="super-linter-versions/${TAG}.toml"
 
-
 cat >"$OUTPUT" <<EOF
 # Tool versions matching super-linter ${TAG}
 # Source: https://github.com/${REPO}/tree/${TAG}

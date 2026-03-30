@@ -66,7 +66,6 @@ if [ "$NATIVE" = "true" ]; then
 		eval "$(mise env -E "$_SL_ENV_NAME" 2>/dev/null)" || true
 	fi
 
-
 	# Native mode expects linter configs at the project root (standard tool locations).
 	# Super-linter's .github/linters/ convention is not supported.
 	LINTER_RULES_PATH="${LINTER_RULES_PATH:-.github/linters}"

@@ -44,7 +44,9 @@ jobs:
           if [[ -z "$CHANGES" ]]; then
             exit 0
           fi
-          UNEXPECTED=$(printf '%s\n' "$CHANGES" | awk '{print $2}' | grep -v '^super-linter-versions/' || true)
+          UNEXPECTED=$(printf '%s\n' "$CHANGES" \
+            | awk '{print $2}' \
+            | grep -v '^super-linter-versions/' || true)
           if [[ -n "$UNEXPECTED" ]]; then
             echo "::error::Unexpected files changed:"
             echo "$UNEXPECTED"

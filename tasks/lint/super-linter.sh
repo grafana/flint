@@ -13,7 +13,10 @@ if [ "${usage_autofix:-}" = "true" ]; then
 fi
 
 # shellcheck disable=SC2154 # usage_native is set by mise
-NATIVE="${usage_native:-false}"
+if [ "${usage_native:-}" = "true" ]; then
+	NATIVE=true
+fi
+NATIVE="${NATIVE:-false}"
 
 # shellcheck disable=SC2154 # usage_full is set by mise
 LINT_ALL="${usage_full:-false}"
@@ -52,6 +55,18 @@ ENV_FILE="${SUPER_LINTER_ENV_FILE:-.github/config/super-linter.env}"
 
 # --- Native mode ---
 if [ "$NATIVE" = "true" ]; then
+	# Activate the mise environment created by setup:native-lint-tools so that
+	# installed tools (shfmt, actionlint, codespell, etc.) are on PATH.
+	_SL_ENV_TOML=$(compgen -G ".mise.super-linter-*.toml" | head -1 || true)
+	if [ -n "$_SL_ENV_TOML" ]; then
+		_SL_ENV_NAME="${_SL_ENV_TOML#.mise.}"
+		_SL_ENV_NAME="${_SL_ENV_NAME%.toml}"
+		# Allow failure so the script falls through to the "Missing native lint tools"
+		# message instead of exiting with a confusing mise error.
+		eval "$(mise env -E "$_SL_ENV_NAME" 2>/dev/null)" || true
+	fi
+
+
 	# Native mode expects linter configs at the project root (standard tool locations).
 	# Super-linter's .github/linters/ convention is not supported.
 	LINTER_RULES_PATH="${LINTER_RULES_PATH:-.github/linters}"
@@ -113,10 +128,11 @@ if [ "$NATIVE" = "true" ]; then
 			git ls-files
 		else
 			if [ -n "$_MERGE_BASE" ]; then
-				# Files changed in the PR + uncommitted changes
+				# Files changed in the PR + uncommitted (staged and unstaged) changes
 				{
 					git diff --name-only --diff-filter=d "$_MERGE_BASE"...HEAD
 					git diff --name-only --diff-filter=d
+					git diff --name-only --diff-filter=d --cached
 				} | sort -u
 			else
 				# No merge base found (e.g. shallow clone), fall back to all files
@@ -185,7 +201,8 @@ if [ "$NATIVE" = "true" ]; then
 
 	_LINTER_RAN=true
 	_failed=()
-	_skipped=()
+	_skipped_flags=()
+	_skipped_tools=()
 
 	for def in "${LINTER_DEFS[@]}"; do
 		IFS='|' read -r flag tool check_cmd fix_cmd patterns <<<"$def"
@@ -195,7 +212,8 @@ if [ "$NATIVE" = "true" ]; then
 		fi
 
 		if ! command -v "$tool" >/dev/null 2>&1; then
-			_skipped+=("$flag")
+			_skipped_flags+=("$flag")
+			_skipped_tools+=("$tool")
 			continue
 		fi
 
@@ -263,8 +281,11 @@ if [ "$NATIVE" = "true" ]; then
 		fi
 	done
 
-	if [ ${#_skipped[@]} -gt 0 ]; then
-		printf '⚠️  Skipped (tool not found): %s\n' "${_skipped[*]}"
+	if [ ${#_skipped_tools[@]} -gt 0 ]; then
+		printf '\n❌ Missing native lint tools: %s\n' "${_skipped_tools[*]}"
+		# shellcheck disable=SC2016 # backticks are intentional: literal formatting, not command substitution
+		printf '   Run `mise run setup:native-lint-tools` to install them.\n'
+		_failed+=("${_skipped_flags[@]}")
 	fi
 
 	if [ ${#_failed[@]} -gt 0 ]; then

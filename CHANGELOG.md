@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.9.1](https://github.com/grafana/flint/compare/v0.9.0...v0.9.1) (2026-03-19)
+
+
+### Bug Fixes
+
+* activate mise environment in native lint mode ([#123](https://github.com/grafana/flint/issues/123)) ([d0fec45](https://github.com/grafana/flint/commit/d0fec4574c1905efb22e7e75bcca7ba7c2db64cf))
+
+## [0.9.0](https://github.com/grafana/flint/compare/v0.8.0...v0.9.0) (2026-03-19)
+
+
+### Features
+
+* support NATIVE env var for container-free linting ([#107](https://github.com/grafana/flint/issues/107)) ([0a8193d](https://github.com/grafana/flint/commit/0a8193d5b0c264430b7a78c56a0fe0418173ff37))
+
+
+### Bug Fixes
+
+* decouple version mapping generation from pinned super-linter version ([#112](https://github.com/grafana/flint/issues/112)) ([5370e77](https://github.com/grafana/flint/commit/5370e77a864084c146502f9c265792d035517376))
+* fail native lint when enabled tools are missing ([#111](https://github.com/grafana/flint/issues/111)) ([163bb6b](https://github.com/grafana/flint/commit/163bb6b31e558af4a977c94cf8489311a085fc54))
+* tighten markdownlint config for native mode ([#106](https://github.com/grafana/flint/issues/106)) ([6ef25b2](https://github.com/grafana/flint/commit/6ef25b2fd3f3887e4be9918317526ddc77b65575))
+
+## [0.8.0](https://github.com/grafana/flint/compare/v0.7.1...v0.8.0) (2026-03-11)
+
+
+### Features
+
+* add native linting mode and version mapping infrastructure ([#93](https://github.com/grafana/flint/issues/93)) ([24b06da](https://github.com/grafana/flint/commit/24b06da3eeeb97722cf280b5815c75c3ec31f134))
+
+
+### Bug Fixes
+
+* add 'mise run fix' hint to lint failure output ([#90](https://github.com/grafana/flint/issues/90)) ([5b4ad5d](https://github.com/grafana/flint/commit/5b4ad5d2a2fc53e0d11de924b183adb4fb4f5a90))
+* improve link checker reliability against GitHub rate limiting ([#95](https://github.com/grafana/flint/issues/95)) ([7a5282d](https://github.com/grafana/flint/commit/7a5282de91df8a67dad3fd6ac8fc2b082434d8df))
+* remap same-repo GitHub URLs to local file paths ([#100](https://github.com/grafana/flint/issues/100)) ([b4feadd](https://github.com/grafana/flint/commit/b4feaddd9af690574eaefc112f465b556bf9c345))
+
 ## [0.7.1](https://github.com/grafana/flint/compare/v0.7.0...v0.7.1) (2026-03-02)
 
 

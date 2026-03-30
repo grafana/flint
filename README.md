@@ -1,4 +1,5 @@
 <!-- editorconfig-checker-disable -->
+<!-- markdownlint-disable MD033 MD041 -->
 <p align="center">
   <img src=".idea/icon.svg" width="128" height="128" alt="flint logo">
 </p>
@@ -9,6 +10,7 @@
   <a href="https://github.com/grafana/flint/actions/workflows/lint.yml"><img src="https://github.com/grafana/flint/actions/workflows/lint.yml/badge.svg" alt="Lint"></a>
   <a href="https://github.com/grafana/flint/releases"><img src="https://img.shields.io/github/v/release/grafana/flint" alt="GitHub Release"></a>
 </p>
+<!-- markdownlint-enable MD033 MD041 -->
 <!-- editorconfig-checker-enable -->
 
 A toolbox of reusable [mise](https://mise.jdx.dev/) lint task scripts.
@@ -75,13 +77,13 @@ pinned to the commit SHA of a release tag with a version comment:
 # Pick the tasks you need from flint (https://github.com/grafana/flint)
 [tasks."lint:super-linter"]
 description = "Run Super-Linter on the repository"
-file = "https://raw.githubusercontent.com/grafana/flint/0ac131d7832bd8964f6ca9e5af73207dca6a85ba/tasks/lint/super-linter.sh" # v0.7.1
+file = "https://raw.githubusercontent.com/grafana/flint/8a39d96e17327c54974623b252eb5260d67ed68a/tasks/lint/super-linter.sh" # v0.9.1
 [tasks."lint:links"]
 description = "Check for broken links in changed files + all local links"
-file = "https://raw.githubusercontent.com/grafana/flint/0ac131d7832bd8964f6ca9e5af73207dca6a85ba/tasks/lint/links.sh" # v0.7.1
+file = "https://raw.githubusercontent.com/grafana/flint/8a39d96e17327c54974623b252eb5260d67ed68a/tasks/lint/links.sh" # v0.9.1
 [tasks."lint:renovate-deps"]
 description = "Verify renovate-tracked-deps.json is up to date"
-file = "https://raw.githubusercontent.com/grafana/flint/0ac131d7832bd8964f6ca9e5af73207dca6a85ba/tasks/lint/renovate-deps.py" # v0.7.1
+file = "https://raw.githubusercontent.com/grafana/flint/8a39d96e17327c54974623b252eb5260d67ed68a/tasks/lint/renovate-deps.py" # v0.9.1
 ```
 
 <!-- editorconfig-checker-enable -->
@@ -94,13 +96,21 @@ Then wire up top-level `lint` and `fix` tasks that reference whichever tasks
 you adopted (add any project-specific subtasks to the `depends` list):
 
 ```toml
+[tasks."lint:fast"]
+description = "Run fast lints (no Renovate)"
+depends = ["lint:super-linter", "lint:links"]
+
 [tasks.lint]
 description = "Run all lints"
-depends = ["lint:super-linter", "lint:links", "lint:renovate-deps"]
+depends = ["lint:fast", "lint:renovate-deps"]
 
 [tasks.fix]
 description = "Auto-fix lint issues and regenerate tracked deps"
 run = "AUTOFIX=true mise run lint"
+
+[tasks.native-lint]
+description = "Run lints natively (no container)"
+run = "NATIVE=true mise run lint:fast"
 ```
 
 Finally, extend the flint [Renovate preset](#automatic-version-updates-with-renovate)
@@ -159,6 +169,11 @@ Docker versioning).
 | `--autofix` | Enable autofix mode (enables `FIX_*` vars from the env file) |
 | `--native`  | Run linters natively instead of via container                |
 | `--full`    | Lint all files instead of only changed files                 |
+
+`--autofix` and `--native` can also be set via the `AUTOFIX=true`
+and `NATIVE=true` environment variables respectively. This is how
+the `fix` and `native-lint` meta-tasks propagate them through the
+`depends` chain.
 
 When autofix is not enabled, all `FIX_*` lines are filtered out of
 the env file before running Super-Linter.
@@ -405,11 +420,14 @@ committed `.github/renovate-tracked-deps.json`:
   scans, the linter will detect the change and require
   regeneration.
 
-## How AUTOFIX Works
+## How AUTOFIX and NATIVE Work
 
-Lint scripts that support fixing accept an `--autofix` flag. Autofix
-can also be enabled via the `AUTOFIX=true` environment variable, which
-is how the `fix` meta-task propagates it through the dependency chain.
+`lint:super-linter` accepts `--autofix` and `--native` flags.
+Both can also be set as environment variables (`AUTOFIX=true`,
+`NATIVE=true`), which is how the `fix` and `native-lint`
+meta-tasks propagate them — mise's `depends` cannot forward CLI
+flags, but env vars flow through naturally. Tasks that don't
+recognize these variables simply ignore them.
 
 **Check mode** (default):
 
@@ -431,27 +449,43 @@ mise run lint:renovate-deps --autofix         # Regenerate tracked deps
 Linters that don't support autofix (like lychee link checker)
 silently ignore the `AUTOFIX` environment variable.
 
+**Native mode:**
+
+```bash
+mise run native-lint                          # Fast lints, natively (no container)
+# Or run directly:
+NATIVE=true mise run lint:fast                # Same effect
+mise run lint:super-linter --native           # Single task with CLI flag
+```
+
+Native mode is useful in environments where Docker/Podman is
+unavailable (e.g., inside containers, CI hooks). `native-lint`
+targets `lint:fast` (super-linter + links), skipping
+`lint:renovate-deps` which requires the Renovate CLI. Tasks
+that don't use a container (like `lint:links`) ignore the
+`NATIVE` variable.
+
 ## Pre-commit hook
 
-Flint provides a `pre-commit` task that runs native linters with
-autofix on every commit — fast feedback without the container
-overhead. To set it up:
+Flint provides a `pre-commit` task that runs native linters on
+every commit — fast feedback without the container overhead. To
+set it up:
 
 ```bash
 mise run setup:pre-commit-hook
 ```
 
 This generates a `.git/hooks/pre-commit` that runs
-`mise run pre-commit`, which uses `--native --autofix` to fix
-formatting issues before the commit completes.
+`mise run pre-commit`, which uses native mode for fast checks
+without requiring a container.
 
 **For consuming repos**, add these tasks to your `mise.toml`:
 
 ```toml
 [tasks.pre-commit]
-description = "Pre-commit hook: native lint with autofix"
+description = "Pre-commit hook: native lint"
 depends = ["setup:native-lint-tools"]
-run = "mise run lint:super-linter -- --native --autofix"
+run = "NATIVE=true mise run lint:fast"
 
 [tasks."setup:pre-commit-hook"]
 description = "Install git pre-commit hook"

@@ -137,8 +137,8 @@ running on non-Go repos.
 
 After updating the super-linter version in `mise.toml`,
 run `mise run setup:native-lint-tools` on the host to
-install matching tool versions. Tools not installed are
-skipped with a warning in native mode.
+install matching tool versions. Native mode fails if
+enabled tools are missing.
 
 **Config files:** Native mode requires linter configs at
 standard locations (project root), not in

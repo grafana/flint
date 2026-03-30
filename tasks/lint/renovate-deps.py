@@ -37,6 +37,11 @@ def run_renovate(tmpdir):
         "LOG_FORMAT": "json",
         "RENOVATE_CONFIG_FILE": config_path,
     }
+    # Renovate uses GITHUB_COM_TOKEN for github.com API calls (preset fetching,
+    # release lookups). In CI, only GITHUB_TOKEN is typically set — forward it
+    # so Renovate doesn't fall back to unauthenticated requests and hit rate limits.
+    if "GITHUB_COM_TOKEN" not in env and env.get("GITHUB_TOKEN"):
+        env["GITHUB_COM_TOKEN"] = env["GITHUB_TOKEN"]
     with open(log_path, "w", encoding="utf-8") as log_file:
         result = subprocess.run(
             [

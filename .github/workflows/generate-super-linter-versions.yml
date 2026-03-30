@@ -40,8 +40,11 @@ jobs:
       - name: Commit and push
         if: steps.check.outputs.changed == 'true'
         run: |
-          git diff --quiet && exit 0
-          UNEXPECTED=$(git diff --name-only | grep -v '^super-linter-versions/' || true)
+          CHANGES=$(git status --porcelain)
+          if [[ -z "$CHANGES" ]]; then
+            exit 0
+          fi
+          UNEXPECTED=$(printf '%s\n' "$CHANGES" | awk '{print $2}' | grep -v '^super-linter-versions/' || true)
           if [[ -n "$UNEXPECTED" ]]; then
             echo "::error::Unexpected files changed:"
             echo "$UNEXPECTED"

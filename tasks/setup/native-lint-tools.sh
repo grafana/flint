@@ -27,8 +27,7 @@ FLINT_REPO="${FLINT_REPO:-grafana/flint}"
 # This ensures the version mapping matches the flint version in use.
 # Falls back to "main" for flint itself (where tasks are local file paths).
 if [ -z "${FLINT_REF:-}" ]; then
-	FLINT_REF=$(grep -oP \
-		"raw\\.githubusercontent\\.com/${FLINT_REPO}/\\K[a-f0-9]{40}" \
+	FLINT_REF=$(sed -n "s|.*raw\.githubusercontent\.com/${FLINT_REPO}/\([a-f0-9]\{40\}\).*|\1|p" \
 		mise.toml 2>/dev/null | head -1 || true)
 	FLINT_REF="${FLINT_REF:-main}"
 fi

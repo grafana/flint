@@ -141,10 +141,11 @@ if [ "$NATIVE" = "true" ]; then
 			git ls-files
 		else
 			if [ -n "$_MERGE_BASE" ]; then
-				# Files changed in the PR + uncommitted changes
+				# Files changed in the PR + uncommitted (staged and unstaged) changes
 				{
 					git diff --name-only --diff-filter=d "$_MERGE_BASE"...HEAD
 					git diff --name-only --diff-filter=d
+					git diff --name-only --diff-filter=d --cached
 				} | sort -u
 			else
 				# No merge base found (e.g. shallow clone), fall back to all files

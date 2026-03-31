@@ -182,7 +182,7 @@ if [ "$NATIVE" = "true" ]; then
 		"VALIDATE_MARKDOWN_PRETTIER|prettier|prettier --check {FILE}|prettier --write {FILE}|*.md"
 		"VALIDATE_YAML_PRETTIER|prettier|prettier --check {FILE}|prettier --write {FILE}|*.yaml *.yml"
 		"VALIDATE_JSON_PRETTIER|prettier|prettier --check {FILE}|prettier --write {FILE}|*.json"
-		"VALIDATE_EDITORCONFIG|editorconfig-checker|editorconfig-checker {FILES}||*"
+		"VALIDATE_EDITORCONFIG|ec|ec {FILES}||*"
 		"VALIDATE_GITHUB_ACTIONS|actionlint|actionlint {FILE}||.github/workflows/*.yml .github/workflows/*.yaml"
 		"VALIDATE_DOCKERFILE_HADOLINT|hadolint|hadolint {FILE}||Dockerfile Dockerfile.* *.dockerfile"
 		"VALIDATE_GO_GOLANGCI_LINT|golangci-lint|golangci-lint run||SELF"

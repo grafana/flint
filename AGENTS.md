@@ -108,10 +108,10 @@ This ensures all files pass CI linting (Biome formatting,
 shellcheck, etc.). Review the auto-fixed files before
 committing — auto-fixes may produce unexpected results.
 
-Linting can be automated via a git pre-commit hook or an
+Linting can be automated via a Git pre-commit hook or an
 agent-specific hook (e.g. a Claude Code `PreToolUse` hook
 that intercepts `git push`). Use whichever fits your
-workflow — both are optional. To install the git hook:
+workflow — both are optional. To install the Git hook:
 
 ```bash
 # Auto-fix and verify (recommended dev workflow)
@@ -145,6 +145,7 @@ standard locations (project root), not in
 `.github/linters/` (super-linter's convention). The
 script errors if `.github/linters/` exists. All
 supported linters auto-discover their config:
+`textlint`→`.textlintrc`,
 `shellcheck`→`.shellcheckrc`,
 `markdownlint`→`.markdownlint.json`,
 `ec` (editorconfig-checker)→`.ecrc`,

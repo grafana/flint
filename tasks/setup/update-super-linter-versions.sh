@@ -60,6 +60,8 @@ golangci_lint=$(_from_version "golangci/golangci-lint")
 markdownlint=$(_npm_version "markdownlint-cli")
 prettier=$(_npm_version "prettier")
 biome=$(_npm_version "@biomejs/biome")
+textlint=$(_npm_version "textlint")
+textlint_terminology=$(_npm_version "textlint-rule-terminology")
 ruff=$(_pip_version "ruff")
 codespell=$(_pip_version "codespell")
 
@@ -83,6 +85,8 @@ hadolint = "${hadolint}"
 "npm:markdownlint-cli" = "${markdownlint}"
 "npm:prettier" = "${prettier}"
 "npm:@biomejs/biome" = "${biome}"
+"npm:textlint" = "${textlint}"
+"npm:textlint-rule-terminology" = "${textlint_terminology}"
 "pipx:ruff" = "${ruff}"
 "pipx:codespell" = "${codespell}"
 editorconfig-checker = "${editorconfig_checker}"

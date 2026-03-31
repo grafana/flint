@@ -188,6 +188,7 @@ if [ "$NATIVE" = "true" ]; then
 		"VALIDATE_GO_GOLANGCI_LINT|golangci-lint|golangci-lint run||SELF"
 		"VALIDATE_PYTHON_RUFF|ruff|ruff check {FILE}|ruff check --fix {FILE}|*.py"
 		"VALIDATE_PYTHON_RUFF_FORMAT|ruff|ruff format --check {FILE}|ruff format {FILE}|*.py"
+		"VALIDATE_NATURAL_LANGUAGE|textlint|textlint {FILE}||*.md *.txt"
 		"VALIDATE_SPELL_CODESPELL|codespell|codespell {FILES}|codespell --write-changes {FILES}|*"
 		"VALIDATE_JSONC|biome|biome check {FILE}|biome check --fix {FILE}|*.json *.jsonc *.js *.ts *.jsx *.tsx"
 		"VALIDATE_BIOME_FORMAT|biome|biome format {FILE}|biome format --write {FILE}|*.json *.jsonc *.js *.ts *.jsx *.tsx"

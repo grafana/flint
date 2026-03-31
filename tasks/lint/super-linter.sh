@@ -66,12 +66,13 @@ if [ "$NATIVE" = "true" ]; then
 		if [ -f "$_SL_VERSION_TOML" ]; then
 			_SL_ENV_TOML=".mise.super-linter-${_SL_TAG}.toml"
 			cp "$_SL_VERSION_TOML" "$_SL_ENV_TOML"
+			mise trust "$_SL_ENV_TOML"
 		fi
 	fi
 	if [ -n "$_SL_ENV_TOML" ]; then
 		_SL_ENV_NAME="${_SL_ENV_TOML#.mise.}"
 		_SL_ENV_NAME="${_SL_ENV_NAME%.toml}"
-		_SL_ENV_OUTPUT=$(mise env -E "$_SL_ENV_NAME" 2>/dev/null) || {
+		_SL_ENV_OUTPUT=$(mise env -E "$_SL_ENV_NAME") || {
 			echo "Error: failed to activate mise environment '$_SL_ENV_NAME'." >&2
 			echo "Run 'mise run setup:native-lint-tools' to install tools." >&2
 			exit 1

@@ -15,11 +15,6 @@ SUPER_LINTER_VERSION="slim-v8.5.0@sha256:857dcc3f0bf5dd065fdeed1ace63394bb200423
 description = "Run Super-Linter on the repository"
 file = "tasks/lint/super-linter.sh"
 
-[tasks."lint:super-linter-native"]
-description = "Run linters natively (fast, for local dev)"
-depends = ["setup:native-lint-tools"]
-run = [{ task = "lint:super-linter", env = { NATIVE = "true" } }]
-
 [tasks."setup:native-lint-tools"]
 description = "Install native lint tools matching the pinned super-linter version"
 file = "tasks/setup/native-lint-tools.sh"

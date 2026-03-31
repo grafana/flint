@@ -147,7 +147,7 @@ script errors if `.github/linters/` exists. All
 supported linters auto-discover their config:
 `shellcheck`→`.shellcheckrc`,
 `markdownlint`→`.markdownlint.json`,
-`editorconfig-checker`→`.ecrc`,
+`ec` (editorconfig-checker)→`.ecrc`,
 `actionlint`→`.github/actionlint.yml`,
 `hadolint`→`.hadolint.yaml`,
 `golangci-lint`→`.golangci.yml`,

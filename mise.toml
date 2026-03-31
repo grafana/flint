@@ -1,4 +1,6 @@
 [tools]
+bats = "1.13.0"
+editorconfig-checker = "v3.6.1"
 lychee = "0.22.0"
 node = "24.14.1"
 "npm:renovate" = "43.92.1"
@@ -54,6 +56,10 @@ run = "NATIVE=true mise run lint:fast"
 description = "Pre-commit hook: native lint"
 depends = ["setup:native-lint-tools"]
 run = "NATIVE=true mise run lint:fast"
+
+[tasks.test]
+description = "Run tests"
+run = "bats tests/"
 
 [tasks."setup:pre-commit-hook"]
 description = "Install git pre-commit hook that runs native linting"

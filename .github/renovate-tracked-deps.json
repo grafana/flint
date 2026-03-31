@@ -11,6 +11,8 @@
   },
   "mise.toml": {
     "mise": [
+      "bats",
+      "editorconfig-checker",
       "lychee",
       "node",
       "npm:renovate"

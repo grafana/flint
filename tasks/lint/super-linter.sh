@@ -139,8 +139,13 @@ if [ "$NATIVE" = "true" ]; then
 		fi
 	}
 
-	# Cache the file list once (avoids re-running git commands per linter)
-	mapfile -t _CACHED_FILES < <(_list_files | _filter_files)
+	# Cache the file list once (avoids re-running git commands per linter).
+	# Filter to files that exist on disk — excludes uncommitted deletions/renames.
+	mapfile -t _CACHED_FILES < <(
+		_list_files | _filter_files | while IFS= read -r f; do
+			[ -f "$f" ] && printf '%s\n' "$f"
+		done
+	)
 
 	_find_files() {
 		local -a patterns=("$@")
@@ -171,7 +176,7 @@ if [ "$NATIVE" = "true" ]; then
 		"VALIDATE_EDITORCONFIG|editorconfig-checker|editorconfig-checker {FILES}||*"
 		"VALIDATE_GITHUB_ACTIONS|actionlint|actionlint {FILE}||.github/workflows/*.yml .github/workflows/*.yaml"
 		"VALIDATE_DOCKERFILE_HADOLINT|hadolint|hadolint {FILE}||Dockerfile Dockerfile.* *.dockerfile"
-		"VALIDATE_GO_GOLANGCI_LINT|golangci-lint|golangci-lint run||SELF"
+		"VALIDATE_GO_GOLANGCI_LINT|golangci-lint|golangci-lint run --new-from-rev={MERGE_BASE}||SELF"
 		"VALIDATE_PYTHON_RUFF|ruff|ruff check {FILE}|ruff check --fix {FILE}|*.py"
 		"VALIDATE_PYTHON_RUFF_FORMAT|ruff|ruff format --check {FILE}|ruff format {FILE}|*.py"
 		"VALIDATE_SPELL_CODESPELL|codespell|codespell {FILES}|codespell --write-changes {FILES}|*"
@@ -230,13 +235,14 @@ if [ "$NATIVE" = "true" ]; then
 
 		linter_failed=false
 
+		# Substitute {MERGE_BASE}; strip --flag={MERGE_BASE} entirely when no merge base available
+		if [ -n "$_MERGE_BASE" ]; then
+			cmd_template="${cmd_template//\{MERGE_BASE\}/$_MERGE_BASE}"
+		else
+			cmd_template=$(printf '%s' "$cmd_template" | sed 's/ \?--[a-zA-Z_-]*={MERGE_BASE}//g')
+		fi
+
 		if [ "$patterns" = "SELF" ]; then
-			# Tool handles its own file discovery; add diff flags when not linting all files
-			if [ "$LINT_ALL" != "true" ] && [ -n "$_MERGE_BASE" ]; then
-				if [[ "$cmd_template" == golangci-lint* ]]; then
-					cmd_template+=" --new-from-rev=$_MERGE_BASE"
-				fi
-			fi
 			if ! eval "$cmd_template"; then
 				linter_failed=true
 			fi

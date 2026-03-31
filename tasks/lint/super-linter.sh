@@ -55,15 +55,29 @@ ENV_FILE="${SUPER_LINTER_ENV_FILE:-.github/config/super-linter.env}"
 
 # --- Native mode ---
 if [ "$NATIVE" = "true" ]; then
-	# Activate the mise environment created by setup:native-lint-tools so that
-	# installed tools (shfmt, actionlint, codespell, etc.) are on PATH.
+	# Activate the mise environment so installed tools are on PATH.
+	# The .mise.super-linter-*.toml is created by setup:native-lint-tools.
+	# In worktrees it won't exist — create it from the tracked version mapping.
 	_SL_ENV_TOML=$(compgen -G ".mise.super-linter-*.toml" | head -1 || true)
+	if [ -z "$_SL_ENV_TOML" ] && [ -n "${SUPER_LINTER_VERSION:-}" ]; then
+		_SL_TAG="${SUPER_LINTER_VERSION#slim-}"
+		_SL_TAG="${_SL_TAG%%@*}"
+		_SL_VERSION_TOML="super-linter-versions/${_SL_TAG}.toml"
+		if [ -f "$_SL_VERSION_TOML" ]; then
+			_SL_ENV_TOML=".mise.super-linter-${_SL_TAG}.toml"
+			cp "$_SL_VERSION_TOML" "$_SL_ENV_TOML"
+			mise trust "$_SL_ENV_TOML"
+		fi
+	fi
 	if [ -n "$_SL_ENV_TOML" ]; then
 		_SL_ENV_NAME="${_SL_ENV_TOML#.mise.}"
 		_SL_ENV_NAME="${_SL_ENV_NAME%.toml}"
-		# Allow failure so the script falls through to the "Missing native lint tools"
-		# message instead of exiting with a confusing mise error.
-		eval "$(mise env -E "$_SL_ENV_NAME" 2>/dev/null)" || true
+		_SL_ENV_OUTPUT=$(mise env -E "$_SL_ENV_NAME") || {
+			echo "Error: failed to activate mise environment '$_SL_ENV_NAME'." >&2
+			echo "Run 'mise run setup:native-lint-tools' to install tools." >&2
+			exit 1
+		}
+		eval "$_SL_ENV_OUTPUT"
 	fi
 
 	# Native mode expects linter configs at the project root (standard tool locations).
@@ -168,12 +182,13 @@ if [ "$NATIVE" = "true" ]; then
 		"VALIDATE_MARKDOWN_PRETTIER|prettier|prettier --check {FILE}|prettier --write {FILE}|*.md"
 		"VALIDATE_YAML_PRETTIER|prettier|prettier --check {FILE}|prettier --write {FILE}|*.yaml *.yml"
 		"VALIDATE_JSON_PRETTIER|prettier|prettier --check {FILE}|prettier --write {FILE}|*.json"
-		"VALIDATE_EDITORCONFIG|editorconfig-checker|editorconfig-checker {FILES}||*"
+		"VALIDATE_EDITORCONFIG|ec|ec {FILES}||*"
 		"VALIDATE_GITHUB_ACTIONS|actionlint|actionlint {FILE}||.github/workflows/*.yml .github/workflows/*.yaml"
 		"VALIDATE_DOCKERFILE_HADOLINT|hadolint|hadolint {FILE}||Dockerfile Dockerfile.* *.dockerfile"
 		"VALIDATE_GO_GOLANGCI_LINT|golangci-lint|golangci-lint run||SELF"
 		"VALIDATE_PYTHON_RUFF|ruff|ruff check {FILE}|ruff check --fix {FILE}|*.py"
 		"VALIDATE_PYTHON_RUFF_FORMAT|ruff|ruff format --check {FILE}|ruff format {FILE}|*.py"
+		"VALIDATE_NATURAL_LANGUAGE|textlint|textlint {FILE}||*.md *.txt"
 		"VALIDATE_SPELL_CODESPELL|codespell|codespell {FILES}|codespell --write-changes {FILES}|*"
 		"VALIDATE_JSONC|biome|biome check {FILE}|biome check --fix {FILE}|*.json *.jsonc *.js *.ts *.jsx *.tsx"
 		"VALIDATE_BIOME_FORMAT|biome|biome format {FILE}|biome format --write {FILE}|*.json *.jsonc *.js *.ts *.jsx *.tsx"

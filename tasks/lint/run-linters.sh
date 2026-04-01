@@ -48,7 +48,7 @@ _register() {
 	_PATTERNS["$1"]="$4"
 }
 
-_register shellcheck "shellcheck {FILE}" "" "*.sh *.bash"
+_register shellcheck "shellcheck {FILE}" "" "*.sh *.bash *.bats"
 _register shfmt "shfmt -d {FILE}" "shfmt -w {FILE}" "*.sh *.bash"
 _register markdownlint "markdownlint {FILE}" "markdownlint --fix {FILE}" "*.md"
 _register prettier "prettier --check {FILES}" "prettier --write {FILES}" "*.md *.json *.yml *.yaml"

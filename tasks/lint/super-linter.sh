@@ -177,7 +177,7 @@ if [ "$NATIVE" = "true" ]; then
 	# "SELF" = tool handles its own file discovery (no file args)
 	# Config files: linters use their standard config discovery from the project root.
 	declare -a LINTER_DEFS=(
-		"VALIDATE_BASH|shellcheck|shellcheck {FILE}||*.sh *.bash"
+		"VALIDATE_BASH|shellcheck|shellcheck {FILE}||*.sh *.bash *.bats"
 		"VALIDATE_SHELL_SHFMT|shfmt|shfmt -d {FILE}|shfmt -w {FILE}|*.sh *.bash"
 		"VALIDATE_MARKDOWN|markdownlint|markdownlint {FILE}|markdownlint --fix {FILE}|*.md"
 		"VALIDATE_MARKDOWN_PRETTIER|prettier|prettier --check {FILE}|prettier --write {FILE}|*.md"

@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.2](https://github.com/grafana/flint/compare/v0.9.1...v0.9.2) (2026-03-31)
+
+
+### Bug Fixes
+
+* include staged files in native lint file list ([#135](https://github.com/grafana/flint/issues/135)) ([34412d6](https://github.com/grafana/flint/commit/34412d69d9af0b189dbe8de5a5549a964d8cfe80))
+* native lint in worktrees, trust toml, use ec binary, drop isort ([#134](https://github.com/grafana/flint/issues/134)) ([8594bba](https://github.com/grafana/flint/commit/8594bbabd4de528da476d0f6ead9dfb49913dd8a))
+* **renovate-deps:** forward GITHUB_TOKEN as GITHUB_COM_TOKEN ([#132](https://github.com/grafana/flint/issues/132)) ([4d6510b](https://github.com/grafana/flint/commit/4d6510b78361f2fe0bfd1d0cfe27ce8e26256054))
+
 ## [0.9.1](https://github.com/grafana/flint/compare/v0.9.0...v0.9.1) (2026-03-19)
 
 

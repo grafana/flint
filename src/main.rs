@@ -124,15 +124,31 @@ async fn main() -> Result<()> {
     if !failed.is_empty() {
         let n = failed.len();
         let noun = if n == 1 { "check" } else { "checks" };
-        let prefix = if cli.short { "" } else { "\n" };
-        eprintln!(
-            "{prefix}flint: {n} {noun} failed ({names})",
-            names = failed.join(", ")
-        );
-        if !cli.fix && !cli.short {
+        if cli.short {
+            // Partition by fixability. Emit the exact command for fixable checks
+            // so AI callers can act without a reasoning step.
+            let (fixable, reviewable): (Vec<&str>, Vec<&str>) = failed
+                .iter()
+                .copied()
+                .partition(|name| active.iter().any(|c| c.name == *name && c.has_fix()));
+            let mut segments = vec![];
+            if !fixable.is_empty() {
+                segments.push(format!("flint --fix {}", fixable.join(" ")));
+            }
+            if !reviewable.is_empty() {
+                segments.push(format!("review: {}", reviewable.join(", ")));
+            }
+            eprintln!("flint: {n} {noun} failed — {}", segments.join(" | "));
+        } else {
             eprintln!(
-                "💡 Try `mise run fix` to auto-fix lint issues, then re-run `mise run lint` to verify."
+                "\nflint: {n} {noun} failed ({names})",
+                names = failed.join(", ")
             );
+            if !cli.fix {
+                eprintln!(
+                    "💡 Try `mise run fix` to auto-fix lint issues, then re-run `mise run lint` to verify."
+                );
+            }
         }
         std::process::exit(1);
     }

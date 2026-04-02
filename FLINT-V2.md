@@ -35,16 +35,32 @@ use everywhere" promise of mise. Container startup also adds latency to every ru
 ## Principles
 
 1. **mise-based** — `flint` distributed via mise. Tools managed by the consuming
-   repo's `mise.toml`. No separate tool installation.
+   repo's `mise.toml`. No separate tool installation step.
+
 2. **Fast** — native execution only (no Docker). Linters run in parallel.
+   Designed to be the default `mise run lint`, not a slow fallback.
+   Slow checks (e.g. `renovate-deps`) can be skipped with `--fast`.
+
 3. **Local same as CI** — one binary, one config, identical behavior.
-4. **AI-friendly** — structured output for AI tools; works headless in agentic pipelines.
+   No "native mode subset" distinction. If it passes locally, it passes in CI.
+
+4. **AI-friendly** — `--short` suppresses per-check output and emits a single
+   structured summary line (`flint --fix prettier | review: shellcheck`) for
+   token-efficient AI consumption. Fixable checks are expressed as the exact
+   command to run — no reasoning step required. Also runnable containerised —
+   no host tool dependencies required.
+
 5. **Opt-in via tool install** — checks auto-enable when their binary is in PATH.
-   `flint.toml` adds detail but is not required to activate anything.
+   Installing a tool in `mise.toml` is the opt-in. `flint.toml` adds detail
+   (config paths, exclusions) but is not required to activate anything.
+
 6. **Changed files by default** — git-aware diff detection. `--from-ref`/`--to-ref`
-   for CI. `--full` to check everything.
+   for CI. `--full` to check everything. Falls back to all files when no merge
+   base is found.
+
 7. **Autofix where possible** — `--fix` flag (or `AUTOFIX=true`). Fix mode runs
-   serially to avoid concurrent writes to the same file.
+   serially to avoid concurrent writes to the same file. Pass specific linter
+   names to limit which fixers run (`flint --fix prettier shfmt`).
 
 ## Installation
 

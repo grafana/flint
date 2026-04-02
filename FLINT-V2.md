@@ -166,7 +166,7 @@ Checks auto-enable when their binary is found in PATH. Install tools via `mise.t
 | `shellcheck`    | `shellcheck`    | `*.sh *.bash *.bats`                               | no  | file    |
 | `shfmt`         | `shfmt`         | `*.sh *.bash`                                      | yes | file    |
 | `markdownlint`  | `markdownlint`  | `*.md`                                             | yes | file    |
-| `prettier`      | `prettier`      | `*.md *.json *.yml *.yaml`                         | yes | files   |
+| `prettier`      | `prettier`      | `*.md *.yml *.yaml`                                | yes | files   |
 | `actionlint`    | `actionlint`    | `.github/workflows/*.yml .github/workflows/*.yaml` | no  | file    |
 | `hadolint`      | `hadolint`      | `Dockerfile Dockerfile.* *.dockerfile`             | no  | file    |
 | `codespell`     | `codespell`     | `*`                                                | yes | files   |

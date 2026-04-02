@@ -90,7 +90,7 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "prettier",
             bin_name: "prettier",
-            patterns: "*.md *.json *.yml *.yaml",
+            patterns: "*.md *.yml *.yaml",
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "prettier --check {FILES}",

@@ -1,10 +1,6 @@
 {
-	"files": {
-		"ignoreUnknown": true,
-		"includes": [
-			"**",
-			"!!**/.github/renovate-tracked-deps.json",
-			"!!**/.claude"
-		]
-	}
+  "files": {
+    "ignoreUnknown": true,
+    "includes": ["**", "!!**/.github/renovate-tracked-deps.json", "!!**/.claude"]
+  }
 }

@@ -25,7 +25,8 @@ pub async fn run(
             let check_name = check.name.to_string();
             let (ok, stdout, stderr) = match &check.kind {
                 CheckKind::Template { .. } => {
-                    let invocations = build_invocations(check, file_list, fix, project_root);
+                    let invocations =
+                        build_invocations(check, file_list, fix, project_root, checks);
                     if invocations.is_empty() {
                         continue;
                     }
@@ -55,7 +56,7 @@ pub async fn run(
 
         match &check.kind {
             CheckKind::Template { .. } => {
-                let invocations = build_invocations(check, file_list, fix, project_root);
+                let invocations = build_invocations(check, file_list, fix, project_root, checks);
                 if invocations.is_empty() {
                     continue;
                 }
@@ -128,6 +129,7 @@ fn build_invocations(
     file_list: &FileList,
     fix: bool,
     project_root: &Path,
+    active_checks: &[&Check],
 ) -> Vec<Vec<String>> {
     let CheckKind::Template {
         check_cmd,
@@ -144,7 +146,12 @@ fn build_invocations(
         check_cmd
     };
 
-    let excludes: Vec<&str> = check.exclude_patterns.split_whitespace().collect();
+    // Collect patterns from checks that are active and listed in excludes_if_active.
+    let excludes: Vec<&str> = active_checks
+        .iter()
+        .filter(|c| check.excludes_if_active.contains(&c.name))
+        .flat_map(|c| c.patterns.split_whitespace())
+        .collect();
 
     match scope {
         Scope::Project => {
@@ -348,7 +355,7 @@ mod tests {
             name: "test",
             bin_name: "test-bin",
             patterns,
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "run-it",
@@ -372,14 +379,14 @@ mod tests {
     fn project_scope_skips_when_no_matching_files() {
         let check = project_check("*.rs");
         let fl = file_list(&["foo.py", "bar.md"]);
-        assert!(build_invocations(&check, &fl, false, Path::new("/repo")).is_empty());
+        assert!(build_invocations(&check, &fl, false, Path::new("/repo"), &[]).is_empty());
     }
 
     #[test]
     fn project_scope_runs_when_matching_files_present() {
         let check = project_check("*.rs");
         let fl = file_list(&["src/main.rs", "foo.py"]);
-        let inv = build_invocations(&check, &fl, false, Path::new("/repo"));
+        let inv = build_invocations(&check, &fl, false, Path::new("/repo"), &[]);
         assert_eq!(inv, vec![vec!["run-it".to_string()]]);
     }
 
@@ -387,7 +394,7 @@ mod tests {
     fn project_scope_empty_patterns_always_runs() {
         let check = project_check("");
         let fl = file_list(&["foo.py"]);
-        let inv = build_invocations(&check, &fl, false, Path::new("/repo"));
+        let inv = build_invocations(&check, &fl, false, Path::new("/repo"), &[]);
         assert_eq!(inv, vec![vec!["run-it".to_string()]]);
     }
 }

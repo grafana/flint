@@ -32,8 +32,10 @@ pub struct Check {
     pub bin_name: &'static str,
     /// Glob patterns (space-separated) for matching files.
     pub patterns: &'static str,
-    /// Glob patterns (space-separated) to exclude from the file list.
-    pub exclude_patterns: &'static str,
+    /// When any of these named checks are active, exclude their patterns from
+    /// this check's file list. Used to avoid double-checking files that a
+    /// dedicated formatter already owns.
+    pub excludes_if_active: &'static [&'static str],
     /// Slow checks are skipped when `--fast` is passed.
     pub slow: bool,
     pub kind: CheckKind,
@@ -60,7 +62,7 @@ pub fn builtin() -> Vec<Check> {
             name: "shellcheck",
             bin_name: "shellcheck",
             patterns: "*.sh *.bash *.bats",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "shellcheck {FILE}",
@@ -72,7 +74,7 @@ pub fn builtin() -> Vec<Check> {
             name: "shfmt",
             bin_name: "shfmt",
             patterns: "*.sh *.bash",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "shfmt -d {FILE}",
@@ -84,7 +86,7 @@ pub fn builtin() -> Vec<Check> {
             name: "markdownlint",
             bin_name: "markdownlint",
             patterns: "*.md",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "markdownlint {FILE}",
@@ -96,7 +98,7 @@ pub fn builtin() -> Vec<Check> {
             name: "prettier",
             bin_name: "prettier",
             patterns: "*.md *.yml *.yaml",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "prettier --check {FILES}",
@@ -108,7 +110,7 @@ pub fn builtin() -> Vec<Check> {
             name: "actionlint",
             bin_name: "actionlint",
             patterns: ".github/workflows/*.yml .github/workflows/*.yaml",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "actionlint {FILE}",
@@ -120,7 +122,7 @@ pub fn builtin() -> Vec<Check> {
             name: "hadolint",
             bin_name: "hadolint",
             patterns: "Dockerfile Dockerfile.* *.dockerfile",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "hadolint {FILE}",
@@ -132,7 +134,7 @@ pub fn builtin() -> Vec<Check> {
             name: "codespell",
             bin_name: "codespell",
             patterns: "*",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "codespell {FILES}",
@@ -144,8 +146,16 @@ pub fn builtin() -> Vec<Check> {
             name: "ec",
             bin_name: "ec",
             patterns: "*",
-            // Defer to dedicated formatters for the types they own.
-            exclude_patterns: "*.rs *.py *.go *.sh *.bash *.bats *.json *.jsonc *.js *.ts *.jsx *.tsx *.md",
+            // Defer to dedicated formatters when they are active.
+            excludes_if_active: &[
+                "cargo-fmt",
+                "ruff-format",
+                "golangci-lint",
+                "shfmt",
+                "biome-format",
+                "markdownlint",
+                "prettier",
+            ],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "ec {FILES}",
@@ -157,7 +167,7 @@ pub fn builtin() -> Vec<Check> {
             name: "golangci-lint",
             bin_name: "golangci-lint",
             patterns: "*.go",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "golangci-lint run --new-from-rev={MERGE_BASE}",
@@ -169,7 +179,7 @@ pub fn builtin() -> Vec<Check> {
             name: "ruff",
             bin_name: "ruff",
             patterns: "*.py",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "ruff check {FILE}",
@@ -181,7 +191,7 @@ pub fn builtin() -> Vec<Check> {
             name: "ruff-format",
             bin_name: "ruff",
             patterns: "*.py",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "ruff format --check {FILE}",
@@ -193,7 +203,7 @@ pub fn builtin() -> Vec<Check> {
             name: "biome",
             bin_name: "biome",
             patterns: "*.json *.jsonc *.js *.ts *.jsx *.tsx",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "biome check {FILE}",
@@ -205,7 +215,7 @@ pub fn builtin() -> Vec<Check> {
             name: "biome-format",
             bin_name: "biome",
             patterns: "*.json *.jsonc *.js *.ts *.jsx *.tsx",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "biome format {FILE}",
@@ -217,7 +227,7 @@ pub fn builtin() -> Vec<Check> {
             name: "cargo-clippy",
             bin_name: "cargo-clippy",
             patterns: "*.rs",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "cargo clippy -q -- -D warnings",
@@ -229,7 +239,7 @@ pub fn builtin() -> Vec<Check> {
             name: "cargo-fmt",
             bin_name: "cargo-fmt",
             patterns: "*.rs",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "cargo fmt -- --check",
@@ -241,7 +251,7 @@ pub fn builtin() -> Vec<Check> {
             name: "links",
             bin_name: "lychee",
             patterns: "",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Special(SpecialKind::Links),
         },
@@ -249,7 +259,7 @@ pub fn builtin() -> Vec<Check> {
             name: "renovate-deps",
             bin_name: "renovate",
             patterns: "",
-            exclude_patterns: "",
+            excludes_if_active: &[],
             slow: true,
             kind: CheckKind::Special(SpecialKind::RenovateDeps),
         },

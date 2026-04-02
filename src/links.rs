@@ -5,7 +5,11 @@ use tokio::process::Command;
 use crate::config::LinksConfig;
 use crate::files::FileList;
 
-pub async fn run(cfg: &LinksConfig, file_list: &FileList, project_root: &Path) -> (bool, Vec<u8>, Vec<u8>) {
+pub async fn run(
+    cfg: &LinksConfig,
+    file_list: &FileList,
+    project_root: &Path,
+) -> (bool, Vec<u8>, Vec<u8>) {
     let lychee_cfg = cfg
         .config
         .as_deref()
@@ -16,7 +20,14 @@ pub async fn run(cfg: &LinksConfig, file_list: &FileList, project_root: &Path) -
 
     // Full mode: no merge base (shallow clone or --full flag)
     if file_list.merge_base.is_none() {
-        return run_lychee_cmd("Checking all links in all files", &lychee_cfg, &remap_args, &["."], false).await;
+        return run_lychee_cmd(
+            "Checking all links in all files",
+            &lychee_cfg,
+            &remap_args,
+            &["."],
+            false,
+        )
+        .await;
     }
 
     // Check if lychee config is in the changed file list
@@ -27,8 +38,14 @@ pub async fn run(cfg: &LinksConfig, file_list: &FileList, project_root: &Path) -
 
     if config_changed {
         let mut stderr = b"Config changes detected, falling back to full check.\n".to_vec();
-        let (ok, stdout, extra_stderr) =
-            run_lychee_cmd("Checking all links in all files", &lychee_cfg, &remap_args, &["."], false).await;
+        let (ok, stdout, extra_stderr) = run_lychee_cmd(
+            "Checking all links in all files",
+            &lychee_cfg,
+            &remap_args,
+            &["."],
+            false,
+        )
+        .await;
         stderr.extend_from_slice(&extra_stderr);
         return (ok, stdout, stderr);
     }
@@ -52,8 +69,14 @@ pub async fn run(cfg: &LinksConfig, file_list: &FileList, project_root: &Path) -
 
     if !checkable.is_empty() {
         let file_refs: Vec<&str> = checkable.iter().map(String::as_str).collect();
-        let (ok, stdout, stderr) =
-            run_lychee_cmd("Checking all links in modified files", &lychee_cfg, &remap_args, &file_refs, false).await;
+        let (ok, stdout, stderr) = run_lychee_cmd(
+            "Checking all links in modified files",
+            &lychee_cfg,
+            &remap_args,
+            &file_refs,
+            false,
+        )
+        .await;
         if !ok {
             all_ok = false;
         }
@@ -64,8 +87,14 @@ pub async fn run(cfg: &LinksConfig, file_list: &FileList, project_root: &Path) -
     }
 
     if cfg.check_all_local {
-        let (ok, stdout, stderr) =
-            run_lychee_cmd("Checking local links in all files", &lychee_cfg, &remap_args, &["."], true).await;
+        let (ok, stdout, stderr) = run_lychee_cmd(
+            "Checking local links in all files",
+            &lychee_cfg,
+            &remap_args,
+            &["."],
+            true,
+        )
+        .await;
         if !ok {
             all_ok = false;
         }
@@ -83,7 +112,11 @@ async fn run_lychee_cmd(
     files: &[&str],
     local_only: bool,
 ) -> (bool, Vec<u8>, Vec<u8>) {
-    let mut argv: Vec<String> = vec!["lychee".to_string(), "--config".to_string(), lychee_cfg.to_string()];
+    let mut argv: Vec<String> = vec![
+        "lychee".to_string(),
+        "--config".to_string(),
+        lychee_cfg.to_string(),
+    ];
 
     if local_only {
         argv.push("--scheme".to_string());
@@ -206,10 +239,10 @@ fn build_branch_remap_args(project_root: &Path) -> Vec<String> {
 }
 
 fn resolve_repo(project_root: &Path) -> Option<String> {
-    if let Ok(repo) = std::env::var("GITHUB_REPOSITORY") {
-        if !repo.is_empty() {
-            return Some(repo);
-        }
+    if let Ok(repo) = std::env::var("GITHUB_REPOSITORY")
+        && !repo.is_empty()
+    {
+        return Some(repo);
     }
 
     let out = std::process::Command::new("git")
@@ -245,10 +278,10 @@ fn parse_github_repo(url: &str) -> Option<String> {
 }
 
 fn resolve_base_ref(project_root: &Path) -> String {
-    if let Ok(base) = std::env::var("GITHUB_BASE_REF") {
-        if !base.is_empty() {
-            return base;
-        }
+    if let Ok(base) = std::env::var("GITHUB_BASE_REF")
+        && !base.is_empty()
+    {
+        return base;
     }
 
     let out = std::process::Command::new("git")
@@ -256,15 +289,15 @@ fn resolve_base_ref(project_root: &Path) -> String {
         .current_dir(project_root)
         .output();
 
-    if let Ok(out) = out {
-        if out.status.success() {
-            let full = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            // refs/remotes/origin/main → main
-            if let Some(branch) = full.rsplit('/').next() {
-                if !branch.is_empty() {
-                    return branch.to_string();
-                }
-            }
+    if let Ok(out) = out
+        && out.status.success()
+    {
+        let full = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        // refs/remotes/origin/main → main
+        if let Some(branch) = full.rsplit('/').next()
+            && !branch.is_empty()
+        {
+            return branch.to_string();
         }
     }
 
@@ -272,10 +305,10 @@ fn resolve_base_ref(project_root: &Path) -> String {
 }
 
 fn resolve_head_ref(project_root: &Path) -> Option<String> {
-    if let Ok(head) = std::env::var("GITHUB_HEAD_REF") {
-        if !head.is_empty() {
-            return Some(head);
-        }
+    if let Ok(head) = std::env::var("GITHUB_HEAD_REF")
+        && !head.is_empty()
+    {
+        return Some(head);
     }
 
     let out = std::process::Command::new("git")
@@ -315,4 +348,3 @@ fn is_link_checkable(path: &Path) -> bool {
             | "txt"
     )
 }
-

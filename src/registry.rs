@@ -198,6 +198,39 @@ pub fn builtin() -> Vec<Check> {
             },
         },
         Check {
+            name: "textlint",
+            bin_name: "textlint",
+            patterns: "*.md *.txt",
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "textlint {FILES}",
+                fix_cmd: "textlint --fix {FILES}",
+                scope: Scope::Files,
+            },
+        },
+        Check {
+            name: "cargo-clippy",
+            bin_name: "cargo-clippy",
+            patterns: "*.rs",
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "cargo clippy -q -- -D warnings",
+                fix_cmd: "cargo clippy -q --fix --allow-dirty --allow-staged -- -D warnings",
+                scope: Scope::Project,
+            },
+        },
+        Check {
+            name: "cargo-fmt",
+            bin_name: "cargo-fmt",
+            patterns: "*.rs",
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "cargo fmt -- --check",
+                fix_cmd: "cargo fmt",
+                scope: Scope::Project,
+            },
+        },
+        Check {
             name: "links",
             bin_name: "lychee",
             patterns: "",

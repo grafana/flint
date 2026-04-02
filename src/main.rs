@@ -100,7 +100,15 @@ async fn main() -> Result<()> {
         cli.to_ref.as_deref(),
     )?;
 
-    let results = runner::run(&active, &file_list, cli.fix, cli.verbose, &project_root, &cfg).await?;
+    let results = runner::run(
+        &active,
+        &file_list,
+        cli.fix,
+        cli.verbose,
+        &project_root,
+        &cfg,
+    )
+    .await?;
 
     let mut failed = false;
     for (name, ok) in &results {
@@ -124,12 +132,25 @@ async fn main() -> Result<()> {
 
 fn print_list(registry: &[registry::Check]) {
     // Column widths.
-    let name_w = registry.iter().map(|c| c.name.len()).max().unwrap_or(4).max(4);
-    let bin_w = registry.iter().map(|c| c.bin().len()).max().unwrap_or(6).max(6);
+    let name_w = registry
+        .iter()
+        .map(|c| c.name.len())
+        .max()
+        .unwrap_or(4)
+        .max(4);
+    let bin_w = registry
+        .iter()
+        .map(|c| c.bin().len())
+        .max()
+        .unwrap_or(6)
+        .max(6);
 
     println!(
-        "{:<name_w$}  {:<bin_w$}  {:<9}  {:<4}  {}",
-        "NAME", "BINARY", "STATUS", "SPEED", "PATTERNS",
+        "{:<name_w$}  {:<bin_w$}  {:<9}  {:<4}  PATTERNS",
+        "NAME",
+        "BINARY",
+        "STATUS",
+        "SPEED",
         name_w = name_w,
         bin_w = bin_w,
     );

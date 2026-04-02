@@ -2,16 +2,21 @@
 lychee = "0.22.0"
 node = "24.14.1"
 "npm:renovate" = "43.92.1"
+shellcheck = "v0.11.0"
+shfmt = "v3.12.0"
+actionlint = "1.7.10"
+editorconfig-checker = "v3.6.1"
+"npm:markdownlint-cli" = "0.47.0"
+"npm:prettier" = "3.8.1"
+"npm:@biomejs/biome" = "2.3.14"
+"npm:textlint" = "15.5.1"
+"npm:textlint-rule-terminology" = "5.2.16"
+"pipx:ruff" = "0.15.0"
+"pipx:codespell" = "2.4.1"
 
 [env]
-RENOVATE_TRACKED_DEPS_EXCLUDE="github-actions,github-runners"
 # renovate: datasource=docker depName=ghcr.io/super-linter/super-linter
 SUPER_LINTER_VERSION="slim-v8.5.0@sha256:857dcc3f0bf5dd065fdeed1ace63394bb2004238a5ef02910ea23d9bcd8fd2b8"
-
-# Dogfood our own lint tasks - use local file paths
-[tasks."lint:super-linter"]
-description = "Run Super-Linter on the repository"
-file = "tasks/lint/super-linter.sh"
 
 [tasks."setup:native-lint-tools"]
 description = "Install native lint tools matching the pinned super-linter version"
@@ -21,38 +26,17 @@ file = "tasks/setup/native-lint-tools.sh"
 description = "Generate super-linter version mapping from the super-linter repo"
 file = "tasks/setup/update-super-linter-versions.sh"
 
-[tasks."lint:links"]
-description = "Check for broken links in changed files + all local links"
-file = "tasks/lint/links.sh"
-
-[tasks."lint:renovate-deps"]
-description = "Verify renovate-tracked-deps.json is up to date"
-file = "tasks/lint/renovate-deps.py"
-
-[tasks."lint:fast"]
-description = "Run fast lints (no Renovate)"
-depends = ["lint:super-linter", "lint:links"]
-
-[tasks."lint"]
+[tasks.lint]
 description = "Run all lints"
-depends = ["lint:fast", "lint:renovate-deps"]
+run = "cargo build -q && ./target/debug/flint"
 
 [tasks.fix]
-description = "Auto-fix lint issues and regenerate tracked deps"
-run = "AUTOFIX=true mise run lint"
+description = "Auto-fix lint issues"
+run = "cargo build -q && ./target/debug/flint --fix"
 
 [tasks.native-lint]
-description = "Run lints natively (no container)"
-depends = ["lint:rust", "check-fmt"]
-
-[tasks.pre-commit]
-description = "Pre-commit hook: native lint"
-depends = ["setup:native-lint-tools"]
-run = "NATIVE=true mise run lint:fast"
-
-[tasks."setup:pre-commit-hook"]
-description = "Install git pre-commit hook that runs native linting"
-run = "mise generate git-pre-commit --write --task=pre-commit"
+description = "Run lints natively (fast, no renovate)"
+run = "cargo build -q && ./target/debug/flint --fast"
 
 # Rust tasks
 [tasks.build]
@@ -61,13 +45,7 @@ run = "cargo build"
 
 [tasks."lint:rust"]
 description = "Lint Rust code (clippy)"
-run = """
-if [ "${AUTOFIX:-}" = "true" ]; then
-  cargo clippy -q --fix --allow-dirty --allow-staged -- -D warnings
-else
-  cargo clippy -q -- -D warnings
-fi
-"""
+run = "cargo clippy -q -- -D warnings"
 
 [tasks.fmt]
 description = "Format Rust code"

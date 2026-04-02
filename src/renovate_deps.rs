@@ -6,12 +6,17 @@ use crate::config::RenovateDepsConfig;
 
 const SCRIPT: &str = include_str!("../tasks/lint/renovate-deps.py");
 
-pub async fn run(cfg: &RenovateDepsConfig, fix: bool, project_root: &Path) -> (bool, Vec<u8>, Vec<u8>) {
+pub async fn run(
+    cfg: &RenovateDepsConfig,
+    fix: bool,
+    project_root: &Path,
+) -> (bool, Vec<u8>, Vec<u8>) {
     let pid = std::process::id();
     let tmp_path = format!("/tmp/flint-renovate-deps-{pid}.py");
 
     if let Err(e) = std::fs::write(&tmp_path, SCRIPT) {
-        let stderr = format!("flint: renovate-deps: failed to write temp script: {e}\n").into_bytes();
+        let stderr =
+            format!("flint: renovate-deps: failed to write temp script: {e}\n").into_bytes();
         return (false, vec![], stderr);
     }
 
@@ -26,7 +31,10 @@ pub async fn run(cfg: &RenovateDepsConfig, fix: bool, project_root: &Path) -> (b
     }
 
     if !cfg.exclude_managers.is_empty() {
-        cmd.env("RENOVATE_TRACKED_DEPS_EXCLUDE", cfg.exclude_managers.join(","));
+        cmd.env(
+            "RENOVATE_TRACKED_DEPS_EXCLUDE",
+            cfg.exclude_managers.join(","),
+        );
     }
 
     let result = cmd.output().await;
@@ -40,7 +48,8 @@ pub async fn run(cfg: &RenovateDepsConfig, fix: bool, project_root: &Path) -> (b
             (ok, out.stdout, out.stderr)
         }
         Err(e) => {
-            let stderr = format!("flint: renovate-deps: failed to spawn python3: {e}\n").into_bytes();
+            let stderr =
+                format!("flint: renovate-deps: failed to spawn python3: {e}\n").into_bytes();
             (false, vec![], stderr)
         }
     }

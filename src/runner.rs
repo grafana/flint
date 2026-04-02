@@ -113,7 +113,10 @@ pub async fn run(
         }
     }
 
-    Ok(collected.into_iter().map(|(name, ok, _, _)| (name, ok)).collect())
+    Ok(collected
+        .into_iter()
+        .map(|(name, ok, _, _)| (name, ok))
+        .collect())
 }
 
 /// Returns the list of argv vectors to execute for a check.
@@ -123,7 +126,12 @@ fn build_invocations(
     fix: bool,
     project_root: &Path,
 ) -> Vec<Vec<String>> {
-    let CheckKind::Template { check_cmd, fix_cmd, scope } = &check.kind else {
+    let CheckKind::Template {
+        check_cmd,
+        fix_cmd,
+        scope,
+    } = &check.kind
+    else {
         return vec![];
     };
 
@@ -135,6 +143,13 @@ fn build_invocations(
 
     match scope {
         Scope::Project => {
+            // If patterns are set, only run when relevant files are present.
+            if !check.patterns.is_empty() {
+                let patterns: Vec<&str> = check.patterns.split_whitespace().collect();
+                if match_files(&file_list.files, &patterns, project_root).is_empty() {
+                    return vec![];
+                }
+            }
             let cmd = substitute_merge_base(cmd_template, file_list.merge_base.as_deref());
             vec![shell_words(cmd)]
         }

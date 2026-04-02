@@ -65,6 +65,39 @@ fn shellcheck_failure_shows_check_name_header() {
 }
 
 #[test]
+fn cargo_fmt_diff_shows_check_name_header() {
+    let repo = git_repo();
+
+    // Minimal Cargo project with a badly formatted Rust file.
+    std::fs::write(
+        repo.path().join("Cargo.toml"),
+        "[package]\nname = \"test\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+    )
+    .unwrap();
+    let src = repo.path().join("src");
+    std::fs::create_dir_all(&src).unwrap();
+    // Poorly formatted: fields on one line, which rustfmt will expand.
+    stage(
+        &src.join("lib.rs"),
+        "pub struct Foo { pub a: u32, pub b: u32 }\n",
+        repo.path(),
+    );
+
+    let out = flint(&["--full", "cargo-fmt"], repo.path());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    println!("=== stdout ===\n{stdout}");
+    eprintln!("=== stderr ===\n{stderr}");
+
+    assert!(!out.status.success(), "flint should fail");
+    assert!(
+        stderr.contains("[cargo-fmt]"),
+        "expected [cargo-fmt] header, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn shellcheck_clean_script_passes() {
     let repo = git_repo();
 

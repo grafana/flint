@@ -144,12 +144,14 @@ fn build_invocations(
         check_cmd
     };
 
+    let excludes: Vec<&str> = check.exclude_patterns.split_whitespace().collect();
+
     match scope {
         Scope::Project => {
             // If patterns are set, only run when relevant files are present.
             if !check.patterns.is_empty() {
                 let patterns: Vec<&str> = check.patterns.split_whitespace().collect();
-                if match_files(&file_list.files, &patterns, project_root).is_empty() {
+                if match_files(&file_list.files, &patterns, &excludes, project_root).is_empty() {
                     return vec![];
                 }
             }
@@ -159,7 +161,7 @@ fn build_invocations(
 
         Scope::File => {
             let patterns: Vec<&str> = check.patterns.split_whitespace().collect();
-            let matched = match_files(&file_list.files, &patterns, project_root);
+            let matched = match_files(&file_list.files, &patterns, &excludes, project_root);
             matched
                 .iter()
                 .map(|f| {
@@ -171,7 +173,7 @@ fn build_invocations(
 
         Scope::Files => {
             let patterns: Vec<&str> = check.patterns.split_whitespace().collect();
-            let matched = match_files(&file_list.files, &patterns, project_root);
+            let matched = match_files(&file_list.files, &patterns, &excludes, project_root);
             if matched.is_empty() {
                 return vec![];
             }
@@ -238,6 +240,7 @@ fn flush_output(stdout: &[u8], stderr: &[u8]) {
 fn match_files<'a>(
     files: &'a [PathBuf],
     patterns: &[&str],
+    exclude_patterns: &[&str],
     project_root: &Path,
 ) -> Vec<&'a PathBuf> {
     files
@@ -249,12 +252,16 @@ fn match_files<'a>(
                 .file_name()
                 .map(|n| n.to_string_lossy())
                 .unwrap_or_default();
-            patterns.iter().any(|pat| {
+            let included = patterns.iter().any(|pat| {
                 if *pat == "*" {
                     return true;
                 }
                 glob_match(pat, file_name.as_ref()) || glob_match(pat, rel_str.as_ref())
-            })
+            });
+            let excluded = exclude_patterns.iter().any(|pat| {
+                glob_match(pat, file_name.as_ref()) || glob_match(pat, rel_str.as_ref())
+            });
+            included && !excluded
         })
         .collect()
 }
@@ -341,6 +348,7 @@ mod tests {
             name: "test",
             bin_name: "test-bin",
             patterns,
+            exclude_patterns: "",
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "run-it",

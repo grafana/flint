@@ -9,18 +9,8 @@ editorconfig-checker = "v3.6.1"
 "npm:markdownlint-cli" = "0.47.0"
 "npm:prettier" = "3.8.1"
 "npm:@biomejs/biome" = "2.3.14"
-"npm:textlint" = "15.5.1"
-"npm:textlint-rule-terminology" = "5.2.16"
 "pipx:ruff" = "0.15.0"
 "pipx:codespell" = "2.4.1"
-
-[env]
-# renovate: datasource=docker depName=ghcr.io/super-linter/super-linter
-SUPER_LINTER_VERSION="slim-v8.5.0@sha256:857dcc3f0bf5dd065fdeed1ace63394bb2004238a5ef02910ea23d9bcd8fd2b8"
-
-[tasks."setup:native-lint-tools"]
-description = "Install native lint tools matching the pinned super-linter version"
-file = "tasks/setup/native-lint-tools.sh"
 
 [tasks."setup:update-super-linter-versions"]
 description = "Generate super-linter version mapping from the super-linter repo"
@@ -36,7 +26,7 @@ run = "cargo build -q && ./target/debug/flint --fix"
 
 [tasks.native-lint]
 description = "Run lints natively (fast, no renovate)"
-run = "cargo build -q && ./target/debug/flint --fast"
+run = "cargo build -q && ./target/debug/flint --fast --short"
 
 # Rust tasks
 [tasks.build]

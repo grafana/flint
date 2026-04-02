@@ -17,6 +17,9 @@ A toolbox of reusable [mise](https://mise.jdx.dev/) lint task scripts.
 Pick the ones you need — each task is independent and can be adopted
 on its own.
 
+> **v2 in development**: a single Rust binary is replacing these bash
+> scripts. See [FLINT-V2.md](FLINT-V2.md) for details.
+
 **Available tasks:**
 
 | Task                 | Tool                                                          |

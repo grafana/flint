@@ -16,7 +16,7 @@ pub async fn run(
         .unwrap_or(".github/config/lychee.toml")
         .to_string();
 
-    let remap_args = build_remap_args(project_root);
+    let remap_args = build_remap_args(project_root).await;
 
     // Full mode: no merge base (shallow clone or --full flag)
     if file_list.merge_base.is_none() {
@@ -149,114 +149,131 @@ async fn run_lychee_cmd(
     }
 }
 
-fn build_remap_args(project_root: &Path) -> Vec<String> {
+async fn build_remap_args(project_root: &Path) -> Vec<String> {
     if std::env::var("LYCHEE_SKIP_GITHUB_REMAPS").as_deref() == Ok("true") {
         return vec![];
     }
-
     let mut args = build_global_github_args();
-    args.extend(build_branch_remap_args(project_root));
+    args.extend(build_branch_remap_args(project_root).await);
     args
 }
 
 fn build_global_github_args() -> Vec<String> {
-    vec![
-        "--remap".to_string(),
-        r"^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#L[0-9]+.*$ https://raw.githubusercontent.com/$1/$2/$3".to_string(),
-        "--remap".to_string(),
-        r"^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#:~:text=.*$ https://raw.githubusercontent.com/$1/$2/$3".to_string(),
-        "--remap".to_string(),
-        r"^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*)$ https://raw.githubusercontent.com/$1/$2/$3".to_string(),
-        "--remap".to_string(),
-        r"^https://github.com/([^/]+/[^/]+)/(issues|pull)/([0-9]+)#issuecomment-.*$ https://github.com/$1/$2/$3".to_string(),
-    ]
+    let mut args = Vec::new();
+    push_remap(
+        &mut args,
+        r"^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#L[0-9]+.*$ https://raw.githubusercontent.com/$1/$2/$3",
+    );
+    push_remap(
+        &mut args,
+        r"^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#:~:text=.*$ https://raw.githubusercontent.com/$1/$2/$3",
+    );
+    push_remap(
+        &mut args,
+        r"^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*)$ https://raw.githubusercontent.com/$1/$2/$3",
+    );
+    push_remap(
+        &mut args,
+        r"^https://github.com/([^/]+/[^/]+)/(issues|pull)/([0-9]+)#issuecomment-.*$ https://github.com/$1/$2/$3",
+    );
+    args
 }
 
-fn build_branch_remap_args(project_root: &Path) -> Vec<String> {
-    let repo = match resolve_repo(project_root) {
-        Some(r) => r,
-        None => return vec![],
+async fn build_branch_remap_args(project_root: &Path) -> Vec<String> {
+    let Some(repo) = resolve_repo(project_root).await else {
+        return vec![];
+    };
+    let base_ref = resolve_base_ref(project_root).await;
+    let Some(head_ref) = resolve_head_ref(project_root).await else {
+        return vec![];
     };
 
-    let base_ref = resolve_base_ref(project_root);
-
-    let head_ref = match resolve_head_ref(project_root) {
-        Some(r) => r,
-        None => return vec![],
-    };
-
-    // Skip if on the base branch
     if head_ref == base_ref {
         return vec![];
     }
 
     let head_repo = std::env::var("PR_HEAD_REPO").unwrap_or_else(|_| repo.clone());
-
     let base_url = format!("https://github.com/{repo}");
+    let mut args = Vec::new();
 
     if head_repo == repo {
-        // Same-repo PR: remap to local file paths
         let pwd = project_root.to_string_lossy();
-        vec![
-            // /blob/ rule 1: line-number anchors
-            "--remap".to_string(),
-            format!("^{base_url}/blob/{base_ref}/(.*?)#L[0-9]+.*$ file://{pwd}/$1"),
-            // /blob/ rule 2: scroll to text fragments
-            "--remap".to_string(),
-            format!("^{base_url}/blob/{base_ref}/(.*?)#:~:text=.*$ file://{pwd}/$1"),
-            // /blob/ rule 3: all other blob URLs
-            "--remap".to_string(),
-            format!("^{base_url}/blob/{base_ref}/(.*)$ file://{pwd}/$1"),
-            // /tree/ rule 4: line-number anchors on tree URLs
-            "--remap".to_string(),
-            format!("^{base_url}/tree/{base_ref}/(.*?)#L[0-9]+.*$ file://{pwd}/$1"),
-            // /tree/ rule 5: non-fragment tree URLs
-            "--remap".to_string(),
-            format!("^{base_url}/tree/{base_ref}/(.*)$ file://{pwd}/$1"),
-        ]
+        push_remap(&mut args, format!("^{base_url}/blob/{base_ref}/(.*?)#L[0-9]+.*$ file://{pwd}/$1"));
+        push_remap(&mut args, format!("^{base_url}/blob/{base_ref}/(.*?)#:~:text=.*$ file://{pwd}/$1"));
+        push_remap(&mut args, format!("^{base_url}/blob/{base_ref}/(.*)$ file://{pwd}/$1"));
+        push_remap(&mut args, format!("^{base_url}/tree/{base_ref}/(.*?)#L[0-9]+.*$ file://{pwd}/$1"));
+        push_remap(&mut args, format!("^{base_url}/tree/{base_ref}/(.*)$ file://{pwd}/$1"));
     } else {
-        // Fork PR: remap to raw.githubusercontent.com and github.com head branch
         let raw_head = format!("https://raw.githubusercontent.com/{head_repo}/{head_ref}");
         let head_url = format!("https://github.com/{head_repo}");
-        vec![
-            // /blob/ rule 1: line-number anchors
-            "--remap".to_string(),
-            format!("^{base_url}/blob/{base_ref}/(.*?)#L[0-9]+.*$ {raw_head}/$1"),
-            // /blob/ rule 2: scroll to text fragments
-            "--remap".to_string(),
-            format!("^{base_url}/blob/{base_ref}/(.*?)#:~:text=.*$ {raw_head}/$1"),
-            // /blob/ rule 3: all other blob URLs
-            "--remap".to_string(),
-            format!("^{base_url}/blob/{base_ref}/(.*)$ {raw_head}/$1"),
-            // /tree/ rule 4: line-number anchors on tree URLs
-            "--remap".to_string(),
+        push_remap(&mut args, format!("^{base_url}/blob/{base_ref}/(.*?)#L[0-9]+.*$ {raw_head}/$1"));
+        push_remap(&mut args, format!("^{base_url}/blob/{base_ref}/(.*?)#:~:text=.*$ {raw_head}/$1"));
+        push_remap(&mut args, format!("^{base_url}/blob/{base_ref}/(.*)$ {raw_head}/$1"));
+        push_remap(
+            &mut args,
             format!("^{base_url}/tree/{base_ref}/(.*?)#L[0-9]+.*$ {head_url}/tree/{head_ref}/$1"),
-            // /tree/ rule 5: non-fragment tree URLs
-            "--remap".to_string(),
+        );
+        push_remap(
+            &mut args,
             format!("^{base_url}/tree/{base_ref}/(.*)$ {head_url}/tree/{head_ref}/$1"),
-        ]
+        );
     }
+
+    args
 }
 
-fn resolve_repo(project_root: &Path) -> Option<String> {
+fn push_remap(args: &mut Vec<String>, pattern: impl Into<String>) {
+    args.push("--remap".to_string());
+    args.push(pattern.into());
+}
+
+/// Runs a git command and returns its trimmed stdout, or `None` if it fails or is empty.
+async fn run_git_output(project_root: &Path, args: &[&str]) -> Option<String> {
+    let out = Command::new("git")
+        .args(args)
+        .current_dir(project_root)
+        .output()
+        .await
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if s.is_empty() { None } else { Some(s) }
+}
+
+async fn resolve_repo(project_root: &Path) -> Option<String> {
     if let Ok(repo) = std::env::var("GITHUB_REPOSITORY")
         && !repo.is_empty()
     {
         return Some(repo);
     }
+    run_git_output(project_root, &["config", "--get", "remote.origin.url"])
+        .await
+        .and_then(|url| parse_github_repo(&url))
+}
 
-    let out = std::process::Command::new("git")
-        .args(["config", "--get", "remote.origin.url"])
-        .current_dir(project_root)
-        .output()
-        .ok()?;
-
-    if !out.status.success() {
-        return None;
+async fn resolve_base_ref(project_root: &Path) -> String {
+    if let Ok(base) = std::env::var("GITHUB_BASE_REF")
+        && !base.is_empty()
+    {
+        return base;
     }
+    run_git_output(project_root, &["symbolic-ref", "refs/remotes/origin/HEAD"])
+        .await
+        .as_deref()
+        .and_then(|s| s.rsplit('/').next())
+        .map(String::from)
+        .unwrap_or_else(|| "main".to_string())
+}
 
-    let url = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    parse_github_repo(&url)
+async fn resolve_head_ref(project_root: &Path) -> Option<String> {
+    if let Ok(head) = std::env::var("GITHUB_HEAD_REF")
+        && !head.is_empty()
+    {
+        return Some(head);
+    }
+    run_git_output(project_root, &["rev-parse", "--abbrev-ref", "HEAD"]).await
 }
 
 fn parse_github_repo(url: &str) -> Option<String> {
@@ -275,58 +292,6 @@ fn parse_github_repo(url: &str) -> Option<String> {
         }
     }
     None
-}
-
-fn resolve_base_ref(project_root: &Path) -> String {
-    if let Ok(base) = std::env::var("GITHUB_BASE_REF")
-        && !base.is_empty()
-    {
-        return base;
-    }
-
-    let out = std::process::Command::new("git")
-        .args(["symbolic-ref", "refs/remotes/origin/HEAD"])
-        .current_dir(project_root)
-        .output();
-
-    if let Ok(out) = out
-        && out.status.success()
-    {
-        let full = String::from_utf8_lossy(&out.stdout).trim().to_string();
-        // refs/remotes/origin/main → main
-        if let Some(branch) = full.rsplit('/').next()
-            && !branch.is_empty()
-        {
-            return branch.to_string();
-        }
-    }
-
-    "main".to_string()
-}
-
-fn resolve_head_ref(project_root: &Path) -> Option<String> {
-    if let Ok(head) = std::env::var("GITHUB_HEAD_REF")
-        && !head.is_empty()
-    {
-        return Some(head);
-    }
-
-    let out = std::process::Command::new("git")
-        .args(["rev-parse", "--abbrev-ref", "HEAD"])
-        .current_dir(project_root)
-        .output()
-        .ok()?;
-
-    if !out.status.success() {
-        return None;
-    }
-
-    let branch = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    if branch.is_empty() {
-        None
-    } else {
-        Some(branch)
-    }
 }
 
 fn is_link_checkable(path: &Path) -> bool {

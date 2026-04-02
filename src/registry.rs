@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::path::Path;
+
 /// How a check is invoked relative to the file list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
@@ -184,10 +187,68 @@ pub fn builtin() -> Vec<Check> {
     ]
 }
 
+/// Reads `[tools]` from the consuming repo's mise.toml and returns a map of
+/// tool name → declared version string.
+pub fn read_mise_tools(project_root: &Path) -> HashMap<String, String> {
+    let path = project_root.join("mise.toml");
+    let content = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(_) => return HashMap::new(),
+    };
+    let value: toml::Value = match toml::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return HashMap::new(),
+    };
+    let mut tools = HashMap::new();
+    if let Some(table) = value.get("tools").and_then(|v| v.as_table()) {
+        for (name, val) in table {
+            let version = match val {
+                toml::Value::String(s) => Some(s.clone()),
+                toml::Value::Table(t) => {
+                    t.get("version").and_then(|v| v.as_str()).map(String::from)
+                }
+                _ => None,
+            };
+            if let Some(v) = version {
+                tools.insert(name.clone(), v);
+            }
+        }
+    }
+    tools
+}
+
+/// Returns true if the check's tool is declared in mise.toml and its version
+/// satisfies the check's version_range (if any).
+pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool {
+    let lookup_key = check.mise_tool_name.unwrap_or(check.bin_name);
+    let Some(declared) = mise_tools.get(lookup_key) else {
+        return false;
+    };
+    let Some(range_str) = check.version_range else {
+        return true;
+    };
+    let Ok(req) = semver::VersionReq::parse(range_str) else {
+        return false;
+    };
+    coerce_version(declared).is_some_and(|v| req.matches(&v))
+}
+
+/// Parses a version string, padding with `.0` components if needed to satisfy
+/// semver's three-part requirement (e.g. `"20"` → `20.0.0`, `"3.12"` → `3.12.0`).
+fn coerce_version(s: &str) -> Option<semver::Version> {
+    semver::Version::parse(s).ok().or_else(|| {
+        let parts = s.split('.').count();
+        match parts {
+            1 => semver::Version::parse(&format!("{s}.0.0")).ok(),
+            2 => semver::Version::parse(&format!("{s}.0")).ok(),
+            _ => None,
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
 
     /// If any entry for a bin_name declares a version_range, every entry for that
     /// bin_name must declare one. A mix of ranged and unranged entries for the same

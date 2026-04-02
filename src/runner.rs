@@ -4,10 +4,44 @@ use std::process::Stdio;
 use tokio::process::Command;
 use tokio::task::JoinSet;
 
-use crate::linters::{lychee, renovate_deps};
-use crate::config::Config;
+use crate::config::{Config, LycheeConfig, RenovateDepsConfig};
 use crate::files::FileList;
+use crate::linters::{lychee, renovate_deps};
 use crate::registry::{Check, CheckKind, Scope, SpecialKind};
+
+/// A check with all inputs pre-resolved, ready to execute without borrowing
+/// the registry or config. Built by `prepare()` before the fix/check split.
+enum PreparedCheck {
+    Invocations { name: String, argv_list: Vec<Vec<String>> },
+    Links { name: String, cfg: LycheeConfig, file_list: FileList },
+    RenovateDeps { name: String, cfg: RenovateDepsConfig },
+}
+
+impl PreparedCheck {
+    fn name(&self) -> &str {
+        match self {
+            Self::Invocations { name, .. }
+            | Self::Links { name, .. }
+            | Self::RenovateDeps { name, .. } => name,
+        }
+    }
+
+    async fn execute(self, fix: bool, project_root: &Path) -> (String, bool, Vec<u8>, Vec<u8>) {
+        let name = self.name().to_string();
+        let (ok, stdout, stderr) = match self {
+            Self::Invocations { argv_list, .. } => {
+                run_invocations(&name, &argv_list, project_root).await
+            }
+            Self::Links { cfg, file_list, .. } => {
+                lychee::run(&cfg, &file_list, project_root).await
+            }
+            Self::RenovateDeps { cfg, .. } => {
+                renovate_deps::run(&cfg, fix, project_root).await
+            }
+        };
+        (name, ok, stdout, stderr)
+    }
+}
 
 pub async fn run(
     checks: &[&Check],
@@ -18,91 +52,38 @@ pub async fn run(
     project_root: &Path,
     cfg: &Config,
 ) -> Result<Vec<(String, bool)>> {
+    let prepared: Vec<PreparedCheck> = checks
+        .iter()
+        .filter_map(|&check| prepare(check, file_list, fix, project_root, checks, cfg))
+        .collect();
+
     if fix {
-        // Serial execution in fix mode: print each check's output immediately as it finishes.
         let mut results = vec![];
-        for &check in checks {
-            let check_name = check.name.to_string();
-            let (ok, stdout, stderr) = match &check.kind {
-                CheckKind::Template { .. } => {
-                    let invocations =
-                        build_invocations(check, file_list, fix, project_root, checks);
-                    if invocations.is_empty() {
-                        continue;
-                    }
-                    run_invocations(&check_name, &invocations, project_root).await
-                }
-                CheckKind::Special(SpecialKind::Links) => {
-                    lychee::run(&cfg.checks.lychee, file_list, project_root).await
-                }
-                CheckKind::Special(SpecialKind::RenovateDeps) => {
-                    renovate_deps::run(&cfg.checks.renovate_deps, fix, project_root).await
-                }
-            };
+        for task in prepared {
+            let name = task.name().to_string();
+            let (_, ok, stdout, stderr) = task.execute(fix, project_root).await;
             if !short && (verbose || !ok) {
-                eprintln!("[{check_name}]");
+                eprintln!("[{name}]");
                 flush_output(&stdout, &stderr);
             }
-            results.push((check_name, ok));
+            results.push((name, ok));
         }
         return Ok(results);
     }
 
-    // Parallel execution in check mode.
     let mut set: JoinSet<(String, bool, Vec<u8>, Vec<u8>)> = JoinSet::new();
-
-    for &check in checks {
-        let check_name = check.name.to_string();
-
-        match &check.kind {
-            CheckKind::Template { .. } => {
-                let invocations = build_invocations(check, file_list, fix, project_root, checks);
-                if invocations.is_empty() {
-                    continue;
-                }
-
-                let root = project_root.to_path_buf();
-                let name = check_name.clone();
-
-                set.spawn(async move {
-                    let (ok, stdout, stderr) = run_invocations(&name, &invocations, &root).await;
-                    if verbose {
-                        flush_output(&stdout, &stderr);
-                    }
-                    (name, ok, stdout, stderr)
-                });
+    for task in prepared {
+        let root = project_root.to_path_buf();
+        set.spawn(async move {
+            let (name, ok, stdout, stderr) = task.execute(false, &root).await;
+            if verbose {
+                flush_output(&stdout, &stderr);
             }
-            CheckKind::Special(SpecialKind::Links) => {
-                let links_cfg = cfg.checks.lychee.clone();
-                let fl = file_list.clone();
-                let root = project_root.to_path_buf();
-                let name = check_name.clone();
-
-                set.spawn(async move {
-                    let (ok, stdout, stderr) = lychee::run(&links_cfg, &fl, &root).await;
-                    if verbose {
-                        flush_output(&stdout, &stderr);
-                    }
-                    (name, ok, stdout, stderr)
-                });
-            }
-            CheckKind::Special(SpecialKind::RenovateDeps) => {
-                let renov_cfg = cfg.checks.renovate_deps.clone();
-                let root = project_root.to_path_buf();
-                let name = check_name.clone();
-
-                set.spawn(async move {
-                    let (ok, stdout, stderr) = renovate_deps::run(&renov_cfg, false, &root).await;
-                    if verbose {
-                        flush_output(&stdout, &stderr);
-                    }
-                    (name, ok, stdout, stderr)
-                });
-            }
-        }
+            (name, ok, stdout, stderr)
+        });
     }
 
-    // Collect all results before printing in quiet mode to avoid interleaved output.
+    // Collect all results before printing to avoid interleaved output.
     let mut collected = vec![];
     while let Some(res) = set.join_next().await {
         collected.push(res?);
@@ -121,6 +102,34 @@ pub async fn run(
         .into_iter()
         .map(|(name, ok, _, _)| (name, ok))
         .collect())
+}
+
+fn prepare(
+    check: &Check,
+    file_list: &FileList,
+    fix: bool,
+    project_root: &Path,
+    active_checks: &[&Check],
+    cfg: &Config,
+) -> Option<PreparedCheck> {
+    let name = check.name.to_string();
+    match &check.kind {
+        CheckKind::Template { .. } => {
+            let argv_list = build_invocations(check, file_list, fix, project_root, active_checks);
+            if argv_list.is_empty() {
+                return None;
+            }
+            Some(PreparedCheck::Invocations { name, argv_list })
+        }
+        CheckKind::Special(SpecialKind::Links) => Some(PreparedCheck::Links {
+            name,
+            cfg: cfg.checks.lychee.clone(),
+            file_list: file_list.clone(),
+        }),
+        CheckKind::Special(SpecialKind::RenovateDeps) => {
+            Some(PreparedCheck::RenovateDeps { name, cfg: cfg.checks.renovate_deps.clone() })
+        }
+    }
 }
 
 /// Returns the list of argv vectors to execute for a check.
@@ -306,7 +315,6 @@ fn substitute_merge_base(cmd: &str, merge_base: Option<&str>) -> String {
 
 fn quote_path(p: &Path) -> String {
     let s = p.to_string_lossy();
-    // Simple single-quote escaping.
     format!("'{}'", s.replace('\'', "'\\''"))
 }
 

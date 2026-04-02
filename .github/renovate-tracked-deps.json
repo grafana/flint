@@ -4,6 +4,17 @@
       "mise"
     ]
   },
+  "Cargo.toml": {
+    "cargo": [
+      "anyhow",
+      "clap",
+      "regex",
+      "serde",
+      "tokio",
+      "toml",
+      "which"
+    ]
+  },
   "README.md": {
     "regex": [
       "grafana/flint"
@@ -11,9 +22,20 @@
   },
   "mise.toml": {
     "mise": [
+      "actionlint",
+      "editorconfig-checker",
       "lychee",
       "node",
-      "npm:renovate"
+      "npm:@biomejs/biome",
+      "npm:markdownlint-cli",
+      "npm:prettier",
+      "npm:renovate",
+      "npm:textlint",
+      "npm:textlint-rule-terminology",
+      "pipx:codespell",
+      "pipx:ruff",
+      "shellcheck",
+      "shfmt"
     ],
     "regex": [
       "ghcr.io/super-linter/super-linter"

@@ -31,6 +31,10 @@ struct Cli {
     #[arg(long)]
     verbose: bool,
 
+    /// Suppress per-check output; print only the summary line (useful for AI/token-constrained callers)
+    #[arg(long, env = "FLINT_SHORT")]
+    short: bool,
+
     /// Compare changed files from this ref (default: merge base with base branch)
     #[arg(long)]
     from_ref: Option<String>,
@@ -105,23 +109,29 @@ async fn main() -> Result<()> {
         &file_list,
         cli.fix,
         cli.verbose,
+        cli.short,
         &project_root,
         &cfg,
     )
     .await?;
 
-    let mut failed = false;
-    for (name, ok) in &results {
-        if !ok {
-            eprintln!("flint: {name} failed");
-            failed = true;
-        }
-    }
+    let failed: Vec<&str> = results
+        .iter()
+        .filter(|(_, ok)| !ok)
+        .map(|(name, _)| name.as_str())
+        .collect();
 
-    if failed {
-        if !cli.fix {
+    if !failed.is_empty() {
+        let n = failed.len();
+        let noun = if n == 1 { "check" } else { "checks" };
+        let prefix = if cli.short { "" } else { "\n" };
+        eprintln!(
+            "{prefix}flint: {n} {noun} failed ({names})",
+            names = failed.join(", ")
+        );
+        if !cli.fix && !cli.short {
             eprintln!(
-                "\n💡 Try `mise run fix` to auto-fix lint issues, then re-run `mise run lint` to verify."
+                "💡 Try `mise run fix` to auto-fix lint issues, then re-run `mise run lint` to verify."
             );
         }
         std::process::exit(1);

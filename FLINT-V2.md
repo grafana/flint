@@ -66,21 +66,24 @@ cargo build --release
 
 ## Usage
 
-```
+```text
 flint [OPTIONS] [LINTERS...]
 flint list
 ```
 
 **Options:**
 
-| Flag | Description |
-|------|-------------|
-| `--fix` | Auto-fix issues instead of checking (also: `AUTOFIX=true`) |
-| `--full` | Lint all files instead of only changed files |
-| `--fast` | Skip slow checks (e.g. `renovate-deps`) |
-| `--verbose` | Show all linter output, not just failures |
-| `--from-ref REF` | Changed-files diff base (default: merge base with base branch) |
-| `--to-ref REF` | Changed-files diff head (default: HEAD) |
+| Flag             | Description                                      |
+| ---------------- | ------------------------------------------------ |
+| `--fix`          | Auto-fix issues instead of checking              |
+| `--full`         | Lint all files instead of only changed files     |
+| `--fast`         | Skip slow checks (e.g. `renovate-deps`)          |
+| `--short`        | Suppress per-check output, print summary only    |
+| `--verbose`      | Show all linter output, not just failures        |
+| `--from-ref REF` | Diff base (default: merge base with base branch) |
+| `--to-ref REF`   | Diff head (default: HEAD)                        |
+
+Env var equivalents: `AUTOFIX=true` for `--fix`, `FLINT_SHORT=true` for `--short`.
 
 Pass one or more linter names to run only those:
 
@@ -91,7 +94,7 @@ flint --fix prettier          # fix only prettier
 
 `flint list` shows every check with its status:
 
-```
+```text
 NAME            BINARY          STATUS     SPEED  PATTERNS
 -------------------------------------------------------------------
 shellcheck      shellcheck      installed  fast   *.sh *.bash *.bats
@@ -140,26 +143,29 @@ run = "flint --fix"
 
 Checks auto-enable when their binary is found in PATH. Install tools via `mise.toml`.
 
-| Name | Binary | Patterns | Fix | Scope |
-|------|--------|----------|-----|-------|
-| `shellcheck` | `shellcheck` | `*.sh *.bash *.bats` | no | file |
-| `shfmt` | `shfmt` | `*.sh *.bash` | yes | file |
-| `markdownlint` | `markdownlint` | `*.md` | yes | file |
-| `prettier` | `prettier` | `*.md *.json *.yml *.yaml` | yes | files |
-| `actionlint` | `actionlint` | `.github/workflows/*.yml .github/workflows/*.yaml` | no | file |
-| `hadolint` | `hadolint` | `Dockerfile Dockerfile.* *.dockerfile` | no | file |
-| `codespell` | `codespell` | `*` | yes | files |
-| `ec` | `ec` | `*` | no | files |
-| `golangci-lint` | `golangci-lint` | `*.go` | no | project |
-| `ruff` | `ruff` | `*.py` | yes | file |
-| `ruff-format` | `ruff` | `*.py` | yes | file |
-| `biome` | `biome` | `*.json *.jsonc *.js *.ts *.jsx *.tsx` | yes | file |
-| `biome-format` | `biome` | `*.json *.jsonc *.js *.ts *.jsx *.tsx` | yes | file |
-| `textlint` | `textlint` | `*.md *.txt` | yes | files |
-| `cargo-clippy` | `cargo-clippy` | `*.rs` | yes | project |
-| `cargo-fmt` | `cargo-fmt` | `*.rs` | yes | project |
-| `links` | `lychee` | (all files) | no | special |
-| `renovate-deps` | `renovate` | (all files) | yes | special |
+<!-- editorconfig-checker-disable -->
+
+| Name            | Binary          | Patterns                                           | Fix | Scope   |
+| --------------- | --------------- | -------------------------------------------------- | --- | ------- |
+| `shellcheck`    | `shellcheck`    | `*.sh *.bash *.bats`                               | no  | file    |
+| `shfmt`         | `shfmt`         | `*.sh *.bash`                                      | yes | file    |
+| `markdownlint`  | `markdownlint`  | `*.md`                                             | yes | file    |
+| `prettier`      | `prettier`      | `*.md *.json *.yml *.yaml`                         | yes | files   |
+| `actionlint`    | `actionlint`    | `.github/workflows/*.yml .github/workflows/*.yaml` | no  | file    |
+| `hadolint`      | `hadolint`      | `Dockerfile Dockerfile.* *.dockerfile`             | no  | file    |
+| `codespell`     | `codespell`     | `*`                                                | yes | files   |
+| `ec`            | `ec`            | `*`                                                | no  | files   |
+| `golangci-lint` | `golangci-lint` | `*.go`                                             | no  | project |
+| `ruff`          | `ruff`          | `*.py`                                             | yes | file    |
+| `ruff-format`   | `ruff`          | `*.py`                                             | yes | file    |
+| `biome`         | `biome`         | `*.json *.jsonc *.js *.ts *.jsx *.tsx`             | yes | file    |
+| `biome-format`  | `biome`         | `*.json *.jsonc *.js *.ts *.jsx *.tsx`             | yes | file    |
+| `cargo-clippy`  | `cargo-clippy`  | `*.rs`                                             | yes | project |
+| `cargo-fmt`     | `cargo-fmt`     | `*.rs`                                             | yes | project |
+| `links`         | `lychee`        | (all files)                                        | no  | special |
+| `renovate-deps` | `renovate`      | (all files)                                        | yes | special |
+
+<!-- editorconfig-checker-enable -->
 
 **Scopes:**
 
@@ -213,7 +219,7 @@ exclude_managers = ["github-actions", "github-runners"]
   run: mise install
 
 - name: Lint
-  run: mise run lint   # or: flint --from-ref origin/main --to-ref HEAD
+  run: mise run lint # or: flint --from-ref origin/main --to-ref HEAD
 ```
 
 `--from-ref`/`--to-ref` is optional in CI — flint detects the merge base

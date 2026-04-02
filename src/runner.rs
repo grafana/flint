@@ -14,6 +14,7 @@ pub async fn run(
     file_list: &FileList,
     fix: bool,
     verbose: bool,
+    short: bool,
     project_root: &Path,
     cfg: &Config,
 ) -> Result<Vec<(String, bool)>> {
@@ -37,7 +38,7 @@ pub async fn run(
                     renovate_deps::run(&cfg.checks.renovate_deps, fix, project_root).await
                 }
             };
-            if verbose || !ok {
+            if !short && (verbose || !ok) {
                 eprintln!("[{check_name}]");
                 flush_output(&stdout, &stderr);
             }
@@ -106,7 +107,7 @@ pub async fn run(
         collected.push(res?);
     }
 
-    if !verbose {
+    if !verbose && !short {
         for (name, ok, stdout, stderr) in &collected {
             if !ok {
                 eprintln!("[{name}]");

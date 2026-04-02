@@ -98,6 +98,71 @@ fn cargo_fmt_diff_shows_check_name_header() {
 }
 
 #[test]
+fn auto_fixes_and_reports_summary() {
+    let repo = git_repo();
+
+    // Poorly formatted Rust — cargo-fmt is fixable.
+    std::fs::write(
+        repo.path().join("Cargo.toml"),
+        "[package]\nname = \"test\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+    )
+    .unwrap();
+    let src = repo.path().join("src");
+    std::fs::create_dir_all(&src).unwrap();
+    stage(
+        &src.join("lib.rs"),
+        "pub struct Foo { pub a: u32, pub b: u32 }\n",
+        repo.path(),
+    );
+
+    let out = flint(&["--full", "--auto", "cargo-fmt"], repo.path());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    println!("=== stdout ===\n{stdout}");
+    eprintln!("=== stderr ===\n{stderr}");
+
+    // --auto should fix cargo-fmt and exit 0.
+    assert!(
+        out.status.success(),
+        "flint --auto should exit 0 after fixing, got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("fixed: cargo-fmt"),
+        "expected 'fixed: cargo-fmt' in summary, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn auto_reports_unfixable_as_review() {
+    let repo = git_repo();
+
+    // SC2086: unquoted variable — shellcheck violation with no auto-fix.
+    stage(
+        &repo.path().join("bad.sh"),
+        "#!/bin/bash\necho $1\n",
+        repo.path(),
+    );
+
+    let out = flint(&["--full", "--auto", "shellcheck"], repo.path());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    println!("=== stdout ===\n{stdout}");
+    eprintln!("=== stderr ===\n{stderr}");
+
+    // --auto should exit 1 for non-fixable failures and surface them under review:.
+    assert!(
+        !out.status.success(),
+        "flint --auto should exit 1 for unfixable checks"
+    );
+    assert!(
+        stderr.contains("review: shellcheck"),
+        "expected 'review: shellcheck' in summary, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn shellcheck_clean_script_passes() {
     let repo = git_repo();
 

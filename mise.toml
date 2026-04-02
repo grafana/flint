@@ -26,7 +26,7 @@ run = "cargo build -q && ./target/debug/flint --fix"
 
 [tasks.native-lint]
 description = "Run lints natively (fast, no renovate)"
-run = "cargo build -q && ./target/debug/flint --fast --short"
+run = "cargo build -q && ./target/debug/flint --auto --fast"
 
 # Rust tasks
 [tasks.build]

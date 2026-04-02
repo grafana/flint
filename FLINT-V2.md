@@ -89,23 +89,40 @@ flint list
 
 **Options:**
 
-| Flag             | Description                                      |
-| ---------------- | ------------------------------------------------ |
-| `--fix`          | Auto-fix issues instead of checking              |
-| `--full`         | Lint all files instead of only changed files     |
-| `--fast`         | Skip slow checks (e.g. `renovate-deps`)          |
-| `--short`        | Suppress per-check output, print summary only    |
-| `--verbose`      | Show all linter output, not just failures        |
-| `--from-ref REF` | Diff base (default: merge base with base branch) |
-| `--to-ref REF`   | Diff head (default: HEAD)                        |
+| Flag             | Description                                        |
+| ---------------- | -------------------------------------------------- |
+| `--fix`          | Auto-fix issues instead of checking                |
+| `--auto`         | Fix what's fixable, report what still needs review |
+| `--full`         | Lint all files instead of only changed files       |
+| `--fast`         | Skip slow checks (e.g. `renovate-deps`)            |
+| `--short`        | Compact summary output, no per-check noise         |
+| `--verbose`      | Show all linter output, not just failures          |
+| `--from-ref REF` | Diff base (default: merge base with base branch)   |
+| `--to-ref REF`   | Diff head (default: HEAD)                          |
 
 Env var equivalents: `AUTOFIX=true` for `--fix`, `FLINT_SHORT=true` for `--short`.
 
-In `--short` mode, failed checks are partitioned by fixability and emitted
-as a single line. Fixable checks are expressed as the exact command to run:
+### Intended use by context
+
+| Context                      | Command                   | Why                                                               |
+| ---------------------------- | ------------------------- | ----------------------------------------------------------------- |
+| Interactive development      | `flint` or `flint --fast` | Full output so you can read the details                           |
+| Human wanting a summary      | `flint --short`           | Compact output, no per-check noise                                |
+| Pre-push hook (CC / agentic) | `flint --auto --fast`     | Fixes what it can silently, surfaces only what needs human review |
+| CI                           | `flint`                   | Full output for humans reading CI logs                            |
+
+**`--short` output** — failed checks partitioned by fixability, fixable ones
+expressed as the exact command to run:
 
 ```text
 flint: 2 checks failed — flint --fix prettier cargo-fmt | review: shellcheck
+```
+
+**`--auto` output** — fixes what's fixable, reports the outcome. Exits 0 if
+everything passed or was fixed; exits 1 only if something still needs review:
+
+```text
+flint: fixed: prettier cargo-fmt | review: shellcheck
 ```
 
 Pass one or more linter names to run only those:

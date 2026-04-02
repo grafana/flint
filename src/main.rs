@@ -31,9 +31,15 @@ struct Cli {
     #[arg(long)]
     verbose: bool,
 
-    /// Suppress per-check output; print only the summary line (useful for AI/token-constrained callers)
+    /// Compact summary output — no per-check noise (human) or read-only AI review
     #[arg(long, env = "FLINT_SHORT")]
     short: bool,
+
+    /// Autonomous mode: fix what's fixable, report what still needs review.
+    /// Exits 0 if everything passed or was fixed. Intended for pre-push hooks
+    /// and agentic pipelines that have write access.
+    #[arg(long)]
+    auto: bool,
 
     /// Compare changed files from this ref (default: merge base with base branch)
     #[arg(long)]
@@ -103,6 +109,76 @@ async fn main() -> Result<()> {
         cli.from_ref.as_deref(),
         cli.to_ref.as_deref(),
     )?;
+
+    if cli.auto {
+        // Run checks, fix what's fixable, report outcome.
+        // Exits 0 if everything passed or was fixed; 1 if anything still needs review.
+        let check_results = runner::run(
+            &active,
+            &file_list,
+            false,
+            false,
+            true, // suppress per-check output
+            &project_root,
+            &cfg,
+        )
+        .await?;
+
+        let (fixable_names, reviewable): (Vec<&str>, Vec<&str>) = check_results
+            .iter()
+            .filter(|(_, ok)| !ok)
+            .map(|(name, _)| name.as_str())
+            .partition(|name| active.iter().any(|c| c.name == *name && c.has_fix()));
+
+        let mut fixed = vec![];
+        let mut fix_failed = vec![];
+        if !fixable_names.is_empty() {
+            let to_fix: Vec<&registry::Check> = active
+                .iter()
+                .filter(|c| fixable_names.contains(&c.name))
+                .copied()
+                .collect();
+            let fix_results = runner::run(
+                &to_fix,
+                &file_list,
+                true,
+                false,
+                true, // suppress per-check output
+                &project_root,
+                &cfg,
+            )
+            .await?;
+            for (name, ok) in fix_results {
+                if ok {
+                    fixed.push(name);
+                } else {
+                    fix_failed.push(name);
+                }
+            }
+        }
+
+        let remaining: Vec<&str> = reviewable
+            .iter()
+            .copied()
+            .chain(fix_failed.iter().map(String::as_str))
+            .collect();
+
+        let mut segments = vec![];
+        if !fixed.is_empty() {
+            segments.push(format!("fixed: {}", fixed.join(", ")));
+        }
+        if !remaining.is_empty() {
+            segments.push(format!("review: {}", remaining.join(", ")));
+        }
+        if !segments.is_empty() {
+            eprintln!("flint: {}", segments.join(" | "));
+        }
+
+        if !remaining.is_empty() {
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
 
     let results = runner::run(
         &active,

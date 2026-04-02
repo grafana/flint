@@ -165,16 +165,18 @@ async fn main() -> Result<()> {
 
         let mut segments = vec![];
         if !fixed.is_empty() {
-            segments.push(format!("fixed: {}", fixed.join(", ")));
+            // Exit 1 even when fixes were applied: in a pre-push context the
+            // fixed files are uncommitted. The caller must commit them first.
+            segments.push(format!(
+                "fixed: {} — commit before pushing",
+                fixed.join(", ")
+            ));
         }
         if !remaining.is_empty() {
             segments.push(format!("review: {}", remaining.join(", ")));
         }
         if !segments.is_empty() {
             eprintln!("flint: {}", segments.join(" | "));
-        }
-
-        if !remaining.is_empty() {
             std::process::exit(1);
         }
         return Ok(());

@@ -122,14 +122,18 @@ fn auto_fixes_and_reports_summary() {
     println!("=== stdout ===\n{stdout}");
     eprintln!("=== stderr ===\n{stderr}");
 
-    // --auto should fix cargo-fmt and exit 0.
+    // --auto fixes cargo-fmt but exits 1 — fixed files must be committed before pushing.
     assert!(
-        out.status.success(),
-        "flint --auto should exit 0 after fixing, got:\n{stderr}"
+        !out.status.success(),
+        "flint --auto should exit 1 when fixes were applied"
     );
     assert!(
         stderr.contains("fixed: cargo-fmt"),
         "expected 'fixed: cargo-fmt' in summary, got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("commit before pushing"),
+        "expected 'commit before pushing' hint, got:\n{stderr}"
     );
 }
 

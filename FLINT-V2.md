@@ -118,11 +118,12 @@ expressed as the exact command to run:
 flint: 2 checks failed — flint --fix prettier cargo-fmt | review: shellcheck
 ```
 
-**`--auto` output** — fixes what's fixable, reports the outcome. Exits 0 if
-everything passed or was fixed; exits 1 only if something still needs review:
+**`--auto` output** — fixes what's fixable, reports the outcome. Exits 1 if
+anything was fixed (so the caller commits the fixes before pushing) or if
+anything still needs review. Exits 0 only if everything was already clean:
 
 ```text
-flint: fixed: prettier cargo-fmt | review: shellcheck
+flint: fixed: prettier cargo-fmt — commit before pushing | review: shellcheck
 ```
 
 Pass one or more linter names to run only those:

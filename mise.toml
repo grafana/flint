@@ -43,7 +43,7 @@ run = "AUTOFIX=true mise run lint"
 
 [tasks.native-lint]
 description = "Run lints natively (no container)"
-run = "NATIVE=true mise run lint:fast"
+depends = ["lint:rust", "check-fmt"]
 
 [tasks.pre-commit]
 description = "Pre-commit hook: native lint"
@@ -53,3 +53,30 @@ run = "NATIVE=true mise run lint:fast"
 [tasks."setup:pre-commit-hook"]
 description = "Install git pre-commit hook that runs native linting"
 run = "mise generate git-pre-commit --write --task=pre-commit"
+
+# Rust tasks
+[tasks.build]
+description = "Build the project"
+run = "cargo build"
+
+[tasks."lint:rust"]
+description = "Lint Rust code (clippy)"
+run = """
+if [ "${AUTOFIX:-}" = "true" ]; then
+  cargo clippy -q --fix --allow-dirty --allow-staged -- -D warnings
+else
+  cargo clippy -q -- -D warnings
+fi
+"""
+
+[tasks.fmt]
+description = "Format Rust code"
+run = "cargo fmt"
+
+[tasks."check-fmt"]
+description = "Check Rust formatting"
+run = "cargo fmt -- --check"
+
+[tasks.test]
+description = "Run tests"
+run = "cargo test -q"

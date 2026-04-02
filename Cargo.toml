@@ -1,0 +1,16 @@
+[package]
+name = "flint"
+version = "0.1.0"
+edition = "2024"
+description = "mise-native lint orchestrator"
+license = "Apache-2.0"
+repository = "https://github.com/grafana/flint"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+serde = { version = "1", features = ["derive"] }
+toml = "1.0"
+tokio = { version = "1", features = ["full"] }
+which = "7"
+regex = "1"

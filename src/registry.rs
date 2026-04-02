@@ -146,16 +146,9 @@ pub fn builtin() -> Vec<Check> {
             name: "ec",
             bin_name: "ec",
             patterns: "*",
-            // Defer to dedicated formatters when they are active.
-            excludes_if_active: &[
-                "cargo-fmt",
-                "ruff-format",
-                "golangci-lint",
-                "shfmt",
-                "biome-format",
-                "markdownlint",
-                "prettier",
-            ],
+            // Defer to formatters that enforce line length — those are the ones
+            // that conflict with ec's max_line_length editorconfig check.
+            excludes_if_active: &["cargo-fmt", "ruff-format", "biome-format", "prettier"],
             slow: false,
             kind: CheckKind::Template {
                 check_cmd: "ec {FILES}",

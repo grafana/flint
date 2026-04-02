@@ -4,17 +4,6 @@
       "mise"
     ]
   },
-  "Cargo.toml": {
-    "cargo": [
-      "anyhow",
-      "clap",
-      "regex",
-      "serde",
-      "tokio",
-      "toml",
-      "which"
-    ]
-  },
   "README.md": {
     "regex": [
       "grafana/flint"

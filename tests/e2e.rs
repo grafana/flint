@@ -115,8 +115,5 @@ fn shellcheck_clean_script_passes() {
     println!("=== stdout ===\n{stdout}");
     eprintln!("=== stderr ===\n{stderr}");
 
-    assert!(
-        out.status.success(),
-        "flint should pass, got:\n{stderr}"
-    );
+    assert!(out.status.success(), "flint should pass, got:\n{stderr}");
 }

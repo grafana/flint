@@ -2,13 +2,14 @@ use anyhow::Result;
 use serde::Deserialize;
 use std::path::Path;
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, Clone)]
 #[serde(default)]
 pub struct Config {
     pub settings: Settings,
+    pub checks: ChecksConfig,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(default)]
 pub struct Settings {
     pub base_branch: String,
@@ -22,6 +23,36 @@ impl Default for Settings {
             exclude: None,
         }
     }
+}
+
+#[derive(Debug, Default, Deserialize, Clone)]
+#[serde(default)]
+pub struct ChecksConfig {
+    pub links: LinksConfig,
+    #[serde(rename = "renovate-deps")]
+    pub renovate_deps: RenovateDepsConfig,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(default)]
+pub struct LinksConfig {
+    pub config: Option<String>,
+    pub check_all_local: bool,
+}
+
+impl Default for LinksConfig {
+    fn default() -> Self {
+        Self {
+            config: None,
+            check_all_local: false,
+        }
+    }
+}
+
+#[derive(Debug, Default, Deserialize, Clone)]
+#[serde(default)]
+pub struct RenovateDepsConfig {
+    pub exclude_managers: Vec<String>,
 }
 
 pub fn load(project_root: &Path) -> Result<Config> {

@@ -9,29 +9,46 @@ pub enum Scope {
     Project,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpecialKind {
+    Links,
+    RenovateDeps,
+}
+
+#[derive(Debug, Clone)]
+pub enum CheckKind {
+    Template {
+        check_cmd: &'static str,
+        fix_cmd: &'static str,
+        scope: Scope,
+    },
+    Special(SpecialKind),
+}
+
 #[derive(Debug, Clone)]
 pub struct Check {
     pub name: &'static str,
-    /// Command template for check mode.
-    pub check_cmd: &'static str,
-    /// Command template for fix mode (empty string = no fix support).
-    pub fix_cmd: &'static str,
+    /// Binary name to check in PATH.
+    pub bin_name: &'static str,
     /// Glob patterns (space-separated) for matching files.
     pub patterns: &'static str,
-    pub scope: Scope,
+    /// Slow checks are skipped when `--fast` is passed.
+    pub slow: bool,
+    pub kind: CheckKind,
 }
 
 impl Check {
-    /// The binary name (first word of check_cmd).
+    /// The binary name used to check PATH availability.
     pub fn bin(&self) -> &str {
-        self.check_cmd
-            .split_whitespace()
-            .next()
-            .unwrap_or(self.name)
+        self.bin_name
     }
 
     pub fn has_fix(&self) -> bool {
-        !self.fix_cmd.is_empty()
+        match &self.kind {
+            CheckKind::Template { fix_cmd, .. } => !fix_cmd.is_empty(),
+            CheckKind::Special(SpecialKind::Links) => false,
+            CheckKind::Special(SpecialKind::RenovateDeps) => true,
+        }
     }
 }
 
@@ -39,94 +56,160 @@ pub fn builtin() -> Vec<Check> {
     vec![
         Check {
             name: "shellcheck",
-            check_cmd: "shellcheck {FILE}",
-            fix_cmd: "",
+            bin_name: "shellcheck",
             patterns: "*.sh *.bash *.bats",
-            scope: Scope::File,
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "shellcheck {FILE}",
+                fix_cmd: "",
+                scope: Scope::File,
+            },
         },
         Check {
             name: "shfmt",
-            check_cmd: "shfmt -d {FILE}",
-            fix_cmd: "shfmt -w {FILE}",
+            bin_name: "shfmt",
             patterns: "*.sh *.bash",
-            scope: Scope::File,
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "shfmt -d {FILE}",
+                fix_cmd: "shfmt -w {FILE}",
+                scope: Scope::File,
+            },
         },
         Check {
             name: "markdownlint",
-            check_cmd: "markdownlint {FILE}",
-            fix_cmd: "markdownlint --fix {FILE}",
+            bin_name: "markdownlint",
             patterns: "*.md",
-            scope: Scope::File,
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "markdownlint {FILE}",
+                fix_cmd: "markdownlint --fix {FILE}",
+                scope: Scope::File,
+            },
         },
         Check {
             name: "prettier",
-            check_cmd: "prettier --check {FILES}",
-            fix_cmd: "prettier --write {FILES}",
+            bin_name: "prettier",
             patterns: "*.md *.json *.yml *.yaml",
-            scope: Scope::Files,
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "prettier --check {FILES}",
+                fix_cmd: "prettier --write {FILES}",
+                scope: Scope::Files,
+            },
         },
         Check {
             name: "actionlint",
-            check_cmd: "actionlint {FILE}",
-            fix_cmd: "",
+            bin_name: "actionlint",
             patterns: ".github/workflows/*.yml .github/workflows/*.yaml",
-            scope: Scope::File,
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "actionlint {FILE}",
+                fix_cmd: "",
+                scope: Scope::File,
+            },
         },
         Check {
             name: "hadolint",
-            check_cmd: "hadolint {FILE}",
-            fix_cmd: "",
+            bin_name: "hadolint",
             patterns: "Dockerfile Dockerfile.* *.dockerfile",
-            scope: Scope::File,
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "hadolint {FILE}",
+                fix_cmd: "",
+                scope: Scope::File,
+            },
         },
         Check {
             name: "codespell",
-            check_cmd: "codespell {FILES}",
-            fix_cmd: "codespell --write-changes {FILES}",
+            bin_name: "codespell",
             patterns: "*",
-            scope: Scope::Files,
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "codespell {FILES}",
+                fix_cmd: "codespell --write-changes {FILES}",
+                scope: Scope::Files,
+            },
         },
         Check {
             name: "ec",
-            check_cmd: "ec {FILES}",
-            fix_cmd: "",
+            bin_name: "ec",
             patterns: "*",
-            scope: Scope::Files,
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "ec {FILES}",
+                fix_cmd: "",
+                scope: Scope::Files,
+            },
         },
         Check {
             name: "golangci-lint",
-            check_cmd: "golangci-lint run --new-from-rev={MERGE_BASE}",
-            fix_cmd: "",
+            bin_name: "golangci-lint",
             patterns: "*.go",
-            scope: Scope::Project,
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "golangci-lint run --new-from-rev={MERGE_BASE}",
+                fix_cmd: "",
+                scope: Scope::Project,
+            },
         },
         Check {
             name: "ruff",
-            check_cmd: "ruff check {FILE}",
-            fix_cmd: "ruff check --fix {FILE}",
+            bin_name: "ruff",
             patterns: "*.py",
-            scope: Scope::File,
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "ruff check {FILE}",
+                fix_cmd: "ruff check --fix {FILE}",
+                scope: Scope::File,
+            },
         },
         Check {
             name: "ruff-format",
-            check_cmd: "ruff format --check {FILE}",
-            fix_cmd: "ruff format {FILE}",
+            bin_name: "ruff",
             patterns: "*.py",
-            scope: Scope::File,
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "ruff format --check {FILE}",
+                fix_cmd: "ruff format {FILE}",
+                scope: Scope::File,
+            },
         },
         Check {
             name: "biome",
-            check_cmd: "biome check {FILE}",
-            fix_cmd: "biome check --fix {FILE}",
+            bin_name: "biome",
             patterns: "*.json *.jsonc *.js *.ts *.jsx *.tsx",
-            scope: Scope::File,
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "biome check {FILE}",
+                fix_cmd: "biome check --fix {FILE}",
+                scope: Scope::File,
+            },
         },
         Check {
             name: "biome-format",
-            check_cmd: "biome format {FILE}",
-            fix_cmd: "biome format --write {FILE}",
+            bin_name: "biome",
             patterns: "*.json *.jsonc *.js *.ts *.jsx *.tsx",
-            scope: Scope::File,
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "biome format {FILE}",
+                fix_cmd: "biome format --write {FILE}",
+                scope: Scope::File,
+            },
+        },
+        Check {
+            name: "links",
+            bin_name: "lychee",
+            patterns: "",
+            slow: false,
+            kind: CheckKind::Special(SpecialKind::Links),
+        },
+        Check {
+            name: "renovate-deps",
+            bin_name: "renovate",
+            patterns: "",
+            slow: true,
+            kind: CheckKind::Special(SpecialKind::RenovateDeps),
         },
     ]
 }

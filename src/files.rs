@@ -4,6 +4,7 @@ use std::process::Command;
 
 use crate::config::Config;
 
+#[derive(Clone)]
 pub struct FileList {
     pub files: Vec<PathBuf>,
     /// The merge base ref, used by project-scoped checks (e.g. golangci-lint).

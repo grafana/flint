@@ -4,38 +4,116 @@ use std::process::Stdio;
 use tokio::process::Command;
 use tokio::task::JoinSet;
 
+use crate::config::Config;
 use crate::files::FileList;
-use crate::registry::{Check, Scope};
+use crate::registry::{Check, CheckKind, Scope, SpecialKind};
+use crate::{links, renovate_deps};
 
 pub async fn run(
     checks: &[&Check],
     file_list: &FileList,
     fix: bool,
+    verbose: bool,
     project_root: &Path,
+    cfg: &Config,
 ) -> Result<Vec<(String, bool)>> {
-    let mut set: JoinSet<(String, bool)> = JoinSet::new();
+    if fix {
+        // Serial execution in fix mode: print each check's output immediately as it finishes.
+        let mut results = vec![];
+        for &check in checks {
+            let check_name = check.name.to_string();
+            let (ok, stdout, stderr) = match &check.kind {
+                CheckKind::Template { .. } => {
+                    let invocations = build_invocations(check, file_list, fix, project_root);
+                    if invocations.is_empty() {
+                        continue;
+                    }
+                    run_invocations(&check_name, &invocations, project_root).await
+                }
+                CheckKind::Special(SpecialKind::Links) => {
+                    links::run(&cfg.checks.links, file_list, project_root).await
+                }
+                CheckKind::Special(SpecialKind::RenovateDeps) => {
+                    renovate_deps::run(&cfg.checks.renovate_deps, fix, project_root).await
+                }
+            };
+            if verbose || !ok {
+                flush_output(&stdout, &stderr);
+            }
+            results.push((check_name, ok));
+        }
+        return Ok(results);
+    }
+
+    // Parallel execution in check mode.
+    let mut set: JoinSet<(String, bool, Vec<u8>, Vec<u8>)> = JoinSet::new();
 
     for &check in checks {
-        let invocations = build_invocations(check, file_list, fix, project_root);
-        if invocations.is_empty() {
-            continue;
+        let check_name = check.name.to_string();
+
+        match &check.kind {
+            CheckKind::Template { .. } => {
+                let invocations = build_invocations(check, file_list, fix, project_root);
+                if invocations.is_empty() {
+                    continue;
+                }
+
+                let root = project_root.to_path_buf();
+                let name = check_name.clone();
+
+                set.spawn(async move {
+                    let (ok, stdout, stderr) = run_invocations(&name, &invocations, &root).await;
+                    if verbose {
+                        flush_output(&stdout, &stderr);
+                    }
+                    (name, ok, stdout, stderr)
+                });
+            }
+            CheckKind::Special(SpecialKind::Links) => {
+                let links_cfg = cfg.checks.links.clone();
+                let fl = file_list.clone();
+                let root = project_root.to_path_buf();
+                let name = check_name.clone();
+
+                set.spawn(async move {
+                    let (ok, stdout, stderr) = links::run(&links_cfg, &fl, &root).await;
+                    if verbose {
+                        flush_output(&stdout, &stderr);
+                    }
+                    (name, ok, stdout, stderr)
+                });
+            }
+            CheckKind::Special(SpecialKind::RenovateDeps) => {
+                let renov_cfg = cfg.checks.renovate_deps.clone();
+                let root = project_root.to_path_buf();
+                let name = check_name.clone();
+
+                set.spawn(async move {
+                    let (ok, stdout, stderr) = renovate_deps::run(&renov_cfg, false, &root).await;
+                    if verbose {
+                        flush_output(&stdout, &stderr);
+                    }
+                    (name, ok, stdout, stderr)
+                });
+            }
         }
-
-        let name = check.name.to_string();
-        let root = project_root.to_path_buf();
-
-        set.spawn(async move {
-            let ok = run_invocations(&name, &invocations, &root).await;
-            (name, ok)
-        });
     }
 
-    let mut results = vec![];
+    // Collect all results before printing in quiet mode to avoid interleaved output.
+    let mut collected = vec![];
     while let Some(res) = set.join_next().await {
-        results.push(res?);
+        collected.push(res?);
     }
 
-    Ok(results)
+    if !verbose {
+        for (_, ok, stdout, stderr) in &collected {
+            if !ok {
+                flush_output(stdout, stderr);
+            }
+        }
+    }
+
+    Ok(collected.into_iter().map(|(name, ok, _, _)| (name, ok)).collect())
 }
 
 /// Returns the list of argv vectors to execute for a check.
@@ -45,13 +123,17 @@ fn build_invocations(
     fix: bool,
     project_root: &Path,
 ) -> Vec<Vec<String>> {
-    let cmd_template = if fix && check.has_fix() {
-        check.fix_cmd
-    } else {
-        check.check_cmd
+    let CheckKind::Template { check_cmd, fix_cmd, scope } = &check.kind else {
+        return vec![];
     };
 
-    match check.scope {
+    let cmd_template = if fix && check.has_fix() {
+        fix_cmd
+    } else {
+        check_cmd
+    };
+
+    match scope {
         Scope::Project => {
             let cmd = substitute_merge_base(cmd_template, file_list.merge_base.as_deref());
             vec![shell_words(cmd)]
@@ -86,30 +168,53 @@ fn build_invocations(
     }
 }
 
-async fn run_invocations(name: &str, invocations: &[Vec<String>], root: &Path) -> bool {
+/// Runs all invocations for one check, returning (ok, stdout, stderr).
+/// Never prints — callers decide when and whether to flush output.
+async fn run_invocations(
+    name: &str,
+    invocations: &[Vec<String>],
+    root: &Path,
+) -> (bool, Vec<u8>, Vec<u8>) {
     let mut all_ok = true;
+    let mut combined_stdout = Vec::new();
+    let mut combined_stderr = Vec::new();
+
     for argv in invocations {
         if argv.is_empty() {
             continue;
         }
-        let status = Command::new(&argv[0])
+        let result = Command::new(&argv[0])
             .args(&argv[1..])
             .current_dir(root)
             .stdin(Stdio::null())
-            .status()
+            .output()
             .await;
-        match status {
-            Ok(s) if s.success() => {}
-            Ok(_) => {
-                all_ok = false;
+        match result {
+            Ok(out) => {
+                combined_stdout.extend_from_slice(&out.stdout);
+                combined_stderr.extend_from_slice(&out.stderr);
+                if !out.status.success() {
+                    all_ok = false;
+                }
             }
             Err(e) => {
-                eprintln!("flint: {name}: failed to spawn: {e}");
+                combined_stderr
+                    .extend_from_slice(format!("flint: {name}: failed to spawn: {e}\n").as_bytes());
                 all_ok = false;
             }
         }
     }
-    all_ok
+
+    (all_ok, combined_stdout, combined_stderr)
+}
+
+fn flush_output(stdout: &[u8], stderr: &[u8]) {
+    if !stdout.is_empty() {
+        print!("{}", String::from_utf8_lossy(stdout));
+    }
+    if !stderr.is_empty() {
+        eprint!("{}", String::from_utf8_lossy(stderr));
+    }
 }
 
 fn match_files<'a>(

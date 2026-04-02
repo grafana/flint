@@ -1,14 +1,20 @@
 mod config;
 mod files;
+mod links;
 mod registry;
+mod renovate_deps;
 mod runner;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(name = "flint", about = "mise-native lint orchestrator")]
+#[command(args_conflicts_with_subcommands = true)]
 struct Cli {
+    #[command(subcommand)]
+    command: Option<SubCommand>,
+
     /// Auto-fix issues instead of checking
     #[arg(long, env = "AUTOFIX")]
     fix: bool,
@@ -16,6 +22,14 @@ struct Cli {
     /// Lint all files instead of only changed files
     #[arg(long)]
     full: bool,
+
+    /// Skip slow checks
+    #[arg(long)]
+    fast: bool,
+
+    /// Show all linter output, not just failures
+    #[arg(long)]
+    verbose: bool,
 
     /// Compare changed files from this ref (default: merge base with base branch)
     #[arg(long)]
@@ -29,6 +43,12 @@ struct Cli {
     linters: Vec<String>,
 }
 
+#[derive(Subcommand, Debug)]
+enum SubCommand {
+    /// List all available checks with their status
+    List,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -39,9 +59,14 @@ async fn main() -> Result<()> {
 
     std::env::set_current_dir(&project_root)?;
 
-    let cfg = config::load(&project_root)?;
-
     let registry = registry::builtin();
+
+    if let Some(SubCommand::List) = cli.command {
+        print_list(&registry);
+        return Ok(());
+    }
+
+    let cfg = config::load(&project_root)?;
 
     // Filter registry to requested linters (or all if none specified).
     let checks: Vec<&registry::Check> = if cli.linters.is_empty() {
@@ -60,10 +85,11 @@ async fn main() -> Result<()> {
         out
     };
 
-    // Discover which checks have their tool available in PATH.
+    // Discover which checks have their tool available in PATH, and apply --fast filter.
     let active: Vec<&registry::Check> = checks
         .into_iter()
         .filter(|c| which::which(c.bin()).is_ok())
+        .filter(|c| !cli.fast || !c.slow)
         .collect();
 
     let file_list = files::changed(
@@ -74,7 +100,7 @@ async fn main() -> Result<()> {
         cli.to_ref.as_deref(),
     )?;
 
-    let results = runner::run(&active, &file_list, cli.fix, &project_root).await?;
+    let results = runner::run(&active, &file_list, cli.fix, cli.verbose, &project_root, &cfg).await?;
 
     let mut failed = false;
     for (name, ok) in &results {
@@ -94,4 +120,37 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn print_list(registry: &[registry::Check]) {
+    // Column widths.
+    let name_w = registry.iter().map(|c| c.name.len()).max().unwrap_or(4).max(4);
+    let bin_w = registry.iter().map(|c| c.bin().len()).max().unwrap_or(6).max(6);
+
+    println!(
+        "{:<name_w$}  {:<bin_w$}  {:<9}  {:<4}  {}",
+        "NAME", "BINARY", "STATUS", "SPEED", "PATTERNS",
+        name_w = name_w,
+        bin_w = bin_w,
+    );
+    println!("{}", "-".repeat(name_w + bin_w + 35));
+
+    for check in registry {
+        let status = if which::which(check.bin()).is_ok() {
+            "installed"
+        } else {
+            "missing"
+        };
+        let speed = if check.slow { "slow" } else { "fast" };
+        println!(
+            "{:<name_w$}  {:<bin_w$}  {:<9}  {:<4}  {}",
+            check.name,
+            check.bin(),
+            status,
+            speed,
+            check.patterns,
+            name_w = name_w,
+            bin_w = bin_w,
+        );
+    }
 }

@@ -28,14 +28,14 @@ impl Default for Settings {
 #[derive(Debug, Default, Deserialize, Clone)]
 #[serde(default)]
 pub struct ChecksConfig {
-    pub links: LinksConfig,
+    pub lychee: LycheeConfig,
     #[serde(rename = "renovate-deps")]
     pub renovate_deps: RenovateDepsConfig,
 }
 
 #[derive(Debug, Default, Deserialize, Clone)]
 #[serde(default)]
-pub struct LinksConfig {
+pub struct LycheeConfig {
     pub config: Option<String>,
     pub check_all_local: bool,
 }

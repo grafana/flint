@@ -2,11 +2,11 @@ use std::path::Path;
 use std::process::Stdio;
 use tokio::process::Command;
 
-use crate::config::LinksConfig;
+use crate::config::LycheeConfig;
 use crate::files::FileList;
 
 pub async fn run(
-    cfg: &LinksConfig,
+    cfg: &LycheeConfig,
     file_list: &FileList,
     project_root: &Path,
 ) -> (bool, Vec<u8>, Vec<u8>) {

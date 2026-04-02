@@ -4,7 +4,7 @@ use tokio::process::Command;
 
 use crate::config::RenovateDepsConfig;
 
-const SCRIPT: &str = include_str!("../tasks/lint/renovate-deps.py");
+const SCRIPT: &str = include_str!("../../tasks/lint/renovate-deps.py");
 
 pub async fn run(
     cfg: &RenovateDepsConfig,

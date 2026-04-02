@@ -38,8 +38,8 @@ pub struct Check {
     /// When multiple registry entries share a `bin_name`, each must have a `version_range`
     /// and the ranges must be non-overlapping and collectively exhaustive.
     pub version_range: Option<&'static str>,
-    /// Glob patterns (space-separated) for matching files.
-    pub patterns: &'static str,
+    /// Glob patterns for matching files.
+    pub patterns: &'static [&'static str],
     /// When any of these named checks are active, exclude their patterns from
     /// this check's file list. Used to avoid double-checking files that a
     /// dedicated formatter already owns.
@@ -50,11 +50,6 @@ pub struct Check {
 }
 
 impl Check {
-    /// The binary name used to check PATH availability.
-    pub fn bin(&self) -> &str {
-        self.bin_name
-    }
-
     pub fn has_fix(&self) -> bool {
         match &self.kind {
             CheckKind::Template { fix_cmd, .. } => !fix_cmd.is_empty(),
@@ -62,242 +57,130 @@ impl Check {
             CheckKind::Special(SpecialKind::RenovateDeps) => true,
         }
     }
+
+    // --- Constructors ---
+
+    /// Check invoked once per matched file (`{FILE}`). `name` is also used as `bin_name`.
+    pub fn file(name: &'static str, check_cmd: &'static str, patterns: &'static [&'static str]) -> Self {
+        Self::template(name, patterns, check_cmd, Scope::File)
+    }
+
+    /// Check invoked once with all matched files (`{FILES}`). `name` is also used as `bin_name`.
+    pub fn files(name: &'static str, check_cmd: &'static str, patterns: &'static [&'static str]) -> Self {
+        Self::template(name, patterns, check_cmd, Scope::Files)
+    }
+
+    /// Check invoked once per project (no file args). `name` is also used as `bin_name`.
+    pub fn project(name: &'static str, check_cmd: &'static str, patterns: &'static [&'static str]) -> Self {
+        Self::template(name, patterns, check_cmd, Scope::Project)
+    }
+
+    fn template(
+        name: &'static str,
+        patterns: &'static [&'static str],
+        check_cmd: &'static str,
+        scope: Scope,
+    ) -> Self {
+        Check {
+            name,
+            bin_name: name,
+            mise_tool_name: None,
+            version_range: None,
+            patterns,
+            excludes_if_active: &[],
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd,
+                fix_cmd: "",
+                scope,
+            },
+        }
+    }
+
+    /// Special check with custom logic (not a simple command template).
+    pub fn special(name: &'static str, bin_name: &'static str, kind: SpecialKind) -> Self {
+        Check {
+            name,
+            bin_name,
+            mise_tool_name: None,
+            version_range: None,
+            patterns: &[],
+            excludes_if_active: &[],
+            slow: false,
+            kind: CheckKind::Special(kind),
+        }
+    }
+
+    // --- Modifiers ---
+
+    /// Override `bin_name` when the binary name differs from the check name
+    /// (e.g. `ruff-format` invokes `ruff`).
+    pub fn bin(mut self, bin_name: &'static str) -> Self {
+        self.bin_name = bin_name;
+        self
+    }
+
+    /// Set the mise.toml tool key when the binary ships as part of a toolchain
+    /// (e.g. `cargo-fmt` ships with `rust`).
+    pub fn mise_tool(mut self, name: &'static str) -> Self {
+        self.mise_tool_name = Some(name);
+        self
+    }
+
+    /// Add a fix command (auto-fix mode).
+    pub fn fix(mut self, fix_cmd: &'static str) -> Self {
+        if let CheckKind::Template { fix_cmd: ref mut f, .. } = self.kind {
+            *f = fix_cmd;
+        }
+        self
+    }
+
+    /// Restrict activation to a semver range of the declared tool version.
+    #[allow(dead_code)]
+    pub fn version_req(mut self, range: &'static str) -> Self {
+        self.version_range = Some(range);
+        self
+    }
+
+    /// Skip files already owned by the named checks (avoids double-checking).
+    pub fn excludes(mut self, names: &'static [&'static str]) -> Self {
+        self.excludes_if_active = names;
+        self
+    }
+
+    /// Mark as slow — skipped when `--fast` is passed.
+    pub fn slow(mut self) -> Self {
+        self.slow = true;
+        self
+    }
 }
 
 pub fn builtin() -> Vec<Check> {
     vec![
-        Check {
-            name: "shellcheck",
-            bin_name: "shellcheck",
-            mise_tool_name: None,
-            patterns: "*.sh *.bash *.bats",
-            version_range: None,
-            excludes_if_active: &[],
-            slow: false,
-            kind: CheckKind::Template {
-                check_cmd: "shellcheck {FILE}",
-                fix_cmd: "",
-                scope: Scope::File,
-            },
-        },
-        Check {
-            name: "shfmt",
-            bin_name: "shfmt",
-            mise_tool_name: None,
-            patterns: "*.sh *.bash",
-            version_range: None,
-            excludes_if_active: &[],
-            slow: false,
-            kind: CheckKind::Template {
-                check_cmd: "shfmt -d {FILE}",
-                fix_cmd: "shfmt -w {FILE}",
-                scope: Scope::File,
-            },
-        },
-        Check {
-            name: "markdownlint",
-            bin_name: "markdownlint",
-            mise_tool_name: None,
-            patterns: "*.md",
-            version_range: None,
-            excludes_if_active: &[],
-            slow: false,
-            kind: CheckKind::Template {
-                check_cmd: "markdownlint {FILE}",
-                fix_cmd: "markdownlint --fix {FILE}",
-                scope: Scope::File,
-            },
-        },
-        Check {
-            name: "prettier",
-            bin_name: "prettier",
-            mise_tool_name: None,
-            patterns: "*.md *.yml *.yaml",
-            version_range: None,
-            excludes_if_active: &[],
-            slow: false,
-            kind: CheckKind::Template {
-                check_cmd: "prettier --check {FILES}",
-                fix_cmd: "prettier --write {FILES}",
-                scope: Scope::Files,
-            },
-        },
-        Check {
-            name: "actionlint",
-            bin_name: "actionlint",
-            mise_tool_name: None,
-            patterns: ".github/workflows/*.yml .github/workflows/*.yaml",
-            version_range: None,
-            excludes_if_active: &[],
-            slow: false,
-            kind: CheckKind::Template {
-                check_cmd: "actionlint {FILE}",
-                fix_cmd: "",
-                scope: Scope::File,
-            },
-        },
-        Check {
-            name: "hadolint",
-            bin_name: "hadolint",
-            mise_tool_name: None,
-            patterns: "Dockerfile Dockerfile.* *.dockerfile",
-            version_range: None,
-            excludes_if_active: &[],
-            slow: false,
-            kind: CheckKind::Template {
-                check_cmd: "hadolint {FILE}",
-                fix_cmd: "",
-                scope: Scope::File,
-            },
-        },
-        Check {
-            name: "codespell",
-            bin_name: "codespell",
-            mise_tool_name: None,
-            patterns: "*",
-            version_range: None,
-            excludes_if_active: &[],
-            slow: false,
-            kind: CheckKind::Template {
-                check_cmd: "codespell {FILES}",
-                fix_cmd: "codespell --write-changes {FILES}",
-                scope: Scope::Files,
-            },
-        },
-        Check {
-            name: "ec",
-            bin_name: "ec",
-            mise_tool_name: None,
-            version_range: None,
-            patterns: "*",
-            // Defer to formatters that enforce line length — those are the ones
-            // that conflict with ec's max_line_length editorconfig check.
-            excludes_if_active: &["cargo-fmt", "ruff-format", "biome-format", "prettier"],
-            slow: false,
-            kind: CheckKind::Template {
-                check_cmd: "ec {FILES}",
-                fix_cmd: "",
-                scope: Scope::Files,
-            },
-        },
-        Check {
-            name: "golangci-lint",
-            bin_name: "golangci-lint",
-            mise_tool_name: None,
-            patterns: "*.go",
-            version_range: None,
-            excludes_if_active: &[],
-            slow: false,
-            kind: CheckKind::Template {
-                check_cmd: "golangci-lint run --new-from-rev={MERGE_BASE}",
-                fix_cmd: "",
-                scope: Scope::Project,
-            },
-        },
-        Check {
-            name: "ruff",
-            bin_name: "ruff",
-            mise_tool_name: None,
-            patterns: "*.py",
-            version_range: None,
-            excludes_if_active: &[],
-            slow: false,
-            kind: CheckKind::Template {
-                check_cmd: "ruff check {FILE}",
-                fix_cmd: "ruff check --fix {FILE}",
-                scope: Scope::File,
-            },
-        },
-        Check {
-            name: "ruff-format",
-            bin_name: "ruff",
-            mise_tool_name: None,
-            patterns: "*.py",
-            version_range: None,
-            excludes_if_active: &[],
-            slow: false,
-            kind: CheckKind::Template {
-                check_cmd: "ruff format --check {FILE}",
-                fix_cmd: "ruff format {FILE}",
-                scope: Scope::File,
-            },
-        },
-        Check {
-            name: "biome",
-            bin_name: "biome",
-            mise_tool_name: None,
-            patterns: "*.json *.jsonc *.js *.ts *.jsx *.tsx",
-            version_range: None,
-            excludes_if_active: &[],
-            slow: false,
-            kind: CheckKind::Template {
-                check_cmd: "biome check {FILE}",
-                fix_cmd: "biome check --fix {FILE}",
-                scope: Scope::File,
-            },
-        },
-        Check {
-            name: "biome-format",
-            bin_name: "biome",
-            mise_tool_name: None,
-            patterns: "*.json *.jsonc *.js *.ts *.jsx *.tsx",
-            version_range: None,
-            excludes_if_active: &[],
-            slow: false,
-            kind: CheckKind::Template {
-                check_cmd: "biome format {FILE}",
-                fix_cmd: "biome format --write {FILE}",
-                scope: Scope::File,
-            },
-        },
-        Check {
-            name: "cargo-clippy",
-            bin_name: "cargo-clippy",
-            mise_tool_name: Some("rust"),
-            version_range: None,
-            patterns: "*.rs",
-            excludes_if_active: &[],
-            slow: false,
-            kind: CheckKind::Template {
-                check_cmd: "cargo clippy -q -- -D warnings",
-                fix_cmd: "cargo clippy -q --fix --allow-dirty --allow-staged -- -D warnings",
-                scope: Scope::Project,
-            },
-        },
-        Check {
-            name: "cargo-fmt",
-            bin_name: "cargo-fmt",
-            mise_tool_name: Some("rust"),
-            version_range: None,
-            patterns: "*.rs",
-            excludes_if_active: &[],
-            slow: false,
-            kind: CheckKind::Template {
-                check_cmd: "cargo fmt -- --check",
-                fix_cmd: "cargo fmt",
-                scope: Scope::Project,
-            },
-        },
-        Check {
-            name: "links",
-            bin_name: "lychee",
-            mise_tool_name: None,
-            version_range: None,
-            patterns: "",
-            excludes_if_active: &[],
-            slow: false,
-            kind: CheckKind::Special(SpecialKind::Links),
-        },
-        Check {
-            name: "renovate-deps",
-            bin_name: "renovate",
-            mise_tool_name: None,
-            version_range: None,
-            patterns: "",
-            excludes_if_active: &[],
-            slow: true,
-            kind: CheckKind::Special(SpecialKind::RenovateDeps),
-        },
+        Check::file("shellcheck", "shellcheck {FILE}", &["*.sh", "*.bash", "*.bats"]),
+        Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"]).fix("shfmt -w {FILE}"),
+        Check::file("markdownlint", "markdownlint {FILE}", &["*.md"]).fix("markdownlint --fix {FILE}"),
+        Check::files("prettier", "prettier --check {FILES}", &["*.md", "*.yml", "*.yaml"]).fix("prettier --write {FILES}"),
+        Check::file("actionlint", "actionlint {FILE}", &[".github/workflows/*.yml", ".github/workflows/*.yaml"]),
+        Check::file("hadolint", "hadolint {FILE}", &["Dockerfile", "Dockerfile.*", "*.dockerfile"]),
+        Check::files("codespell", "codespell {FILES}", &["*"]).fix("codespell --write-changes {FILES}"),
+        // Defer to formatters that enforce line length — those are the ones
+        // that conflict with ec's max_line_length editorconfig check.
+        Check::files("ec", "ec {FILES}", &["*"])
+            .excludes(&["cargo-fmt", "ruff-format", "biome-format", "prettier"]),
+        Check::project("golangci-lint", "golangci-lint run --new-from-rev={MERGE_BASE}", &["*.go"]),
+        Check::file("ruff", "ruff check {FILE}", &["*.py"]).fix("ruff check --fix {FILE}"),
+        Check::file("ruff-format", "ruff format --check {FILE}", &["*.py"]).bin("ruff").fix("ruff format {FILE}"),
+        Check::file("biome", "biome check {FILE}", &["*.json", "*.jsonc", "*.js", "*.ts", "*.jsx", "*.tsx"]).fix("biome check --fix {FILE}"),
+        Check::file("biome-format", "biome format {FILE}", &["*.json", "*.jsonc", "*.js", "*.ts", "*.jsx", "*.tsx"]).bin("biome").fix("biome format --write {FILE}"),
+        Check::project("cargo-clippy", "cargo clippy -q -- -D warnings", &["*.rs"])
+            .fix("cargo clippy -q --fix --allow-dirty --allow-staged -- -D warnings")
+            .mise_tool("rust"),
+        Check::project("cargo-fmt", "cargo fmt -- --check", &["*.rs"])
+            .fix("cargo fmt")
+            .mise_tool("rust"),
+        Check::special("lychee", "lychee", SpecialKind::Links),
+        Check::special("renovate-deps", "renovate", SpecialKind::RenovateDeps).slow(),
     ]
 }
 

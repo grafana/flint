@@ -1,8 +1,7 @@
+mod linters;
 mod config;
 mod files;
-mod links;
 mod registry;
-mod renovate_deps;
 mod runner;
 
 use anyhow::Result;
@@ -10,7 +9,7 @@ use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 
 #[derive(Parser, Debug)]
-#[command(name = "flint", about = "mise-native lint orchestrator")]
+#[command(name = "flint", about = "flint — fast lint")]
 #[command(args_conflicts_with_subcommands = true)]
 struct Cli {
     #[command(subcommand)]
@@ -310,7 +309,7 @@ fn print_list(registry: &[registry::Check], mise_tools: &HashMap<String, String>
         .max(4);
     let bin_w = registry
         .iter()
-        .map(|c| c.bin().len())
+        .map(|c| c.bin_name.len())
         .max()
         .unwrap_or(6)
         .max(6);
@@ -338,10 +337,10 @@ fn print_list(registry: &[registry::Check], mise_tools: &HashMap<String, String>
         println!(
             "{:<name_w$}  {:<bin_w$}  {:<9}  {:<4}  {}",
             check.name,
-            check.bin(),
+            check.bin_name,
             status,
             speed,
-            check.patterns,
+            check.patterns.join(" "),
             name_w = name_w,
             bin_w = bin_w,
         );

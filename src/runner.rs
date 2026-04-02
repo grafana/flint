@@ -325,3 +325,58 @@ fn shell_words(cmd: String) -> Vec<String> {
     }
     words
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::files::FileList;
+    use crate::registry::{Check, CheckKind, Scope};
+    use std::path::PathBuf;
+
+    fn project_check(patterns: &'static str) -> Check {
+        Check {
+            name: "test",
+            bin_name: "test-bin",
+            patterns,
+            slow: false,
+            kind: CheckKind::Template {
+                check_cmd: "run-it",
+                fix_cmd: "",
+                scope: Scope::Project,
+            },
+        }
+    }
+
+    fn file_list(paths: &[&str]) -> FileList {
+        FileList {
+            files: paths
+                .iter()
+                .map(|s| PathBuf::from(format!("/repo/{s}")))
+                .collect(),
+            merge_base: Some("abc123".to_string()),
+        }
+    }
+
+    #[test]
+    fn project_scope_skips_when_no_matching_files() {
+        let check = project_check("*.rs");
+        let fl = file_list(&["foo.py", "bar.md"]);
+        assert!(build_invocations(&check, &fl, false, Path::new("/repo")).is_empty());
+    }
+
+    #[test]
+    fn project_scope_runs_when_matching_files_present() {
+        let check = project_check("*.rs");
+        let fl = file_list(&["src/main.rs", "foo.py"]);
+        let inv = build_invocations(&check, &fl, false, Path::new("/repo"));
+        assert_eq!(inv, vec![vec!["run-it".to_string()]]);
+    }
+
+    #[test]
+    fn project_scope_empty_patterns_always_runs() {
+        let check = project_check("");
+        let fl = file_list(&["foo.py"]);
+        let inv = build_invocations(&check, &fl, false, Path::new("/repo"));
+        assert_eq!(inv, vec![vec!["run-it".to_string()]]);
+    }
+}

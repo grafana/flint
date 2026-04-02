@@ -38,6 +38,7 @@ pub async fn run(
                 }
             };
             if verbose || !ok {
+                eprintln!("[{check_name}]");
                 flush_output(&stdout, &stderr);
             }
             results.push((check_name, ok));
@@ -106,8 +107,9 @@ pub async fn run(
     }
 
     if !verbose {
-        for (_, ok, stdout, stderr) in &collected {
+        for (name, ok, stdout, stderr) in &collected {
             if !ok {
+                eprintln!("[{name}]");
                 flush_output(stdout, stderr);
             }
         }

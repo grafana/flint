@@ -354,6 +354,8 @@ mod tests {
         Check {
             name: "test",
             bin_name: "test-bin",
+            mise_tool_name: None,
+            version_range: None,
             patterns,
             excludes_if_active: &[],
             slow: false,

@@ -7,6 +7,7 @@ mod runner;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use std::collections::HashMap;
 
 #[derive(Parser, Debug)]
 #[command(name = "flint", about = "mise-native lint orchestrator")]
@@ -72,7 +73,8 @@ async fn main() -> Result<()> {
     let registry = registry::builtin();
 
     if let Some(SubCommand::List) = cli.command {
-        print_list(&registry);
+        let mise_tools = read_mise_tools(&project_root);
+        print_list(&registry, &mise_tools);
         return Ok(());
     }
 
@@ -95,10 +97,12 @@ async fn main() -> Result<()> {
         out
     };
 
-    // Discover which checks have their tool available in PATH, and apply --fast filter.
+    // Discover which checks are declared in the consuming repo's mise.toml, and apply
+    // --fast filter. mise guarantees declared tools are on PATH, so no PATH check needed.
+    let mise_tools = read_mise_tools(&project_root);
     let active: Vec<&registry::Check> = checks
         .into_iter()
-        .filter(|c| which::which(c.bin()).is_ok())
+        .filter(|c| check_version_matches(c, &mise_tools))
         .filter(|c| !cli.fast || !c.slow)
         .collect();
 
@@ -234,7 +238,69 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn print_list(registry: &[registry::Check]) {
+/// Reads `[tools]` from the consuming repo's mise.toml and returns a map of
+/// tool name → declared version string.
+fn read_mise_tools(project_root: &std::path::Path) -> HashMap<String, String> {
+    let path = project_root.join("mise.toml");
+    let content = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(_) => return HashMap::new(),
+    };
+    let value: toml::Value = match toml::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return HashMap::new(),
+    };
+    let mut tools = HashMap::new();
+    if let Some(table) = value.get("tools").and_then(|v| v.as_table()) {
+        for (name, val) in table {
+            let version = match val {
+                toml::Value::String(s) => Some(s.clone()),
+                toml::Value::Table(t) => {
+                    t.get("version").and_then(|v| v.as_str()).map(String::from)
+                }
+                _ => None,
+            };
+            if let Some(v) = version {
+                tools.insert(name.clone(), v);
+            }
+        }
+    }
+    tools
+}
+
+/// Returns true if the check's tool is declared in mise.toml and its version
+/// satisfies the check's version_range (if any).
+fn check_version_matches(
+    check: &registry::Check,
+    mise_tools: &HashMap<String, String>,
+) -> bool {
+    let lookup_key = check.mise_tool_name.unwrap_or(check.bin_name);
+    let Some(declared) = mise_tools.get(lookup_key) else {
+        return false;
+    };
+    let Some(range_str) = check.version_range else {
+        return true;
+    };
+    let Ok(req) = semver::VersionReq::parse(range_str) else {
+        return false;
+    };
+    coerce_version(declared).is_some_and(|v| req.matches(&v))
+}
+
+/// Parses a version string, padding with `.0` components if needed to satisfy
+/// semver's three-part requirement (e.g. `"20"` → `20.0.0`, `"3.12"` → `3.12.0`).
+fn coerce_version(s: &str) -> Option<semver::Version> {
+    semver::Version::parse(s).ok().or_else(|| {
+        let parts = s.split('.').count();
+        match parts {
+            1 => semver::Version::parse(&format!("{s}.0.0")).ok(),
+            2 => semver::Version::parse(&format!("{s}.0")).ok(),
+            _ => None,
+        }
+    })
+}
+
+fn print_list(registry: &[registry::Check], mise_tools: &HashMap<String, String>) {
     // Column widths.
     let name_w = registry
         .iter()
@@ -261,8 +327,10 @@ fn print_list(registry: &[registry::Check]) {
     println!("{}", "-".repeat(name_w + bin_w + 35));
 
     for check in registry {
-        let status = if which::which(check.bin()).is_ok() {
-            "installed"
+        let status = if check_version_matches(check, mise_tools) {
+            "active"
+        } else if mise_tools.contains_key(check.bin_name) {
+            "wrong version"
         } else {
             "missing"
         };

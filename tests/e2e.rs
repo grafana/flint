@@ -29,6 +29,20 @@ fn git_repo() -> TempDir {
     dir
 }
 
+/// Writes a minimal mise.toml declaring the given tools so flint's availability
+/// check passes. Version strings are arbitrary — these checks have no version_range.
+fn write_mise_toml(repo: &TempDir, tools: &[&str]) {
+    let entries: String = tools
+        .iter()
+        .map(|t| format!("{t} = \"latest\"\n"))
+        .collect();
+    std::fs::write(
+        repo.path().join("mise.toml"),
+        format!("[tools]\n{entries}"),
+    )
+    .unwrap();
+}
+
 // Helper to stage a file so it appears in `git ls-files` (used by --full).
 fn stage(path: &Path, content: &str, repo: &Path) {
     std::fs::write(path, content).unwrap();
@@ -42,6 +56,7 @@ fn stage(path: &Path, content: &str, repo: &Path) {
 #[test]
 fn shellcheck_failure_shows_check_name_header() {
     let repo = git_repo();
+    write_mise_toml(&repo, &["shellcheck"]);
 
     // SC2086: unquoted variable — reliable shellcheck violation.
     stage(
@@ -67,6 +82,7 @@ fn shellcheck_failure_shows_check_name_header() {
 #[test]
 fn cargo_fmt_diff_shows_check_name_header() {
     let repo = git_repo();
+    write_mise_toml(&repo, &["rust"]);
 
     // Minimal Cargo project with a badly formatted Rust file.
     std::fs::write(
@@ -100,6 +116,7 @@ fn cargo_fmt_diff_shows_check_name_header() {
 #[test]
 fn auto_fixes_and_reports_summary() {
     let repo = git_repo();
+    write_mise_toml(&repo, &["rust"]);
 
     // Poorly formatted Rust — cargo-fmt is fixable.
     std::fs::write(
@@ -140,6 +157,7 @@ fn auto_fixes_and_reports_summary() {
 #[test]
 fn auto_reports_unfixable_as_review() {
     let repo = git_repo();
+    write_mise_toml(&repo, &["shellcheck"]);
 
     // SC2086: unquoted variable — shellcheck violation with no auto-fix.
     stage(
@@ -169,6 +187,7 @@ fn auto_reports_unfixable_as_review() {
 #[test]
 fn shellcheck_clean_script_passes() {
     let repo = git_repo();
+    write_mise_toml(&repo, &["shellcheck"]);
 
     // A well-formed shell script — no violations.
     stage(

@@ -28,8 +28,16 @@ pub enum CheckKind {
 #[derive(Debug, Clone)]
 pub struct Check {
     pub name: &'static str,
-    /// Binary name to check in PATH.
+    /// Binary name used to invoke the tool.
     pub bin_name: &'static str,
+    /// mise.toml tool key to look up for availability. When `None`, falls back to
+    /// `bin_name`. Use this when the binary comes from a toolchain entry rather than
+    /// its own tool entry (e.g. `cargo-fmt` ships with `rust`).
+    pub mise_tool_name: Option<&'static str>,
+    /// Semver requirement string (e.g. `">=1.0.0"`). When `None`, any version matches.
+    /// When multiple registry entries share a `bin_name`, each must have a `version_range`
+    /// and the ranges must be non-overlapping and collectively exhaustive.
+    pub version_range: Option<&'static str>,
     /// Glob patterns (space-separated) for matching files.
     pub patterns: &'static str,
     /// When any of these named checks are active, exclude their patterns from
@@ -61,7 +69,9 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "shellcheck",
             bin_name: "shellcheck",
+            mise_tool_name: None,
             patterns: "*.sh *.bash *.bats",
+            version_range: None,
             excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
@@ -73,7 +83,9 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "shfmt",
             bin_name: "shfmt",
+            mise_tool_name: None,
             patterns: "*.sh *.bash",
+            version_range: None,
             excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
@@ -85,7 +97,9 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "markdownlint",
             bin_name: "markdownlint",
+            mise_tool_name: None,
             patterns: "*.md",
+            version_range: None,
             excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
@@ -97,7 +111,9 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "prettier",
             bin_name: "prettier",
+            mise_tool_name: None,
             patterns: "*.md *.yml *.yaml",
+            version_range: None,
             excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
@@ -109,7 +125,9 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "actionlint",
             bin_name: "actionlint",
+            mise_tool_name: None,
             patterns: ".github/workflows/*.yml .github/workflows/*.yaml",
+            version_range: None,
             excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
@@ -121,7 +139,9 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "hadolint",
             bin_name: "hadolint",
+            mise_tool_name: None,
             patterns: "Dockerfile Dockerfile.* *.dockerfile",
+            version_range: None,
             excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
@@ -133,7 +153,9 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "codespell",
             bin_name: "codespell",
+            mise_tool_name: None,
             patterns: "*",
+            version_range: None,
             excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
@@ -145,6 +167,8 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "ec",
             bin_name: "ec",
+            mise_tool_name: None,
+            version_range: None,
             patterns: "*",
             // Defer to formatters that enforce line length — those are the ones
             // that conflict with ec's max_line_length editorconfig check.
@@ -159,7 +183,9 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "golangci-lint",
             bin_name: "golangci-lint",
+            mise_tool_name: None,
             patterns: "*.go",
+            version_range: None,
             excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
@@ -171,7 +197,9 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "ruff",
             bin_name: "ruff",
+            mise_tool_name: None,
             patterns: "*.py",
+            version_range: None,
             excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
@@ -183,7 +211,9 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "ruff-format",
             bin_name: "ruff",
+            mise_tool_name: None,
             patterns: "*.py",
+            version_range: None,
             excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
@@ -195,7 +225,9 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "biome",
             bin_name: "biome",
+            mise_tool_name: None,
             patterns: "*.json *.jsonc *.js *.ts *.jsx *.tsx",
+            version_range: None,
             excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
@@ -207,7 +239,9 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "biome-format",
             bin_name: "biome",
+            mise_tool_name: None,
             patterns: "*.json *.jsonc *.js *.ts *.jsx *.tsx",
+            version_range: None,
             excludes_if_active: &[],
             slow: false,
             kind: CheckKind::Template {
@@ -219,6 +253,8 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "cargo-clippy",
             bin_name: "cargo-clippy",
+            mise_tool_name: Some("rust"),
+            version_range: None,
             patterns: "*.rs",
             excludes_if_active: &[],
             slow: false,
@@ -231,6 +267,8 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "cargo-fmt",
             bin_name: "cargo-fmt",
+            mise_tool_name: Some("rust"),
+            version_range: None,
             patterns: "*.rs",
             excludes_if_active: &[],
             slow: false,
@@ -243,6 +281,8 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "links",
             bin_name: "lychee",
+            mise_tool_name: None,
+            version_range: None,
             patterns: "",
             excludes_if_active: &[],
             slow: false,
@@ -251,10 +291,45 @@ pub fn builtin() -> Vec<Check> {
         Check {
             name: "renovate-deps",
             bin_name: "renovate",
+            mise_tool_name: None,
+            version_range: None,
             patterns: "",
             excludes_if_active: &[],
             slow: true,
             kind: CheckKind::Special(SpecialKind::RenovateDeps),
         },
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    /// If any entry for a bin_name declares a version_range, every entry for that
+    /// bin_name must declare one. A mix of ranged and unranged entries for the same
+    /// binary is ambiguous — it would be impossible to guarantee exactly one activates.
+    /// (Multiple unranged entries for the same binary are fine: they're different
+    /// subcommand invocations of the same tool, e.g. `biome check` vs `biome format`.)
+    #[test]
+    fn version_ranges_must_not_be_mixed_with_unranged_entries() {
+        let registry = builtin();
+        let mut by_bin: HashMap<&str, Vec<&Check>> = HashMap::new();
+        for check in &registry {
+            by_bin.entry(check.bin_name).or_default().push(check);
+        }
+        for (bin, checks) in &by_bin {
+            let any_ranged = checks.iter().any(|c| c.version_range.is_some());
+            if any_ranged {
+                for check in checks {
+                    assert!(
+                        check.version_range.is_some(),
+                        "check '{}' shares bin_name '{}' with version-ranged entries but has no version_range",
+                        check.name,
+                        bin,
+                    );
+                }
+            }
+        }
+    }
 }

@@ -101,6 +101,13 @@ flint list
 
 Env var equivalents: `AUTOFIX=true` for `--fix`, `FLINT_SHORT=true` for `--short`.
 
+In `--short` mode, failed checks are partitioned by fixability and emitted
+as a single line. Fixable checks are expressed as the exact command to run:
+
+```text
+flint: 2 checks failed — flint --fix prettier cargo-fmt | review: shellcheck
+```
+
 Pass one or more linter names to run only those:
 
 ```bash
@@ -192,6 +199,14 @@ Checks auto-enable when their binary is found in PATH. Install tools via `mise.t
 
 **Slow checks** (`renovate-deps`) are skipped by `--fast`. Use `--fast` for
 local/pre-push feedback and the full set in CI.
+
+**`ec` deference**: `ec` (editorconfig-checker) runs on all files, but
+automatically skips file types owned by an active line-length-enforcing
+formatter. When `cargo-fmt`, `ruff-format`, `biome-format`, or `prettier`
+are active, their file types are excluded from `ec` — those formatters
+already enforce line length and would conflict with `ec`'s
+`max_line_length` editorconfig check. If none of those formatters are
+installed, `ec` checks those files itself.
 
 ## Special checks
 

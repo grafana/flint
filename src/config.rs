@@ -46,8 +46,8 @@ pub struct RenovateDepsConfig {
     pub exclude_managers: Vec<String>,
 }
 
-pub fn load(project_root: &Path) -> Result<Config> {
-    let path = project_root.join("flint.toml");
+pub fn load(config_dir: &Path) -> Result<Config> {
+    let path = config_dir.join("flint.toml");
     if !path.exists() {
         return Ok(Config::default());
     }

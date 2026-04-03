@@ -67,6 +67,10 @@ async fn main() -> Result<()> {
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| std::env::current_dir().expect("cannot determine working directory"));
 
+    let config_dir = std::env::var("FLINT_CONFIG_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| project_root.clone());
+
     std::env::set_current_dir(&project_root)?;
 
     let registry = registry::builtin();
@@ -77,7 +81,7 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    let cfg = config::load(&project_root)?;
+    let cfg = config::load(&config_dir)?;
 
     // Filter registry to requested linters (or all if none specified).
     let checks: Vec<&registry::Check> = if cli.linters.is_empty() {
@@ -124,6 +128,7 @@ async fn main() -> Result<()> {
             true, // suppress per-check output
             &project_root,
             &cfg,
+            &config_dir,
         )
         .await?;
 
@@ -149,6 +154,7 @@ async fn main() -> Result<()> {
                 true, // suppress per-check output
                 &project_root,
                 &cfg,
+                &config_dir,
             )
             .await?;
             for (name, ok) in fix_results {
@@ -193,6 +199,7 @@ async fn main() -> Result<()> {
         cli.short,
         &project_root,
         &cfg,
+        &config_dir,
     )
     .await?;
 

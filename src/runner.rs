@@ -13,7 +13,7 @@ use crate::registry::{Check, CheckKind, Scope, SpecialKind};
 /// the registry or config. Built by `prepare()` before the fix/check split.
 enum PreparedCheck {
     Invocations { name: String, argv_list: Vec<Vec<String>> },
-    Links { name: String, cfg: LycheeConfig, file_list: FileList },
+    Links { name: String, cfg: LycheeConfig, file_list: FileList, config_dir: PathBuf },
     RenovateDeps { name: String, cfg: RenovateDepsConfig },
 }
 
@@ -32,8 +32,8 @@ impl PreparedCheck {
             Self::Invocations { argv_list, .. } => {
                 run_invocations(&name, &argv_list, project_root).await
             }
-            Self::Links { cfg, file_list, .. } => {
-                lychee::run(&cfg, &file_list, project_root).await
+            Self::Links { cfg, file_list, config_dir, .. } => {
+                lychee::run(&cfg, &file_list, project_root, &config_dir).await
             }
             Self::RenovateDeps { cfg, .. } => {
                 renovate_deps::run(&cfg, fix, project_root).await
@@ -51,10 +51,11 @@ pub async fn run(
     short: bool,
     project_root: &Path,
     cfg: &Config,
+    config_dir: &Path,
 ) -> Result<Vec<(String, bool)>> {
     let prepared: Vec<PreparedCheck> = checks
         .iter()
-        .filter_map(|&check| prepare(check, file_list, fix, project_root, checks, cfg))
+        .filter_map(|&check| prepare(check, file_list, fix, project_root, checks, cfg, config_dir))
         .collect();
 
     if fix {
@@ -111,6 +112,7 @@ fn prepare(
     project_root: &Path,
     active_checks: &[&Check],
     cfg: &Config,
+    config_dir: &Path,
 ) -> Option<PreparedCheck> {
     let name = check.name.to_string();
     match &check.kind {
@@ -125,6 +127,7 @@ fn prepare(
             name,
             cfg: cfg.checks.lychee.clone(),
             file_list: file_list.clone(),
+            config_dir: config_dir.to_path_buf(),
         }),
         CheckKind::Special(SpecialKind::RenovateDeps) => {
             Some(PreparedCheck::RenovateDeps { name, cfg: cfg.checks.renovate_deps.clone() })

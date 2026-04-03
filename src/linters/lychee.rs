@@ -9,12 +9,14 @@ pub async fn run(
     cfg: &LycheeConfig,
     file_list: &FileList,
     project_root: &Path,
+    config_dir: &Path,
 ) -> (bool, Vec<u8>, Vec<u8>) {
-    let lychee_cfg = cfg
-        .config
-        .as_deref()
-        .unwrap_or(".github/config/lychee.toml")
-        .to_string();
+    let lychee_cfg_raw = cfg.config.as_deref().unwrap_or("lychee.toml");
+    let lychee_cfg = if Path::new(lychee_cfg_raw).is_relative() {
+        config_dir.join(lychee_cfg_raw).to_string_lossy().into_owned()
+    } else {
+        lychee_cfg_raw.to_string()
+    };
 
     let remap_args = build_remap_args(project_root).await;
 
@@ -31,10 +33,7 @@ pub async fn run(
     }
 
     // Check if lychee config is in the changed file list
-    let config_changed = file_list.files.iter().any(|f| {
-        let rel = f.strip_prefix(project_root).unwrap_or(f);
-        rel == Path::new(&lychee_cfg)
-    });
+    let config_changed = file_list.files.iter().any(|f| f.as_path() == Path::new(&lychee_cfg));
 
     if config_changed {
         let mut stderr = b"Config changes detected, falling back to full check.\n".to_vec();

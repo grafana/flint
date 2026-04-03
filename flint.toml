@@ -3,7 +3,6 @@ base_branch = "main"
 exclude = "CHANGELOG\\.md|\\.github/renovate-tracked-deps\\.json"
 
 [checks.lychee]
-config = ".github/config/lychee.toml"
 check_all_local = true
 
 [checks.renovate-deps]

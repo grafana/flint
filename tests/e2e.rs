@@ -4,13 +4,20 @@ use tempfile::TempDir;
 
 /// Runs the flint binary in the given directory with the given args.
 fn flint(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_flint"))
-        .args(args)
+    flint_with_env(args, cwd, &[])
+}
+
+/// Runs the flint binary with additional environment variables.
+fn flint_with_env(args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Output {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_flint"));
+    cmd.args(args)
         .env("MISE_PROJECT_ROOT", cwd)
         .env_remove("FLINT_CONFIG_DIR")
-        .current_dir(cwd)
-        .output()
-        .expect("failed to spawn flint")
+        .current_dir(cwd);
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
+    cmd.output().expect("failed to spawn flint")
 }
 
 /// Creates a temp directory initialised as a git repo.
@@ -84,7 +91,19 @@ fn run_case(case: &Path, name: &str, update: bool) {
         .output()
         .expect("git add failed");
 
-    let out = flint(&args, repo.path());
+    let env_vars: Vec<(String, String)> = cfg
+        .get("env")
+        .and_then(|v| v.as_table())
+        .map(|t| {
+            t.iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                .collect()
+        })
+        .unwrap_or_default();
+    let env_refs: Vec<(&str, &str)> =
+        env_vars.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+
+    let out = flint_with_env(&args, repo.path(), &env_refs);
 
     let repo_str = repo.path().to_string_lossy();
     let stderr =
@@ -106,7 +125,6 @@ fn run_case(case: &Path, name: &str, update: bool) {
         .get("expected_stdout")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-
     assert_eq!(stderr, exp_stderr, "{name}: stderr mismatch");
     assert_eq!(stdout, exp_stdout, "{name}: stdout mismatch");
     assert_eq!(

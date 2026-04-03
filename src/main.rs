@@ -1,11 +1,12 @@
-mod linters;
 mod config;
 mod files;
+mod linters;
 mod registry;
 mod runner;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use runner::CheckResult;
 use std::collections::HashMap;
 
 #[derive(Parser, Debug)]
@@ -132,15 +133,15 @@ async fn main() -> Result<()> {
         )
         .await?;
 
-        let (fixable_names, reviewable): (Vec<&str>, Vec<&str>) = check_results
-            .iter()
-            .filter(|(_, ok)| !ok)
-            .map(|(name, _)| name.as_str())
-            .partition(|name| is_fixable(name, &active));
+        let (fixable, reviewable): (Vec<CheckResult>, Vec<CheckResult>) = check_results
+            .into_iter()
+            .filter(|r| !r.ok)
+            .partition(|r| is_fixable(&r.name, &active));
 
         let mut fixed = vec![];
         let mut fix_failed = vec![];
-        if !fixable_names.is_empty() {
+        if !fixable.is_empty() {
+            let fixable_names: Vec<&str> = fixable.iter().map(|r| r.name.as_str()).collect();
             let to_fix: Vec<&registry::Check> = active
                 .iter()
                 .filter(|c| fixable_names.contains(&c.name))
@@ -157,18 +158,30 @@ async fn main() -> Result<()> {
                 &config_dir,
             )
             .await?;
-            for (name, ok) in fix_results {
-                if ok {
-                    fixed.push(name);
+            for r in fix_results {
+                if r.ok {
+                    fixed.push(r.name);
                 } else {
-                    fix_failed.push(name);
+                    fix_failed.push(r.name);
                 }
+            }
+        }
+
+        // Emit linter output for checks that need manual review so the caller
+        // has the failure details without a second flint invocation.
+        for r in &reviewable {
+            eprintln!("[{}]", r.name);
+            if !r.stdout.is_empty() {
+                print!("{}", String::from_utf8_lossy(&r.stdout));
+            }
+            if !r.stderr.is_empty() {
+                eprint!("{}", String::from_utf8_lossy(&r.stderr));
             }
         }
 
         let remaining: Vec<&str> = reviewable
             .iter()
-            .copied()
+            .map(|r| r.name.as_str())
             .chain(fix_failed.iter().map(String::as_str))
             .collect();
 
@@ -205,8 +218,8 @@ async fn main() -> Result<()> {
 
     let failed: Vec<&str> = results
         .iter()
-        .filter(|(_, ok)| !ok)
-        .map(|(name, _)| name.as_str())
+        .filter(|r| !r.ok)
+        .map(|r| r.name.as_str())
         .collect();
 
     if !failed.is_empty() {

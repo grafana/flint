@@ -9,12 +9,30 @@ use crate::files::FileList;
 use crate::linters::{lychee, renovate_deps};
 use crate::registry::{Check, CheckKind, Scope, SpecialKind};
 
+pub struct CheckResult {
+    pub name: String,
+    pub ok: bool,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+}
+
 /// A check with all inputs pre-resolved, ready to execute without borrowing
 /// the registry or config. Built by `prepare()` before the fix/check split.
 enum PreparedCheck {
-    Invocations { name: String, argv_list: Vec<Vec<String>> },
-    Links { name: String, cfg: LycheeConfig, file_list: FileList, config_dir: PathBuf },
-    RenovateDeps { name: String, cfg: RenovateDepsConfig },
+    Invocations {
+        name: String,
+        argv_list: Vec<Vec<String>>,
+    },
+    Links {
+        name: String,
+        cfg: LycheeConfig,
+        file_list: FileList,
+        config_dir: PathBuf,
+    },
+    RenovateDeps {
+        name: String,
+        cfg: RenovateDepsConfig,
+    },
 }
 
 impl PreparedCheck {
@@ -26,20 +44,26 @@ impl PreparedCheck {
         }
     }
 
-    async fn execute(self, fix: bool, project_root: &Path) -> (String, bool, Vec<u8>, Vec<u8>) {
+    async fn execute(self, fix: bool, project_root: &Path) -> CheckResult {
         let name = self.name().to_string();
         let (ok, stdout, stderr) = match self {
             Self::Invocations { argv_list, .. } => {
                 run_invocations(&name, &argv_list, project_root).await
             }
-            Self::Links { cfg, file_list, config_dir, .. } => {
-                lychee::run(&cfg, &file_list, project_root, &config_dir).await
-            }
-            Self::RenovateDeps { cfg, .. } => {
-                renovate_deps::run(&cfg, fix, project_root).await
-            }
+            Self::Links {
+                cfg,
+                file_list,
+                config_dir,
+                ..
+            } => lychee::run(&cfg, &file_list, project_root, &config_dir).await,
+            Self::RenovateDeps { cfg, .. } => renovate_deps::run(&cfg, fix, project_root).await,
         };
-        (name, ok, stdout, stderr)
+        CheckResult {
+            name,
+            ok,
+            stdout,
+            stderr,
+        }
     }
 }
 
@@ -52,7 +76,7 @@ pub async fn run(
     project_root: &Path,
     cfg: &Config,
     config_dir: &Path,
-) -> Result<Vec<(String, bool)>> {
+) -> Result<Vec<CheckResult>> {
     let prepared: Vec<PreparedCheck> = checks
         .iter()
         .filter_map(|&check| prepare(check, file_list, fix, project_root, checks, cfg, config_dir))
@@ -61,26 +85,26 @@ pub async fn run(
     if fix {
         let mut results = vec![];
         for task in prepared {
-            let name = task.name().to_string();
-            let (_, ok, stdout, stderr) = task.execute(fix, project_root).await;
-            if !short && (verbose || !ok) {
-                eprintln!("[{name}]");
-                flush_output(&stdout, &stderr);
+            let r = task.execute(fix, project_root).await;
+            if !short && (verbose || !r.ok) {
+                eprintln!("[{}]", r.name);
+                flush_output(&r.stdout, &r.stderr);
             }
-            results.push((name, ok));
+            results.push(r);
         }
         return Ok(results);
     }
 
-    let mut set: JoinSet<(String, bool, Vec<u8>, Vec<u8>)> = JoinSet::new();
+    let mut set: JoinSet<CheckResult> = JoinSet::new();
     for task in prepared {
         let root = project_root.to_path_buf();
         set.spawn(async move {
-            let (name, ok, stdout, stderr) = task.execute(false, &root).await;
+            let r = task.execute(false, &root).await;
             if verbose {
-                flush_output(&stdout, &stderr);
+                eprintln!("[{}]", r.name);
+                flush_output(&r.stdout, &r.stderr);
             }
-            (name, ok, stdout, stderr)
+            r
         });
     }
 
@@ -91,18 +115,15 @@ pub async fn run(
     }
 
     if !verbose && !short {
-        for (name, ok, stdout, stderr) in &collected {
-            if !ok {
-                eprintln!("[{name}]");
-                flush_output(stdout, stderr);
+        for r in &collected {
+            if !r.ok {
+                eprintln!("[{}]", r.name);
+                flush_output(&r.stdout, &r.stderr);
             }
         }
     }
 
-    Ok(collected
-        .into_iter()
-        .map(|(name, ok, _, _)| (name, ok))
-        .collect())
+    Ok(collected)
 }
 
 fn prepare(
@@ -129,9 +150,10 @@ fn prepare(
             file_list: file_list.clone(),
             config_dir: config_dir.to_path_buf(),
         }),
-        CheckKind::Special(SpecialKind::RenovateDeps) => {
-            Some(PreparedCheck::RenovateDeps { name, cfg: cfg.checks.renovate_deps.clone() })
-        }
+        CheckKind::Special(SpecialKind::RenovateDeps) => Some(PreparedCheck::RenovateDeps {
+            name,
+            cfg: cfg.checks.renovate_deps.clone(),
+        }),
     }
 }
 
@@ -168,10 +190,10 @@ fn build_invocations(
     match scope {
         Scope::Project => {
             // If patterns are set, only run when relevant files are present.
-            if !check.patterns.is_empty() {
-                if match_files(&file_list.files, check.patterns, &excludes, project_root).is_empty() {
-                    return vec![];
-                }
+            if !check.patterns.is_empty()
+                && match_files(&file_list.files, check.patterns, &excludes, project_root).is_empty()
+            {
+                return vec![];
             }
             let cmd = substitute_merge_base(cmd_template, file_list.merge_base.as_deref());
             vec![shell_words(cmd)]

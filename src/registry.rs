@@ -64,17 +64,29 @@ impl Check {
     // --- Constructors ---
 
     /// Check invoked once per matched file (`{FILE}`). `name` is also used as `bin_name`.
-    pub fn file(name: &'static str, check_cmd: &'static str, patterns: &'static [&'static str]) -> Self {
+    pub fn file(
+        name: &'static str,
+        check_cmd: &'static str,
+        patterns: &'static [&'static str],
+    ) -> Self {
         Self::template(name, patterns, check_cmd, Scope::File)
     }
 
     /// Check invoked once with all matched files (`{FILES}`). `name` is also used as `bin_name`.
-    pub fn files(name: &'static str, check_cmd: &'static str, patterns: &'static [&'static str]) -> Self {
+    pub fn files(
+        name: &'static str,
+        check_cmd: &'static str,
+        patterns: &'static [&'static str],
+    ) -> Self {
         Self::template(name, patterns, check_cmd, Scope::Files)
     }
 
     /// Check invoked once per project (no file args). `name` is also used as `bin_name`.
-    pub fn project(name: &'static str, check_cmd: &'static str, patterns: &'static [&'static str]) -> Self {
+    pub fn project(
+        name: &'static str,
+        check_cmd: &'static str,
+        patterns: &'static [&'static str],
+    ) -> Self {
         Self::template(name, patterns, check_cmd, Scope::Project)
     }
 
@@ -132,7 +144,10 @@ impl Check {
 
     /// Add a fix command (auto-fix mode).
     pub fn fix(mut self, fix_cmd: &'static str) -> Self {
-        if let CheckKind::Template { fix_cmd: ref mut f, .. } = self.kind {
+        if let CheckKind::Template {
+            fix_cmd: ref mut f, ..
+        } = self.kind
+        {
             *f = fix_cmd;
         }
         self
@@ -160,22 +175,62 @@ impl Check {
 
 pub fn builtin() -> Vec<Check> {
     vec![
-        Check::file("shellcheck", "shellcheck {FILE}", &["*.sh", "*.bash", "*.bats"]),
+        Check::file(
+            "shellcheck",
+            "shellcheck {FILE}",
+            &["*.sh", "*.bash", "*.bats"],
+        ),
         Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"]).fix("shfmt -w {FILE}"),
-        Check::file("markdownlint", "markdownlint {FILE}", &["*.md"]).fix("markdownlint --fix {FILE}"),
-        Check::files("prettier", "prettier --check {FILES}", &["*.md", "*.yml", "*.yaml"]).fix("prettier --write {FILES}"),
-        Check::file("actionlint", "actionlint {FILE}", &[".github/workflows/*.yml", ".github/workflows/*.yaml"]),
-        Check::file("hadolint", "hadolint {FILE}", &["Dockerfile", "Dockerfile.*", "*.dockerfile"]),
-        Check::files("codespell", "codespell {FILES}", &["*"]).fix("codespell --write-changes {FILES}"),
+        Check::file("markdownlint", "markdownlint {FILE}", &["*.md"])
+            .fix("markdownlint --fix {FILE}"),
+        Check::files(
+            "prettier",
+            "prettier --check {FILES}",
+            &["*.md", "*.yml", "*.yaml"],
+        )
+        .fix("prettier --write {FILES}"),
+        Check::file(
+            "actionlint",
+            "actionlint {FILE}",
+            &[".github/workflows/*.yml", ".github/workflows/*.yaml"],
+        ),
+        Check::file(
+            "hadolint",
+            "hadolint {FILE}",
+            &["Dockerfile", "Dockerfile.*", "*.dockerfile"],
+        ),
+        Check::files("codespell", "codespell {FILES}", &["*"])
+            .fix("codespell --write-changes {FILES}"),
         // Defer to formatters that enforce line length — those are the ones
         // that conflict with ec's max_line_length editorconfig check.
-        Check::files("ec", "ec {FILES}", &["*"])
-            .excludes(&["cargo-fmt", "ruff-format", "biome-format", "prettier"]),
-        Check::project("golangci-lint", "golangci-lint run --new-from-rev={MERGE_BASE}", &["*.go"]),
+        Check::files("ec", "ec {FILES}", &["*"]).excludes(&[
+            "cargo-fmt",
+            "ruff-format",
+            "biome-format",
+            "prettier",
+        ]),
+        Check::project(
+            "golangci-lint",
+            "golangci-lint run --new-from-rev={MERGE_BASE}",
+            &["*.go"],
+        ),
         Check::file("ruff", "ruff check {FILE}", &["*.py"]).fix("ruff check --fix {FILE}"),
-        Check::file("ruff-format", "ruff format --check {FILE}", &["*.py"]).bin("ruff").fix("ruff format {FILE}"),
-        Check::file("biome", "biome check {FILE}", &["*.json", "*.jsonc", "*.js", "*.ts", "*.jsx", "*.tsx"]).fix("biome check --fix {FILE}"),
-        Check::file("biome-format", "biome format {FILE}", &["*.json", "*.jsonc", "*.js", "*.ts", "*.jsx", "*.tsx"]).bin("biome").fix("biome format --write {FILE}"),
+        Check::file("ruff-format", "ruff format --check {FILE}", &["*.py"])
+            .bin("ruff")
+            .fix("ruff format {FILE}"),
+        Check::file(
+            "biome",
+            "biome check {FILE}",
+            &["*.json", "*.jsonc", "*.js", "*.ts", "*.jsx", "*.tsx"],
+        )
+        .fix("biome check --fix {FILE}"),
+        Check::file(
+            "biome-format",
+            "biome format {FILE}",
+            &["*.json", "*.jsonc", "*.js", "*.ts", "*.jsx", "*.tsx"],
+        )
+        .bin("biome")
+        .fix("biome format --write {FILE}"),
         Check::project("cargo-clippy", "cargo clippy -q -- -D warnings", &["*.rs"])
             .fix("cargo clippy -q --fix --allow-dirty --allow-staged -- -D warnings")
             .mise_tool("rust"),

@@ -36,11 +36,7 @@ fn write_mise_toml(repo: &TempDir, tools: &[&str]) {
         .iter()
         .map(|t| format!("{t} = \"latest\"\n"))
         .collect();
-    std::fs::write(
-        repo.path().join("mise.toml"),
-        format!("[tools]\n{entries}"),
-    )
-    .unwrap();
+    std::fs::write(repo.path().join("mise.toml"), format!("[tools]\n{entries}")).unwrap();
 }
 
 // Helper to stage a file so it appears in `git ls-files` (used by --full).
@@ -177,6 +173,11 @@ fn auto_reports_unfixable_as_review() {
     assert!(
         !out.status.success(),
         "flint --auto should exit 1 for unfixable checks"
+    );
+    // Linter output must appear inline so the caller doesn't need a second invocation.
+    assert!(
+        stderr.contains("[shellcheck]"),
+        "expected inline [shellcheck] output, got:\n{stderr}"
     );
     assert!(
         stderr.contains("review: shellcheck"),

@@ -14,6 +14,7 @@ editorconfig-checker = "v3.6.1"
 "npm:@biomejs/biome" = "2.3.14"
 "pipx:ruff" = "0.15.0"
 "pipx:codespell" = "2.4.1"
+rust = "1.94.1"
 
 [tasks."setup:update-super-linter-versions"]
 description = "Generate super-linter version mapping from the super-linter repo"
@@ -23,30 +24,17 @@ file = "tasks/setup/update-super-linter-versions.sh"
 description = "Run all lints"
 run = "cargo build -q && ./target/debug/flint"
 
-[tasks.fix]
+[tasks."lint:fix"]
 description = "Auto-fix lint issues"
 run = "cargo build -q && ./target/debug/flint --fix"
 
-[tasks.native-lint]
-description = "Run lints natively (fast, no renovate)"
+[tasks."lint:pre-commit"]
+description = "Fast auto-fix lint pass (skips slow checks like renovate) — intended for pre-commit/pre-push hooks"
 run = "cargo build -q && ./target/debug/flint --auto --fast"
 
-# Rust tasks
 [tasks.build]
 description = "Build the project"
 run = "cargo build"
-
-[tasks."lint:rust"]
-description = "Lint Rust code (clippy)"
-run = "cargo clippy -q -- -D warnings"
-
-[tasks.fmt]
-description = "Format Rust code"
-run = "cargo fmt"
-
-[tasks."check-fmt"]
-description = "Check Rust formatting"
-run = "cargo fmt -- --check"
 
 [tasks.test]
 description = "Run tests"

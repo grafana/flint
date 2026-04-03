@@ -38,7 +38,10 @@ pub fn changed(
 }
 
 fn compile_exclude_re(cfg: &Config) -> Option<regex::Regex> {
-    cfg.settings.exclude.as_deref().and_then(|pat| regex::Regex::new(pat).ok())
+    cfg.settings
+        .exclude
+        .as_deref()
+        .and_then(|pat| regex::Regex::new(pat).ok())
 }
 
 fn resolve_merge_base(
@@ -129,7 +132,7 @@ fn filter_names(
 ) -> Vec<PathBuf> {
     names
         .into_iter()
-        .filter(|name| exclude_re.map_or(true, |re| !re.is_match(name)))
+        .filter(|name| exclude_re.is_none_or(|re| !re.is_match(name)))
         .map(|name| project_root.join(name))
         .collect()
 }

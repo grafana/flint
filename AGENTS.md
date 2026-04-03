@@ -14,7 +14,7 @@ This repository contains two generations of flint:
 
 ## Linting
 
-**Always run `mise run fix` before committing changes.**
+**Always run `mise run lint:fix` before committing changes.**
 This ensures all files pass CI linting (Biome formatting,
 shellcheck, etc.). Review the auto-fixed files before
 committing — auto-fixes may produce unexpected results.
@@ -26,7 +26,7 @@ workflow — both are optional. To install the Git hook:
 
 ```bash
 # Auto-fix and verify (recommended dev workflow)
-mise run fix
+mise run lint:fix
 
 # Verify only (same command used in CI)
 mise run lint

@@ -13,7 +13,10 @@ pub async fn run(
 ) -> (bool, Vec<u8>, Vec<u8>) {
     let lychee_cfg_raw = cfg.config.as_deref().unwrap_or("lychee.toml");
     let lychee_cfg = if Path::new(lychee_cfg_raw).is_relative() {
-        config_dir.join(lychee_cfg_raw).to_string_lossy().into_owned()
+        config_dir
+            .join(lychee_cfg_raw)
+            .to_string_lossy()
+            .into_owned()
     } else {
         lychee_cfg_raw.to_string()
     };
@@ -33,7 +36,10 @@ pub async fn run(
     }
 
     // Check if lychee config is in the changed file list
-    let config_changed = file_list.files.iter().any(|f| f.as_path() == Path::new(&lychee_cfg));
+    let config_changed = file_list
+        .files
+        .iter()
+        .any(|f| f.as_path() == Path::new(&lychee_cfg));
 
     if config_changed {
         let mut stderr = b"Config changes detected, falling back to full check.\n".to_vec();
@@ -197,17 +203,41 @@ async fn build_branch_remap_args(project_root: &Path) -> Vec<String> {
 
     if head_repo == repo {
         let pwd = project_root.to_string_lossy();
-        push_remap(&mut args, format!("^{base_url}/blob/{base_ref}/(.*?)#L[0-9]+.*$ file://{pwd}/$1"));
-        push_remap(&mut args, format!("^{base_url}/blob/{base_ref}/(.*?)#:~:text=.*$ file://{pwd}/$1"));
-        push_remap(&mut args, format!("^{base_url}/blob/{base_ref}/(.*)$ file://{pwd}/$1"));
-        push_remap(&mut args, format!("^{base_url}/tree/{base_ref}/(.*?)#L[0-9]+.*$ file://{pwd}/$1"));
-        push_remap(&mut args, format!("^{base_url}/tree/{base_ref}/(.*)$ file://{pwd}/$1"));
+        push_remap(
+            &mut args,
+            format!("^{base_url}/blob/{base_ref}/(.*?)#L[0-9]+.*$ file://{pwd}/$1"),
+        );
+        push_remap(
+            &mut args,
+            format!("^{base_url}/blob/{base_ref}/(.*?)#:~:text=.*$ file://{pwd}/$1"),
+        );
+        push_remap(
+            &mut args,
+            format!("^{base_url}/blob/{base_ref}/(.*)$ file://{pwd}/$1"),
+        );
+        push_remap(
+            &mut args,
+            format!("^{base_url}/tree/{base_ref}/(.*?)#L[0-9]+.*$ file://{pwd}/$1"),
+        );
+        push_remap(
+            &mut args,
+            format!("^{base_url}/tree/{base_ref}/(.*)$ file://{pwd}/$1"),
+        );
     } else {
         let raw_head = format!("https://raw.githubusercontent.com/{head_repo}/{head_ref}");
         let head_url = format!("https://github.com/{head_repo}");
-        push_remap(&mut args, format!("^{base_url}/blob/{base_ref}/(.*?)#L[0-9]+.*$ {raw_head}/$1"));
-        push_remap(&mut args, format!("^{base_url}/blob/{base_ref}/(.*?)#:~:text=.*$ {raw_head}/$1"));
-        push_remap(&mut args, format!("^{base_url}/blob/{base_ref}/(.*)$ {raw_head}/$1"));
+        push_remap(
+            &mut args,
+            format!("^{base_url}/blob/{base_ref}/(.*?)#L[0-9]+.*$ {raw_head}/$1"),
+        );
+        push_remap(
+            &mut args,
+            format!("^{base_url}/blob/{base_ref}/(.*?)#:~:text=.*$ {raw_head}/$1"),
+        );
+        push_remap(
+            &mut args,
+            format!("^{base_url}/blob/{base_ref}/(.*)$ {raw_head}/$1"),
+        );
         push_remap(
             &mut args,
             format!("^{base_url}/tree/{base_ref}/(.*?)#L[0-9]+.*$ {head_url}/tree/{head_ref}/$1"),

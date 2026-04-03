@@ -171,11 +171,11 @@ flint = "0.x.y"
 description = "Run all lints"
 run = "flint"
 
-[tasks."native-lint"]
-description = "Run fast lints (skip slow checks)"
-run = "flint --fast"
+[tasks."lint:pre-commit"]
+description = "Fast auto-fix lint pass (skips slow checks) — intended for pre-commit/pre-push hooks"
+run = "flint --auto --fast"
 
-[tasks.fix]
+[tasks."lint:fix"]
 description = "Auto-fix lint issues"
 run = "flint --fix"
 ```

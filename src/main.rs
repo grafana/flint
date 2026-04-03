@@ -6,7 +6,7 @@ mod runner;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use runner::CheckResult;
+use runner::{CheckResult, RunOptions};
 use std::collections::HashMap;
 
 #[derive(Parser, Debug)]
@@ -124,9 +124,11 @@ async fn main() -> Result<()> {
         let check_results = runner::run(
             &active,
             &file_list,
-            false,
-            false,
-            true, // suppress per-check output
+            RunOptions {
+                fix: false,
+                verbose: false,
+                short: true,
+            },
             &project_root,
             &cfg,
             &config_dir,
@@ -150,9 +152,11 @@ async fn main() -> Result<()> {
             let fix_results = runner::run(
                 &to_fix,
                 &file_list,
-                true,
-                false,
-                true, // suppress per-check output
+                RunOptions {
+                    fix: true,
+                    verbose: false,
+                    short: true,
+                },
                 &project_root,
                 &cfg,
                 &config_dir,
@@ -207,9 +211,11 @@ async fn main() -> Result<()> {
     let results = runner::run(
         &active,
         &file_list,
-        cli.fix,
-        cli.verbose,
-        cli.short,
+        RunOptions {
+            fix: cli.fix,
+            verbose: cli.verbose,
+            short: cli.short,
+        },
         &project_root,
         &cfg,
         &config_dir,

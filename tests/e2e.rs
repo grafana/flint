@@ -186,6 +186,74 @@ fn auto_reports_unfixable_as_review() {
 }
 
 #[test]
+fn auto_inline_output_has_header_per_linter() {
+    let repo = git_repo();
+    write_mise_toml(&repo, &["shellcheck", "actionlint"]);
+
+    // SC2086: unquoted variable — shellcheck violation with no auto-fix.
+    stage(
+        &repo.path().join("bad.sh"),
+        "#!/bin/bash\necho $1\n",
+        repo.path(),
+    );
+
+    // Undefined expression context — actionlint violation with no auto-fix.
+    let workflows = repo.path().join(".github/workflows");
+    std::fs::create_dir_all(&workflows).unwrap();
+    stage(
+        &workflows.join("ci.yml"),
+        "on: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ${{ foo.bar }}\n",
+        repo.path(),
+    );
+
+    let out = flint(
+        &["--full", "--auto", "shellcheck", "actionlint"],
+        repo.path(),
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    println!("=== stdout ===\n{stdout}");
+    eprintln!("=== stderr ===\n{stderr}");
+
+    assert!(!out.status.success(), "flint --auto should exit 1");
+
+    // Each failing linter must emit its own header so output is attributable.
+    assert!(
+        stderr.contains("[shellcheck]"),
+        "expected [shellcheck] header in:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("[actionlint]"),
+        "expected [actionlint] header in:\n{stderr}"
+    );
+
+    // Headers must appear before the summary line.
+    let summary_pos = stderr.find("flint:").expect("expected summary line");
+    let shellcheck_pos = stderr.find("[shellcheck]").unwrap();
+    let actionlint_pos = stderr.find("[actionlint]").unwrap();
+    assert!(
+        shellcheck_pos < summary_pos,
+        "[shellcheck] header must precede summary"
+    );
+    assert!(
+        actionlint_pos < summary_pos,
+        "[actionlint] header must precede summary"
+    );
+
+    // Both must appear in the review summary.
+    assert!(stderr.contains("review:"), "expected review: in summary");
+    assert!(
+        stderr.contains("shellcheck"),
+        "expected shellcheck in summary"
+    );
+    assert!(
+        stderr.contains("actionlint"),
+        "expected actionlint in summary"
+    );
+}
+
+#[test]
 fn shellcheck_clean_script_passes() {
     let repo = git_repo();
     write_mise_toml(&repo, &["shellcheck"]);

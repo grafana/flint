@@ -9,6 +9,12 @@ use crate::files::FileList;
 use crate::linters::{lychee, renovate_deps};
 use crate::registry::{Check, CheckKind, Scope, SpecialKind};
 
+pub struct RunOptions {
+    pub fix: bool,
+    pub verbose: bool,
+    pub short: bool,
+}
+
 pub struct CheckResult {
     pub name: String,
     pub ok: bool,
@@ -70,13 +76,16 @@ impl PreparedCheck {
 pub async fn run(
     checks: &[&Check],
     file_list: &FileList,
-    fix: bool,
-    verbose: bool,
-    short: bool,
+    opts: RunOptions,
     project_root: &Path,
     cfg: &Config,
     config_dir: &Path,
 ) -> Result<Vec<CheckResult>> {
+    let RunOptions {
+        fix,
+        verbose,
+        short,
+    } = opts;
     let prepared: Vec<PreparedCheck> = checks
         .iter()
         .filter_map(|&check| prepare(check, file_list, fix, project_root, checks, cfg, config_dir))

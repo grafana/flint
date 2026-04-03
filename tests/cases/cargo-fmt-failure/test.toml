@@ -1,0 +1,16 @@
+args = "--full cargo-fmt"
+exit = 1
+
+expected_stderr = """
+[cargo-fmt]
+Diff in <REPO>/src/lib.rs:1:
+-pub struct Foo { pub a: u32, pub b: u32 }
++pub struct Foo {
++    pub a: u32,
++    pub b: u32,
++}
+ 
+
+flint: 1 check failed (cargo-fmt)
+💡 Try `mise run lint:fix` to auto-fix lint issues, then re-run `mise run lint` to verify.
+"""

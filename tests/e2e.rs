@@ -29,248 +29,135 @@ fn git_repo() -> TempDir {
     dir
 }
 
-/// Writes a minimal mise.toml declaring the given tools so flint's availability
-/// check passes. Version strings are arbitrary — these checks have no version_range.
-fn write_mise_toml(repo: &TempDir, tools: &[&str]) {
-    let entries: String = tools
-        .iter()
-        .map(|t| format!("{t} = \"latest\"\n"))
+/// Runs all fixture cases under tests/cases/.
+/// Each case is a directory containing:
+///   files/     — files to copy into the repo and stage
+///   test.toml  — args, expected exit code, and golden output
+///
+/// test.toml format:
+///   args             = "--full --auto shellcheck"
+///   exit             = 1                          # optional, default 0
+///   expected_stderr  = """..."""                  # optional, default ""
+///   expected_stdout  = """..."""                  # optional, default ""
+///
+/// Set UPDATE_SNAPSHOTS=1 to regenerate golden output in test.toml.
+#[test]
+fn cases() {
+    let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/cases");
+    let update = std::env::var("UPDATE_SNAPSHOTS").is_ok();
+
+    let mut entries: Vec<_> = std::fs::read_dir(&cases_dir)
+        .expect("tests/cases/ not found")
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir())
         .collect();
-    std::fs::write(repo.path().join("mise.toml"), format!("[tools]\n{entries}")).unwrap();
+    entries.sort_by_key(|e| e.file_name());
+
+    for entry in entries {
+        let case = entry.path();
+        let name = case.file_name().unwrap().to_string_lossy().into_owned();
+        run_case(&case, &name, update);
+    }
 }
 
-// Helper to stage a file so it appears in `git ls-files` (used by --full).
-fn stage(path: &Path, content: &str, repo: &Path) {
-    std::fs::write(path, content).unwrap();
+fn run_case(case: &Path, name: &str, update: bool) {
+    let toml_path = case.join("test.toml");
+    let raw = std::fs::read_to_string(&toml_path)
+        .unwrap_or_else(|_| panic!("{name}: missing test.toml"));
+    let cfg: toml::Value = toml::from_str(&raw)
+        .unwrap_or_else(|e| panic!("{name}: invalid test.toml: {e}"));
+
+    let args_str = cfg["args"].as_str().unwrap_or_else(|| panic!("{name}: missing args"));
+    let args: Vec<&str> = args_str.split_whitespace().collect();
+    let expected_exit = cfg.get("exit").and_then(|v| v.as_integer()).unwrap_or(0) as i32;
+
+    let repo = git_repo();
+
+    let files_dir = case.join("files");
+    copy_dir_into(&files_dir, repo.path());
     Command::new("git")
-        .args(["add", path.to_str().unwrap()])
-        .current_dir(repo)
+        .args(["add", "-A"])
+        .current_dir(repo.path())
         .output()
         .expect("git add failed");
-}
 
-#[test]
-fn shellcheck_failure_shows_check_name_header() {
-    let repo = git_repo();
-    write_mise_toml(&repo, &["shellcheck"]);
+    let out = flint(&args, repo.path());
 
-    // SC2086: unquoted variable — reliable shellcheck violation.
-    stage(
-        &repo.path().join("bad.sh"),
-        "#!/bin/bash\necho $1\n",
-        repo.path(),
+    let repo_str = repo.path().to_string_lossy();
+    let stderr = strip_ansi(
+        &String::from_utf8_lossy(&out.stderr).replace(repo_str.as_ref(), "<REPO>"),
+    );
+    let stdout = strip_ansi(
+        &String::from_utf8_lossy(&out.stdout).replace(repo_str.as_ref(), "<REPO>"),
     );
 
-    let out = flint(&["--full", "shellcheck"], repo.path());
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    let stdout = String::from_utf8_lossy(&out.stdout);
+    if update {
+        write_test_toml(&toml_path, args_str, expected_exit, &stderr, &stdout);
+        println!("{name}: snapshots updated");
+        return;
+    }
 
-    println!("=== stdout ===\n{stdout}");
-    eprintln!("=== stderr ===\n{stderr}");
+    let exp_stderr = cfg
+        .get("expected_stderr")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let exp_stdout = cfg
+        .get("expected_stdout")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
 
-    assert!(!out.status.success(), "flint should fail");
-    assert!(
-        stderr.contains("[shellcheck]"),
-        "expected [shellcheck] header, got:\n{stderr}"
-    );
-}
-
-#[test]
-fn cargo_fmt_diff_shows_check_name_header() {
-    let repo = git_repo();
-    write_mise_toml(&repo, &["rust"]);
-
-    // Minimal Cargo project with a badly formatted Rust file.
-    std::fs::write(
-        repo.path().join("Cargo.toml"),
-        "[package]\nname = \"test\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
-    )
-    .unwrap();
-    let src = repo.path().join("src");
-    std::fs::create_dir_all(&src).unwrap();
-    // Poorly formatted: fields on one line, which rustfmt will expand.
-    stage(
-        &src.join("lib.rs"),
-        "pub struct Foo { pub a: u32, pub b: u32 }\n",
-        repo.path(),
-    );
-
-    let out = flint(&["--full", "cargo-fmt"], repo.path());
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    let stdout = String::from_utf8_lossy(&out.stdout);
-
-    println!("=== stdout ===\n{stdout}");
-    eprintln!("=== stderr ===\n{stderr}");
-
-    assert!(!out.status.success(), "flint should fail");
-    assert!(
-        stderr.contains("[cargo-fmt]"),
-        "expected [cargo-fmt] header, got:\n{stderr}"
+    assert_eq!(stderr, exp_stderr, "{name}: stderr mismatch");
+    assert_eq!(stdout, exp_stdout, "{name}: stdout mismatch");
+    assert_eq!(
+        out.status.code(),
+        Some(expected_exit),
+        "{name}: exit code mismatch"
     );
 }
 
-#[test]
-fn auto_fixes_and_reports_summary() {
-    let repo = git_repo();
-    write_mise_toml(&repo, &["rust"]);
-
-    // Poorly formatted Rust — cargo-fmt is fixable.
-    std::fs::write(
-        repo.path().join("Cargo.toml"),
-        "[package]\nname = \"test\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
-    )
-    .unwrap();
-    let src = repo.path().join("src");
-    std::fs::create_dir_all(&src).unwrap();
-    stage(
-        &src.join("lib.rs"),
-        "pub struct Foo { pub a: u32, pub b: u32 }\n",
-        repo.path(),
-    );
-
-    let out = flint(&["--full", "--auto", "cargo-fmt"], repo.path());
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    let stdout = String::from_utf8_lossy(&out.stdout);
-
-    println!("=== stdout ===\n{stdout}");
-    eprintln!("=== stderr ===\n{stderr}");
-
-    // --auto fixes cargo-fmt but exits 1 — fixed files must be committed before pushing.
-    assert!(
-        !out.status.success(),
-        "flint --auto should exit 1 when fixes were applied"
-    );
-    assert!(
-        stderr.contains("fixed: cargo-fmt"),
-        "expected 'fixed: cargo-fmt' in summary, got:\n{stderr}"
-    );
-    assert!(
-        stderr.contains("commit before pushing"),
-        "expected 'commit before pushing' hint, got:\n{stderr}"
-    );
+/// Rewrites test.toml preserving args/exit and updating the expected fields.
+fn write_test_toml(path: &Path, args: &str, exit: i32, stderr: &str, stdout: &str) {
+    let mut out = format!("args = \"{}\"\n", args.replace('"', "\\\""));
+    out += &format!("exit = {exit}\n");
+    if !stderr.is_empty() {
+        out += &format!("\nexpected_stderr = \"\"\"\n{stderr}\"\"\"");
+    }
+    if !stdout.is_empty() {
+        out += &format!("\nexpected_stdout = \"\"\"\n{stdout}\"\"\"");
+    }
+    std::fs::write(path, out).unwrap();
 }
 
-#[test]
-fn auto_reports_unfixable_as_review() {
-    let repo = git_repo();
-    write_mise_toml(&repo, &["shellcheck"]);
-
-    // SC2086: unquoted variable — shellcheck violation with no auto-fix.
-    stage(
-        &repo.path().join("bad.sh"),
-        "#!/bin/bash\necho $1\n",
-        repo.path(),
-    );
-
-    let out = flint(&["--full", "--auto", "shellcheck"], repo.path());
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    let stdout = String::from_utf8_lossy(&out.stdout);
-
-    println!("=== stdout ===\n{stdout}");
-    eprintln!("=== stderr ===\n{stderr}");
-
-    // --auto should exit 1 for non-fixable failures and surface them under review:.
-    assert!(
-        !out.status.success(),
-        "flint --auto should exit 1 for unfixable checks"
-    );
-    // Linter output must appear inline so the caller doesn't need a second invocation.
-    assert!(
-        stderr.contains("[shellcheck]"),
-        "expected inline [shellcheck] output, got:\n{stderr}"
-    );
-    assert!(
-        stderr.contains("review: shellcheck"),
-        "expected 'review: shellcheck' in summary, got:\n{stderr}"
-    );
+/// Strips ANSI escape sequences (e.g. colour codes from cargo fmt diffs).
+/// TOML strings cannot contain raw control characters, so these must be removed.
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' && chars.peek() == Some(&'[') {
+            chars.next(); // consume '['
+            while let Some(&next) = chars.peek() {
+                chars.next();
+                if next.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
-#[test]
-fn auto_inline_output_has_header_per_linter() {
-    let repo = git_repo();
-    write_mise_toml(&repo, &["shellcheck", "actionlint"]);
-
-    // SC2086: unquoted variable — shellcheck violation with no auto-fix.
-    stage(
-        &repo.path().join("bad.sh"),
-        "#!/bin/bash\necho $1\n",
-        repo.path(),
-    );
-
-    // Undefined expression context — actionlint violation with no auto-fix.
-    let workflows = repo.path().join(".github/workflows");
-    std::fs::create_dir_all(&workflows).unwrap();
-    stage(
-        &workflows.join("ci.yml"),
-        "on: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ${{ foo.bar }}\n",
-        repo.path(),
-    );
-
-    let out = flint(
-        &["--full", "--auto", "shellcheck", "actionlint"],
-        repo.path(),
-    );
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    let stdout = String::from_utf8_lossy(&out.stdout);
-
-    println!("=== stdout ===\n{stdout}");
-    eprintln!("=== stderr ===\n{stderr}");
-
-    assert!(!out.status.success(), "flint --auto should exit 1");
-
-    // Each failing linter must emit its own header so output is attributable.
-    assert!(
-        stderr.contains("[shellcheck]"),
-        "expected [shellcheck] header in:\n{stderr}"
-    );
-    assert!(
-        stderr.contains("[actionlint]"),
-        "expected [actionlint] header in:\n{stderr}"
-    );
-
-    // Headers must appear before the summary line.
-    let summary_pos = stderr.find("flint:").expect("expected summary line");
-    let shellcheck_pos = stderr.find("[shellcheck]").unwrap();
-    let actionlint_pos = stderr.find("[actionlint]").unwrap();
-    assert!(
-        shellcheck_pos < summary_pos,
-        "[shellcheck] header must precede summary"
-    );
-    assert!(
-        actionlint_pos < summary_pos,
-        "[actionlint] header must precede summary"
-    );
-
-    // Both must appear in the review summary.
-    assert!(stderr.contains("review:"), "expected review: in summary");
-    assert!(
-        stderr.contains("shellcheck"),
-        "expected shellcheck in summary"
-    );
-    assert!(
-        stderr.contains("actionlint"),
-        "expected actionlint in summary"
-    );
-}
-
-#[test]
-fn shellcheck_clean_script_passes() {
-    let repo = git_repo();
-    write_mise_toml(&repo, &["shellcheck"]);
-
-    // A well-formed shell script — no violations.
-    stage(
-        &repo.path().join("good.sh"),
-        "#!/bin/bash\necho \"$1\"\n",
-        repo.path(),
-    );
-
-    let out = flint(&["--full", "shellcheck"], repo.path());
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    let stdout = String::from_utf8_lossy(&out.stdout);
-
-    println!("=== stdout ===\n{stdout}");
-    eprintln!("=== stderr ===\n{stderr}");
-
-    assert!(out.status.success(), "flint should pass, got:\n{stderr}");
+fn copy_dir_into(src: &Path, dst: &Path) {
+    for entry in std::fs::read_dir(src).expect("files/ dir not found") {
+        let entry = entry.unwrap();
+        let target = dst.join(entry.file_name());
+        if entry.path().is_dir() {
+            std::fs::create_dir_all(&target).unwrap();
+            copy_dir_into(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), &target).unwrap();
+        }
+    }
 }

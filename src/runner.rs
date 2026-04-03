@@ -118,10 +118,12 @@ pub async fn run(
     }
 
     // Collect all results before printing to avoid interleaved output.
+    // Sort by name for deterministic output order.
     let mut collected = vec![];
     while let Some(res) = set.join_next().await {
         collected.push(res?);
     }
+    collected.sort_by(|a, b| a.name.cmp(&b.name));
 
     if !verbose && !short {
         for r in &collected {
@@ -276,8 +278,10 @@ async fn run_invocations(
 }
 
 fn flush_output(stdout: &[u8], stderr: &[u8]) {
+    // All tool output goes to stderr so headers and diagnostics stay on the
+    // same stream — callers (humans and AI alike) see a coherent sequence.
     if !stdout.is_empty() {
-        print!("{}", String::from_utf8_lossy(stdout));
+        eprint!("{}", String::from_utf8_lossy(stdout));
     }
     if !stderr.is_empty() {
         eprint!("{}", String::from_utf8_lossy(stderr));

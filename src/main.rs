@@ -176,7 +176,7 @@ async fn main() -> Result<()> {
         for r in &reviewable {
             eprintln!("[{}]", r.name);
             if !r.stdout.is_empty() {
-                print!("{}", String::from_utf8_lossy(&r.stdout));
+                eprint!("{}", String::from_utf8_lossy(&r.stdout));
             }
             if !r.stderr.is_empty() {
                 eprint!("{}", String::from_utf8_lossy(&r.stderr));
@@ -253,7 +253,7 @@ async fn main() -> Result<()> {
             );
             if !cli.fix {
                 eprintln!(
-                    "💡 Try `mise run fix` to auto-fix lint issues, then re-run `mise run lint` to verify."
+                    "💡 Try `mise run lint:fix` to auto-fix lint issues, then re-run `mise run lint` to verify."
                 );
             }
         }

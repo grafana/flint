@@ -17,7 +17,7 @@ struct Cli {
     command: Option<SubCommand>,
 
     /// Auto-fix issues instead of checking
-    #[arg(long, env = "AUTOFIX")]
+    #[arg(long)]
     fix: bool,
 
     /// Lint all files instead of only changed files

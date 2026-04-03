@@ -10,7 +10,7 @@ tools from the consuming repo's `mise.toml`, runs them
 against changed files in parallel, and produces identical
 output locally and in CI.
 
-See [FLINT-V2.md](FLINT-V2.md) for usage documentation.
+See [README.md](README.md) for usage documentation.
 
 ## Architecture
 

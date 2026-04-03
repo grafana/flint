@@ -4,9 +4,9 @@ use std::process::Stdio;
 use tokio::process::Command;
 use tokio::task::JoinSet;
 
-use crate::config::{Config, LycheeConfig, RenovateDepsConfig};
+use crate::config::{Config, LicenseHeaderConfig, LycheeConfig, RenovateDepsConfig};
 use crate::files::FileList;
-use crate::linters::{lychee, renovate_deps};
+use crate::linters::{license_header, lychee, renovate_deps};
 use crate::registry::{Check, CheckKind, Scope, SpecialKind};
 
 pub struct RunOptions {
@@ -39,6 +39,11 @@ enum PreparedCheck {
         name: String,
         cfg: RenovateDepsConfig,
     },
+    LicenseHeader {
+        name: String,
+        cfg: LicenseHeaderConfig,
+        files: Vec<PathBuf>,
+    },
 }
 
 impl PreparedCheck {
@@ -46,7 +51,8 @@ impl PreparedCheck {
         match self {
             Self::Invocations { name, .. }
             | Self::Links { name, .. }
-            | Self::RenovateDeps { name, .. } => name,
+            | Self::RenovateDeps { name, .. }
+            | Self::LicenseHeader { name, .. } => name,
         }
     }
 
@@ -63,6 +69,9 @@ impl PreparedCheck {
                 ..
             } => lychee::run(&cfg, &file_list, project_root, &config_dir).await,
             Self::RenovateDeps { cfg, .. } => renovate_deps::run(&cfg, fix, project_root).await,
+            Self::LicenseHeader { cfg, files, .. } => {
+                license_header::run(&cfg, project_root, &files).await
+            }
         };
         CheckResult {
             name,
@@ -172,6 +181,11 @@ fn prepare(
             name,
             cfg: cfg.checks.renovate_deps.clone(),
         }),
+        CheckKind::Special(SpecialKind::LicenseHeader) => Some(PreparedCheck::LicenseHeader {
+            name,
+            cfg: cfg.checks.license_header.clone(),
+            files: file_list.files.clone(),
+        }),
     }
 }
 
@@ -200,11 +214,18 @@ fn build_invocations(
     };
 
     // Collect patterns from checks that are active and listed in excludes_if_active.
-    let excludes: Vec<&str> = active_checks
+    let mut excludes: Vec<&str> = active_checks
         .iter()
         .filter(|c| check.excludes_if_active.contains(&c.name))
         .flat_map(|c| c.patterns.iter().copied())
         .collect();
+
+    // When this check defers to formatters, also exclude files owned by active formatters.
+    if check.defers_to_formatters {
+        for active in active_checks.iter().filter(|c| c.is_formatter) {
+            excludes.extend(active.patterns.iter().copied());
+        }
+    }
 
     let config_args = resolve_linter_config(check, config_dir);
 
@@ -388,25 +409,41 @@ fn substitute_merge_base(cmd: &str, merge_base: Option<&str>) -> String {
 
 fn quote_path(p: &Path) -> String {
     let s = p.to_string_lossy();
-    format!("'{}'", s.replace('\'', "'\\''"))
+    format!("\"{}\"", s.replace('"', "\\\""))
 }
 
 fn shell_words(cmd: String) -> Vec<String> {
-    // Minimal word-splitting that respects single-quoted strings.
+    // Minimal word-splitting that respects single- and double-quoted strings.
     let mut words = vec![];
     let mut current = String::new();
     let mut in_single = false;
+    let mut in_double = false;
     let chars: Vec<char> = cmd.chars().collect();
     let mut i = 0;
     while i < chars.len() {
         match chars[i] {
-            '\'' if !in_single => {
+            '\'' if !in_single && !in_double => {
                 in_single = true;
             }
             '\'' if in_single => {
                 in_single = false;
             }
-            ' ' | '\t' if !in_single => {
+            '"' if !in_single && !in_double => {
+                in_double = true;
+            }
+            '"' if in_double => {
+                in_double = false;
+            }
+            '\\' if in_double => {
+                // Only handle \" inside double quotes; pass other backslashes through.
+                if i + 1 < chars.len() && chars[i + 1] == '"' {
+                    current.push('"');
+                    i += 2;
+                    continue;
+                }
+                current.push('\\');
+            }
+            ' ' | '\t' if !in_single && !in_double => {
                 if !current.is_empty() {
                     words.push(std::mem::take(&mut current));
                 }
@@ -491,6 +528,9 @@ mod tests {
             excludes_if_active: &[],
             slow: false,
             linter_config: None,
+            is_formatter: false,
+            defers_to_formatters: false,
+            activate_unconditionally: false,
             kind: CheckKind::Template {
                 check_cmd: "run-it",
                 fix_cmd: "",

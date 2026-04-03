@@ -16,6 +16,7 @@ pub enum Scope {
 pub enum SpecialKind {
     Links,
     RenovateDeps,
+    LicenseHeader,
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +53,12 @@ pub struct Check {
     /// When set, look for `(filename, flag)` in config_dir: if the file exists, inject
     /// `flag <abs-path>` into the command right after the binary name.
     pub linter_config: Option<(&'static str, &'static str)>,
+    /// This check is a formatter — it owns certain file types for formatting purposes.
+    pub is_formatter: bool,
+    /// Skip files owned by active formatters (used by ec to avoid double-checking).
+    pub defers_to_formatters: bool,
+    /// Always considered active regardless of mise.toml (used for config-activated checks).
+    pub activate_unconditionally: bool,
     pub kind: CheckKind,
 }
 
@@ -61,6 +68,7 @@ impl Check {
             CheckKind::Template { fix_cmd, .. } => !fix_cmd.is_empty(),
             CheckKind::Special(SpecialKind::Links) => false,
             CheckKind::Special(SpecialKind::RenovateDeps) => true,
+            CheckKind::Special(SpecialKind::LicenseHeader) => false,
         }
     }
 
@@ -108,6 +116,9 @@ impl Check {
             excludes_if_active: &[],
             slow: false,
             linter_config: None,
+            is_formatter: false,
+            defers_to_formatters: false,
+            activate_unconditionally: false,
             kind: CheckKind::Template {
                 check_cmd,
                 fix_cmd: "",
@@ -127,6 +138,9 @@ impl Check {
             excludes_if_active: &[],
             slow: false,
             linter_config: None,
+            is_formatter: false,
+            defers_to_formatters: false,
+            activate_unconditionally: false,
             kind: CheckKind::Special(kind),
         }
     }
@@ -165,15 +179,27 @@ impl Check {
         self
     }
 
-    /// Skip files already owned by the named checks (avoids double-checking).
-    pub fn excludes(mut self, names: &'static [&'static str]) -> Self {
-        self.excludes_if_active = names;
-        self
-    }
-
     /// Mark as slow — skipped when `--fast` is passed.
     pub fn slow(mut self) -> Self {
         self.slow = true;
+        self
+    }
+
+    /// Mark as a formatter — files it owns are excluded from ec when both are active.
+    pub fn formatter(mut self) -> Self {
+        self.is_formatter = true;
+        self
+    }
+
+    /// Skip files owned by active formatters (for ec — avoids double-checking).
+    pub fn defer_to_formatters(mut self) -> Self {
+        self.defers_to_formatters = true;
+        self
+    }
+
+    /// Always considered active regardless of mise.toml (for config-activated checks).
+    pub fn activate_unconditionally(mut self) -> Self {
+        self.activate_unconditionally = true;
         self
     }
 
@@ -194,9 +220,14 @@ pub fn builtin() -> Vec<Check> {
             &["*.sh", "*.bash", "*.bats"],
         )
         .linter_config(".shellcheckrc", "--rcfile"),
-        Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"]).fix("shfmt -w {FILE}"),
+        Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"])
+            .fix("shfmt -w {FILE}")
+            .formatter(),
         Check::file("markdownlint", "markdownlint {FILE}", &["*.md"])
             .fix("markdownlint --fix {FILE}")
+            .linter_config(".markdownlint.json", "--config"),
+        Check::file("markdownlint-cli2", "markdownlint-cli2 {FILE}", &["*.md"])
+            .fix("markdownlint-cli2 --fix {FILE}")
             .linter_config(".markdownlint.json", "--config"),
         Check::files(
             "prettier",
@@ -204,7 +235,8 @@ pub fn builtin() -> Vec<Check> {
             &["*.md", "*.yml", "*.yaml"],
         )
         .fix("prettier --write {FILES}")
-        .linter_config(".prettierrc", "--config"),
+        .linter_config(".prettierrc", "--config")
+        .formatter(),
         Check::file(
             "actionlint",
             "actionlint {FILE}",
@@ -224,7 +256,7 @@ pub fn builtin() -> Vec<Check> {
         // that conflict with ec's max_line_length editorconfig check.
         // Note: ec's -config flag controls ec's own JSON config, not .editorconfig itself.
         Check::files("ec", "ec {FILES}", &["*"])
-            .excludes(&["cargo-fmt", "ruff-format", "biome-format", "prettier"])
+            .defer_to_formatters()
             .linter_config(".editorconfig-checker.json", "-config"),
         Check::project(
             "golangci-lint",
@@ -238,7 +270,8 @@ pub fn builtin() -> Vec<Check> {
         Check::file("ruff-format", "ruff format --check {FILE}", &["*.py"])
             .bin("ruff")
             .fix("ruff format {FILE}")
-            .linter_config("ruff.toml", "--config"),
+            .linter_config("ruff.toml", "--config")
+            .formatter(),
         Check::file(
             "biome",
             "biome check {FILE}",
@@ -251,15 +284,53 @@ pub fn builtin() -> Vec<Check> {
             &["*.json", "*.jsonc", "*.js", "*.ts", "*.jsx", "*.tsx"],
         )
         .bin("biome")
-        .fix("biome format --write {FILE}"),
+        .fix("biome format --write {FILE}")
+        .formatter(),
         Check::project("cargo-clippy", "cargo clippy -q -- -D warnings", &["*.rs"])
             .fix("cargo clippy -q --fix --allow-dirty --allow-staged -- -D warnings")
             .mise_tool("rust"),
         Check::project("cargo-fmt", "cargo fmt -- --check", &["*.rs"])
             .fix("cargo fmt")
-            .mise_tool("rust"),
+            .mise_tool("rust")
+            .formatter(),
+        Check::file("gofmt", "gofmt -d {FILE}", &["*.go"])
+            .fix("gofmt -w {FILE}")
+            .mise_tool("go")
+            .formatter(),
+        Check::files(
+            "google-java-format",
+            "google-java-format --dry-run --set-exit-if-changed {FILES}",
+            &["*.java"],
+        )
+        .fix("google-java-format -i {FILES}")
+        .mise_tool("ubi:google/google-java-format")
+        .formatter(),
+        Check::files("ktlint", "ktlint {FILES}", &["*.kt", "*.kts"])
+            .fix("ktlint --format {FILES}")
+            .mise_tool("ubi:pinterest/ktlint")
+            .bin(if cfg!(windows) {
+                "ktlint.bat"
+            } else {
+                "ktlint"
+            })
+            .formatter(),
+        Check::project(
+            "dotnet-format",
+            "dotnet format --verify-no-changes",
+            &["*.cs"],
+        )
+        .fix("dotnet format")
+        .mise_tool("dotnet")
+        .slow()
+        .formatter(),
         Check::special("lychee", "lychee", SpecialKind::Links),
         Check::special("renovate-deps", "renovate", SpecialKind::RenovateDeps).slow(),
+        Check::special(
+            "license-header",
+            "license-header",
+            SpecialKind::LicenseHeader,
+        )
+        .activate_unconditionally(),
     ]
 }
 
@@ -296,6 +367,9 @@ pub fn read_mise_tools(project_root: &Path) -> HashMap<String, String> {
 /// Returns true if the check's tool is declared in mise.toml and its version
 /// satisfies the check's version_range (if any).
 pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool {
+    if check.activate_unconditionally {
+        return true;
+    }
     let lookup_key = check.mise_tool_name.unwrap_or(check.bin_name);
     let Some(declared) = mise_tools.get(lookup_key) else {
         return false;

@@ -1,2 +1,5 @@
 args = "--full shellcheck"
 exit = 0
+
+[env]
+FLINT_EXCLUDE = "bad.sh"

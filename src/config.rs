@@ -42,6 +42,8 @@ pub struct ChecksConfig {
     // hyphenated form used in flint.toml.
     #[serde(rename = "renovate-deps", alias = "renovate_deps")]
     pub renovate_deps: RenovateDepsConfig,
+    #[serde(rename = "license-header", alias = "license_header")]
+    pub license_header: LicenseHeaderConfig,
 }
 
 #[derive(Debug, Default, Deserialize, Clone)]
@@ -56,6 +58,28 @@ pub struct LycheeConfig {
 pub struct RenovateDepsConfig {
     // Env var: FLINT_RENOVATE_DEPS_EXCLUDE_MANAGERS (JSON array, e.g. '["npm"]')
     pub exclude_managers: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(default)]
+pub struct LicenseHeaderConfig {
+    /// The text that must appear within the first `lines_to_check` lines of each file.
+    /// When empty (default), the check is disabled.
+    pub text: String,
+    /// Glob patterns for files to check (e.g. `["*.java", "*.kt"]`).
+    pub patterns: Vec<String>,
+    /// How many lines from the top of each file to search. Default: 5.
+    pub lines_to_check: usize,
+}
+
+impl Default for LicenseHeaderConfig {
+    fn default() -> Self {
+        Self {
+            text: String::new(),
+            patterns: vec![],
+            lines_to_check: 5,
+        }
+    }
 }
 
 /// Builds env-var prefix → figment key-path mappings for every check in the registry.

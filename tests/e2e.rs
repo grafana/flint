@@ -7,6 +7,7 @@ fn flint(args: &[&str], cwd: &Path) -> Output {
     Command::new(env!("CARGO_BIN_EXE_flint"))
         .args(args)
         .env("MISE_PROJECT_ROOT", cwd)
+        .env_remove("FLINT_CONFIG_DIR")
         .current_dir(cwd)
         .output()
         .expect("failed to spawn flint")
@@ -62,12 +63,14 @@ fn cases() {
 
 fn run_case(case: &Path, name: &str, update: bool) {
     let toml_path = case.join("test.toml");
-    let raw = std::fs::read_to_string(&toml_path)
-        .unwrap_or_else(|_| panic!("{name}: missing test.toml"));
-    let cfg: toml::Value = toml::from_str(&raw)
-        .unwrap_or_else(|e| panic!("{name}: invalid test.toml: {e}"));
+    let raw =
+        std::fs::read_to_string(&toml_path).unwrap_or_else(|_| panic!("{name}: missing test.toml"));
+    let cfg: toml::Value =
+        toml::from_str(&raw).unwrap_or_else(|e| panic!("{name}: invalid test.toml: {e}"));
 
-    let args_str = cfg["args"].as_str().unwrap_or_else(|| panic!("{name}: missing args"));
+    let args_str = cfg["args"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{name}: missing args"));
     let args: Vec<&str> = args_str.split_whitespace().collect();
     let expected_exit = cfg.get("exit").and_then(|v| v.as_integer()).unwrap_or(0) as i32;
 
@@ -84,12 +87,10 @@ fn run_case(case: &Path, name: &str, update: bool) {
     let out = flint(&args, repo.path());
 
     let repo_str = repo.path().to_string_lossy();
-    let stderr = strip_ansi(
-        &String::from_utf8_lossy(&out.stderr).replace(repo_str.as_ref(), "<REPO>"),
-    );
-    let stdout = strip_ansi(
-        &String::from_utf8_lossy(&out.stdout).replace(repo_str.as_ref(), "<REPO>"),
-    );
+    let stderr =
+        strip_ansi(&String::from_utf8_lossy(&out.stderr).replace(repo_str.as_ref(), "<REPO>"));
+    let stdout =
+        strip_ansi(&String::from_utf8_lossy(&out.stdout).replace(repo_str.as_ref(), "<REPO>"));
 
     if update {
         write_test_toml(&toml_path, args_str, expected_exit, &stderr, &stdout);

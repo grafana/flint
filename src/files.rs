@@ -19,19 +19,20 @@ pub fn changed(
     to_ref: Option<&str>,
 ) -> Result<FileList> {
     let exclude_re = compile_exclude_re(cfg);
+    let exclude_paths = &cfg.settings.exclude_paths;
 
     if full {
-        return all_files(project_root, exclude_re.as_ref());
+        return all_files(project_root, exclude_re.as_ref(), exclude_paths);
     }
 
     let merge_base = resolve_merge_base(project_root, cfg, from_ref)?;
 
     let files = if let Some(ref base) = merge_base {
         let to = to_ref.unwrap_or("HEAD");
-        collect_changed_files(project_root, exclude_re.as_ref(), base, to)?
+        collect_changed_files(project_root, exclude_re.as_ref(), exclude_paths, base, to)?
     } else {
         // No merge base (shallow clone etc.) — fall back to all files.
-        return all_files(project_root, exclude_re.as_ref());
+        return all_files(project_root, exclude_re.as_ref(), exclude_paths);
     };
 
     Ok(FileList { files, merge_base })
@@ -71,6 +72,7 @@ fn resolve_merge_base(
 fn collect_changed_files(
     project_root: &Path,
     exclude_re: Option<&regex::Regex>,
+    exclude_paths: &[String],
     base: &str,
     to: &str,
 ) -> Result<Vec<PathBuf>> {
@@ -90,10 +92,14 @@ fn collect_changed_files(
         names.insert(line);
     }
 
-    Ok(filter_names(project_root, exclude_re, names))
+    Ok(filter_names(project_root, exclude_re, exclude_paths, names))
 }
 
-fn all_files(project_root: &Path, exclude_re: Option<&regex::Regex>) -> Result<FileList> {
+fn all_files(
+    project_root: &Path,
+    exclude_re: Option<&regex::Regex>,
+    exclude_paths: &[String],
+) -> Result<FileList> {
     let out = Command::new("git")
         .args(["ls-files"])
         .current_dir(project_root)
@@ -106,7 +112,7 @@ fn all_files(project_root: &Path, exclude_re: Option<&regex::Regex>) -> Result<F
         .collect();
 
     Ok(FileList {
-        files: filter_names(project_root, exclude_re, names),
+        files: filter_names(project_root, exclude_re, exclude_paths, names),
         merge_base: None,
     })
 }
@@ -128,11 +134,13 @@ fn git_diff_names(project_root: &Path, extra_args: &[&str]) -> Result<Vec<String
 fn filter_names(
     project_root: &Path,
     exclude_re: Option<&regex::Regex>,
+    exclude_paths: &[String],
     names: std::collections::BTreeSet<String>,
 ) -> Vec<PathBuf> {
     names
         .into_iter()
         .filter(|name| exclude_re.is_none_or(|re| !re.is_match(name)))
+        .filter(|name| !exclude_paths.iter().any(|p| name.starts_with(p.as_str())))
         .map(|name| project_root.join(name))
         .collect()
 }

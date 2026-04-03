@@ -14,6 +14,7 @@ pub struct Config {
 pub struct Settings {
     pub base_branch: String,
     pub exclude: Option<String>,
+    pub exclude_paths: Vec<String>,
 }
 
 impl Default for Settings {
@@ -21,6 +22,7 @@ impl Default for Settings {
         Self {
             base_branch: "main".to_string(),
             exclude: None,
+            exclude_paths: vec![],
         }
     }
 }

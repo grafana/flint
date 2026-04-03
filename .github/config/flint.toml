@@ -1,6 +1,7 @@
 [settings]
 base_branch = "main"
 exclude = "CHANGELOG\\.md|\\.github/renovate-tracked-deps\\.json"
+exclude_paths = ["tests/cases/"]
 
 [checks.lychee]
 check_all_local = true

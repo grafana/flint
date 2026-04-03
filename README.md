@@ -125,7 +125,8 @@ flint list
 | `--from-ref REF` | Diff base (default: merge base with base branch)   |
 | `--to-ref REF`   | Diff head (default: HEAD)                          |
 
-Env var equivalent: `FLINT_SHORT=true` for `--short`.
+Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`, `FLINT_FAST`,
+`FLINT_VERBOSE`, `FLINT_SHORT`, `FLINT_AUTO`, `FLINT_FROM_REF`, `FLINT_TO_REF`.
 
 #### Intended use by context
 

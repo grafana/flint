@@ -17,19 +17,19 @@ struct Cli {
     command: Option<SubCommand>,
 
     /// Auto-fix issues instead of checking
-    #[arg(long)]
+    #[arg(long, env = "FLINT_FIX")]
     fix: bool,
 
     /// Lint all files instead of only changed files
-    #[arg(long)]
+    #[arg(long, env = "FLINT_FULL")]
     full: bool,
 
     /// Skip slow checks
-    #[arg(long)]
+    #[arg(long, env = "FLINT_FAST")]
     fast: bool,
 
     /// Show all linter output, not just failures
-    #[arg(long)]
+    #[arg(long, env = "FLINT_VERBOSE")]
     verbose: bool,
 
     /// Compact summary output — no per-check noise (human) or read-only AI review
@@ -39,15 +39,15 @@ struct Cli {
     /// Autonomous mode: fix what's fixable, report what still needs review.
     /// Exits 0 if everything passed or was fixed. Intended for pre-push hooks
     /// and agentic pipelines that have write access.
-    #[arg(long)]
+    #[arg(long, env = "FLINT_AUTO")]
     auto: bool,
 
     /// Compare changed files from this ref (default: merge base with base branch)
-    #[arg(long)]
+    #[arg(long, env = "FLINT_FROM_REF")]
     from_ref: Option<String>,
 
     /// Compare changed files to this ref (default: HEAD)
-    #[arg(long)]
+    #[arg(long, env = "FLINT_TO_REF")]
     to_ref: Option<String>,
 
     /// Linters to run (default: all discovered)

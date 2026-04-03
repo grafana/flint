@@ -428,6 +428,59 @@ mod tests {
     use crate::registry::{Check, CheckKind, Scope};
     use std::path::PathBuf;
 
+    #[test]
+    fn inject_config_inserts_after_binary() {
+        let argv = vec!["shellcheck".to_string(), "file.sh".to_string()];
+        let config = vec!["--rcfile".to_string(), "/cfg/.shellcheckrc".to_string()];
+        assert_eq!(
+            inject_config(argv, &config),
+            vec!["shellcheck", "--rcfile", "/cfg/.shellcheckrc", "file.sh"],
+        );
+    }
+
+    #[test]
+    fn inject_config_noop_when_no_config_args() {
+        let argv = vec!["shellcheck".to_string(), "file.sh".to_string()];
+        assert_eq!(inject_config(argv.clone(), &[]), argv,);
+    }
+
+    #[test]
+    fn inject_config_noop_when_argv_empty() {
+        assert_eq!(
+            inject_config(vec![], &["--rcfile".to_string()]),
+            vec![] as Vec<String>
+        );
+    }
+
+    #[test]
+    fn resolve_linter_config_absent_file_returns_empty() {
+        let check = Check::file("shellcheck", "shellcheck {FILE}", &["*.sh"])
+            .linter_config(".shellcheckrc", "--rcfile");
+        let dir = tempfile::tempdir().unwrap();
+        assert!(resolve_linter_config(&check, dir.path()).is_empty());
+    }
+
+    #[test]
+    fn resolve_linter_config_present_file_returns_flag_and_path() {
+        let check = Check::file("shellcheck", "shellcheck {FILE}", &["*.sh"])
+            .linter_config(".shellcheckrc", "--rcfile");
+        let dir = tempfile::tempdir().unwrap();
+        let cfg_path = dir.path().join(".shellcheckrc");
+        std::fs::write(&cfg_path, "").unwrap();
+        let result = resolve_linter_config(&check, dir.path());
+        assert_eq!(
+            result,
+            vec!["--rcfile", cfg_path.to_string_lossy().as_ref()]
+        );
+    }
+
+    #[test]
+    fn resolve_linter_config_none_returns_empty() {
+        let check = Check::file("shellcheck", "shellcheck {FILE}", &["*.sh"]);
+        let dir = tempfile::tempdir().unwrap();
+        assert!(resolve_linter_config(&check, dir.path()).is_empty());
+    }
+
     fn project_check(patterns: &'static [&'static str]) -> Check {
         Check {
             name: "test",

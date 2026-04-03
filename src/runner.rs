@@ -149,7 +149,14 @@ fn prepare(
     let name = check.name.to_string();
     match &check.kind {
         CheckKind::Template { .. } => {
-            let argv_list = build_invocations(check, file_list, fix, project_root, active_checks);
+            let argv_list = build_invocations(
+                check,
+                file_list,
+                fix,
+                project_root,
+                active_checks,
+                config_dir,
+            );
             if argv_list.is_empty() {
                 return None;
             }
@@ -175,6 +182,7 @@ fn build_invocations(
     fix: bool,
     project_root: &Path,
     active_checks: &[&Check],
+    config_dir: &Path,
 ) -> Vec<Vec<String>> {
     let CheckKind::Template {
         check_cmd,
@@ -198,6 +206,8 @@ fn build_invocations(
         .flat_map(|c| c.patterns.iter().copied())
         .collect();
 
+    let config_args = resolve_linter_config(check, config_dir);
+
     match scope {
         Scope::Project => {
             // If patterns are set, only run when relevant files are present.
@@ -207,7 +217,7 @@ fn build_invocations(
                 return vec![];
             }
             let cmd = substitute_merge_base(cmd_template, file_list.merge_base.as_deref());
-            vec![shell_words(cmd)]
+            vec![inject_config(shell_words(cmd), &config_args)]
         }
 
         Scope::File => {
@@ -216,7 +226,7 @@ fn build_invocations(
                 .iter()
                 .map(|f| {
                     let cmd = cmd_template.replace("{FILE}", &quote_path(f));
-                    shell_words(cmd)
+                    inject_config(shell_words(cmd), &config_args)
                 })
                 .collect()
         }
@@ -232,9 +242,34 @@ fn build_invocations(
                 .collect::<Vec<_>>()
                 .join(" ");
             let cmd = cmd_template.replace("{FILES}", &files_arg);
-            vec![shell_words(cmd)]
+            vec![inject_config(shell_words(cmd), &config_args)]
         }
     }
+}
+
+/// Returns `[flag, abs-path]` if `check.linter_config` is set and the file exists
+/// in `config_dir`, otherwise an empty slice.
+fn resolve_linter_config(check: &Check, config_dir: &Path) -> Vec<String> {
+    let Some((file, flag)) = check.linter_config else {
+        return vec![];
+    };
+    let path = config_dir.join(file);
+    if !path.exists() {
+        return vec![];
+    }
+    vec![flag.to_string(), path.to_string_lossy().into_owned()]
+}
+
+/// Inserts `config_args` at position 1 (right after the binary name) in `argv`.
+fn inject_config(mut argv: Vec<String>, config_args: &[String]) -> Vec<String> {
+    if config_args.is_empty() || argv.is_empty() {
+        return argv;
+    }
+    // Insert after argv[0] (the binary name).
+    let tail = argv.split_off(1);
+    argv.extend_from_slice(config_args);
+    argv.extend(tail);
+    argv
 }
 
 /// Runs all invocations for one check, returning (ok, stdout, stderr).
@@ -402,6 +437,7 @@ mod tests {
             patterns,
             excludes_if_active: &[],
             slow: false,
+            linter_config: None,
             kind: CheckKind::Template {
                 check_cmd: "run-it",
                 fix_cmd: "",
@@ -424,14 +460,31 @@ mod tests {
     fn project_scope_skips_when_no_matching_files() {
         let check = project_check(&["*.rs"]);
         let fl = file_list(&["foo.py", "bar.md"]);
-        assert!(build_invocations(&check, &fl, false, Path::new("/repo"), &[]).is_empty());
+        assert!(
+            build_invocations(
+                &check,
+                &fl,
+                false,
+                Path::new("/repo"),
+                &[],
+                Path::new("/repo")
+            )
+            .is_empty()
+        );
     }
 
     #[test]
     fn project_scope_runs_when_matching_files_present() {
         let check = project_check(&["*.rs"]);
         let fl = file_list(&["src/main.rs", "foo.py"]);
-        let inv = build_invocations(&check, &fl, false, Path::new("/repo"), &[]);
+        let inv = build_invocations(
+            &check,
+            &fl,
+            false,
+            Path::new("/repo"),
+            &[],
+            Path::new("/repo"),
+        );
         assert_eq!(inv, vec![vec!["run-it".to_string()]]);
     }
 
@@ -439,7 +492,14 @@ mod tests {
     fn project_scope_empty_patterns_always_runs() {
         let check = project_check(&[]);
         let fl = file_list(&["foo.py"]);
-        let inv = build_invocations(&check, &fl, false, Path::new("/repo"), &[]);
+        let inv = build_invocations(
+            &check,
+            &fl,
+            false,
+            Path::new("/repo"),
+            &[],
+            Path::new("/repo"),
+        );
         assert_eq!(inv, vec![vec!["run-it".to_string()]]);
     }
 }

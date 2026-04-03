@@ -49,6 +49,9 @@ pub struct Check {
     pub excludes_if_active: &'static [&'static str],
     /// Slow checks are skipped when `--fast` is passed.
     pub slow: bool,
+    /// When set, look for `(filename, flag)` in config_dir: if the file exists, inject
+    /// `flag <abs-path>` into the command right after the binary name.
+    pub linter_config: Option<(&'static str, &'static str)>,
     pub kind: CheckKind,
 }
 
@@ -104,6 +107,7 @@ impl Check {
             patterns,
             excludes_if_active: &[],
             slow: false,
+            linter_config: None,
             kind: CheckKind::Template {
                 check_cmd,
                 fix_cmd: "",
@@ -122,6 +126,7 @@ impl Check {
             patterns: &[],
             excludes_if_active: &[],
             slow: false,
+            linter_config: None,
             kind: CheckKind::Special(kind),
         }
     }
@@ -171,6 +176,14 @@ impl Check {
         self.slow = true;
         self
     }
+
+    /// Inject a config file from config_dir into the linter command.
+    /// If `config_dir/file` exists at runtime, `flag <abs-path>` is inserted
+    /// right after the binary name. Has no effect when the file is absent.
+    pub fn linter_config(mut self, file: &'static str, flag: &'static str) -> Self {
+        self.linter_config = Some((file, flag));
+        self
+    }
 }
 
 pub fn builtin() -> Vec<Check> {
@@ -179,45 +192,53 @@ pub fn builtin() -> Vec<Check> {
             "shellcheck",
             "shellcheck {FILE}",
             &["*.sh", "*.bash", "*.bats"],
-        ),
+        )
+        .linter_config(".shellcheckrc", "--rcfile"),
         Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"]).fix("shfmt -w {FILE}"),
         Check::file("markdownlint", "markdownlint {FILE}", &["*.md"])
-            .fix("markdownlint --fix {FILE}"),
+            .fix("markdownlint --fix {FILE}")
+            .linter_config(".markdownlint.json", "--config"),
         Check::files(
             "prettier",
             "prettier --check {FILES}",
             &["*.md", "*.yml", "*.yaml"],
         )
-        .fix("prettier --write {FILES}"),
+        .fix("prettier --write {FILES}")
+        .linter_config(".prettierrc", "--config"),
         Check::file(
             "actionlint",
             "actionlint {FILE}",
             &[".github/workflows/*.yml", ".github/workflows/*.yaml"],
-        ),
+        )
+        .linter_config("actionlint.yml", "-config-file"),
         Check::file(
             "hadolint",
             "hadolint {FILE}",
             &["Dockerfile", "Dockerfile.*", "*.dockerfile"],
-        ),
+        )
+        .linter_config(".hadolint.yaml", "--config"),
         Check::files("codespell", "codespell {FILES}", &["*"])
-            .fix("codespell --write-changes {FILES}"),
+            .fix("codespell --write-changes {FILES}")
+            .linter_config(".codespellrc", "--config"),
         // Defer to formatters that enforce line length — those are the ones
         // that conflict with ec's max_line_length editorconfig check.
-        Check::files("ec", "ec {FILES}", &["*"]).excludes(&[
-            "cargo-fmt",
-            "ruff-format",
-            "biome-format",
-            "prettier",
-        ]),
+        // Note: ec's -config flag controls ec's own JSON config, not .editorconfig itself.
+        Check::files("ec", "ec {FILES}", &["*"])
+            .excludes(&["cargo-fmt", "ruff-format", "biome-format", "prettier"])
+            .linter_config(".editorconfig-checker.json", "-config"),
         Check::project(
             "golangci-lint",
             "golangci-lint run --new-from-rev={MERGE_BASE}",
             &["*.go"],
-        ),
-        Check::file("ruff", "ruff check {FILE}", &["*.py"]).fix("ruff check --fix {FILE}"),
+        )
+        .linter_config(".golangci.yml", "--config"),
+        Check::file("ruff", "ruff check {FILE}", &["*.py"])
+            .fix("ruff check --fix {FILE}")
+            .linter_config("ruff.toml", "--config"),
         Check::file("ruff-format", "ruff format --check {FILE}", &["*.py"])
             .bin("ruff")
-            .fix("ruff format {FILE}"),
+            .fix("ruff format {FILE}")
+            .linter_config("ruff.toml", "--config"),
         Check::file(
             "biome",
             "biome check {FILE}",

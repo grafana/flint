@@ -10,18 +10,10 @@ use crate::registry;
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(default)]
+#[derive(Default)]
 pub struct Config {
     pub settings: Settings,
     pub checks: ChecksConfig,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            settings: Settings::default(),
-            checks: ChecksConfig::default(),
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, Clone)]

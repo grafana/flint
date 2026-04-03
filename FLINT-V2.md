@@ -146,7 +146,7 @@ renovate-deps   renovate        installed  slow
 
 ## Config (`flint.toml`)
 
-Optional. Place in the repo root. All settings have defaults.
+Optional. Place in the repo root (or in `FLINT_CONFIG_DIR` — see below). All settings have defaults.
 
 ```toml
 [settings]
@@ -160,6 +160,25 @@ check_all_local = true                         # second pass: local links in all
 [checks.renovate-deps]
 exclude_managers = ["github-actions", "cargo"] # skip these Renovate managers
 ```
+
+### `FLINT_CONFIG_DIR`
+
+Set this env var to consolidate config files in one directory (e.g. `.github/config`):
+
+```toml
+# mise.toml
+[env]
+FLINT_CONFIG_DIR = ".github/config"
+```
+
+When set, `flint.toml` is loaded from that directory, and each linter that supports
+an explicit config flag will have it injected automatically when the corresponding
+file exists there (see the "Config file" column in the table below). Files that are
+absent are silently skipped — existing project-root configs remain in effect.
+
+**Note:** `ec`'s config file (`.editorconfig-checker.json`) controls ec's own settings,
+not `.editorconfig` itself — editorconfig discovery always walks up from the file
+being linted and cannot be redirected via a flag.
 
 ## mise.toml wiring
 
@@ -186,25 +205,28 @@ Checks auto-enable when their binary is found in PATH. Install tools via `mise.t
 
 <!-- editorconfig-checker-disable -->
 
-| Name            | Binary          | Patterns                                           | Fix | Scope   |
-| --------------- | --------------- | -------------------------------------------------- | --- | ------- |
-| `shellcheck`    | `shellcheck`    | `*.sh *.bash *.bats`                               | no  | file    |
-| `shfmt`         | `shfmt`         | `*.sh *.bash`                                      | yes | file    |
-| `markdownlint`  | `markdownlint`  | `*.md`                                             | yes | file    |
-| `prettier`      | `prettier`      | `*.md *.yml *.yaml`                                | yes | files   |
-| `actionlint`    | `actionlint`    | `.github/workflows/*.yml .github/workflows/*.yaml` | no  | file    |
-| `hadolint`      | `hadolint`      | `Dockerfile Dockerfile.* *.dockerfile`             | no  | file    |
-| `codespell`     | `codespell`     | `*`                                                | yes | files   |
-| `ec`            | `ec`            | `*`                                                | no  | files   |
-| `golangci-lint` | `golangci-lint` | `*.go`                                             | no  | project |
-| `ruff`          | `ruff`          | `*.py`                                             | yes | file    |
-| `ruff-format`   | `ruff`          | `*.py`                                             | yes | file    |
-| `biome`         | `biome`         | `*.json *.jsonc *.js *.ts *.jsx *.tsx`             | yes | file    |
-| `biome-format`  | `biome`         | `*.json *.jsonc *.js *.ts *.jsx *.tsx`             | yes | file    |
-| `cargo-clippy`  | `cargo-clippy`  | `*.rs`                                             | yes | project |
-| `cargo-fmt`     | `cargo-fmt`     | `*.rs`                                             | yes | project |
-| `links`         | `lychee`        | (all files)                                        | no  | special |
-| `renovate-deps` | `renovate`      | (all files)                                        | yes | special |
+| Name            | Binary          | Patterns                                           | Fix | Scope   | Config file                    |
+| --------------- | --------------- | -------------------------------------------------- | --- | ------- | ------------------------------ |
+| `shellcheck`    | `shellcheck`    | `*.sh *.bash *.bats`                               | no  | file    | `.shellcheckrc`                |
+| `shfmt`         | `shfmt`         | `*.sh *.bash`                                      | yes | file    | —                              |
+| `markdownlint`  | `markdownlint`  | `*.md`                                             | yes | file    | `.markdownlint.json`           |
+| `prettier`      | `prettier`      | `*.md *.yml *.yaml`                                | yes | files   | `.prettierrc`                  |
+| `actionlint`    | `actionlint`    | `.github/workflows/*.yml .github/workflows/*.yaml` | no  | file    | `actionlint.yml`               |
+| `hadolint`      | `hadolint`      | `Dockerfile Dockerfile.* *.dockerfile`             | no  | file    | `.hadolint.yaml`               |
+| `codespell`     | `codespell`     | `*`                                                | yes | files   | `.codespellrc`                 |
+| `ec`            | `ec`            | `*`                                                | no  | files   | `.editorconfig-checker.json`   |
+| `golangci-lint` | `golangci-lint` | `*.go`                                             | no  | project | `.golangci.yml`                |
+| `ruff`          | `ruff`          | `*.py`                                             | yes | file    | `ruff.toml`                    |
+| `ruff-format`   | `ruff`          | `*.py`                                             | yes | file    | `ruff.toml`                    |
+| `biome`         | `biome`         | `*.json *.jsonc *.js *.ts *.jsx *.tsx`             | yes | file    | `biome.json` ¹                 |
+| `biome-format`  | `biome`         | `*.json *.jsonc *.js *.ts *.jsx *.tsx`             | yes | file    | `biome.json` ¹                 |
+| `cargo-clippy`  | `cargo-clippy`  | `*.rs`                                             | yes | project | —                              |
+| `cargo-fmt`     | `cargo-fmt`     | `*.rs`                                             | yes | project | —                              |
+| `links`         | `lychee`        | (all files)                                        | no  | special | via `[checks.links]` in flint.toml |
+| `renovate-deps` | `renovate`      | (all files)                                        | yes | special | —                              |
+
+¹ Not yet implemented. Biome's flag (`--config-path`) takes a directory, not a
+file path — requires a directory-injection variant of the config mechanism.
 
 <!-- editorconfig-checker-enable -->
 

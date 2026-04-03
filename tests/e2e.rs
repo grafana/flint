@@ -100,8 +100,10 @@ fn run_case(case: &Path, name: &str, update: bool) {
                 .collect()
         })
         .unwrap_or_default();
-    let env_refs: Vec<(&str, &str)> =
-        env_vars.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+    let env_refs: Vec<(&str, &str)> = env_vars
+        .iter()
+        .map(|(k, v)| (k.as_str(), v.as_str()))
+        .collect();
 
     let out = flint_with_env(&args, repo.path(), &env_refs);
 

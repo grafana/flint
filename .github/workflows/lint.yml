@@ -2,7 +2,10 @@
 name: Lint
 
 on:
+  push:
+    branches: [main] # warms the Rust cache so PR branches get a cache hit
   pull_request:
+    branches: [main]
 
 permissions: {}
 
@@ -25,6 +28,8 @@ jobs:
         with:
           version: v2026.3.16
           sha256: 1aadc8f126b0fc588b70ad2296cf7a963ba014ef2fd017a6087329ec6160063e
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
       - name: Lint
         env:

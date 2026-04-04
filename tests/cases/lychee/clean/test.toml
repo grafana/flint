@@ -2,6 +2,7 @@
 args = "run --full lychee"
 exit = 0
 
+
 [env]
 LYCHEE_SKIP_GITHUB_REMAPS = "true"
 

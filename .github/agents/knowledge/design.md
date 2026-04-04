@@ -19,6 +19,7 @@
    prettier: formatting). To avoid MD013 (line length)
    conflicting with prettier's line wrapping, consuming
    repos must disable MD013 in `.markdownlint.json`:
+
    ```json
    { "MD013": false }
    ```

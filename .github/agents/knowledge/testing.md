@@ -9,6 +9,7 @@ cargo test
 ## Unit Tests
 
 In-module `#[cfg(test)]` blocks in `src/`. Notable:
+
 - `src/registry.rs`: enforces version-range consistency
 - `src/runner.rs`: config injection, scope filtering
 - `src/linters/renovate_deps.rs`: log parsing, snapshot

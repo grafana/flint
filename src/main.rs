@@ -16,7 +16,8 @@ struct Cli {
     #[command(subcommand)]
     command: Option<SubCommand>,
 
-    /// Auto-fix issues instead of checking
+    /// Fix what's fixable, report what still needs review.
+    /// Exits 1 if anything was fixed (uncommitted) or needs review; 0 if already clean.
     #[arg(long, env = "FLINT_FIX")]
     fix: bool,
 
@@ -35,12 +36,6 @@ struct Cli {
     /// Compact summary output — no per-check noise (human) or read-only AI review
     #[arg(long, env = "FLINT_SHORT")]
     short: bool,
-
-    /// Autonomous mode: fix what's fixable, report what still needs review.
-    /// Exits 0 if everything passed or was fixed. Intended for pre-push hooks
-    /// and agentic pipelines that have write access.
-    #[arg(long, env = "FLINT_AUTO")]
-    auto: bool,
 
     /// Compare changed files from this ref (default: merge base with base branch)
     #[arg(long, env = "FLINT_FROM_REF")]
@@ -118,9 +113,10 @@ async fn main() -> Result<()> {
         cli.to_ref.as_deref(),
     )?;
 
-    if cli.auto {
-        // Run checks, fix what's fixable, report outcome.
-        // Exits 0 if everything passed or was fixed; 1 if anything still needs review.
+    if cli.fix {
+        // Pre-check, fix what's fixable, report outcome.
+        // Exits 0 if everything was already clean; 1 if anything was fixed (uncommitted)
+        // or still needs review.
         let check_results = runner::run(
             &active,
             &file_list,
@@ -212,7 +208,7 @@ async fn main() -> Result<()> {
         &active,
         &file_list,
         RunOptions {
-            fix: cli.fix,
+            fix: false,
             verbose: cli.verbose,
             short: cli.short,
         },
@@ -251,11 +247,9 @@ async fn main() -> Result<()> {
                 "\nflint: {n} {noun} failed ({names})",
                 names = failed.join(", ")
             );
-            if !cli.fix {
-                eprintln!(
-                    "💡 Try `mise run lint:fix` to auto-fix lint issues, then re-run `mise run lint` to verify."
-                );
-            }
+            eprintln!(
+                "💡 Try `mise run lint:fix` to auto-fix lint issues, then re-run `mise run lint` to verify."
+            );
         }
         std::process::exit(1);
     }

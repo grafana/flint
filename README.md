@@ -75,7 +75,7 @@ run = "flint"
 
 [tasks."lint:pre-commit"]
 description = "Fast auto-fix lint pass — for pre-push hooks and agentic pipelines"
-run = "flint --auto --fast"
+run = "flint --fix --fast"
 
 [tasks."lint:fix"]
 description = "Auto-fix lint issues"
@@ -114,19 +114,18 @@ flint [OPTIONS] [LINTERS...]
 flint list
 ```
 
-| Flag             | Description                                        |
-| ---------------- | -------------------------------------------------- |
-| `--fix`          | Auto-fix issues instead of checking                |
-| `--auto`         | Fix what's fixable, report what still needs review |
-| `--full`         | Lint all files instead of only changed files       |
-| `--fast`         | Skip slow checks (e.g. `renovate-deps`)            |
-| `--short`        | Compact summary output, no per-check noise         |
-| `--verbose`      | Show all linter output, not just failures          |
-| `--from-ref REF` | Diff base (default: merge base with base branch)   |
-| `--to-ref REF`   | Diff head (default: HEAD)                          |
+| Flag             | Description                                                              |
+| ---------------- | ------------------------------------------------------------------------ |
+| `--fix`          | Fix what's fixable, report what still needs review; exit 1 if anything changed or needs review |
+| `--full`         | Lint all files instead of only changed files                             |
+| `--fast`         | Skip slow checks (e.g. `renovate-deps`)                                  |
+| `--short`        | Compact summary output, no per-check noise                               |
+| `--verbose`      | Show all linter output, not just failures                                |
+| `--from-ref REF` | Diff base (default: merge base with base branch)                         |
+| `--to-ref REF`   | Diff head (default: HEAD)                                                |
 
 Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`, `FLINT_FAST`,
-`FLINT_VERBOSE`, `FLINT_SHORT`, `FLINT_AUTO`, `FLINT_FROM_REF`, `FLINT_TO_REF`.
+`FLINT_VERBOSE`, `FLINT_SHORT`, `FLINT_FROM_REF`, `FLINT_TO_REF`.
 
 #### Intended use by context
 
@@ -134,7 +133,7 @@ Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`, `FLINT_FAST`,
 | ---------------------------- | ------------------------- | ----------------------------------------------------------------- |
 | Interactive development      | `flint` or `flint --fast` | Full output so you can read the details                           |
 | Human wanting a summary      | `flint --short`           | Compact output, no per-check noise                                |
-| Pre-push hook (CC / agentic) | `flint --auto --fast`     | Fixes what it can silently, surfaces only what needs human review |
+| Pre-push hook (CC / agentic) | `flint --fix --fast`      | Fixes what it can silently, surfaces only what needs human review |
 | CI                           | `flint`                   | Full output for humans reading CI logs                            |
 
 **`--short` output** — failed checks partitioned by fixability, fixable ones
@@ -144,7 +143,7 @@ expressed as the exact command to run:
 flint: 2 checks failed — flint --fix prettier cargo-fmt | review: shellcheck
 ```
 
-**`--auto` output** — fixes what's fixable, then prints the full output of
+**`--fix` output** — fixes what's fixable, then prints the full output of
 any checks that still need review, followed by a summary line. Exits 1 if
 anything was fixed (so the caller commits the fixes before pushing) or if
 anything still needs review. Exits 0 only if everything was already clean:
@@ -336,7 +335,7 @@ use everywhere" promise of mise. Container startup also adds latency to every ru
 4. **Local same as CI** — one binary, one config, identical behavior.
    No "native mode subset" distinction. If it passes locally, it passes in CI.
 
-5. **AI-friendly** — `--auto` fixes what's fixable silently, prints output
+5. **AI-friendly** — `--fix` fixes what's fixable silently, prints output
    only for issues needing review, and exits with a structured summary:
    ```
    [shellcheck]
@@ -354,9 +353,9 @@ use everywhere" promise of mise. Container startup also adds latency to every ru
    for CI. `--full` to check everything. Falls back to all files when no merge
    base is found.
 
-8. **Autofix where possible** — `--fix` flag. Fix mode runs serially to avoid
-   concurrent writes to the same file. Pass specific linter names to limit which
-   fixers run (`flint --fix prettier shfmt`).
+8. **Autofix where possible** — `--fix` checks first, fixes what's fixable,
+   reports what needs review. Fix mode runs serially to avoid concurrent writes.
+   Pass specific linter names to limit which fixers run (`flint --fix prettier shfmt`).
 
 ## Versioning
 

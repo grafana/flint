@@ -1,5 +1,5 @@
 [expected]
-args = "--full --auto shellcheck"
+args = "--full --fix shellcheck"
 exit = 1
 stderr = """
 [shellcheck]

@@ -1,5 +1,5 @@
 [expected]
-args = "--full --auto shellcheck actionlint"
+args = "--full --fix shellcheck actionlint"
 exit = 1
 stderr = """
 [actionlint]

@@ -25,7 +25,7 @@ Available builder modifiers:
 | `.mise_tool(name)` | Look up availability under a different mise key (e.g. `rust` for `cargo-fmt`) |
 | `.version_req(range)` | Restrict to a semver range (e.g. `">=1.0.0"`) |
 | `.excludes(names)` | Skip files already owned by these active checks |
-| `.slow()` | Mark as slow — skipped by `--fast` |
+| `.slow()` | Mark as slow — skipped by `--fast-only` |
 | `.linter_config(file, flag)` | Inject a config flag when `FLINT_CONFIG_DIR/<file>` exists (see below) |
 
 ## Config File Injection (`.linter_config`)

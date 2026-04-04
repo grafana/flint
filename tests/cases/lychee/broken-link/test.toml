@@ -1,5 +1,5 @@
 [expected]
-args = "--full lychee"
+args = "run --full lychee"
 exit = 1
 stderr = """
 [lychee]
@@ -7,7 +7,7 @@ stderr = """
 [404] https://example.com/does-not-exist
 
 flint: 1 check failed (lychee)
-💡 Try `mise run lint:fix` to auto-fix lint issues, then re-run `mise run lint` to verify.
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
 """
 
 [env]

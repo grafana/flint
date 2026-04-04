@@ -1,5 +1,5 @@
 [expected]
-args = "--full --fix renovate-deps"
+args = "run --full --fix renovate-deps"
 exit = 1
 stderr = """
 flint: fixed: renovate-deps — commit before pushing

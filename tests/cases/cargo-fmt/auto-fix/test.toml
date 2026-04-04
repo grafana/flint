@@ -1,5 +1,5 @@
 [expected]
-args = "--full --fix cargo-fmt"
+args = "run --full --fix cargo-fmt"
 exit = 1
 stderr = """
 flint: fixed: cargo-fmt — commit before pushing

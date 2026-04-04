@@ -42,7 +42,7 @@ async fn run_inner(
             });
         }
         return Ok(LinterOutput::err(format!(
-            "ERROR: {COMMITTED_DISPLAY} does not exist.\nRun `flint --fix renovate-deps` to create it.\n"
+            "ERROR: {COMMITTED_DISPLAY} does not exist.\nRun `flint run --fix renovate-deps` to create it.\n"
         )));
     }
 
@@ -73,7 +73,7 @@ async fn run_inner(
         ok: false,
         stdout: diff.into_bytes(),
         stderr: format!(
-            "ERROR: {COMMITTED_FILE} is out of date.\nRun `flint --fix renovate-deps` to update.\n"
+            "ERROR: {COMMITTED_FILE} is out of date.\nRun `flint run --fix renovate-deps` to update.\n"
         )
         .into_bytes(),
     })

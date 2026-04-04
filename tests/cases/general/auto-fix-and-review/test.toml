@@ -1,5 +1,5 @@
 [expected]
-args = "--full --fix cargo-fmt shellcheck"
+args = "run --full --fix cargo-fmt shellcheck"
 exit = 1
 stderr = """
 [shellcheck]

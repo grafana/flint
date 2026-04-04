@@ -1,5 +1,5 @@
 [expected]
-args = "--full shellcheck"
+args = "run --full shellcheck"
 exit = 0
 
 

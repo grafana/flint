@@ -1,5 +1,5 @@
 [expected]
-args = "--full lychee"
+args = "run --full lychee"
 exit = 0
 
 [env]

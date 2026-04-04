@@ -20,3 +20,10 @@ For more information:
   https://www.shellcheck.net/wiki/SC2086 -- Double quote to prevent globbing ...
 flint: review: actionlint, shellcheck
 """
+
+[fake_bins]
+actionlint = '''
+#!/bin/sh
+printf '.github/workflows/ci.yml:6:23: undefined variable "foo". available variables are "env", "github", "inputs", "job", "matrix", "needs", "runner", "secrets", "steps", "strategy", "vars" [expression]\n  |\n6 |       - run: echo ${{ foo.bar }}\n  |                       ^~~~~~~\n'
+exit 1
+'''

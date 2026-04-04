@@ -7,11 +7,13 @@ It is faster, supports more configuration options, and is the direction the
 markdownlint ecosystem is moving. flint only supports `markdownlint-cli2`.
 
 **Before** (`mise.toml`):
+
 ```toml
 "npm:markdownlint-cli" = "0.47.0"
 ```
 
 **After**:
+
 ```toml
 "npm:markdownlint-cli2" = "0.17.2"
 ```

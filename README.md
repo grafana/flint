@@ -117,27 +117,27 @@ flint version
 
 `flint run` flags:
 
-| Flag                | Description                                                              |
-| ------------------- | ------------------------------------------------------------------------ |
-| `--fix`             | Fix what's fixable, report what still needs review; exit 1 if anything changed or needs review |
-| `--full`            | Lint all files instead of only changed files                             |
-| `--fast-only`       | Skip slow checks (e.g. `renovate-deps`). Overridden by explicit linter names. |
-| `--short`           | Compact summary output, no per-check noise                               |
-| `--verbose`         | Show all linter output, not just failures                                |
-| `--new-from-rev REV` | Diff base (default: merge base with base branch)                        |
-| `--to-ref REF`      | Diff head (default: HEAD)                                                |
+| Flag                 | Description                                                                                    |
+| -------------------- | ---------------------------------------------------------------------------------------------- |
+| `--fix`              | Fix what's fixable, report what still needs review; exit 1 if anything changed or needs review |
+| `--full`             | Lint all files instead of only changed files                                                   |
+| `--fast-only`        | Skip slow checks (e.g. `renovate-deps`). Overridden by explicit linter names.                  |
+| `--short`            | Compact summary output, no per-check noise                                                     |
+| `--verbose`          | Show all linter output, not just failures                                                      |
+| `--new-from-rev REV` | Diff base (default: merge base with base branch)                                               |
+| `--to-ref REF`       | Diff head (default: HEAD)                                                                      |
 
 Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`, `FLINT_FAST_ONLY`,
 `FLINT_VERBOSE`, `FLINT_SHORT`, `FLINT_NEW_FROM_REV`, `FLINT_TO_REF`.
 
 #### Intended use by context
 
-| Context                      | Command                              | Why                                                               |
-| ---------------------------- | ------------------------------------ | ----------------------------------------------------------------- |
-| Interactive development      | `flint run` or `flint run --fast-only` | Full output so you can read the details                         |
-| Human wanting a summary      | `flint run --short`                  | Compact output, no per-check noise                                |
-| Pre-push hook (CC / agentic) | `flint run --fix --fast-only`        | Fixes what it can silently, surfaces only what needs human review |
-| CI                           | `flint run`                          | Full output for humans reading CI logs                            |
+| Context                      | Command                                | Why                                                               |
+| ---------------------------- | -------------------------------------- | ----------------------------------------------------------------- |
+| Interactive development      | `flint run` or `flint run --fast-only` | Full output so you can read the details                           |
+| Human wanting a summary      | `flint run --short`                    | Compact output, no per-check noise                                |
+| Pre-push hook (CC / agentic) | `flint run --fix --fast-only`          | Fixes what it can silently, surfaces only what needs human review |
+| CI                           | `flint run`                            | Full output for humans reading CI logs                            |
 
 **`--short` output** — failed checks partitioned by fixability, fixable ones
 expressed as the exact command to run:
@@ -220,25 +220,25 @@ being linted and cannot be redirected via a flag.
 
 <!-- editorconfig-checker-disable -->
 
-| Name            | Binary          | Patterns                                           | Fix | Scope   | Config file                    |
-| --------------- | --------------- | -------------------------------------------------- | --- | ------- | ------------------------------ |
-| `shellcheck`    | `shellcheck`    | `*.sh *.bash *.bats`                               | no  | file    | `.shellcheckrc`                |
-| `shfmt`         | `shfmt`         | `*.sh *.bash`                                      | yes | file    | —                              |
-| `markdownlint`  | `markdownlint`  | `*.md`                                             | yes | file    | `.markdownlint.json`           |
-| `prettier`      | `prettier`      | `*.md *.yml *.yaml`                                | yes | files   | `.prettierrc`                  |
-| `actionlint`    | `actionlint`    | `.github/workflows/*.yml .github/workflows/*.yaml` | no  | file    | `actionlint.yml`               |
-| `hadolint`      | `hadolint`      | `Dockerfile Dockerfile.* *.dockerfile`             | no  | file    | `.hadolint.yaml`               |
-| `codespell`     | `codespell`     | `*`                                                | yes | files   | `.codespellrc`                 |
-| `ec`            | `ec`            | `*`                                                | no  | files   | `.editorconfig-checker.json`   |
-| `golangci-lint` | `golangci-lint` | `*.go`                                             | no  | project | `.golangci.yml`                |
-| `ruff`          | `ruff`          | `*.py`                                             | yes | file    | `ruff.toml`                    |
-| `ruff-format`   | `ruff`          | `*.py`                                             | yes | file    | `ruff.toml`                    |
-| `biome`         | `biome`         | `*.json *.jsonc *.js *.ts *.jsx *.tsx`             | yes | file    | `biome.json` ¹                 |
-| `biome-format`  | `biome`         | `*.json *.jsonc *.js *.ts *.jsx *.tsx`             | yes | file    | `biome.json` ¹                 |
-| `cargo-clippy`  | `cargo-clippy`  | `*.rs`                                             | yes | project | —                              |
-| `cargo-fmt`     | `cargo-fmt`     | `*.rs`                                             | yes | project | —                              |
+| Name            | Binary          | Patterns                                           | Fix | Scope   | Config file                        |
+| --------------- | --------------- | -------------------------------------------------- | --- | ------- | ---------------------------------- |
+| `shellcheck`    | `shellcheck`    | `*.sh *.bash *.bats`                               | no  | file    | `.shellcheckrc`                    |
+| `shfmt`         | `shfmt`         | `*.sh *.bash`                                      | yes | file    | —                                  |
+| `markdownlint`  | `markdownlint`  | `*.md`                                             | yes | file    | `.markdownlint.json`               |
+| `prettier`      | `prettier`      | `*.md *.yml *.yaml`                                | yes | files   | `.prettierrc`                      |
+| `actionlint`    | `actionlint`    | `.github/workflows/*.yml .github/workflows/*.yaml` | no  | file    | `actionlint.yml`                   |
+| `hadolint`      | `hadolint`      | `Dockerfile Dockerfile.* *.dockerfile`             | no  | file    | `.hadolint.yaml`                   |
+| `codespell`     | `codespell`     | `*`                                                | yes | files   | `.codespellrc`                     |
+| `ec`            | `ec`            | `*`                                                | no  | files   | `.editorconfig-checker.json`       |
+| `golangci-lint` | `golangci-lint` | `*.go`                                             | no  | project | `.golangci.yml`                    |
+| `ruff`          | `ruff`          | `*.py`                                             | yes | file    | `ruff.toml`                        |
+| `ruff-format`   | `ruff`          | `*.py`                                             | yes | file    | `ruff.toml`                        |
+| `biome`         | `biome`         | `*.json *.jsonc *.js *.ts *.jsx *.tsx`             | yes | file    | `biome.json` ¹                     |
+| `biome-format`  | `biome`         | `*.json *.jsonc *.js *.ts *.jsx *.tsx`             | yes | file    | `biome.json` ¹                     |
+| `cargo-clippy`  | `cargo-clippy`  | `*.rs`                                             | yes | project | —                                  |
+| `cargo-fmt`     | `cargo-fmt`     | `*.rs`                                             | yes | project | —                                  |
 | `links`         | `lychee`        | (all files)                                        | no  | special | via `[checks.links]` in flint.toml |
-| `renovate-deps` | `renovate`      | (all files)                                        | yes | special | —                              |
+| `renovate-deps` | `renovate`      | (all files)                                        | yes | special | —                                  |
 
 ¹ Not yet implemented. Biome's flag (`--config-path`) takes a directory, not a
 file path — requires a directory-injection variant of the config mechanism.
@@ -340,11 +340,13 @@ use everywhere" promise of mise. Container startup also adds latency to every ru
 
 5. **AI-friendly** — `--fix` fixes what's fixable silently, prints output
    only for issues needing review, and exits with a structured summary:
-   ```
+
+   ```text
    [shellcheck]
    ...
    flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
    ```
+
    Only unfixable issues surface for review — no reasoning step required.
    Also runnable containerised — no host tool dependencies required.
 

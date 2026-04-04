@@ -132,7 +132,7 @@ async fn run(
         .filter(|c| explicit || !args.fast_only || !c.slow)
         .collect();
 
-    if cli.verbose {
+    if args.verbose {
         let names: Vec<&str> = active.iter().map(|c| c.name).collect();
         if names.is_empty() {
             eprintln!("flint: no active linters");

@@ -324,7 +324,9 @@ pub fn builtin() -> Vec<Check> {
         .slow()
         .formatter(),
         Check::special("lychee", "lychee", SpecialKind::Links),
-        Check::special("renovate-deps", "renovate", SpecialKind::RenovateDeps).slow(),
+        Check::special("renovate-deps", "renovate", SpecialKind::RenovateDeps)
+            .mise_tool("npm:renovate")
+            .slow(),
         Check::special(
             "license-header",
             "license-header",

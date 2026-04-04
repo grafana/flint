@@ -4,11 +4,6 @@
       "mise"
     ]
   },
-  "README.md": {
-    "regex": [
-      "grafana/flint"
-    ]
-  },
   "mise.toml": {
     "mise": [
       "actionlint",
@@ -21,6 +16,7 @@
       "npm:renovate",
       "pipx:codespell",
       "pipx:ruff",
+      "rust",
       "shellcheck",
       "shfmt"
     ]

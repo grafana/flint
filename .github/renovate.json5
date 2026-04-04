@@ -5,7 +5,7 @@
   dependencyDashboard: true,
   platformCommit: "enabled",
   automerge: true,
-  ignorePaths: [],
+  ignorePaths: ["tests/"],
   ignorePresets: [":ignoreModulesAndTests"],
   ignoreUnstable: true,
   vulnerabilityAlerts: {

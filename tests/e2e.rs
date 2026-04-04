@@ -44,7 +44,7 @@ fn git_repo() -> TempDir {
 ///
 /// test.toml format:
 ///   [expected]
-///   args   = "--full --auto shellcheck"
+///   args   = "--full --fix shellcheck"
 ///   exit   = 1                          # optional, default 0
 ///   stderr = """..."""                  # optional, default ""
 ///   stdout = """..."""                  # optional, default ""

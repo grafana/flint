@@ -22,15 +22,15 @@ file = "tasks/setup/update-super-linter-versions.sh"
 
 [tasks.lint]
 description = "Run all lints"
-run = "cargo build -q && ./target/debug/flint"
+run = "cargo run -q"
 
 [tasks."lint:fix"]
 description = "Auto-fix lint issues"
-run = "cargo build -q && ./target/debug/flint --fix"
+run = "cargo run -q -- --fix"
 
 [tasks."lint:pre-commit"]
 description = "Fast auto-fix lint pass (skips slow checks like renovate) — intended for pre-commit/pre-push hooks"
-run = "cargo build -q && ./target/debug/flint --auto --fast"
+run = "cargo run -q -- --auto --fast"
 
 [tasks.build]
 description = "Build the project"

@@ -155,28 +155,73 @@ template), add a module under `src/linters/` and use
    template model. Their implementations live in
    `src/linters/`.
 
+7. **Built-in file exclusions**: `src/files.rs` has a
+   `BUILTIN_EXCLUDES` slice of paths that are always removed
+   from the file list before any linter sees it. Currently
+   contains `.github/renovate-tracked-deps.json` (a
+   generated file that should never be linted by prettier,
+   ec, etc.). Add entries here — not in user-facing `exclude`
+   docs — when a file is managed by flint itself.
+
 ## Testing
 
-### Unit tests
-
-`src/registry.rs` has a unit test that enforces the
-version-range consistency invariant. Run with:
+Run all tests with:
 
 ```bash
 cargo test
 ```
 
-### End-to-end tests
+### Unit tests
 
-`tests/e2e.rs` tests the full binary. Each test:
+In-module `#[cfg(test)]` blocks in `src/`. Notable:
+- `src/registry.rs`: enforces version-range consistency
+- `src/runner.rs`: config injection, scope filtering
+- `src/linters/renovate_deps.rs`: log parsing, snapshot
+  read/write, diff output
 
-1. Creates a temp directory initialised as a git repo
-   (`git_repo()`)
-2. Writes a minimal `mise.toml` declaring the tools under
-   test (`write_mise_toml()`)
-3. Writes and stages test files (`stage()`)
-4. Runs `flint` via `Command` and asserts on output/exit
+### Fixture-based e2e tests
 
-When adding a new linter, add an e2e test that covers at
-least: check mode failure output format, and fix mode if
-the linter supports it.
+`tests/cases/` holds one directory per scenario. Each
+contains:
+
+- `files/` — files copied verbatim into a temp git repo
+  and staged before the run
+- `test.toml` — test spec:
+
+```toml
+args = "--full shellcheck"
+exit = 1                    # optional, default 0
+
+[env]                       # optional extra env vars
+FOO = "bar"
+
+expected_stderr = """
+...golden output...
+"""
+```
+
+The `cases` test in `tests/e2e.rs` runs all of them.
+Set `UPDATE_SNAPSHOTS=1` to regenerate `expected_stderr`/
+`expected_stdout` in place.
+
+Use fixture cases for template-based linters (shellcheck,
+prettier, etc.) where the tool is available on PATH in CI.
+
+### Programmatic e2e tests
+
+For special checks that require controlled tool output (e.g.
+`renovate-deps`, which runs `renovate --platform=local`),
+write a test function directly in `tests/e2e.rs` using a
+fake binary injected via `PATH`:
+
+1. Write a shell script that emits the JSON output your
+   check expects, make it executable, place it in a `TempDir`
+2. Prepend that dir to `PATH` via `flint_with_env`
+3. Assert on exit code and stderr content
+
+See the `renovate_deps` mod in `tests/e2e.rs` for the
+pattern. These tests are `#[cfg(unix)]` because the fake
+binary is a shell script.
+
+When adding a new special check, cover at least: clean pass,
+failure with correct output, and fix mode if supported.

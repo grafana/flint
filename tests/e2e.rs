@@ -170,6 +170,159 @@ fn strip_ansi(s: &str) -> String {
     out
 }
 
+// ── renovate-deps tests ──────────────────────────────────────────────────────
+//
+// These tests inject a fake `renovate` binary via PATH so they don't need the
+// real tool installed. Unix-only because the fake is a shell script.
+
+#[cfg(unix)]
+mod renovate_deps {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    // The JSON log line the fake renovate emits.
+    const RENOVATE_LOG: &str = r#"{"msg":"packageFiles with updates","config":{"npm":[{"packageFile":"package.json","deps":[{"depName":"express"},{"depName":"lodash"}]}]}}"#;
+
+    // What write_snapshot produces for that log (serde_json::to_string_pretty + \n).
+    const SNAPSHOT: &str = "{\n  \"package.json\": {\n    \"npm\": [\n      \"express\",\n      \"lodash\"\n    ]\n  }\n}\n";
+
+    /// Creates a temp dir containing a fake `renovate` script that emits `log_line`.
+    fn fake_renovate_bin(log_line: &str) -> TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        let script = dir.path().join("renovate");
+        std::fs::write(
+            &script,
+            format!("#!/bin/sh\nprintf '%s\\n' '{}'\n", log_line),
+        )
+        .unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        dir
+    }
+
+    /// Sets up a minimal repo with renovate declared in mise.toml.
+    /// Optionally writes a snapshot file.
+    fn setup_repo(snapshot: Option<&str>) -> TempDir {
+        let repo = git_repo();
+        std::fs::create_dir_all(repo.path().join(".github")).unwrap();
+        std::fs::write(
+            repo.path().join("mise.toml"),
+            "[tools]\nrenovate = \"latest\"\n",
+        )
+        .unwrap();
+        std::fs::write(repo.path().join(".github").join("renovate.json5"), "{}").unwrap();
+        std::fs::write(repo.path().join("package.json"), "{}").unwrap();
+        if let Some(snap) = snapshot {
+            std::fs::write(
+                repo.path()
+                    .join(".github")
+                    .join("renovate-tracked-deps.json"),
+                snap,
+            )
+            .unwrap();
+        }
+        Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(repo.path())
+            .output()
+            .unwrap();
+        repo
+    }
+
+    fn prepend_path(dir: &Path) -> String {
+        let orig = std::env::var("PATH").unwrap_or_default();
+        format!("{}:{orig}", dir.display())
+    }
+
+    #[test]
+    fn up_to_date() {
+        let bin = fake_renovate_bin(RENOVATE_LOG);
+        let repo = setup_repo(Some(SNAPSHOT));
+        let path = prepend_path(bin.path());
+        let out = flint_with_env(
+            &["--full", "renovate-deps"],
+            repo.path(),
+            &[("PATH", &path)],
+        );
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "stderr: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+
+    #[test]
+    fn out_of_date() {
+        let stale = "{\n  \"package.json\": {\n    \"npm\": [\n      \"old-dep\"\n    ]\n  }\n}\n";
+        let bin = fake_renovate_bin(RENOVATE_LOG);
+        let repo = setup_repo(Some(stale));
+        let path = prepend_path(bin.path());
+        let out = flint_with_env(
+            &["--full", "renovate-deps"],
+            repo.path(),
+            &[("PATH", &path)],
+        );
+        assert_eq!(out.status.code(), Some(1));
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(stderr.contains("out of date"), "stderr: {stderr}");
+        assert!(
+            stderr.contains("old-dep"),
+            "diff missing in stderr: {stderr}"
+        );
+    }
+
+    #[test]
+    fn fix_creates_snapshot() {
+        let bin = fake_renovate_bin(RENOVATE_LOG);
+        let repo = setup_repo(None);
+        let path = prepend_path(bin.path());
+        let out = flint_with_env(
+            &["--full", "--fix", "renovate-deps"],
+            repo.path(),
+            &[("PATH", &path)],
+        );
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "stderr: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let written = std::fs::read_to_string(
+            repo.path()
+                .join(".github")
+                .join("renovate-tracked-deps.json"),
+        )
+        .unwrap();
+        assert_eq!(written, SNAPSHOT);
+    }
+
+    #[test]
+    fn fix_updates_stale_snapshot() {
+        let stale = "{\n  \"package.json\": {\n    \"npm\": [\n      \"old-dep\"\n    ]\n  }\n}\n";
+        let bin = fake_renovate_bin(RENOVATE_LOG);
+        let repo = setup_repo(Some(stale));
+        let path = prepend_path(bin.path());
+        let out = flint_with_env(
+            &["--full", "--fix", "renovate-deps"],
+            repo.path(),
+            &[("PATH", &path)],
+        );
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "stderr: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let written = std::fs::read_to_string(
+            repo.path()
+                .join(".github")
+                .join("renovate-tracked-deps.json"),
+        )
+        .unwrap();
+        assert_eq!(written, SNAPSHOT);
+    }
+}
+
 fn copy_dir_into(src: &Path, dst: &Path) {
     for entry in std::fs::read_dir(src).expect("files/ dir not found") {
         let entry = entry.unwrap();

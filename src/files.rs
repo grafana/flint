@@ -4,6 +4,9 @@ use std::process::Command;
 
 use crate::config::Config;
 
+/// Files managed by flint itself — always excluded from generic linter checks.
+const BUILTIN_EXCLUDES: &[&str] = &[".github/renovate-tracked-deps.json"];
+
 #[derive(Clone)]
 pub struct FileList {
     pub files: Vec<PathBuf>,
@@ -139,6 +142,7 @@ fn filter_names(
 ) -> Vec<PathBuf> {
     names
         .into_iter()
+        .filter(|name| !BUILTIN_EXCLUDES.contains(&name.as_str()))
         .filter(|name| exclude_re.is_none_or(|re| !re.is_match(name)))
         .filter(|name| !exclude_paths.iter().any(|p| name.starts_with(p.as_str())))
         .map(|name| project_root.join(name))

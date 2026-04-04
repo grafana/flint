@@ -48,7 +48,7 @@ pub struct Check {
     /// this check's file list. Used to avoid double-checking files that a
     /// dedicated formatter already owns.
     pub excludes_if_active: &'static [&'static str],
-    /// Slow checks are skipped when `--fast` is passed.
+    /// Slow checks are skipped when `--fast-only` is passed.
     pub slow: bool,
     /// When set, look for `(filename, flag)` in config_dir: if the file exists, inject
     /// `flag <abs-path>` into the command right after the binary name.
@@ -179,7 +179,7 @@ impl Check {
         self
     }
 
-    /// Mark as slow — skipped when `--fast` is passed.
+    /// Mark as slow — skipped when `--fast-only` is passed.
     pub fn slow(mut self) -> Self {
         self.slow = true;
         self

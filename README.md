@@ -71,15 +71,15 @@ Then wire up lint tasks:
 ```toml
 [tasks.lint]
 description = "Run all lints"
-run = "flint"
+run = "flint run"
 
 [tasks."lint:pre-commit"]
 description = "Fast auto-fix lint pass — for pre-push hooks and agentic pipelines"
-run = "flint --fix --fast"
+run = "flint run --fix --fast-only"
 
 [tasks."lint:fix"]
 description = "Auto-fix lint issues"
-run = "flint --fix"
+run = "flint run --fix"
 ```
 
 ### CI setup
@@ -110,37 +110,40 @@ run = "flint --fix"
 ### CLI
 
 ```text
-flint [OPTIONS] [LINTERS...]
-flint list
+flint run [OPTIONS] [LINTERS...]
+flint linters
+flint version
 ```
 
-| Flag             | Description                                                              |
-| ---------------- | ------------------------------------------------------------------------ |
-| `--fix`          | Fix what's fixable, report what still needs review; exit 1 if anything changed or needs review |
-| `--full`         | Lint all files instead of only changed files                             |
-| `--fast`         | Skip slow checks (e.g. `renovate-deps`)                                  |
-| `--short`        | Compact summary output, no per-check noise                               |
-| `--verbose`      | Show all linter output, not just failures                                |
-| `--from-ref REF` | Diff base (default: merge base with base branch)                         |
-| `--to-ref REF`   | Diff head (default: HEAD)                                                |
+`flint run` flags:
 
-Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`, `FLINT_FAST`,
-`FLINT_VERBOSE`, `FLINT_SHORT`, `FLINT_FROM_REF`, `FLINT_TO_REF`.
+| Flag                | Description                                                              |
+| ------------------- | ------------------------------------------------------------------------ |
+| `--fix`             | Fix what's fixable, report what still needs review; exit 1 if anything changed or needs review |
+| `--full`            | Lint all files instead of only changed files                             |
+| `--fast-only`       | Skip slow checks (e.g. `renovate-deps`). Overridden by explicit linter names. |
+| `--short`           | Compact summary output, no per-check noise                               |
+| `--verbose`         | Show all linter output, not just failures                                |
+| `--new-from-rev REV` | Diff base (default: merge base with base branch)                        |
+| `--to-ref REF`      | Diff head (default: HEAD)                                                |
+
+Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`, `FLINT_FAST_ONLY`,
+`FLINT_VERBOSE`, `FLINT_SHORT`, `FLINT_NEW_FROM_REV`, `FLINT_TO_REF`.
 
 #### Intended use by context
 
-| Context                      | Command                   | Why                                                               |
-| ---------------------------- | ------------------------- | ----------------------------------------------------------------- |
-| Interactive development      | `flint` or `flint --fast` | Full output so you can read the details                           |
-| Human wanting a summary      | `flint --short`           | Compact output, no per-check noise                                |
-| Pre-push hook (CC / agentic) | `flint --fix --fast`      | Fixes what it can silently, surfaces only what needs human review |
-| CI                           | `flint`                   | Full output for humans reading CI logs                            |
+| Context                      | Command                              | Why                                                               |
+| ---------------------------- | ------------------------------------ | ----------------------------------------------------------------- |
+| Interactive development      | `flint run` or `flint run --fast-only` | Full output so you can read the details                         |
+| Human wanting a summary      | `flint run --short`                  | Compact output, no per-check noise                                |
+| Pre-push hook (CC / agentic) | `flint run --fix --fast-only`        | Fixes what it can silently, surfaces only what needs human review |
+| CI                           | `flint run`                          | Full output for humans reading CI logs                            |
 
 **`--short` output** — failed checks partitioned by fixability, fixable ones
 expressed as the exact command to run:
 
 ```text
-flint: 2 checks failed — flint --fix prettier cargo-fmt | review: shellcheck
+flint: 2 checks failed — flint run --fix prettier cargo-fmt | review: shellcheck
 ```
 
 **`--fix` output** — fixes what's fixable, then prints the full output of
@@ -161,11 +164,11 @@ flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
 Pass one or more linter names to run only those:
 
 ```bash
-flint shellcheck shfmt        # run only shellcheck and shfmt
-flint --fix prettier          # fix only prettier
+flint run shellcheck shfmt        # run only shellcheck and shfmt
+flint run --fix prettier          # fix only prettier
 ```
 
-`flint list` shows every check with its status:
+`flint linters` shows every check with its status:
 
 ```text
 NAME            BINARY          STATUS     SPEED  PATTERNS
@@ -249,7 +252,7 @@ file path — requires a directory-injection variant of the config mechanism.
 - `project` — invoked once with no file args; for checks with patterns set
   (e.g. `cargo-clippy`), skipped entirely if no matching files changed
 
-**Slow checks** (`renovate-deps`) are skipped by `--fast`. Use `--fast` for
+**Slow checks** (`renovate-deps`) are skipped by `--fast-only`. Use `--fast-only` for
 local/pre-push feedback and the full set in CI.
 
 **`ec` deference**: `ec` (editorconfig-checker) runs on all files, but
@@ -285,7 +288,7 @@ Verifies `.github/renovate-tracked-deps.json` is up to date by running Renovate
 locally and comparing its output against the committed snapshot. Same purpose as
 the v1 `lint:renovate-deps` task. Requires `renovate` in `[tools]`.
 
-Tagged `slow = true` — skipped by `--fast`. With `--fix`, automatically regenerates
+Tagged `slow = true` — skipped by `--fast-only`. With `--fix`, automatically regenerates
 and commits the snapshot.
 
 Configure via `flint.toml`:
@@ -327,7 +330,7 @@ use everywhere" promise of mise. Container startup also adds latency to every ru
 
 2. **Fast** — native execution only (no Docker). Linters run in parallel.
    Designed to be the default `mise run lint`, not a slow fallback.
-   Slow checks (e.g. `renovate-deps`) can be skipped with `--fast`.
+   Slow checks (e.g. `renovate-deps`) can be skipped with `--fast-only`.
 
 3. **Cross-platform** — runs on Linux, macOS, and Windows. The built-in
    registry accounts for platform differences (e.g. binary names, path quoting).
@@ -349,13 +352,17 @@ use everywhere" promise of mise. Container startup also adds latency to every ru
    in `mise.toml`. `flint.toml` adds detail (config paths, exclusions) but is
    not required to activate anything.
 
-7. **Changed files by default** — git-aware diff detection. `--from-ref`/`--to-ref`
+7. **Changed files by default** — git-aware diff detection. `--new-from-rev`/`--to-ref`
    for CI. `--full` to check everything. Falls back to all files when no merge
    base is found.
 
 8. **Autofix where possible** — `--fix` checks first, fixes what's fixable,
    reports what needs review. Fix mode runs serially to avoid concurrent writes.
-   Pass specific linter names to limit which fixers run (`flint --fix prettier shfmt`).
+   Pass specific linter names to limit which fixers run (`flint run --fix prettier shfmt`).
+
+9. **Familiar CLI** — commands and flags follow [golangci-lint](https://golangci-lint.run/)
+   conventions (`run`, `linters`, `--fast-only`, `--new-from-rev`) so teams
+   already familiar with golangci-lint don't need to re-learn the interface.
 
 ## Versioning
 

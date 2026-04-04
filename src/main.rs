@@ -5,54 +5,62 @@ mod registry;
 mod runner;
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use runner::{CheckResult, RunOptions};
 use std::collections::HashMap;
 
 #[derive(Parser, Debug)]
 #[command(name = "flint", about = "flint — fast lint")]
-#[command(args_conflicts_with_subcommands = true)]
+#[command(subcommand_required = true, arg_required_else_help = true)]
 struct Cli {
     #[command(subcommand)]
-    command: Option<SubCommand>,
+    command: SubCommand,
+}
 
+#[derive(Subcommand, Debug)]
+enum SubCommand {
+    /// Lint the code.
+    Run(RunArgs),
+    /// List available linters and their status.
+    Linters,
+    /// Display the flint version.
+    Version,
+}
+
+#[derive(Args, Debug)]
+struct RunArgs {
     /// Fix what's fixable, report what still needs review.
     /// Exits 1 if anything was fixed (uncommitted) or needs review; 0 if already clean.
     #[arg(long, env = "FLINT_FIX")]
     fix: bool,
 
-    /// Lint all files instead of only changed files
+    /// Lint all files instead of only changed files.
     #[arg(long, env = "FLINT_FULL")]
     full: bool,
 
-    /// Skip slow checks
-    #[arg(long, env = "FLINT_FAST")]
-    fast: bool,
+    /// Run only fast linters. Overridden by explicitly named linters.
+    #[arg(long, env = "FLINT_FAST_ONLY")]
+    fast_only: bool,
 
-    /// Show all linter output, not just failures
+    /// Show all linter output, not just failures.
     #[arg(long, env = "FLINT_VERBOSE")]
     verbose: bool,
 
-    /// Compact summary output — no per-check noise (human) or read-only AI review
+    /// Compact summary output — no per-check noise (human) or read-only AI review.
     #[arg(long, env = "FLINT_SHORT")]
     short: bool,
 
-    /// Compare changed files from this ref (default: merge base with base branch)
-    #[arg(long, env = "FLINT_FROM_REF")]
-    from_ref: Option<String>,
+    /// Show only new issues created after git revision REV
+    /// (default: merge base with base branch).
+    #[arg(long, value_name = "REV", env = "FLINT_NEW_FROM_REV")]
+    new_from_rev: Option<String>,
 
-    /// Compare changed files to this ref (default: HEAD)
-    #[arg(long, env = "FLINT_TO_REF")]
+    /// Compare changed files to this ref (default: HEAD).
+    #[arg(long, value_name = "REF", env = "FLINT_TO_REF")]
     to_ref: Option<String>,
 
-    /// Linters to run (default: all discovered)
+    /// Linters to run (default: all discovered). Explicit linters override --fast-only.
     linters: Vec<String>,
-}
-
-#[derive(Subcommand, Debug)]
-enum SubCommand {
-    /// List all available checks with their status
-    List,
 }
 
 #[tokio::main]
@@ -71,20 +79,36 @@ async fn main() -> Result<()> {
 
     let registry = registry::builtin();
 
-    if let Some(SubCommand::List) = cli.command {
-        let mise_tools = registry::read_mise_tools(&project_root);
-        print_list(&registry, &mise_tools);
-        return Ok(());
+    match cli.command {
+        SubCommand::Version => {
+            println!("flint {}", env!("CARGO_PKG_VERSION"));
+        }
+        SubCommand::Linters => {
+            let mise_tools = registry::read_mise_tools(&project_root);
+            print_linters(&registry, &mise_tools);
+        }
+        SubCommand::Run(args) => {
+            run(args, &project_root, &config_dir, &registry).await?;
+        }
     }
 
-    let cfg = config::load(&config_dir)?;
+    Ok(())
+}
+
+async fn run(
+    args: RunArgs,
+    project_root: &std::path::Path,
+    config_dir: &std::path::Path,
+    registry: &[registry::Check],
+) -> Result<()> {
+    let cfg = config::load(config_dir)?;
 
     // Filter registry to requested linters (or all if none specified).
-    let checks: Vec<&registry::Check> = if cli.linters.is_empty() {
-        registry.iter().collect()
-    } else {
+    // Explicit linter names override --fast-only (same behaviour as golangci-lint).
+    let explicit = !args.linters.is_empty();
+    let checks: Vec<&registry::Check> = if explicit {
         let mut out = vec![];
-        for name in &cli.linters {
+        for name in &args.linters {
             match registry.iter().find(|c| c.name == name.as_str()) {
                 Some(c) => out.push(c),
                 None => {
@@ -94,26 +118,29 @@ async fn main() -> Result<()> {
             }
         }
         out
+    } else {
+        registry.iter().collect()
     };
 
     // Discover which checks are declared in the consuming repo's mise.toml, and apply
-    // --fast filter. mise guarantees declared tools are on PATH, so no PATH check needed.
-    let mise_tools = registry::read_mise_tools(&project_root);
+    // --fast-only filter (skipped when linters are named explicitly).
+    // mise guarantees declared tools are on PATH, so no PATH check needed.
+    let mise_tools = registry::read_mise_tools(project_root);
     let active: Vec<&registry::Check> = checks
         .into_iter()
         .filter(|c| registry::check_active(c, &mise_tools))
-        .filter(|c| !cli.fast || !c.slow)
+        .filter(|c| explicit || !args.fast_only || !c.slow)
         .collect();
 
     let file_list = files::changed(
-        &project_root,
+        project_root,
         &cfg,
-        cli.full,
-        cli.from_ref.as_deref(),
-        cli.to_ref.as_deref(),
+        args.full,
+        args.new_from_rev.as_deref(),
+        args.to_ref.as_deref(),
     )?;
 
-    if cli.fix {
+    if args.fix {
         // Pre-check, fix what's fixable, report outcome.
         // Exits 0 if everything was already clean; 1 if anything was fixed (uncommitted)
         // or still needs review.
@@ -125,9 +152,9 @@ async fn main() -> Result<()> {
                 verbose: false,
                 short: true,
             },
-            &project_root,
+            project_root,
             &cfg,
-            &config_dir,
+            config_dir,
         )
         .await?;
 
@@ -153,9 +180,9 @@ async fn main() -> Result<()> {
                     verbose: false,
                     short: true,
                 },
-                &project_root,
+                project_root,
                 &cfg,
-                &config_dir,
+                config_dir,
             )
             .await?;
             for r in fix_results {
@@ -209,12 +236,12 @@ async fn main() -> Result<()> {
         &file_list,
         RunOptions {
             fix: false,
-            verbose: cli.verbose,
-            short: cli.short,
+            verbose: args.verbose,
+            short: args.short,
         },
-        &project_root,
+        project_root,
         &cfg,
-        &config_dir,
+        config_dir,
     )
     .await?;
 
@@ -227,7 +254,7 @@ async fn main() -> Result<()> {
     if !failed.is_empty() {
         let n = failed.len();
         let noun = if n == 1 { "check" } else { "checks" };
-        if cli.short {
+        if args.short {
             // Partition by fixability. Emit the exact command for fixable checks
             // so AI callers can act without a reasoning step.
             let (fixable, reviewable): (Vec<&str>, Vec<&str>) = failed
@@ -236,7 +263,7 @@ async fn main() -> Result<()> {
                 .partition(|name| is_fixable(name, &active));
             let mut segments = vec![];
             if !fixable.is_empty() {
-                segments.push(format!("flint --fix {}", fixable.join(" ")));
+                segments.push(format!("flint run --fix {}", fixable.join(" ")));
             }
             if !reviewable.is_empty() {
                 segments.push(format!("review: {}", reviewable.join(", ")));
@@ -248,7 +275,7 @@ async fn main() -> Result<()> {
                 names = failed.join(", ")
             );
             eprintln!(
-                "💡 Try `mise run lint:fix` to auto-fix lint issues, then re-run `mise run lint` to verify."
+                "💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify."
             );
         }
         std::process::exit(1);
@@ -261,7 +288,7 @@ fn is_fixable(name: &str, active: &[&registry::Check]) -> bool {
     active.iter().any(|c| c.name == name && c.has_fix())
 }
 
-fn print_list(registry: &[registry::Check], mise_tools: &HashMap<String, String>) {
+fn print_linters(registry: &[registry::Check], mise_tools: &HashMap<String, String>) {
     // Column widths.
     let name_w = registry
         .iter()

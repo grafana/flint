@@ -1,5 +1,5 @@
 [expected]
-args = "--full renovate-deps"
+args = "run --full renovate-deps"
 exit = 1
 stderr = """
 [renovate-deps]
@@ -16,10 +16,10 @@ stderr = """
    }
  }
 ERROR: renovate-tracked-deps.json is out of date.
-Run `flint --fix renovate-deps` to update.
+Run `flint run --fix renovate-deps` to update.
 
 flint: 1 check failed (renovate-deps)
-💡 Try `mise run lint:fix` to auto-fix lint issues, then re-run `mise run lint` to verify.
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
 """
 
 [expected.files]

@@ -1,5 +1,5 @@
 [expected]
-args = "--full renovate-deps"
+args = "run --full renovate-deps"
 exit = 0
 
 [fake_bins]

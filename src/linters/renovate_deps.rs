@@ -17,80 +17,66 @@ const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value", "invalid-v
 type DepMap = BTreeMap<String, BTreeMap<String, Vec<String>>>;
 
 pub async fn run(cfg: &RenovateDepsConfig, fix: bool, project_root: &Path) -> LinterOutput {
-    let log_bytes = match run_renovate(project_root).await {
-        Ok(b) => b,
-        Err(e) => return LinterOutput::err(format!("flint: renovate-deps: {e}\n")),
-    };
+    match run_inner(cfg, fix, project_root).await {
+        Ok(out) => out,
+        Err(e) => LinterOutput::err(format!("flint: renovate-deps: {e}\n")),
+    }
+}
 
-    let generated = match extract_deps(&log_bytes, &cfg.exclude_managers) {
-        Ok(d) => d,
-        Err(e) => return LinterOutput::err(format!("flint: renovate-deps: {e}\n")),
-    };
-
+async fn run_inner(
+    cfg: &RenovateDepsConfig,
+    fix: bool,
+    project_root: &Path,
+) -> anyhow::Result<LinterOutput> {
+    let log_bytes = run_renovate(project_root).await?;
+    let generated = extract_deps(&log_bytes, &cfg.exclude_managers)?;
     let committed_path = project_root.join(COMMITTED_DIR).join(COMMITTED_FILE);
 
     if !committed_path.exists() {
         if fix {
-            return match write_snapshot(&committed_path, &generated) {
-                Ok(()) => LinterOutput {
-                    ok: true,
-                    stdout: format!("{COMMITTED_FILE} has been created.\n").into_bytes(),
-                    stderr: vec![],
-                },
-                Err(e) => LinterOutput::err(format!("flint: renovate-deps: {e}\n")),
-            };
+            write_snapshot(&committed_path, &generated)?;
+            return Ok(LinterOutput {
+                ok: true,
+                stdout: format!("{COMMITTED_FILE} has been created.\n").into_bytes(),
+                stderr: vec![],
+            });
         }
-        return LinterOutput::err(format!(
+        return Ok(LinterOutput::err(format!(
             "ERROR: {COMMITTED_DISPLAY} does not exist.\nRun `flint --fix renovate-deps` to create it.\n"
-        ));
+        )));
     }
 
-    let committed: DepMap = match std::fs::read_to_string(&committed_path)
-        .map_err(anyhow::Error::from)
-        .and_then(|s| serde_json::from_str(&s).map_err(anyhow::Error::from))
-    {
-        Ok(d) => d,
-        Err(e) => {
-            return LinterOutput::err(format!(
-                "flint: renovate-deps: failed to read committed snapshot: {e}\n"
-            ));
-        }
-    };
+    let committed: DepMap = serde_json::from_str(&std::fs::read_to_string(&committed_path)?)?;
 
     if committed == generated {
-        return LinterOutput {
+        return Ok(LinterOutput {
             ok: true,
             stdout: format!("{COMMITTED_FILE} is up to date.\n").into_bytes(),
             stderr: vec![],
-        };
+        });
     }
 
     let diff = unified_diff(&committed, &generated);
 
     if fix {
-        return match write_snapshot(&committed_path, &generated) {
-            Ok(()) => {
-                let mut stdout = diff.into_bytes();
-                stdout
-                    .extend_from_slice(format!("{COMMITTED_FILE} has been updated.\n").as_bytes());
-                LinterOutput {
-                    ok: true,
-                    stdout,
-                    stderr: vec![],
-                }
-            }
-            Err(e) => LinterOutput::err(format!("flint: renovate-deps: {e}\n")),
-        };
+        write_snapshot(&committed_path, &generated)?;
+        let mut stdout = diff.into_bytes();
+        stdout.extend_from_slice(format!("{COMMITTED_FILE} has been updated.\n").as_bytes());
+        return Ok(LinterOutput {
+            ok: true,
+            stdout,
+            stderr: vec![],
+        });
     }
 
-    LinterOutput {
+    Ok(LinterOutput {
         ok: false,
         stdout: diff.into_bytes(),
         stderr: format!(
             "ERROR: {COMMITTED_FILE} is out of date.\nRun `flint --fix renovate-deps` to update.\n"
         )
         .into_bytes(),
-    }
+    })
 }
 
 /// Runs `renovate --platform=local` and returns the combined stdout+stderr log bytes.

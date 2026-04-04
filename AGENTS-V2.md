@@ -189,10 +189,9 @@ contains:
 - `test.toml` — test spec:
 
 ```toml
+[expected]
 args = "--full shellcheck"
 exit = 1                    # optional, default 0
-
-[expected]                  # optional golden output
 stderr = """
 ...golden output...
 """
@@ -213,9 +212,9 @@ echo '...'
 ```
 
 The `cases` test in `tests/e2e.rs` runs all of them.
-Set `UPDATE_SNAPSHOTS=1` to regenerate `[expected].stderr`/
-`stdout` in place. `[expected.files]` and `[fake_bins]` are
-always preserved by the snapshot writer.
+Set `UPDATE_SNAPSHOTS=1` to regenerate `[expected].exit`/
+`stderr`/`stdout` in place. `[expected.files]` and `[fake_bins]`
+are always preserved by the snapshot writer.
 
 Use fixture cases for any check — including ones that require
 fake external binaries (via `[fake_bins]`). The fixture runner

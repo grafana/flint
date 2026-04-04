@@ -1,2 +1,3 @@
+[expected]
 args = "--full shellcheck"
 exit = 0

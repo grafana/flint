@@ -1,7 +1,6 @@
+[expected]
 args = "--full renovate-deps"
 exit = 1
-
-[expected]
 stderr = """
 [renovate-deps]
 --- .github/renovate-tracked-deps.json
@@ -21,6 +20,17 @@ Run `flint --fix renovate-deps` to update.
 
 flint: 1 check failed (renovate-deps)
 💡 Try `mise run lint:fix` to auto-fix lint issues, then re-run `mise run lint` to verify.
+"""
+
+[expected.files]
+".github/renovate-tracked-deps.json" = """
+{
+  "package.json": {
+    "npm": [
+      "old-dep"
+    ]
+  }
+}
 """
 
 [fake_bins]

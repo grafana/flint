@@ -1,7 +1,6 @@
+[expected]
 args = "--full shellcheck"
 exit = 1
-
-[expected]
 stderr = """
 [shellcheck]
 

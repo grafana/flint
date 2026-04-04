@@ -1,7 +1,6 @@
+[expected]
 args = "--full cargo-fmt"
 exit = 1
-
-[expected]
 stderr = """
 [cargo-fmt]
 Diff in <REPO>/src/lib.rs:1:

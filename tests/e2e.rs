@@ -43,20 +43,19 @@ fn git_repo() -> TempDir {
 ///   test.toml  — args, expected exit code, and golden output
 ///
 /// test.toml format:
-///   args  = "--full --auto shellcheck"
-///   exit  = 1                          # optional, default 0
+///   [expected]
+///   args   = "--full --auto shellcheck"
+///   exit   = 1                          # optional, default 0
+///   stderr = """..."""                  # optional, default ""
+///   stdout = """..."""                  # optional, default ""
 ///
-///   [expected]                         # optional golden output
-///   stderr = """..."""
-///   stdout = """..."""
-///
-///   [expected.files]                   # optional file contents asserted after run
+///   [expected.files]                    # optional file contents asserted after run
 ///   ".github/renovate-tracked-deps.json" = """..."""
 ///
-///   [env]                              # optional extra env vars
+///   [env]                               # optional extra env vars
 ///   KEY = "value"
 ///
-///   [fake_bins]                        # optional fake binaries (Unix only)
+///   [fake_bins]                         # optional fake binaries (Unix only)
 ///   renovate = '''
 ///   #!/bin/sh
 ///   echo '...'
@@ -89,11 +88,17 @@ fn run_case(case: &Path, name: &str, update: bool) {
     let cfg: toml::Value =
         toml::from_str(&raw).unwrap_or_else(|e| panic!("{name}: invalid test.toml: {e}"));
 
-    let args_str = cfg["args"]
+    let expected = cfg
+        .get("expected")
+        .unwrap_or_else(|| panic!("{name}: missing [expected] table"));
+    let args_str = expected["args"]
         .as_str()
-        .unwrap_or_else(|| panic!("{name}: missing args"));
+        .unwrap_or_else(|| panic!("{name}: missing expected.args"));
     let args: Vec<&str> = args_str.split_whitespace().collect();
-    let expected_exit = cfg.get("exit").and_then(|v| v.as_integer()).unwrap_or(0) as i32;
+    let expected_exit = expected
+        .get("exit")
+        .and_then(|v| v.as_integer())
+        .unwrap_or(0) as i32;
 
     let repo = git_repo();
 
@@ -148,13 +153,12 @@ fn run_case(case: &Path, name: &str, update: bool) {
         return;
     }
 
-    let expected = cfg.get("expected");
     let exp_stderr = expected
-        .and_then(|v| v.get("stderr"))
+        .get("stderr")
         .and_then(|v| v.as_str())
         .unwrap_or("");
     let exp_stdout = expected
-        .and_then(|v| v.get("stdout"))
+        .get("stdout")
         .and_then(|v| v.as_str())
         .unwrap_or("");
     assert_eq!(stderr, exp_stderr, "{name}: stderr mismatch");
@@ -166,10 +170,7 @@ fn run_case(case: &Path, name: &str, update: bool) {
     );
 
     // Assert file contents written by flint (e.g. fix mode snapshots).
-    if let Some(files) = expected
-        .and_then(|v| v.get("files"))
-        .and_then(|v| v.as_table())
-    {
+    if let Some(files) = expected.get("files").and_then(|v| v.as_table()) {
         for (rel_path, exp) in files {
             let exp = exp
                 .as_str()
@@ -181,34 +182,29 @@ fn run_case(case: &Path, name: &str, update: bool) {
     }
 }
 
-/// Rewrites test.toml updating snapshot fields (exit, [expected].stderr/stdout)
+/// Rewrites test.toml updating snapshot fields ([expected].exit/stderr/stdout)
 /// while preserving everything else (args, env, fake_bins, expected.files).
 fn write_test_toml(path: &Path, cfg: &toml::Value, exit: i32, stderr: &str, stdout: &str) {
-    let args_str = cfg["args"].as_str().unwrap_or("");
-    let mut out = format!("args = \"{}\"\n", args_str.replace('"', "\\\""));
-    out += &format!("exit = {exit}\n");
-
-    // [expected] — stderr/stdout updated; files preserved unchanged.
-    let has_stderr = !stderr.is_empty();
-    let has_stdout = !stdout.is_empty();
+    let args_str = cfg["expected"]["args"].as_str().unwrap_or("");
     let existing_files = cfg
         .get("expected")
         .and_then(|v| v.get("files"))
         .and_then(|v| v.as_table());
-    if has_stderr || has_stdout || existing_files.is_some() {
-        out += "\n[expected]\n";
-        if has_stderr {
-            out += &format!("stderr = \"\"\"\n{stderr}\"\"\"");
-        }
-        if has_stdout {
-            out += &format!("stdout = \"\"\"\n{stdout}\"\"\"");
-        }
-        if let Some(files) = existing_files {
-            out += "\n\n[expected.files]\n";
-            for (k, v) in files {
-                if let Some(s) = v.as_str() {
-                    out += &format!("\"{k}\" = \"\"\"\n{s}\"\"\"");
-                }
+
+    let mut out = String::from("[expected]\n");
+    out += &format!("args = \"{}\"\n", args_str.replace('"', "\\\""));
+    out += &format!("exit = {exit}\n");
+    if !stderr.is_empty() {
+        out += &format!("stderr = \"\"\"\n{stderr}\"\"\"");
+    }
+    if !stdout.is_empty() {
+        out += &format!("stdout = \"\"\"\n{stdout}\"\"\"");
+    }
+    if let Some(files) = existing_files {
+        out += "\n\n[expected.files]\n";
+        for (k, v) in files {
+            if let Some(s) = v.as_str() {
+                out += &format!("\"{k}\" = \"\"\"\n{s}\"\"\"");
             }
         }
     }

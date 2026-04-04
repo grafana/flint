@@ -1,3 +1,4 @@
+[expected]
 args = "--full renovate-deps"
 exit = 0
 

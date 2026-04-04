@@ -4,13 +4,14 @@ use tokio::process::Command;
 
 use crate::config::LycheeConfig;
 use crate::files::FileList;
+use crate::linters::LinterOutput;
 
 pub async fn run(
     cfg: &LycheeConfig,
     file_list: &FileList,
     project_root: &Path,
     config_dir: &Path,
-) -> (bool, Vec<u8>, Vec<u8>) {
+) -> LinterOutput {
     let lychee_cfg_raw = cfg.config.as_deref().unwrap_or("lychee.toml");
     let lychee_cfg = if Path::new(lychee_cfg_raw).is_relative() {
         config_dir
@@ -42,8 +43,7 @@ pub async fn run(
         .any(|f| f.as_path() == Path::new(&lychee_cfg));
 
     if config_changed {
-        let mut stderr = b"Config changes detected, falling back to full check.\n".to_vec();
-        let (ok, stdout, extra_stderr) = run_lychee_cmd(
+        let mut out = run_lychee_cmd(
             "Checking all links in all files",
             &lychee_cfg,
             &remap_args,
@@ -51,8 +51,10 @@ pub async fn run(
             false,
         )
         .await;
-        stderr.extend_from_slice(&extra_stderr);
-        return (ok, stdout, stderr);
+        let mut stderr = b"Config changes detected, falling back to full check.\n".to_vec();
+        stderr.extend_from_slice(&out.stderr);
+        out.stderr = stderr;
+        return out;
     }
 
     // Diff mode: filter changed files to link-checkable extensions
@@ -74,7 +76,7 @@ pub async fn run(
 
     if !checkable.is_empty() {
         let file_refs: Vec<&str> = checkable.iter().map(String::as_str).collect();
-        let (ok, stdout, stderr) = run_lychee_cmd(
+        let out = run_lychee_cmd(
             "Checking all links in modified files",
             &lychee_cfg,
             &remap_args,
@@ -82,17 +84,15 @@ pub async fn run(
             false,
         )
         .await;
-        if !ok {
-            all_ok = false;
-        }
-        combined_stdout.extend_from_slice(&stdout);
-        combined_stderr.extend_from_slice(&stderr);
+        all_ok &= out.ok;
+        combined_stdout.extend_from_slice(&out.stdout);
+        combined_stderr.extend_from_slice(&out.stderr);
     } else {
         combined_stdout.extend_from_slice(b"No modified files to check for all links.\n");
     }
 
     if cfg.check_all_local {
-        let (ok, stdout, stderr) = run_lychee_cmd(
+        let out = run_lychee_cmd(
             "Checking local links in all files",
             &lychee_cfg,
             &remap_args,
@@ -100,14 +100,16 @@ pub async fn run(
             true,
         )
         .await;
-        if !ok {
-            all_ok = false;
-        }
-        combined_stdout.extend_from_slice(&stdout);
-        combined_stderr.extend_from_slice(&stderr);
+        all_ok &= out.ok;
+        combined_stdout.extend_from_slice(&out.stdout);
+        combined_stderr.extend_from_slice(&out.stderr);
     }
 
-    (all_ok, combined_stdout, combined_stderr)
+    LinterOutput {
+        ok: all_ok,
+        stdout: combined_stdout,
+        stderr: combined_stderr,
+    }
 }
 
 async fn run_lychee_cmd(
@@ -116,7 +118,7 @@ async fn run_lychee_cmd(
     remap_args: &[String],
     files: &[&str],
     local_only: bool,
-) -> (bool, Vec<u8>, Vec<u8>) {
+) -> LinterOutput {
     let mut argv: Vec<String> = vec![
         "lychee".to_string(),
         "--config".to_string(),
@@ -133,7 +135,7 @@ async fn run_lychee_cmd(
     argv.push("--".to_string());
     argv.extend(files.iter().map(|s| s.to_string()));
 
-    let mut stdout_prefix = format!("==> {description}\n").into_bytes();
+    let mut stdout = format!("==> {description}\n").into_bytes();
 
     let result = Command::new(&argv[0])
         .args(&argv[1..])
@@ -143,14 +145,18 @@ async fn run_lychee_cmd(
 
     match result {
         Ok(out) => {
-            stdout_prefix.extend_from_slice(&out.stdout);
-            let ok = out.status.success();
-            (ok, stdout_prefix, out.stderr)
+            stdout.extend_from_slice(&out.stdout);
+            LinterOutput {
+                ok: out.status.success(),
+                stdout,
+                stderr: out.stderr,
+            }
         }
-        Err(e) => {
-            let stderr = format!("flint: links: failed to spawn lychee: {e}\n").into_bytes();
-            (false, stdout_prefix, stderr)
-        }
+        Err(e) => LinterOutput {
+            ok: false,
+            stdout,
+            stderr: format!("flint: links: failed to spawn lychee: {e}\n").into_bytes(),
+        },
     }
 }
 

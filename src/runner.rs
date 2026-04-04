@@ -6,7 +6,7 @@ use tokio::task::JoinSet;
 
 use crate::config::{Config, LicenseHeaderConfig, LycheeConfig, RenovateDepsConfig};
 use crate::files::FileList;
-use crate::linters::{license_header, lychee, renovate_deps};
+use crate::linters::{LinterOutput, license_header, lychee, renovate_deps};
 use crate::registry::{Check, CheckKind, Scope, SpecialKind};
 
 pub struct RunOptions {
@@ -58,7 +58,7 @@ impl PreparedCheck {
 
     async fn execute(self, fix: bool, project_root: &Path) -> CheckResult {
         let name = self.name().to_string();
-        let (ok, stdout, stderr) = match self {
+        let out: LinterOutput = match self {
             Self::Invocations { argv_list, .. } => {
                 run_invocations(&name, &argv_list, project_root).await
             }
@@ -75,9 +75,9 @@ impl PreparedCheck {
         };
         CheckResult {
             name,
-            ok,
-            stdout,
-            stderr,
+            ok: out.ok,
+            stdout: out.stdout,
+            stderr: out.stderr,
         }
     }
 }
@@ -293,13 +293,9 @@ fn inject_config(mut argv: Vec<String>, config_args: &[String]) -> Vec<String> {
     argv
 }
 
-/// Runs all invocations for one check, returning (ok, stdout, stderr).
+/// Runs all invocations for one check.
 /// Never prints — callers decide when and whether to flush output.
-async fn run_invocations(
-    name: &str,
-    invocations: &[Vec<String>],
-    root: &Path,
-) -> (bool, Vec<u8>, Vec<u8>) {
+async fn run_invocations(name: &str, invocations: &[Vec<String>], root: &Path) -> LinterOutput {
     let mut all_ok = true;
     let mut combined_stdout = Vec::new();
     let mut combined_stderr = Vec::new();
@@ -330,7 +326,11 @@ async fn run_invocations(
         }
     }
 
-    (all_ok, combined_stdout, combined_stderr)
+    LinterOutput {
+        ok: all_ok,
+        stdout: combined_stdout,
+        stderr: combined_stderr,
+    }
 }
 
 fn flush_output(stdout: &[u8], stderr: &[u8]) {

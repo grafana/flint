@@ -2,6 +2,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 use crate::config::LicenseHeaderConfig;
+use crate::linters::LinterOutput;
 
 /// Checks that each file matching `cfg.patterns` contains `cfg.text` within
 /// the first `cfg.lines_to_check` lines. Returns early (ok=true) when not configured.
@@ -9,9 +10,9 @@ pub async fn run(
     cfg: &LicenseHeaderConfig,
     project_root: &Path,
     files: &[PathBuf],
-) -> (bool, Vec<u8>, Vec<u8>) {
+) -> LinterOutput {
     if cfg.text.is_empty() {
-        return (true, vec![], vec![]);
+        return LinterOutput::ok();
     }
 
     let mut all_ok = true;
@@ -46,7 +47,11 @@ pub async fn run(
         }
     }
 
-    (all_ok, vec![], stderr)
+    LinterOutput {
+        ok: all_ok,
+        stdout: vec![],
+        stderr,
+    }
 }
 
 /// Returns `true` if `text` appears anywhere within the first `lines_to_check` lines of `path`.

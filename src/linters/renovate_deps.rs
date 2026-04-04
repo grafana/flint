@@ -259,3 +259,161 @@ fn unified_diff(old: &DepMap, new: &DepMap) -> String {
         .header(COMMITTED_DISPLAY, "generated")
         .to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn log(config_json: &str) -> Vec<u8> {
+        format!(r#"{{"msg":"packageFiles with updates","config":{config_json}}}"#).into_bytes()
+    }
+
+    fn dep_map(entries: &[(&str, &[(&str, &[&str])])]) -> DepMap {
+        entries
+            .iter()
+            .map(|(file, managers)| {
+                let m = managers
+                    .iter()
+                    .map(|(mgr, deps)| {
+                        (
+                            mgr.to_string(),
+                            deps.iter().map(|d| d.to_string()).collect(),
+                        )
+                    })
+                    .collect();
+                (file.to_string(), m)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn extracts_deps_basic() {
+        let log = log(
+            r#"{"npm":[{"packageFile":"package.json","deps":[{"depName":"express"},{"depName":"lodash"}]}]}"#,
+        );
+        let result = extract_deps(&log, &[]).unwrap();
+        assert_eq!(
+            result,
+            dep_map(&[("package.json", &[("npm", &["express", "lodash"])])])
+        );
+    }
+
+    #[test]
+    fn deps_are_sorted() {
+        let log = log(
+            r#"{"npm":[{"packageFile":"package.json","deps":[{"depName":"zebra"},{"depName":"alpha"},{"depName":"moose"}]}]}"#,
+        );
+        let result = extract_deps(&log, &[]).unwrap();
+        assert_eq!(
+            result["package.json"]["npm"],
+            vec!["alpha", "moose", "zebra"]
+        );
+    }
+
+    #[test]
+    fn filters_skip_reasons() {
+        let log = log(
+            r#"{"npm":[{"packageFile":"package.json","deps":[{"depName":"keep"},{"depName":"bad1","skipReason":"contains-variable"},{"depName":"bad2","skipReason":"invalid-value"},{"depName":"bad3","skipReason":"invalid-version"}]}]}"#,
+        );
+        let result = extract_deps(&log, &[]).unwrap();
+        assert_eq!(result["package.json"]["npm"], vec!["keep"]);
+    }
+
+    #[test]
+    fn other_skip_reasons_are_kept() {
+        let log = log(
+            r#"{"npm":[{"packageFile":"package.json","deps":[{"depName":"pinned","skipReason":"pinned-major-version"}]}]}"#,
+        );
+        let result = extract_deps(&log, &[]).unwrap();
+        assert_eq!(result["package.json"]["npm"], vec!["pinned"]);
+    }
+
+    #[test]
+    fn excludes_managers() {
+        let log = log(
+            r#"{"npm":[{"packageFile":"package.json","deps":[{"depName":"express"}]}],"cargo":[{"packageFile":"Cargo.toml","deps":[{"depName":"tokio"}]}]}"#,
+        );
+        let result = extract_deps(&log, &["npm".to_string()]).unwrap();
+        assert!(!result.contains_key("package.json"));
+        assert_eq!(result["Cargo.toml"]["cargo"], vec!["tokio"]);
+    }
+
+    #[test]
+    fn skips_deps_without_dep_name() {
+        let log = log(
+            r#"{"npm":[{"packageFile":"package.json","deps":[{"version":"1.0.0"},{"depName":"valid"}]}]}"#,
+        );
+        let result = extract_deps(&log, &[]).unwrap();
+        assert_eq!(result["package.json"]["npm"], vec!["valid"]);
+    }
+
+    #[test]
+    fn last_package_files_message_wins() {
+        let bytes = format!(
+            "{}\n{}\n",
+            r#"{"msg":"packageFiles with updates","config":{"npm":[{"packageFile":"a.json","deps":[{"depName":"old"}]}]}}"#,
+            r#"{"msg":"packageFiles with updates","config":{"npm":[{"packageFile":"b.json","deps":[{"depName":"new"}]}]}}"#,
+        )
+        .into_bytes();
+        let result = extract_deps(&bytes, &[]).unwrap();
+        assert!(!result.contains_key("a.json"), "should use last entry");
+        assert!(result.contains_key("b.json"));
+    }
+
+    #[test]
+    fn non_json_lines_are_skipped() {
+        let bytes =
+            b"not json\n{\"msg\":\"packageFiles with updates\",\"config\":{\"npm\":[{\"packageFile\":\"p.json\",\"deps\":[{\"depName\":\"x\"}]}]}}\nmore garbage\n";
+        let result = extract_deps(bytes, &[]).unwrap();
+        assert!(result.contains_key("p.json"));
+    }
+
+    #[test]
+    fn missing_message_returns_error() {
+        let bytes = b"{\"msg\":\"something else\"}\n";
+        let err = extract_deps(bytes, &[]).unwrap_err();
+        assert!(err.to_string().contains(PACKAGE_FILES_MSG));
+    }
+
+    #[test]
+    fn write_and_read_snapshot_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("out.json");
+        let deps = dep_map(&[
+            ("Cargo.toml", &[("cargo", &["serde", "tokio"])]),
+            ("package.json", &[("npm", &["express", "lodash"])]),
+        ]);
+        write_snapshot(&path, &deps).unwrap();
+        let read_back: DepMap =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(deps, read_back);
+    }
+
+    #[test]
+    fn write_snapshot_ends_with_newline() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("out.json");
+        write_snapshot(&path, &dep_map(&[])).unwrap();
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert!(contents.ends_with('\n'));
+    }
+
+    #[test]
+    fn unified_diff_contains_added_and_removed_lines() {
+        let old = dep_map(&[("a.json", &[("npm", &["old-dep"])])]);
+        let new = dep_map(&[("a.json", &[("npm", &["new-dep"])])]);
+        let diff = unified_diff(&old, &new);
+        assert!(diff.contains("-"), "should have removals");
+        assert!(diff.contains("+"), "should have additions");
+        assert!(diff.contains("old-dep"));
+        assert!(diff.contains("new-dep"));
+    }
+
+    #[test]
+    fn unified_diff_header_uses_display_path() {
+        let old = dep_map(&[("a.json", &[("npm", &["x"])])]);
+        let new = dep_map(&[("a.json", &[("npm", &["y"])])]);
+        let diff = unified_diff(&old, &new);
+        assert!(diff.contains(COMMITTED_DISPLAY));
+    }
+}

@@ -32,7 +32,6 @@ flint: 1 check failed (renovate-deps)
   }
 }
 """
-
 [fake_bins]
 renovate = '''
 #!/bin/sh

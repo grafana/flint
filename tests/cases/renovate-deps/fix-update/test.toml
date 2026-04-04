@@ -2,6 +2,7 @@
 args = "--full --fix renovate-deps"
 exit = 0
 
+
 [expected.files]
 ".github/renovate-tracked-deps.json" = """
 {
@@ -13,7 +14,6 @@ exit = 0
   }
 }
 """
-
 [fake_bins]
 renovate = '''
 #!/bin/sh

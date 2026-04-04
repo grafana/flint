@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use tempfile::TempDir;
 
@@ -67,18 +67,36 @@ fn cases() {
     let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/cases");
     let update = std::env::var("UPDATE_SNAPSHOTS").is_ok();
 
-    let mut entries: Vec<_> = std::fs::read_dir(&cases_dir)
-        .expect("tests/cases/ not found")
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().is_dir())
-        .collect();
-    entries.sort_by_key(|e| e.file_name());
+    let mut case_paths = collect_cases(&cases_dir);
+    case_paths.sort();
 
-    for entry in entries {
-        let case = entry.path();
-        let name = case.file_name().unwrap().to_string_lossy().into_owned();
+    for case in &case_paths {
+        let name = case
+            .strip_prefix(&cases_dir)
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
         run_case(&case, &name, update);
     }
+}
+
+/// Recursively finds all directories containing a `test.toml` file.
+fn collect_cases(dir: &Path) -> Vec<PathBuf> {
+    let mut cases = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return cases;
+    };
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_dir() {
+            if path.join("test.toml").exists() {
+                cases.push(path);
+            } else {
+                cases.extend(collect_cases(&path));
+            }
+        }
+    }
+    cases
 }
 
 fn run_case(case: &Path, name: &str, update: bool) {
@@ -192,7 +210,7 @@ fn write_test_toml(path: &Path, cfg: &toml::Value, exit: i32, stderr: &str, stdo
         .and_then(|v| v.as_table());
 
     let mut out = String::from("[expected]\n");
-    out += &format!("args = \"{}\"\n", args_str.replace('"', "\\\""));
+    out += &format!("args = \"{}\"\n", toml_escape(args_str));
     out += &format!("exit = {exit}\n");
     if !stderr.is_empty() {
         out += &format!("stderr = \"\"\"\n{stderr}\"\"\"");
@@ -214,7 +232,7 @@ fn write_test_toml(path: &Path, cfg: &toml::Value, exit: i32, stderr: &str, stdo
             out += "\n\n[env]\n";
             for (k, v) in env {
                 if let Some(s) = v.as_str() {
-                    out += &format!("{k} = \"{}\"\n", s.replace('"', "\\\""));
+                    out += &format!("{k} = \"{}\"\n", toml_escape(s));
                 }
             }
         }
@@ -234,6 +252,11 @@ fn write_test_toml(path: &Path, cfg: &toml::Value, exit: i32, stderr: &str, stdo
     }
 
     std::fs::write(path, out).unwrap();
+}
+
+/// Escapes a string for use inside TOML basic double-quoted strings.
+fn toml_escape(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 /// Strips ANSI escape sequences (e.g. colour codes from cargo fmt diffs).

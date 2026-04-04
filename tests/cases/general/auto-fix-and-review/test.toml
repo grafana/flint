@@ -1,5 +1,5 @@
 [expected]
-args = "--full --auto shellcheck"
+args = "--full --auto cargo-fmt shellcheck"
 exit = 1
 stderr = """
 [shellcheck]
@@ -13,5 +13,5 @@ echo "$1"
 
 For more information:
   https://www.shellcheck.net/wiki/SC2086 -- Double quote to prevent globbing ...
-flint: review: shellcheck
+flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
 """

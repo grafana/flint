@@ -7,11 +7,14 @@
   "mise.toml": {
     "mise": [
       "actionlint",
+      "dotnet",
       "editorconfig-checker",
+      "github:pinterest/ktlint",
+      "hadolint",
       "lychee",
       "node",
       "npm:@biomejs/biome",
-      "npm:markdownlint-cli",
+      "npm:markdownlint-cli2",
       "npm:prettier",
       "npm:renovate",
       "pipx:codespell",

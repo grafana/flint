@@ -9,12 +9,15 @@ shellcheck = "v0.11.0"
 shfmt = "v3.12.0"
 actionlint = "1.7.10"
 editorconfig-checker = "v3.6.1"
-"npm:markdownlint-cli" = "0.47.0"
+"npm:markdownlint-cli2" = "0.17.2"
 "npm:prettier" = "3.8.1"
 "npm:@biomejs/biome" = "2.3.14"
 "pipx:ruff" = "0.15.0"
 "pipx:codespell" = "2.4.1"
 rust = { version = "1.94.1", components = "clippy,rustfmt" }
+hadolint = "2.14.0"
+"github:pinterest/ktlint" = "1.8.0"
+dotnet = "10.0.201"
 
 [tasks."setup:update-super-linter-versions"]
 description = "Generate super-linter version mapping from the super-linter repo"

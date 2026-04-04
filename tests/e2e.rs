@@ -259,22 +259,39 @@ fn toml_escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-/// Strips ANSI escape sequences (e.g. colour codes from cargo fmt diffs).
+/// Strips ANSI/VT escape sequences (colour codes, character-set switches, etc.).
 /// TOML strings cannot contain raw control characters, so these must be removed.
 fn strip_ansi(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
     while let Some(c) = chars.next() {
-        if c == '\x1b' && chars.peek() == Some(&'[') {
-            chars.next(); // consume '['
-            while let Some(&next) = chars.peek() {
+        if c != '\x1b' {
+            out.push(c);
+            continue;
+        }
+        match chars.peek().copied() {
+            Some('[') => {
+                // CSI sequence: ESC [ <params> <letter>
                 chars.next();
-                if next.is_ascii_alphabetic() {
-                    break;
+                while let Some(&next) = chars.peek() {
+                    chars.next();
+                    if next.is_ascii_alphabetic() {
+                        break;
+                    }
                 }
             }
-        } else {
-            out.push(c);
+            Some(next) if ('\x20'..='\x2f').contains(&next) => {
+                // Two-byte sequence with intermediate: ESC <intermediate> <final>
+                // e.g. ESC(B (select ASCII character set)
+                chars.next();
+                while let Some(&next) = chars.peek() {
+                    chars.next();
+                    if ('\x30'..='\x7e').contains(&next) {
+                        break;
+                    }
+                }
+            }
+            _ => {} // bare ESC — drop it
         }
     }
     out

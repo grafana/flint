@@ -132,6 +132,15 @@ async fn run(
         .filter(|c| explicit || !args.fast_only || !c.slow)
         .collect();
 
+    if cli.verbose {
+        let names: Vec<&str> = active.iter().map(|c| c.name).collect();
+        if names.is_empty() {
+            eprintln!("flint: no active linters");
+        } else {
+            eprintln!("flint: active linters: {}", names.join(", "));
+        }
+    }
+
     let file_list = files::changed(
         project_root,
         &cfg,
@@ -304,7 +313,7 @@ fn print_linters(registry: &[registry::Check], mise_tools: &HashMap<String, Stri
         .max(6);
 
     println!(
-        "{:<name_w$}  {:<bin_w$}  {:<9}  {:<4}  PATTERNS",
+        "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  PATTERNS",
         "NAME",
         "BINARY",
         "STATUS",
@@ -316,7 +325,11 @@ fn print_linters(registry: &[registry::Check], mise_tools: &HashMap<String, Stri
 
     for check in registry {
         let status = if registry::check_active(check, mise_tools) {
-            "active"
+            if !check.uses_binary() || registry::binary_on_path(check.bin_name) {
+                "active"
+            } else {
+                "no binary"
+            }
         } else if mise_tools.contains_key(check.bin_name) {
             "wrong version"
         } else {
@@ -324,7 +337,7 @@ fn print_linters(registry: &[registry::Check], mise_tools: &HashMap<String, Stri
         };
         let speed = if check.slow { "slow" } else { "fast" };
         println!(
-            "{:<name_w$}  {:<bin_w$}  {:<9}  {:<4}  {}",
+            "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  {}",
             check.name,
             check.bin_name,
             status,

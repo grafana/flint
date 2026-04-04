@@ -72,6 +72,11 @@ impl Check {
         }
     }
 
+    /// Returns false for checks implemented entirely in-process with no external binary.
+    pub fn uses_binary(&self) -> bool {
+        !matches!(self.kind, CheckKind::Special(SpecialKind::LicenseHeader))
+    }
+
     // --- Constructors ---
 
     /// Check invoked once per matched file (`{FILE}`). `name` is also used as `bin_name`.
@@ -223,9 +228,6 @@ pub fn builtin() -> Vec<Check> {
         Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"])
             .fix("shfmt -w {FILE}")
             .formatter(),
-        Check::file("markdownlint", "markdownlint {FILE}", &["*.md"])
-            .fix("markdownlint --fix {FILE}")
-            .linter_config(".markdownlint.json", "--config"),
         Check::file("markdownlint-cli2", "markdownlint-cli2 {FILE}", &["*.md"])
             .fix("markdownlint-cli2 --fix {FILE}")
             .linter_config(".markdownlint.json", "--config"),
@@ -256,6 +258,7 @@ pub fn builtin() -> Vec<Check> {
         // that conflict with ec's max_line_length editorconfig check.
         // Note: ec's -config flag controls ec's own JSON config, not .editorconfig itself.
         Check::files("ec", "ec {FILES}", &["*"])
+            .mise_tool("editorconfig-checker")
             .defer_to_formatters()
             .linter_config(".editorconfig-checker.json", "-config"),
         Check::project(
@@ -303,11 +306,11 @@ pub fn builtin() -> Vec<Check> {
             &["*.java"],
         )
         .fix("google-java-format -i {FILES}")
-        .mise_tool("ubi:google/google-java-format")
+        .mise_tool("github:google/google-java-format")
         .formatter(),
         Check::files("ktlint", "ktlint {FILES}", &["*.kt", "*.kts"])
             .fix("ktlint --format {FILES}")
-            .mise_tool("ubi:pinterest/ktlint")
+            .mise_tool("github:pinterest/ktlint")
             .bin(if cfg!(windows) {
                 "ktlint.bat"
             } else {
@@ -320,6 +323,7 @@ pub fn builtin() -> Vec<Check> {
             &["*.cs"],
         )
         .fix("dotnet format")
+        .bin("dotnet")
         .mise_tool("dotnet")
         .slow()
         .formatter(),
@@ -338,6 +342,14 @@ pub fn builtin() -> Vec<Check> {
 
 /// Reads `[tools]` from the consuming repo's mise.toml and returns a map of
 /// tool name → declared version string.
+///
+/// Also registers normalized aliases for backend-prefixed tools so that checks
+/// can match by their bare package/binary name. For example:
+/// - `"npm:prettier"` → also registers `"prettier"`
+/// - `"npm:@biomejs/biome"` → also registers `"biome"` (last path component)
+/// - `"github:google/google-java-format"` → also registers `"google-java-format"`
+///
+/// The original key is always preserved; aliases only fill in missing entries.
 pub fn read_mise_tools(project_root: &Path) -> HashMap<String, String> {
     let path = project_root.join("mise.toml");
     let content = match std::fs::read_to_string(&path) {
@@ -363,6 +375,20 @@ pub fn read_mise_tools(project_root: &Path) -> HashMap<String, String> {
             }
         }
     }
+    // Add normalized aliases: strip the backend prefix (e.g. "npm:", "pipx:", "ubi:")
+    // and take the last path component (e.g. "@biomejs/biome" → "biome").
+    // Aliases never override an explicitly declared entry.
+    let aliases: Vec<(String, String)> = tools
+        .iter()
+        .filter_map(|(k, v)| {
+            let (_, rest) = k.split_once(':')?;
+            let base = rest.rsplit('/').next().unwrap_or(rest);
+            Some((base.to_string(), v.clone()))
+        })
+        .collect();
+    for (alias, version) in aliases {
+        tools.entry(alias).or_insert(version);
+    }
     tools
 }
 
@@ -383,6 +409,18 @@ pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool
         return false;
     };
     coerce_version(declared).is_some_and(|v| req.matches(&v))
+}
+
+/// Returns true if `bin_name` exists as a file in any directory in `path_var`
+/// (a `:`-separated PATH string). Accepts the PATH string as a parameter so
+/// callers can substitute a test-controlled path without mutating env vars.
+pub fn binary_on_path_var(bin_name: &str, path_var: &str) -> bool {
+    std::env::split_paths(path_var).any(|dir| dir.join(bin_name).is_file())
+}
+
+/// Returns true if `bin_name` is found in the current `PATH`.
+pub fn binary_on_path(bin_name: &str) -> bool {
+    binary_on_path_var(bin_name, &std::env::var("PATH").unwrap_or_default())
 }
 
 /// Parses a version string, padding with `.0` components if needed to satisfy
@@ -427,5 +465,61 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// Checks that every linter in the registry that uses an external binary
+    /// actually has that binary on PATH. Covers all registry entries, not just
+    /// those active in this repo — so tools like ktlint and hadolint are checked
+    /// even if they are not declared in this repo's mise.toml.
+    ///
+    /// This test will fail on machines where not all linter tools are installed,
+    /// which is intentional: it identifies what is missing.
+    #[test]
+    fn all_registry_binaries_found() {
+        let registry = builtin();
+
+        let not_found: Vec<&str> = registry
+            .iter()
+            .filter(|c| c.uses_binary())
+            .filter(|c| !binary_on_path(c.bin_name))
+            .map(|c| c.name)
+            .collect();
+
+        assert!(
+            not_found.is_empty(),
+            "registry linters missing binary on PATH: {}",
+            not_found.join(", ")
+        );
+    }
+
+    /// Smoke test: every check whose tool key resolves in this repo's expanded
+    /// mise_tools map must pass check_active. This catches tool-name mismatches
+    /// (wrong lookup key) and version-range violations without a hardcoded list —
+    /// new registry entries are covered automatically.
+    #[test]
+    fn all_flint_repo_linters_detected() {
+        let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mise_tools = read_mise_tools(project_root);
+        let registry = builtin();
+
+        let inactive: Vec<&str> = registry
+            .iter()
+            .filter(|c| {
+                // A check is "expected" if its lookup key appears in the expanded
+                // mise_tools map, or if it activates unconditionally.
+                c.activate_unconditionally || {
+                    let lookup = c.mise_tool_name.unwrap_or(c.bin_name);
+                    mise_tools.contains_key(lookup)
+                }
+            })
+            .filter(|c| !check_active(c, &mise_tools))
+            .map(|c| c.name)
+            .collect();
+
+        assert!(
+            inactive.is_empty(),
+            "linters not detected in flint repo: {}",
+            inactive.join(", ")
+        );
     }
 }

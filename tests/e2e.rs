@@ -280,7 +280,6 @@ fn strip_ansi(s: &str) -> String {
     out
 }
 
-
 /// Writes fake binaries from `[fake_bins]` in the test config into `bin_dir`,
 /// makes them executable (Unix), and returns a PATH string that prepends
 /// `bin_dir` to the current PATH. Returns `None` when no fake_bins are declared.

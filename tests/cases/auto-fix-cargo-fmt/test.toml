@@ -1,6 +1,7 @@
 args = "--full --auto cargo-fmt"
 exit = 1
 
-expected_stderr = """
+[expected]
+stderr = """
 flint: fixed: cargo-fmt — commit before pushing
 """

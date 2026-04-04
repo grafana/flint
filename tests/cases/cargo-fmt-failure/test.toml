@@ -1,7 +1,8 @@
 args = "--full cargo-fmt"
 exit = 1
 
-expected_stderr = """
+[expected]
+stderr = """
 [cargo-fmt]
 Diff in <REPO>/src/lib.rs:1:
 -pub struct Foo { pub a: u32, pub b: u32 }

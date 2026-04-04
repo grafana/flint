@@ -1,7 +1,8 @@
 args = "--full renovate-deps"
 exit = 1
 
-expected_stderr = """
+[expected]
+stderr = """
 [renovate-deps]
 --- .github/renovate-tracked-deps.json
 +++ generated

@@ -192,36 +192,34 @@ contains:
 args = "--full shellcheck"
 exit = 1                    # optional, default 0
 
+[expected]                  # optional golden output
+stderr = """
+...golden output...
+"""
+
+[expected.files]            # optional: assert files written by --fix
+".github/renovate-tracked-deps.json" = """
+{...}
+"""
+
 [env]                       # optional extra env vars
 FOO = "bar"
 
-expected_stderr = """
-...golden output...
-"""
+[fake_bins]                 # optional fake binaries (Unix only)
+renovate = '''
+#!/bin/sh
+echo '...'
+'''
 ```
 
 The `cases` test in `tests/e2e.rs` runs all of them.
-Set `UPDATE_SNAPSHOTS=1` to regenerate `expected_stderr`/
-`expected_stdout` in place.
+Set `UPDATE_SNAPSHOTS=1` to regenerate `[expected].stderr`/
+`stdout` in place. `[expected.files]` and `[fake_bins]` are
+always preserved by the snapshot writer.
 
-Use fixture cases for template-based linters (shellcheck,
-prettier, etc.) where the tool is available on PATH in CI.
+Use fixture cases for any check — including ones that require
+fake external binaries (via `[fake_bins]`). The fixture runner
+writes each binary into a tempdir and prepends it to `PATH`.
 
-### Programmatic e2e tests
-
-For special checks that require controlled tool output (e.g.
-`renovate-deps`, which runs `renovate --platform=local`),
-write a test function directly in `tests/e2e.rs` using a
-fake binary injected via `PATH`:
-
-1. Write a shell script that emits the JSON output your
-   check expects, make it executable, place it in a `TempDir`
-2. Prepend that dir to `PATH` via `flint_with_env`
-3. Assert on exit code and stderr content
-
-See the `renovate_deps` mod in `tests/e2e.rs` for the
-pattern. These tests are `#[cfg(unix)]` because the fake
-binary is a shell script.
-
-When adding a new special check, cover at least: clean pass,
-failure with correct output, and fix mode if supported.
+When adding a new check, cover at least: clean pass, failure
+with correct diff/output, and fix mode if supported.

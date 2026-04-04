@@ -7,7 +7,7 @@ renovate = '''
 printf '%s\n' '{"msg":"packageFiles with updates","config":{"npm":[{"packageFile":"package.json","deps":[{"depName":"express"},{"depName":"lodash"}]}]}}'
 '''
 
-[expected_files]
+[expected.files]
 ".github/renovate-tracked-deps.json" = """
 {
   "package.json": {

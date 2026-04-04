@@ -1,7 +1,8 @@
 args = "--full --auto cargo-fmt shellcheck"
 exit = 1
 
-expected_stderr = """
+[expected]
+stderr = """
 [shellcheck]
 
 In <REPO>/bad.sh line 2:

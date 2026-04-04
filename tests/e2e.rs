@@ -43,16 +43,24 @@ fn git_repo() -> TempDir {
 ///   test.toml  — args, expected exit code, and golden output
 ///
 /// test.toml format:
-///   args             = "--full --auto shellcheck"
-///   exit             = 1                          # optional, default 0
-///   expected_stderr  = """..."""                  # optional, default ""
-///   expected_stdout  = """..."""                  # optional, default ""
+///   args  = "--full --auto shellcheck"
+///   exit  = 1                          # optional, default 0
 ///
-///   [env]                                         # optional extra env vars
+///   [expected]                         # optional golden output
+///   stderr = """..."""
+///   stdout = """..."""
+///
+///   [expected.files]                   # optional file contents asserted after run
+///   ".github/renovate-tracked-deps.json" = """..."""
+///
+///   [env]                              # optional extra env vars
 ///   KEY = "value"
 ///
-///   [fake_bins]                                   # optional fake binaries (Unix only)
-///   renovate = "#!/bin/sh\necho '...'\n"          # written as executable, prepended to PATH
+///   [fake_bins]                        # optional fake binaries (Unix only)
+///   renovate = '''
+///   #!/bin/sh
+///   echo '...'
+///   '''
 ///
 /// Set UPDATE_SNAPSHOTS=1 to regenerate golden output in test.toml.
 #[test]
@@ -140,12 +148,13 @@ fn run_case(case: &Path, name: &str, update: bool) {
         return;
     }
 
-    let exp_stderr = cfg
-        .get("expected_stderr")
+    let expected = cfg.get("expected");
+    let exp_stderr = expected
+        .and_then(|v| v.get("stderr"))
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let exp_stdout = cfg
-        .get("expected_stdout")
+    let exp_stdout = expected
+        .and_then(|v| v.get("stdout"))
         .and_then(|v| v.as_str())
         .unwrap_or("");
     assert_eq!(stderr, exp_stderr, "{name}: stderr mismatch");
@@ -157,33 +166,51 @@ fn run_case(case: &Path, name: &str, update: bool) {
     );
 
     // Assert file contents written by flint (e.g. fix mode snapshots).
-    if let Some(files) = cfg.get("expected_files").and_then(|v| v.as_table()) {
-        for (rel_path, expected) in files {
-            let expected = expected
+    if let Some(files) = expected
+        .and_then(|v| v.get("files"))
+        .and_then(|v| v.as_table())
+    {
+        for (rel_path, exp) in files {
+            let exp = exp
                 .as_str()
-                .unwrap_or_else(|| panic!("{name}: expected_files.{rel_path} must be a string"));
+                .unwrap_or_else(|| panic!("{name}: expected.files.{rel_path} must be a string"));
             let actual = std::fs::read_to_string(repo.path().join(rel_path))
-                .unwrap_or_else(|e| panic!("{name}: expected_files.{rel_path}: {e}"));
-            assert_eq!(actual, expected, "{name}: {rel_path} content mismatch");
+                .unwrap_or_else(|e| panic!("{name}: expected.files.{rel_path}: {e}"));
+            assert_eq!(actual, exp, "{name}: {rel_path} content mismatch");
         }
     }
 }
 
-/// Rewrites test.toml updating snapshot fields (exit, expected_stderr, expected_stdout)
-/// while preserving everything else (args, env, fake_bins, expected_files).
-///
-/// Scalars (args, exit, expected_*) are written before table sections ([env],
-/// [fake_bins], [expected_files]) to satisfy TOML's scoping rules.
+/// Rewrites test.toml updating snapshot fields (exit, [expected].stderr/stdout)
+/// while preserving everything else (args, env, fake_bins, expected.files).
 fn write_test_toml(path: &Path, cfg: &toml::Value, exit: i32, stderr: &str, stdout: &str) {
     let args_str = cfg["args"].as_str().unwrap_or("");
     let mut out = format!("args = \"{}\"\n", args_str.replace('"', "\\\""));
     out += &format!("exit = {exit}\n");
 
-    if !stderr.is_empty() {
-        out += &format!("\nexpected_stderr = \"\"\"\n{stderr}\"\"\"");
-    }
-    if !stdout.is_empty() {
-        out += &format!("\nexpected_stdout = \"\"\"\n{stdout}\"\"\"");
+    // [expected] — stderr/stdout updated; files preserved unchanged.
+    let has_stderr = !stderr.is_empty();
+    let has_stdout = !stdout.is_empty();
+    let existing_files = cfg
+        .get("expected")
+        .and_then(|v| v.get("files"))
+        .and_then(|v| v.as_table());
+    if has_stderr || has_stdout || existing_files.is_some() {
+        out += "\n[expected]\n";
+        if has_stderr {
+            out += &format!("stderr = \"\"\"\n{stderr}\"\"\"");
+        }
+        if has_stdout {
+            out += &format!("stdout = \"\"\"\n{stdout}\"\"\"");
+        }
+        if let Some(files) = existing_files {
+            out += "\n\n[expected.files]\n";
+            for (k, v) in files {
+                if let Some(s) = v.as_str() {
+                    out += &format!("\"{k}\" = \"\"\"\n{s}\"\"\"");
+                }
+            }
+        }
     }
 
     if let Some(env) = cfg.get("env").and_then(|v| v.as_table()) {
@@ -205,18 +232,6 @@ fn write_test_toml(path: &Path, cfg: &toml::Value, exit: i32, stderr: &str, stdo
             for (k, v) in bins {
                 if let Some(s) = v.as_str() {
                     out += &format!("{k} = '''\n{s}'''\n");
-                }
-            }
-        }
-    }
-
-    // Preserve [expected_files] — not updated by UPDATE_SNAPSHOTS, managed manually.
-    if let Some(files) = cfg.get("expected_files").and_then(|v| v.as_table()) {
-        if !files.is_empty() {
-            out += "\n[expected_files]\n";
-            for (k, v) in files {
-                if let Some(s) = v.as_str() {
-                    out += &format!("\"{k}\" = \"\"\"\n{s}\"\"\"");
                 }
             }
         }

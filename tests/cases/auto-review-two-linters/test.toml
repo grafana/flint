@@ -1,7 +1,8 @@
 args = "--full --auto shellcheck actionlint"
 exit = 1
 
-expected_stderr = """
+[expected]
+stderr = """
 [actionlint]
 .github/workflows/ci.yml:6:23: undefined variable "foo". available variables are "env", "github", "inputs", "job", "matrix", "needs", "runner", "secrets", "steps", "strategy", "vars" [expression]
   |

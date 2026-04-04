@@ -5,7 +5,11 @@ use tokio::process::Command;
 
 use crate::config::RenovateDepsConfig;
 
-const COMMITTED_PATH: &str = ".github/renovate-tracked-deps.json";
+const COMMITTED_DIR: &str = ".github";
+const COMMITTED_FILE: &str = "renovate-tracked-deps.json";
+const COMMITTED_DISPLAY: &str = ".github/renovate-tracked-deps.json";
+const RENOVATE_CONFIG_FILE: &str = "renovate.json5";
+const PACKAGE_FILES_MSG: &str = "packageFiles with updates";
 const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value", "invalid-version"];
 
 /// `{file_path: {manager: [dep_name, ...]}}` — all collections sorted.
@@ -38,14 +42,14 @@ pub async fn run(
         }
     };
 
-    let committed_path = project_root.join(COMMITTED_PATH);
+    let committed_path = project_root.join(COMMITTED_DIR).join(COMMITTED_FILE);
 
     if !committed_path.exists() {
         if fix {
             return match write_snapshot(&committed_path, &generated) {
                 Ok(()) => (
                     true,
-                    b"renovate-tracked-deps.json has been created.\n".to_vec(),
+                    format!("{COMMITTED_FILE} has been created.\n").into_bytes(),
                     vec![],
                 ),
                 Err(e) => (
@@ -59,7 +63,7 @@ pub async fn run(
             false,
             vec![],
             format!(
-                "ERROR: {COMMITTED_PATH} does not exist.\nRun `flint --fix renovate-deps` to create it.\n"
+                "ERROR: {COMMITTED_DISPLAY} does not exist.\nRun `flint --fix renovate-deps` to create it.\n"
             )
             .into_bytes(),
         );
@@ -83,7 +87,7 @@ pub async fn run(
     if committed == generated {
         return (
             true,
-            b"renovate-tracked-deps.json is up to date.\n".to_vec(),
+            format!("{COMMITTED_FILE} is up to date.\n").into_bytes(),
             vec![],
         );
     }
@@ -94,7 +98,8 @@ pub async fn run(
         return match write_snapshot(&committed_path, &generated) {
             Ok(()) => {
                 let mut stdout = diff.into_bytes();
-                stdout.extend_from_slice(b"renovate-tracked-deps.json has been updated.\n");
+                stdout
+                    .extend_from_slice(format!("{COMMITTED_FILE} has been updated.\n").as_bytes());
                 (true, stdout, vec![])
             }
             Err(e) => (
@@ -108,13 +113,16 @@ pub async fn run(
     (
         false,
         diff.into_bytes(),
-        b"ERROR: renovate-tracked-deps.json is out of date.\nRun `flint --fix renovate-deps` to update.\n".to_vec(),
+        format!(
+            "ERROR: {COMMITTED_FILE} is out of date.\nRun `flint --fix renovate-deps` to update.\n"
+        )
+        .into_bytes(),
     )
 }
 
 /// Runs `renovate --platform=local` and returns the combined stdout+stderr log bytes.
 async fn run_renovate(project_root: &Path) -> anyhow::Result<Vec<u8>> {
-    let config_path = project_root.join(".github").join("renovate.json5");
+    let config_path = project_root.join(COMMITTED_DIR).join(RENOVATE_CONFIG_FILE);
 
     // Forward env, setting Renovate-specific vars.
     let mut env: Vec<(String, String)> = std::env::vars().collect();
@@ -177,13 +185,13 @@ fn extract_deps(log_bytes: &[u8], exclude_managers: &[String]) -> anyhow::Result
         let Ok(entry) = serde_json::from_str::<serde_json::Value>(line) else {
             continue;
         };
-        if entry.get("msg").and_then(|v| v.as_str()) == Some("packageFiles with updates") {
+        if entry.get("msg").and_then(|v| v.as_str()) == Some(PACKAGE_FILES_MSG) {
             config_obj = entry.get("config").cloned();
         }
     }
 
     let config = config_obj
-        .ok_or_else(|| anyhow::anyhow!("'packageFiles with updates' not found in Renovate log"))?;
+        .ok_or_else(|| anyhow::anyhow!("'{PACKAGE_FILES_MSG}' not found in Renovate log"))?;
 
     let mut deps_by_file: BTreeMap<String, BTreeMap<String, BTreeSet<String>>> = BTreeMap::new();
 
@@ -248,6 +256,6 @@ fn unified_diff(old: &DepMap, new: &DepMap) -> String {
 
     let diff = similar::TextDiff::from_lines(&old_text, &new_text);
     diff.unified_diff()
-        .header(COMMITTED_PATH, "generated")
+        .header(COMMITTED_DISPLAY, "generated")
         .to_string()
 }

@@ -3,9 +3,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::config::Config;
+use crate::linters::renovate_deps::COMMITTED_DISPLAY;
 
 /// Files managed by flint itself — always excluded from generic linter checks.
-const BUILTIN_EXCLUDES: &[&str] = &[".github/renovate-tracked-deps.json"];
+const BUILTIN_EXCLUDES: &[&str] = &[COMMITTED_DISPLAY];
 
 #[derive(Clone)]
 pub struct FileList {

@@ -48,6 +48,12 @@ fn git_repo() -> TempDir {
 ///   expected_stderr  = """..."""                  # optional, default ""
 ///   expected_stdout  = """..."""                  # optional, default ""
 ///
+///   [env]                                         # optional extra env vars
+///   KEY = "value"
+///
+///   [fake_bins]                                   # optional fake binaries (Unix only)
+///   renovate = "#!/bin/sh\necho '...'\n"          # written as executable, prepended to PATH
+///
 /// Set UPDATE_SNAPSHOTS=1 to regenerate golden output in test.toml.
 #[test]
 fn cases() {
@@ -100,10 +106,19 @@ fn run_case(case: &Path, name: &str, update: bool) {
                 .collect()
         })
         .unwrap_or_default();
-    let env_refs: Vec<(&str, &str)> = env_vars
+
+    // Write fake binaries into a temp dir and prepend it to PATH.
+    // The tempdir must stay alive until after flint_with_env returns.
+    let fake_bin_dir = tempfile::tempdir().expect("fake_bin tempdir");
+    let fake_path = setup_fake_bins(&cfg, name, fake_bin_dir.path());
+
+    let mut env_refs: Vec<(&str, &str)> = env_vars
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))
         .collect();
+    if let Some(ref p) = fake_path {
+        env_refs.push(("PATH", p.as_str()));
+    }
 
     let out = flint_with_env(&args, repo.path(), &env_refs);
 
@@ -114,7 +129,13 @@ fn run_case(case: &Path, name: &str, update: bool) {
         strip_ansi(&String::from_utf8_lossy(&out.stdout).replace(repo_str.as_ref(), "<REPO>"));
 
     if update {
-        write_test_toml(&toml_path, args_str, expected_exit, &stderr, &stdout);
+        write_test_toml(
+            &toml_path,
+            &cfg,
+            out.status.code().unwrap_or(0) as i32,
+            &stderr,
+            &stdout,
+        );
         println!("{name}: snapshots updated");
         return;
     }
@@ -134,18 +155,73 @@ fn run_case(case: &Path, name: &str, update: bool) {
         Some(expected_exit),
         "{name}: exit code mismatch"
     );
+
+    // Assert file contents written by flint (e.g. fix mode snapshots).
+    if let Some(files) = cfg.get("expected_files").and_then(|v| v.as_table()) {
+        for (rel_path, expected) in files {
+            let expected = expected
+                .as_str()
+                .unwrap_or_else(|| panic!("{name}: expected_files.{rel_path} must be a string"));
+            let actual = std::fs::read_to_string(repo.path().join(rel_path))
+                .unwrap_or_else(|e| panic!("{name}: expected_files.{rel_path}: {e}"));
+            assert_eq!(actual, expected, "{name}: {rel_path} content mismatch");
+        }
+    }
 }
 
-/// Rewrites test.toml preserving args/exit and updating the expected fields.
-fn write_test_toml(path: &Path, args: &str, exit: i32, stderr: &str, stdout: &str) {
-    let mut out = format!("args = \"{}\"\n", args.replace('"', "\\\""));
+/// Rewrites test.toml updating snapshot fields (exit, expected_stderr, expected_stdout)
+/// while preserving everything else (args, env, fake_bins, expected_files).
+///
+/// Scalars (args, exit, expected_*) are written before table sections ([env],
+/// [fake_bins], [expected_files]) to satisfy TOML's scoping rules.
+fn write_test_toml(path: &Path, cfg: &toml::Value, exit: i32, stderr: &str, stdout: &str) {
+    let args_str = cfg["args"].as_str().unwrap_or("");
+    let mut out = format!("args = \"{}\"\n", args_str.replace('"', "\\\""));
     out += &format!("exit = {exit}\n");
+
     if !stderr.is_empty() {
         out += &format!("\nexpected_stderr = \"\"\"\n{stderr}\"\"\"");
     }
     if !stdout.is_empty() {
         out += &format!("\nexpected_stdout = \"\"\"\n{stdout}\"\"\"");
     }
+
+    if let Some(env) = cfg.get("env").and_then(|v| v.as_table()) {
+        if !env.is_empty() {
+            out += "\n\n[env]\n";
+            for (k, v) in env {
+                if let Some(s) = v.as_str() {
+                    out += &format!("{k} = \"{}\"\n", s.replace('"', "\\\""));
+                }
+            }
+        }
+    }
+
+    // Serialize as multiline literal strings so shell scripts stay readable.
+    // TOML trims the first newline after ''', so '''\n{s}''' roundtrips cleanly.
+    if let Some(bins) = cfg.get("fake_bins").and_then(|v| v.as_table()) {
+        if !bins.is_empty() {
+            out += "\n[fake_bins]\n";
+            for (k, v) in bins {
+                if let Some(s) = v.as_str() {
+                    out += &format!("{k} = '''\n{s}'''\n");
+                }
+            }
+        }
+    }
+
+    // Preserve [expected_files] — not updated by UPDATE_SNAPSHOTS, managed manually.
+    if let Some(files) = cfg.get("expected_files").and_then(|v| v.as_table()) {
+        if !files.is_empty() {
+            out += "\n[expected_files]\n";
+            for (k, v) in files {
+                if let Some(s) = v.as_str() {
+                    out += &format!("\"{k}\" = \"\"\"\n{s}\"\"\"");
+                }
+            }
+        }
+    }
+
     std::fs::write(path, out).unwrap();
 }
 
@@ -321,6 +397,35 @@ mod renovate_deps {
         .unwrap();
         assert_eq!(written, SNAPSHOT);
     }
+}
+
+/// Writes fake binaries from `[fake_bins]` in the test config into `bin_dir`,
+/// makes them executable (Unix), and returns a PATH string that prepends
+/// `bin_dir` to the current PATH. Returns `None` when no fake_bins are declared.
+/// On non-Unix platforms fake_bins are silently ignored.
+fn setup_fake_bins(cfg: &toml::Value, case_name: &str, bin_dir: &Path) -> Option<String> {
+    let table = cfg.get("fake_bins")?.as_table()?;
+    if table.is_empty() {
+        return None;
+    }
+
+    for (bin_name, script) in table {
+        let content = script
+            .as_str()
+            .unwrap_or_else(|| panic!("{case_name}: fake_bins.{bin_name} must be a string"));
+        let path = bin_dir.join(bin_name);
+        std::fs::write(&path, content)
+            .unwrap_or_else(|e| panic!("{case_name}: failed to write fake bin {bin_name}: {e}"));
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+                .unwrap_or_else(|e| panic!("{case_name}: chmod failed for {bin_name}: {e}"));
+        }
+    }
+
+    let orig = std::env::var("PATH").unwrap_or_default();
+    Some(format!("{}:{orig}", bin_dir.display()))
 }
 
 fn copy_dir_into(src: &Path, dst: &Path) {

@@ -8,7 +8,7 @@ use crate::linters::LinterOutput;
 
 const COMMITTED_DIR: &str = ".github";
 const COMMITTED_FILE: &str = "renovate-tracked-deps.json";
-const COMMITTED_DISPLAY: &str = ".github/renovate-tracked-deps.json";
+pub(crate) const COMMITTED_DISPLAY: &str = ".github/renovate-tracked-deps.json";
 const RENOVATE_CONFIG_FILE: &str = "renovate.json5";
 const PACKAGE_FILES_MSG: &str = "packageFiles with updates";
 const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value", "invalid-version"];

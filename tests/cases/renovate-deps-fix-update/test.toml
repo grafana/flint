@@ -1,0 +1,20 @@
+args = "--full --fix renovate-deps"
+exit = 0
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+printf '%s\n' '{"msg":"packageFiles with updates","config":{"npm":[{"packageFile":"package.json","deps":[{"depName":"express"},{"depName":"lodash"}]}]}}'
+'''
+
+[expected_files]
+".github/renovate-tracked-deps.json" = """
+{
+  "package.json": {
+    "npm": [
+      "express",
+      "lodash"
+    ]
+  }
+}
+"""

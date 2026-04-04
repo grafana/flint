@@ -348,3 +348,72 @@ fn is_link_checkable(path: &Path) -> bool {
             | "txt"
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_github_repo_https() {
+        assert_eq!(
+            parse_github_repo("https://github.com/owner/repo"),
+            Some("owner/repo".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_github_repo_https_dotgit() {
+        assert_eq!(
+            parse_github_repo("https://github.com/owner/repo.git"),
+            Some("owner/repo".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_github_repo_ssh() {
+        assert_eq!(
+            parse_github_repo("git@github.com:owner/repo"),
+            Some("owner/repo".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_github_repo_ssh_dotgit() {
+        assert_eq!(
+            parse_github_repo("git@github.com:owner/repo.git"),
+            Some("owner/repo".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_github_repo_non_github() {
+        assert_eq!(parse_github_repo("https://gitlab.com/owner/repo"), None);
+    }
+
+    #[test]
+    fn parse_github_repo_empty_path() {
+        assert_eq!(parse_github_repo("https://github.com/"), None);
+    }
+
+    #[test]
+    fn is_link_checkable_md() {
+        assert!(is_link_checkable(Path::new("README.md")));
+        assert!(is_link_checkable(Path::new("docs/page.markdown")));
+        assert!(is_link_checkable(Path::new("file.html")));
+        assert!(is_link_checkable(Path::new("notes.txt")));
+    }
+
+    #[test]
+    fn is_link_checkable_case_insensitive() {
+        assert!(is_link_checkable(Path::new("README.MD")));
+        assert!(is_link_checkable(Path::new("page.HTML")));
+    }
+
+    #[test]
+    fn is_link_checkable_non_checkable() {
+        assert!(!is_link_checkable(Path::new("main.rs")));
+        assert!(!is_link_checkable(Path::new("config.toml")));
+        assert!(!is_link_checkable(Path::new("script.sh")));
+        assert!(!is_link_checkable(Path::new("Makefile")));
+    }
+}

@@ -1,0 +1,21 @@
+[expected]
+args = "--full lychee"
+exit = 1
+stderr = """
+[lychee]
+==> Checking all links in all files
+[404] https://example.com/does-not-exist
+
+flint: 1 check failed (lychee)
+💡 Try `mise run lint:fix` to auto-fix lint issues, then re-run `mise run lint` to verify.
+"""
+
+[env]
+LYCHEE_SKIP_GITHUB_REMAPS = "true"
+
+[fake_bins]
+lychee = '''
+#!/bin/sh
+echo "[404] https://example.com/does-not-exist"
+exit 1
+'''

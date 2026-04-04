@@ -82,3 +82,53 @@ fn glob_match(pattern: &str, name: &str) -> bool {
         _ => false,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn glob_match_extension() {
+        assert!(glob_match("*.java", "Foo.java"));
+        assert!(glob_match("*.java", "src/main/Foo.java"));
+        assert!(!glob_match("*.java", "Foo.kt"));
+    }
+
+    #[test]
+    fn glob_match_exact() {
+        assert!(glob_match("Makefile", "Makefile"));
+        assert!(glob_match("Makefile", "src/Makefile"));
+        assert!(!glob_match("Makefile", "GNUmakefile"));
+    }
+
+    #[test]
+    fn check_file_finds_header_in_first_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("Foo.java");
+        std::fs::write(&path, "// Copyright 2024 Acme\npublic class Foo {}\n").unwrap();
+        assert!(check_file(&path, "Copyright", 5).unwrap());
+    }
+
+    #[test]
+    fn check_file_missing_header() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("Foo.java");
+        std::fs::write(&path, "public class Foo {}\n").unwrap();
+        assert!(!check_file(&path, "Copyright", 5).unwrap());
+    }
+
+    #[test]
+    fn check_file_header_beyond_line_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("Foo.java");
+        std::fs::write(
+            &path,
+            "line1\nline2\nline3\n// Copyright 2024 Acme\npublic class Foo {}\n",
+        )
+        .unwrap();
+        // Header is on line 4; with limit=3 it should not be found.
+        assert!(!check_file(&path, "Copyright", 3).unwrap());
+        // With limit=5 it should be found.
+        assert!(check_file(&path, "Copyright", 5).unwrap());
+    }
+}

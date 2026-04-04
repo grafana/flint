@@ -4,3 +4,11 @@ exit = 1
 stderr = """
 flint: fixed: cargo-fmt — commit before pushing
 """
+
+[expected.files]
+"src/lib.rs" = """
+pub struct Foo {
+    pub a: u32,
+    pub b: u32,
+}
+"""

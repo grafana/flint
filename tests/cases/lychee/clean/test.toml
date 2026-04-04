@@ -1,0 +1,12 @@
+[expected]
+args = "--full lychee"
+exit = 0
+
+[env]
+LYCHEE_SKIP_GITHUB_REMAPS = "true"
+
+[fake_bins]
+lychee = '''
+#!/bin/sh
+exit 0
+'''

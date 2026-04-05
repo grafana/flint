@@ -338,7 +338,6 @@ pub fn builtin() -> Vec<Check> {
         .fix("dotnet format")
         .bin("dotnet")
         .mise_tool("dotnet")
-        .slow()
         .formatter(),
         Check::special("lychee", "lychee", SpecialKind::Links),
         Check::special("renovate-deps", "renovate", SpecialKind::RenovateDeps)
@@ -573,7 +572,15 @@ mod tests {
 
     fn generate_readme_table(registry: &[Check]) -> String {
         // Build raw cell values for every row (header + data).
-        let headers = ["Name", "Binary", "Patterns", "Fix", "Slow", "Scope", "Config file"];
+        let headers = [
+            "Name",
+            "Binary",
+            "Patterns",
+            "Fix",
+            "Slow",
+            "Scope",
+            "Config file",
+        ];
         let rows: Vec<[String; 7]> = registry.iter().map(table_row).collect();
 
         // Compute column widths.
@@ -597,9 +604,12 @@ mod tests {
         let sep_row = format!("| {} |", separator.join(" | "));
 
         let header_strs: Vec<&str> = headers.iter().copied().collect();
-        let generated_comment =
-            "<!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->";
-        let mut lines = vec![generated_comment.to_string(), fmt_row(&header_strs), sep_row];
+        let generated_comment = "<!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->";
+        let mut lines = vec![
+            generated_comment.to_string(),
+            fmt_row(&header_strs),
+            sep_row,
+        ];
         for row in &rows {
             let strs: Vec<&str> = row.iter().map(|s| s.as_str()).collect();
             lines.push(fmt_row(&strs));

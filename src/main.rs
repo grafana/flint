@@ -6,6 +6,7 @@ mod runner;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
+use registry::{CheckKind, Scope};
 use runner::{CheckResult, RunOptions};
 use std::collections::HashMap;
 
@@ -22,9 +23,16 @@ enum SubCommand {
     /// Lint the code.
     Run(RunArgs),
     /// List available linters and their status.
-    Linters,
+    Linters(LintersArgs),
     /// Display the flint version.
     Version,
+}
+
+#[derive(Args, Debug)]
+struct LintersArgs {
+    /// Output as JSON instead of the human-readable table.
+    #[arg(long)]
+    json: bool,
 }
 
 #[derive(Args, Debug)]
@@ -83,9 +91,13 @@ async fn main() -> Result<()> {
         SubCommand::Version => {
             println!("flint {}", env!("CARGO_PKG_VERSION"));
         }
-        SubCommand::Linters => {
+        SubCommand::Linters(args) => {
             let mise_tools = registry::read_mise_tools(&project_root);
-            print_linters(&registry, &mise_tools);
+            if args.json {
+                print_linters_json(&registry);
+            } else {
+                print_linters(&registry, &mise_tools);
+            }
         }
         SubCommand::Run(args) => {
             run(args, &project_root, &config_dir, &registry).await?;
@@ -291,6 +303,33 @@ async fn run(
     }
 
     Ok(())
+}
+
+fn print_linters_json(registry: &[registry::Check]) {
+    let entries: Vec<serde_json::Value> = registry.iter().map(linter_json).collect();
+    println!("{}", serde_json::to_string_pretty(&entries).unwrap());
+}
+
+pub fn linter_json(check: &registry::Check) -> serde_json::Value {
+    let scope = match &check.kind {
+        CheckKind::Template { scope, .. } => match scope {
+            Scope::File => "file",
+            Scope::Files => "files",
+            Scope::Project => "project",
+        },
+        CheckKind::Special(_) => "special",
+    };
+    let patterns: Vec<&str> = check.patterns.to_vec();
+    let config_file: Option<&str> = check.linter_config.map(|(filename, _)| filename);
+    serde_json::json!({
+        "name": check.name,
+        "binary": if check.uses_binary() { check.bin_name } else { "(built-in)" },
+        "patterns": patterns,
+        "fix": check.has_fix(),
+        "slow": check.slow,
+        "scope": scope,
+        "config_file": config_file,
+    })
 }
 
 fn is_fixable(name: &str, active: &[&registry::Check]) -> bool {

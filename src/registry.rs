@@ -492,6 +492,138 @@ mod tests {
         );
     }
 
+    /// Verifies the README linter table is in sync with the registry.
+    /// Every column is checked against the registry except `config_file`, which
+    /// may contain hand-written footnotes or prose (e.g. the lychee config note).
+    ///
+    /// Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate.
+    #[test]
+    fn readme_linter_table_in_sync() {
+        let readme_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("README.md");
+        let readme = std::fs::read_to_string(&readme_path).expect("README.md must be readable");
+        let registry = builtin();
+
+        let expected = generate_readme_table(&registry);
+
+        if std::env::var("UPDATE_README").is_ok() {
+            let updated = replace_readme_table(&readme, &expected);
+            std::fs::write(&readme_path, updated).expect("failed to write README.md");
+            return;
+        }
+
+        let actual = extract_readme_table(&readme);
+        if actual != expected {
+            panic!(
+                "README linter table is out of sync with the registry.\n\
+                 Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate.\n\n\
+                 Expected:\n{expected}\n\nActual:\n{actual}"
+            );
+        }
+    }
+
+    const README_TABLE_START: &str = "<!-- registry-table-start -->";
+    const README_TABLE_END: &str = "<!-- registry-table-end -->";
+
+    fn extract_readme_table(readme: &str) -> String {
+        let start = readme
+            .find(README_TABLE_START)
+            .expect("README missing <!-- registry-table-start --> marker")
+            + README_TABLE_START.len();
+        let end = readme
+            .find(README_TABLE_END)
+            .expect("README missing <!-- registry-table-end --> marker");
+        readme[start..end].trim().to_string()
+    }
+
+    fn replace_readme_table(readme: &str, table: &str) -> String {
+        // `start` points just after the opening marker; `&readme[..start]` includes it.
+        let start = readme
+            .find(README_TABLE_START)
+            .expect("README missing <!-- registry-table-start --> marker")
+            + README_TABLE_START.len();
+        let end = readme
+            .find(README_TABLE_END)
+            .expect("README missing <!-- registry-table-end --> marker");
+        format!(
+            "{}\n{}\n{}{}",
+            &readme[..start],
+            table,
+            README_TABLE_END,
+            &readme[end + README_TABLE_END.len()..]
+        )
+    }
+
+    fn generate_readme_table(registry: &[Check]) -> String {
+        // Build raw cell values for every row (header + data).
+        let headers = ["Name", "Binary", "Patterns", "Fix", "Slow", "Scope", "Config file"];
+        let rows: Vec<[String; 7]> = registry.iter().map(table_row).collect();
+
+        // Compute column widths.
+        let mut widths = headers.map(|h| h.len());
+        for row in &rows {
+            for (i, cell) in row.iter().enumerate() {
+                widths[i] = widths[i].max(cell.len());
+            }
+        }
+
+        let fmt_row = |cells: &[&str]| -> String {
+            let cols: Vec<String> = cells
+                .iter()
+                .enumerate()
+                .map(|(i, cell)| format!("{:<width$}", cell, width = widths[i]))
+                .collect();
+            format!("| {} |", cols.join(" | "))
+        };
+
+        let separator: Vec<String> = widths.iter().map(|&w| "-".repeat(w)).collect();
+        let sep_row = format!("| {} |", separator.join(" | "));
+
+        let header_strs: Vec<&str> = headers.iter().copied().collect();
+        let generated_comment =
+            "<!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->";
+        let mut lines = vec![generated_comment.to_string(), fmt_row(&header_strs), sep_row];
+        for row in &rows {
+            let strs: Vec<&str> = row.iter().map(|s| s.as_str()).collect();
+            lines.push(fmt_row(&strs));
+        }
+        lines.join("\n")
+    }
+
+    fn table_row(check: &Check) -> [String; 7] {
+        let name = format!("`{}`", check.name);
+        let binary = if check.uses_binary() {
+            format!("`{}`", check.bin_name)
+        } else {
+            "(built-in)".to_string()
+        };
+        let patterns = if check.patterns.is_empty() {
+            "(all files)".to_string()
+        } else {
+            format!("`{}`", check.patterns.join(" "))
+        };
+        let fix = if check.has_fix() { "yes" } else { "no" }.to_string();
+        let slow = if check.slow { "yes" } else { "—" }.to_string();
+        let scope = match &check.kind {
+            CheckKind::Template { scope, .. } => match scope {
+                Scope::File => "file",
+                Scope::Files => "files",
+                Scope::Project => "project",
+            },
+            CheckKind::Special(_) => "special",
+        }
+        .to_string();
+        let config_file = match check.linter_config {
+            Some((filename, _)) => format!("`{filename}`"),
+            None => match &check.kind {
+                CheckKind::Special(SpecialKind::Links) => {
+                    "via `[checks.links]` in flint.toml".to_string()
+                }
+                _ => "—".to_string(),
+            },
+        };
+        [name, binary, patterns, fix, slow, scope, config_file]
+    }
+
     /// Smoke test: every check whose tool key resolves in this repo's expanded
     /// mise_tools map must pass check_active. This catches tool-name mismatches
     /// (wrong lookup key) and version-range violations without a hardcoded list —

@@ -18,7 +18,7 @@ ruff-format           ruff                active         fast  *.py
 biome                 biome               active         fast  *.json *.jsonc *.js *.ts *.jsx *.tsx
 biome-format          biome               active         fast  *.json *.jsonc *.js *.ts *.jsx *.tsx
 cargo-clippy          cargo-clippy        active         fast  *.rs
-cargo-fmt             cargo-fmt           active         fast  *.rs
+cargo-fmt             rustfmt             active         fast  *.rs
 gofmt                 gofmt               missing        fast  *.go
 google-java-format    google-java-format  missing        fast  *.java
 ktlint                ktlint              missing        fast  *.kt *.kts
@@ -37,7 +37,7 @@ biome = '''
 cargo-clippy = '''
 #!/bin/sh
 '''
-cargo-fmt = '''
+rustfmt = '''
 #!/bin/sh
 '''
 codespell = '''

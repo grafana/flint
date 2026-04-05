@@ -13,6 +13,9 @@ pub struct FileList {
     pub files: Vec<PathBuf>,
     /// The merge base ref, used by project-scoped checks (e.g. golangci-lint).
     pub merge_base: Option<String>,
+    /// True when the file list contains all project files (explicit --full or no merge base).
+    /// Used by checks with a `full_cmd` to switch to a project-wide command.
+    pub full: bool,
 }
 
 pub fn changed(
@@ -39,7 +42,11 @@ pub fn changed(
         return all_files(project_root, exclude_re.as_ref(), exclude_paths);
     };
 
-    Ok(FileList { files, merge_base })
+    Ok(FileList {
+        files,
+        merge_base,
+        full: false,
+    })
 }
 
 fn compile_exclude_re(cfg: &Config) -> Option<regex::Regex> {
@@ -118,6 +125,7 @@ fn all_files(
     Ok(FileList {
         files: filter_names(project_root, exclude_re, exclude_paths, names),
         merge_base: None,
+        full: true,
     })
 }
 

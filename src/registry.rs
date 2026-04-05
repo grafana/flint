@@ -24,6 +24,12 @@ pub enum CheckKind {
     Template {
         check_cmd: &'static str,
         fix_cmd: &'static str,
+        /// When set and `file_list.full == true`, used instead of `check_cmd` as a
+        /// project-wide check command (no `{FILES}` substitution). Useful for tools like
+        /// `cargo fmt` that handle all-files scanning better than a long file list.
+        full_cmd: &'static str,
+        /// When set and `file_list.full == true` in fix mode, used instead of `fix_cmd`.
+        full_fix_cmd: &'static str,
         scope: Scope,
     },
     Special(SpecialKind),
@@ -60,6 +66,8 @@ pub struct Check {
     /// Always considered active regardless of mise.toml (used for config-activated checks).
     pub activate_unconditionally: bool,
     pub kind: CheckKind,
+    /// Optional note shown in the README linter table.
+    pub note: Option<&'static str>,
 }
 
 impl Check {
@@ -127,8 +135,11 @@ impl Check {
             kind: CheckKind::Template {
                 check_cmd,
                 fix_cmd: "",
+                full_cmd: "",
+                full_fix_cmd: "",
                 scope,
             },
+            note: None,
         }
     }
 
@@ -147,6 +158,7 @@ impl Check {
             defers_to_formatters: false,
             activate_unconditionally: false,
             kind: CheckKind::Special(kind),
+            note: None,
         }
     }
 
@@ -173,6 +185,23 @@ impl Check {
         } = self.kind
         {
             *f = fix_cmd;
+        }
+        self
+    }
+
+    /// Set project-wide commands used instead of `check_cmd`/`fix_cmd` when
+    /// `file_list.full == true` (explicit `--full` or no merge base). Commands
+    /// run with no file arguments — useful for tools that discover files internally
+    /// (e.g. `cargo fmt`). Also handles edition detection for Rust tools.
+    pub fn full_cmd(mut self, check: &'static str, fix: &'static str) -> Self {
+        if let CheckKind::Template {
+            full_cmd: ref mut c,
+            full_fix_cmd: ref mut f,
+            ..
+        } = self.kind
+        {
+            *c = check;
+            *f = fix;
         }
         self
     }
@@ -205,6 +234,12 @@ impl Check {
     /// Always considered active regardless of mise.toml (for config-activated checks).
     pub fn activate_unconditionally(mut self) -> Self {
         self.activate_unconditionally = true;
+        self
+    }
+
+    /// Add a note shown in the README linter table.
+    pub fn note(mut self, note: &'static str) -> Self {
+        self.note = Some(note);
         self
     }
 
@@ -249,6 +284,7 @@ pub fn builtin() -> Vec<Check> {
             &["*.md", "*.yml", "*.yaml"],
         )
         .fix("prettier --write {FILES}")
+        .full_cmd("prettier --check {ROOT}", "prettier --write {ROOT}")
         .linter_config(".prettierrc", "--config")
         .formatter(),
         Check::file(
@@ -279,7 +315,8 @@ pub fn builtin() -> Vec<Check> {
             "golangci-lint run --new-from-rev={MERGE_BASE}",
             &["*.go"],
         )
-        .linter_config(".golangci.yml", "--config"),
+        .linter_config(".golangci.yml", "--config")
+        .note("uses --new-from-rev to lint only changed code"),
         Check::file("ruff", "ruff check {FILE}", &["*.py"])
             .fix("ruff check --fix {FILE}")
             .linter_config("ruff.toml", "--config"),
@@ -304,11 +341,18 @@ pub fn builtin() -> Vec<Check> {
         .formatter(),
         Check::project("cargo-clippy", "cargo clippy -q -- -D warnings", &["*.rs"])
             .fix("cargo clippy -q --fix --allow-dirty --allow-staged -- -D warnings")
-            .mise_tool("rust"),
-        Check::project("cargo-fmt", "cargo fmt -- --check", &["*.rs"])
-            .fix("cargo fmt")
             .mise_tool("rust")
-            .formatter(),
+            .note("lints all .rs files, not just changed"),
+        Check::files(
+            "cargo-fmt",
+            "rustfmt {CARGO_EDITION_FLAG} --check {FILES}",
+            &["*.rs"],
+        )
+        .fix("rustfmt {CARGO_EDITION_FLAG} {FILES}")
+        .full_cmd("cargo fmt -- --check", "cargo fmt")
+        .bin("rustfmt")
+        .mise_tool("rust")
+        .formatter(),
         Check::file("gofmt", "gofmt -d {FILE}", &["*.go"])
             .fix("gofmt -w {FILE}")
             .mise_tool("go")
@@ -327,6 +371,10 @@ pub fn builtin() -> Vec<Check> {
             &["*.kt", "*.kts"],
         )
         .fix("ktlint --format --log-level=error {FILES}")
+        .full_cmd(
+            "ktlint --log-level=error {ROOT}",
+            "ktlint --format --log-level=error {ROOT}",
+        )
         .mise_tool("github:pinterest/ktlint")
         .bin(if cfg!(windows) {
             "ktlint.bat"
@@ -334,12 +382,13 @@ pub fn builtin() -> Vec<Check> {
             "ktlint"
         })
         .formatter(),
-        Check::project(
+        Check::files(
             "dotnet-format",
-            "dotnet format --verify-no-changes",
+            "dotnet format --verify-no-changes --include {RELFILES}",
             &["*.cs"],
         )
-        .fix("dotnet format")
+        .fix("dotnet format --include {RELFILES}")
+        .full_cmd("dotnet format --verify-no-changes", "dotnet format")
         .bin("dotnet")
         .mise_tool("dotnet")
         .formatter(),
@@ -584,8 +633,9 @@ mod tests {
             "Slow",
             "Scope",
             "Config file",
+            "Notes",
         ];
-        let rows: Vec<[String; 7]> = registry.iter().map(table_row).collect();
+        let rows: Vec<[String; 8]> = registry.iter().map(table_row).collect();
 
         // Compute column widths.
         let mut widths = headers.map(|h| h.len());
@@ -621,7 +671,7 @@ mod tests {
         lines.join("\n")
     }
 
-    fn table_row(check: &Check) -> [String; 7] {
+    fn table_row(check: &Check) -> [String; 8] {
         let name = format!("`{}`", check.name);
         let binary = if check.uses_binary() {
             format!("`{}`", check.bin_name)
@@ -653,7 +703,8 @@ mod tests {
                 _ => "—".to_string(),
             },
         };
-        [name, binary, patterns, fix, slow, scope, config_file]
+        let notes = check.note.unwrap_or("—").to_string();
+        [name, binary, patterns, fix, slow, scope, config_file, notes]
     }
 
     /// Smoke test: every check whose tool key resolves in this repo's expanded

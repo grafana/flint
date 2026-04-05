@@ -8,9 +8,15 @@ builder pattern:
 Check::file("mytool", "mytool --check {FILE}", &["*.ext"])
     .fix("mytool --fix {FILE}"),
 
-// Files scope — invoked once with all matched files
+// Files scope — invoked once with all matched files (absolute paths)
 Check::files("mytool", "mytool {FILES}", &["*.ext"])
     .fix("mytool --fix {FILES}"),
+
+// Files scope — invoked once with all matched files (relative to project root)
+// Use {RELFILES} when the tool requires paths relative to the project root
+// (e.g. dotnet format --include).
+Check::files("mytool", "mytool --include {RELFILES}", &["*.ext"])
+    .fix("mytool --fix --include {RELFILES}"),
 
 // Project scope — invoked once, skipped if no *.ext changed
 Check::project("mytool", "mytool run", &["*.ext"]),
@@ -54,10 +60,21 @@ Check::file("markdownlint", "markdownlint {FILE}", &["*.md"])
   `.linter_config` that injects the directory rather than the full file path
   (not yet implemented)
 - The tool is project-scoped and its config must live at the project root to
-  function (e.g. `cargo-fmt` reads `rustfmt.toml` via Cargo, not a direct flag)
+  function (no explicit `--config` flag exists)
 
 Look up the tool's `--help` or man page for the config flag name and expected
 argument type before adding `.linter_config`.
 
 For checks that need custom logic (not a simple command template), add a module
 under `src/linters/` and use `CheckKind::Special`.
+
+## Changed-files scoping
+
+Most linters use `file` or `files` scope, so they naturally receive only changed
+files as arguments. `golangci-lint` uses `project` scope but scopes internally via
+`--new-from-rev={MERGE_BASE}`.
+
+**`cargo-clippy` cannot scope to changed files.** Cargo has no git-aware flag
+equivalent to `--new-from-rev`. It still skips entirely when no `*.rs` files
+changed, but when it does run it checks the whole project. Workspace support
+(`-p <pkg> --no-deps` per changed package) would be a future improvement.

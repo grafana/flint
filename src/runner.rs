@@ -201,6 +201,8 @@ fn build_invocations(
     let CheckKind::Template {
         check_cmd,
         fix_cmd,
+        full_cmd,
+        full_fix_cmd,
         scope,
     } = &check.kind
     else {
@@ -257,15 +259,64 @@ fn build_invocations(
             if matched.is_empty() {
                 return vec![];
             }
+            // When all project files are in scope and a full_cmd is set, use it as a
+            // project-wide command instead of passing a (potentially huge) file list.
+            if file_list.full {
+                let effective = if fix && !full_fix_cmd.is_empty() {
+                    Some(*full_fix_cmd)
+                } else if !fix && !full_cmd.is_empty() {
+                    Some(*full_cmd)
+                } else {
+                    None
+                };
+                if let Some(cmd) = effective {
+                    let cmd = cmd.replace("{ROOT}", &quote_path(project_root));
+                    return vec![inject_config(shell_words(cmd), &config_args)];
+                }
+            }
+            let edition_flag = resolve_cargo_edition_flag(project_root);
             let files_arg: String = matched
                 .iter()
                 .map(|f| quote_path(f))
                 .collect::<Vec<_>>()
                 .join(" ");
-            let cmd = cmd_template.replace("{FILES}", &files_arg);
+            let rel_files_arg: String = matched
+                .iter()
+                .map(|f| quote_path(f.strip_prefix(project_root).unwrap_or(f)))
+                .collect::<Vec<_>>()
+                .join(" ");
+            let cmd = cmd_template
+                .replace("{CARGO_EDITION_FLAG}", &edition_flag)
+                .replace("{FILES}", &files_arg)
+                .replace("{RELFILES}", &rel_files_arg);
             vec![inject_config(shell_words(cmd), &config_args)]
         }
     }
+}
+
+/// Returns `--edition <edition>` if a Rust edition is declared in the project's
+/// `Cargo.toml`, or an empty string if not found. Used to substitute
+/// `{CARGO_EDITION_FLAG}` in rustfmt command templates.
+fn resolve_cargo_edition_flag(project_root: &Path) -> String {
+    let Ok(content) = std::fs::read_to_string(project_root.join("Cargo.toml")) else {
+        return String::new();
+    };
+    let Ok(doc) = content.parse::<toml::Value>() else {
+        return String::new();
+    };
+    let edition = doc
+        .get("package")
+        .and_then(|p| p.get("edition"))
+        .and_then(|e| e.as_str())
+        .or_else(|| {
+            doc.get("workspace")
+                .and_then(|w| w.get("package"))
+                .and_then(|p| p.get("edition"))
+                .and_then(|e| e.as_str())
+        });
+    edition
+        .map(|e| format!("--edition {e}"))
+        .unwrap_or_default()
 }
 
 /// Returns `[flag, abs-path]` if `check.linter_config` is set and the file exists
@@ -534,8 +585,11 @@ mod tests {
             kind: CheckKind::Template {
                 check_cmd: "run-it",
                 fix_cmd: "",
+                full_cmd: "",
+                full_fix_cmd: "",
                 scope: Scope::Project,
             },
+            note: None,
         }
     }
 
@@ -546,6 +600,7 @@ mod tests {
                 .map(|s| PathBuf::from(format!("/repo/{s}")))
                 .collect(),
             merge_base: Some("abc123".to_string()),
+            full: false,
         }
     }
 

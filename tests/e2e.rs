@@ -1,5 +1,7 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
 /// Runs the flint binary in the given directory with the given args.
@@ -62,21 +64,85 @@ fn git_repo() -> TempDir {
 ///   '''
 ///
 /// Set UPDATE_SNAPSHOTS=1 to regenerate golden output in test.toml.
+/// Set FLINT_CASES=<dir> to run only cases under that directory (e.g. FLINT_CASES=shellcheck
+/// or FLINT_CASES=shellcheck/clean). Top-level groups run in parallel.
 #[test]
 fn cases() {
     let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/cases");
     let update = std::env::var("UPDATE_SNAPSHOTS").is_ok();
+    let filter = std::env::var("FLINT_CASES").ok();
 
     let mut case_paths = collect_cases(&cases_dir);
     case_paths.sort();
 
-    for case in &case_paths {
-        let name = case
+    if let Some(ref f) = filter {
+        case_paths.retain(|p| {
+            let name = p.strip_prefix(&cases_dir).unwrap().to_string_lossy();
+            name.starts_with(f.as_str())
+        });
+        if case_paths.is_empty() {
+            panic!("FLINT_CASES={f}: no matching cases found");
+        }
+    }
+
+    // Group by top-level directory (linter name) so each group runs in its own thread.
+    let mut groups: BTreeMap<String, Vec<PathBuf>> = BTreeMap::new();
+    for path in case_paths {
+        let top = path
             .strip_prefix(&cases_dir)
             .unwrap()
+            .components()
+            .next()
+            .unwrap()
+            .as_os_str()
             .to_string_lossy()
             .into_owned();
-        run_case(&case, &name, update);
+        groups.entry(top).or_default().push(path);
+    }
+
+    let failures: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+
+    let handles: Vec<_> = groups
+        .into_values()
+        .map(|paths| {
+            let cases_dir = cases_dir.clone();
+            let failures = Arc::clone(&failures);
+            std::thread::spawn(move || {
+                for case in &paths {
+                    let name = case
+                        .strip_prefix(&cases_dir)
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned();
+                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        run_case(case, &name, update);
+                    }));
+                    if let Err(e) = result {
+                        let msg = e
+                            .downcast_ref::<String>()
+                            .cloned()
+                            .or_else(|| e.downcast_ref::<&str>().map(|s| s.to_string()))
+                            .unwrap_or_else(|| format!("panic in {name}"));
+                        failures.lock().unwrap().push(format!(
+                            "FAILED: {name}\n{msg}\n  → rerun: FLINT_CASES={name} cargo test cases"
+                        ));
+                    }
+                }
+            })
+        })
+        .collect();
+
+    for h in handles {
+        h.join().unwrap();
+    }
+
+    let failures = failures.lock().unwrap();
+    if !failures.is_empty() {
+        panic!(
+            "\n\n{}\n\n{} case(s) failed",
+            failures.join("\n\n"),
+            failures.len()
+        );
     }
 }
 

@@ -30,5 +30,16 @@ Do not load the entire knowledge folder by default.
 Run tests with `cargo test`. Tests spin up temporary git repos and run the real
 `flint` binary — they are integration tests, not unit tests, so they can be slow.
 
+The `cases` test runs all fixture cases under `tests/cases/` in parallel by
+top-level directory (linter group). Two env vars control its behaviour:
+
+- `FLINT_CASES=<dir>` — run only cases matching that prefix, e.g.
+  `FLINT_CASES=shellcheck` or `FLINT_CASES=shellcheck/clean`.
+- `UPDATE_SNAPSHOTS=1` — regenerate golden stdout/stderr/exit in `test.toml`
+  instead of asserting. Always review the diff before committing.
+
+On failure the test prints a rerun hint, e.g.:
+`FLINT_CASES=shellcheck/clean cargo test cases`
+
 Always run `mise run lint:fix` before committing and review auto-fixed files —
 auto-fixes may produce unexpected results.

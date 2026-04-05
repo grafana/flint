@@ -1,31 +1,31 @@
 [expected]
-args = "list"
+args = "linters"
 exit = 0
 stdout = """
-NAME                BINARY              STATUS         SPEED  PATTERNS
------------------------------------------------------------------------
-shellcheck          shellcheck          active         fast  *.sh *.bash *.bats
-shfmt               shfmt               active         fast  *.sh *.bash
-markdownlint-cli2   markdownlint-cli2   active         fast  *.md
-prettier            prettier            active         fast  *.md *.yml *.yaml
-actionlint          actionlint          active         fast  .github/workflows/*.yml .github/workflows/*.yaml
-hadolint            hadolint            missing        fast  Dockerfile Dockerfile.* *.dockerfile
-codespell           codespell           active         fast  *
-ec                  ec                  active         fast  *
-golangci-lint       golangci-lint       missing        fast  *.go
-ruff                ruff                active         fast  *.py
-ruff-format         ruff                active         fast  *.py
-biome               biome               active         fast  *.json *.jsonc *.js *.ts *.jsx *.tsx
-biome-format        biome               active         fast  *.json *.jsonc *.js *.ts *.jsx *.tsx
-cargo-clippy        cargo-clippy        active         fast  *.rs
-cargo-fmt           cargo-fmt           active         fast  *.rs
-gofmt               gofmt               missing        fast  *.go
-google-java-format  google-java-format  missing        fast  *.java
-ktlint              ktlint              missing        fast  *.kt *.kts
-dotnet-format       dotnet              missing        slow  *.cs
-lychee              lychee              active         fast  
-renovate-deps       renovate            active         slow  
-license-header      license-header      active         fast  
+NAME                  BINARY              STATUS         SPEED  PATTERNS
+-------------------------------------------------------------------------
+shellcheck            shellcheck          active         fast  *.sh *.bash *.bats
+shfmt                 shfmt               active         fast  *.sh *.bash
+markdownlint-cli2     markdownlint-cli2   active         fast  *.md
+prettier              prettier            active         fast  *.md *.yml *.yaml
+actionlint            actionlint          active         fast  .github/workflows/*.yml .github/workflows/*.yaml
+hadolint              hadolint            missing        fast  Dockerfile Dockerfile.* *.dockerfile
+codespell             codespell           active         fast  *
+editorconfig-checker  ec                  active         fast  *
+golangci-lint         golangci-lint       missing        fast  *.go
+ruff                  ruff                active         fast  *.py
+ruff-format           ruff                active         fast  *.py
+biome                 biome               active         fast  *.json *.jsonc *.js *.ts *.jsx *.tsx
+biome-format          biome               active         fast  *.json *.jsonc *.js *.ts *.jsx *.tsx
+cargo-clippy          cargo-clippy        active         fast  *.rs
+cargo-fmt             cargo-fmt           active         fast  *.rs
+gofmt                 gofmt               missing        fast  *.go
+google-java-format    google-java-format  missing        fast  *.java
+ktlint                ktlint              missing        fast  *.kt *.kts
+dotnet-format         dotnet              missing        slow  *.cs
+lychee                lychee              active         fast  
+renovate-deps         renovate            active         slow  
+license-header        license-header      active         fast  
 """
 [fake_bins]
 actionlint = '''

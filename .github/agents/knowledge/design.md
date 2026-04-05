@@ -5,13 +5,13 @@
    the consuming repo's `mise.toml`. No PATH probing —
    mise guarantees declared tools are on PATH.
 
-2. **`ec` deference**: `ec` (editorconfig-checker) runs on
-   all files but skips file types owned by active
-   line-length-enforcing formatters (`cargo-fmt`,
+2. **`editorconfig-checker` deference**: `editorconfig-checker`
+   (binary: `ec`) runs on all files but skips file types owned
+   by active line-length-enforcing formatters (`cargo-fmt`,
    `ruff-format`, `biome-format`, `prettier`). Implemented
-   via `.excludes(&[...])` on the `ec` entry. This avoids
-   `ec`'s `max_line_length` check conflicting with
-   formatter output.
+   via `.defer_to_formatters()` on the `editorconfig-checker`
+   entry. This avoids its `max_line_length` check conflicting
+   with formatter output.
 
 3. **markdownlint + prettier on `*.md`**: Both checkers are
    active when their tools are installed. They cover

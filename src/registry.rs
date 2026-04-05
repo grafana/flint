@@ -217,6 +217,18 @@ impl Check {
     }
 }
 
+/// Built-in linter registry.
+///
+/// # Naming convention
+///
+/// A check's `name` is the last path segment of its mise tool key (after `:` or `/`):
+/// - `editorconfig-checker` → name `editorconfig-checker` (not the binary `ec`)
+/// - `npm:markdownlint-cli2` → name `markdownlint-cli2`
+/// - `github:pinterest/ktlint` → name `ktlint`
+///
+/// Exception: when the mise tool key is a language toolchain shared across multiple
+/// binaries (e.g. `rust`, `go`, `dotnet`), use the binary name instead — the toolchain
+/// name would be ambiguous (`rust` can't name both `cargo-fmt` and `cargo-clippy`).
 pub fn builtin() -> Vec<Check> {
     vec![
         Check::file(
@@ -257,7 +269,8 @@ pub fn builtin() -> Vec<Check> {
         // Defer to formatters that enforce line length — those are the ones
         // that conflict with ec's max_line_length editorconfig check.
         // Note: ec's -config flag controls ec's own JSON config, not .editorconfig itself.
-        Check::files("ec", "ec {FILES}", &["*"])
+        Check::files("editorconfig-checker", "ec {FILES}", &["*"])
+            .bin("ec")
             .mise_tool("editorconfig-checker")
             .defer_to_formatters()
             .linter_config(".editorconfig-checker.json", "-config"),
@@ -532,7 +545,12 @@ mod tests {
         let end = readme
             .find(README_TABLE_END)
             .expect("README missing <!-- registry-table-end --> marker");
-        readme[start..end].trim().to_string()
+        // Strip blank lines that prettier inserts around comments and tables.
+        readme[start..end]
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     fn replace_readme_table(readme: &str, table: &str) -> String {

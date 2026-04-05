@@ -212,7 +212,7 @@ the corresponding file exists there (see the "Config file" column in the table b
 Files that are absent are silently skipped — existing project-root configs remain in
 effect.
 
-**Note:** `ec`'s config file (`.editorconfig-checker.json`) controls ec's own settings,
+**Note:** `editorconfig-checker`'s config file (`.editorconfig-checker.json`) controls its own settings,
 not `.editorconfig` itself — editorconfig discovery always walks up from the file
 being linted and cannot be redirected via a flag.
 
@@ -221,30 +221,32 @@ being linted and cannot be redirected via a flag.
 <!-- editorconfig-checker-disable -->
 <!-- registry-table-start -->
 <!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
-| Name                 | Binary               | Patterns                                           | Fix | Slow | Scope   | Config file                        |
-| -------------------- | -------------------- | -------------------------------------------------- | --- | ---- | ------- | ---------------------------------- |
-| `shellcheck`         | `shellcheck`         | `*.sh *.bash *.bats`                               | no  | —    | file    | `.shellcheckrc`                    |
-| `shfmt`              | `shfmt`              | `*.sh *.bash`                                      | yes | —    | file    | —                                  |
-| `markdownlint-cli2`  | `markdownlint-cli2`  | `*.md`                                             | yes | —    | file    | `.markdownlint.json`               |
-| `prettier`           | `prettier`           | `*.md *.yml *.yaml`                                | yes | —    | files   | `.prettierrc`                      |
-| `actionlint`         | `actionlint`         | `.github/workflows/*.yml .github/workflows/*.yaml` | no  | —    | file    | `actionlint.yml`                   |
-| `hadolint`           | `hadolint`           | `Dockerfile Dockerfile.* *.dockerfile`             | no  | —    | file    | `.hadolint.yaml`                   |
-| `codespell`          | `codespell`          | `*`                                                | yes | —    | files   | `.codespellrc`                     |
-| `ec`                 | `ec`                 | `*`                                                | no  | —    | files   | `.editorconfig-checker.json`       |
-| `golangci-lint`      | `golangci-lint`      | `*.go`                                             | no  | —    | project | `.golangci.yml`                    |
-| `ruff`               | `ruff`               | `*.py`                                             | yes | —    | file    | `ruff.toml`                        |
-| `ruff-format`        | `ruff`               | `*.py`                                             | yes | —    | file    | `ruff.toml`                        |
-| `biome`              | `biome`              | `*.json *.jsonc *.js *.ts *.jsx *.tsx`             | yes | —    | file    | —                                  |
-| `biome-format`       | `biome`              | `*.json *.jsonc *.js *.ts *.jsx *.tsx`             | yes | —    | file    | —                                  |
-| `cargo-clippy`       | `cargo-clippy`       | `*.rs`                                             | yes | —    | project | —                                  |
-| `cargo-fmt`          | `cargo-fmt`          | `*.rs`                                             | yes | —    | project | —                                  |
-| `gofmt`              | `gofmt`              | `*.go`                                             | yes | —    | file    | —                                  |
-| `google-java-format` | `google-java-format` | `*.java`                                           | yes | —    | files   | —                                  |
-| `ktlint`             | `ktlint`             | `*.kt *.kts`                                       | yes | —    | files   | —                                  |
-| `dotnet-format`      | `dotnet`             | `*.cs`                                             | yes | yes  | project | —                                  |
-| `lychee`             | `lychee`             | (all files)                                        | no  | —    | special | via `[checks.links]` in flint.toml |
-| `renovate-deps`      | `renovate`           | (all files)                                        | yes | yes  | special | —                                  |
-| `license-header`     | (built-in)           | (all files)                                        | no  | —    | special | —                                  |
+
+| Name                   | Binary               | Patterns                                           | Fix | Slow | Scope   | Config file                        |
+| ---------------------- | -------------------- | -------------------------------------------------- | --- | ---- | ------- | ---------------------------------- |
+| `shellcheck`           | `shellcheck`         | `*.sh *.bash *.bats`                               | no  | —    | file    | `.shellcheckrc`                    |
+| `shfmt`                | `shfmt`              | `*.sh *.bash`                                      | yes | —    | file    | —                                  |
+| `markdownlint-cli2`    | `markdownlint-cli2`  | `*.md`                                             | yes | —    | file    | `.markdownlint.json`               |
+| `prettier`             | `prettier`           | `*.md *.yml *.yaml`                                | yes | —    | files   | `.prettierrc`                      |
+| `actionlint`           | `actionlint`         | `.github/workflows/*.yml .github/workflows/*.yaml` | no  | —    | file    | `actionlint.yml`                   |
+| `hadolint`             | `hadolint`           | `Dockerfile Dockerfile.* *.dockerfile`             | no  | —    | file    | `.hadolint.yaml`                   |
+| `codespell`            | `codespell`          | `*`                                                | yes | —    | files   | `.codespellrc`                     |
+| `editorconfig-checker` | `ec`                 | `*`                                                | no  | —    | files   | `.editorconfig-checker.json`       |
+| `golangci-lint`        | `golangci-lint`      | `*.go`                                             | no  | —    | project | `.golangci.yml`                    |
+| `ruff`                 | `ruff`               | `*.py`                                             | yes | —    | file    | `ruff.toml`                        |
+| `ruff-format`          | `ruff`               | `*.py`                                             | yes | —    | file    | `ruff.toml`                        |
+| `biome`                | `biome`              | `*.json *.jsonc *.js *.ts *.jsx *.tsx`             | yes | —    | file    | —                                  |
+| `biome-format`         | `biome`              | `*.json *.jsonc *.js *.ts *.jsx *.tsx`             | yes | —    | file    | —                                  |
+| `cargo-clippy`         | `cargo-clippy`       | `*.rs`                                             | yes | —    | project | —                                  |
+| `cargo-fmt`            | `cargo-fmt`          | `*.rs`                                             | yes | —    | project | —                                  |
+| `gofmt`                | `gofmt`              | `*.go`                                             | yes | —    | file    | —                                  |
+| `google-java-format`   | `google-java-format` | `*.java`                                           | yes | —    | files   | —                                  |
+| `ktlint`               | `ktlint`             | `*.kt *.kts`                                       | yes | —    | files   | —                                  |
+| `dotnet-format`        | `dotnet`             | `*.cs`                                             | yes | yes  | project | —                                  |
+| `lychee`               | `lychee`             | (all files)                                        | no  | —    | special | via `[checks.links]` in flint.toml |
+| `renovate-deps`        | `renovate`           | (all files)                                        | yes | yes  | special | —                                  |
+| `license-header`       | (built-in)           | (all files)                                        | no  | —    | special | —                                  |
+
 <!-- registry-table-end -->
 <!-- editorconfig-checker-enable -->
 
@@ -261,13 +263,13 @@ config injection for `biome` and `biome-format` is not yet implemented.
 **Slow checks** (Slow = yes) are skipped by `--fast-only`. Use `--fast-only` for
 local/pre-push feedback and the full set in CI.
 
-**`ec` deference**: `ec` (editorconfig-checker) runs on all files, but
+**`editorconfig-checker` deference**: `editorconfig-checker` runs on all files, but
 automatically skips file types owned by an active line-length-enforcing
 formatter. When `cargo-fmt`, `ruff-format`, `biome-format`, or `prettier`
-are active, their file types are excluded from `ec` — those formatters
-already enforce line length and would conflict with `ec`'s
+are active, their file types are excluded from `editorconfig-checker` — those formatters
+already enforce line length and would conflict with `editorconfig-checker`'s
 `max_line_length` editorconfig check. If none of those formatters are
-installed, `ec` checks those files itself.
+installed, `editorconfig-checker` checks those files itself.
 
 ### Special checks
 

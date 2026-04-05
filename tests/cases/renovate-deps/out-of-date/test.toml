@@ -1,7 +1,7 @@
 [expected]
 args = "run --full renovate-deps"
 exit = 1
-stderr = """
+stderr = '''
 [renovate-deps]
 --- .github/renovate-tracked-deps.json
 +++ generated
@@ -20,7 +20,7 @@ Run `flint run --fix renovate-deps` to update.
 
 flint: 1 check failed (renovate-deps)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
-"""
+'''
 
 [expected.files]
 ".github/renovate-tracked-deps.json" = """

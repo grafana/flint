@@ -1,0 +1,14 @@
+[expected]
+args = "run --full golangci-lint"
+exit = 1
+stderr = '''
+[golangci-lint]
+main.go:6:11: Error return value of `os.Remove` is not checked (errcheck)
+	os.Remove("/tmp/test")
+	         ^
+1 issues:
+* errcheck: 1
+
+flint: 1 check failed (golangci-lint)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''

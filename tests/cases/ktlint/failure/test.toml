@@ -1,0 +1,13 @@
+[expected]
+args = "run --full ktlint"
+exit = 1
+stderr = '''
+[ktlint]
+<REPO>/Hello.kt:2:1: Unexpected indentation (2) (should be 4) (standard:indent)
+
+Summary error count (descending) by rule:
+  standard:indent: 1
+
+flint: 1 check failed (ktlint)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''

@@ -1,14 +1,14 @@
 [expected]
 args = "run --full lychee"
 exit = 1
-stderr = """
+stderr = '''
 [lychee]
 ==> Checking all links in all files
 [404] https://example.com/does-not-exist
 
 flint: 1 check failed (lychee)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
-"""
+'''
 
 [env]
 LYCHEE_SKIP_GITHUB_REMAPS = "true"

@@ -1,7 +1,7 @@
 [expected]
 args = "run --full shellcheck"
 exit = 1
-stderr = """
+stderr = '''
 [shellcheck]
 
 In <REPO>/bad.sh line 2:
@@ -16,4 +16,4 @@ For more information:
 
 flint: 1 check failed (shellcheck)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
-"""
+'''

@@ -1,9 +1,9 @@
 [expected]
 args = "run --full --fix markdownlint-cli2"
 exit = 1
-stderr = """
+stderr = '''
 flint: fixed: markdownlint-cli2 — commit before pushing
-"""
+'''
 
 [expected.files]
 "README.md" = """

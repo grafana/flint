@@ -1,9 +1,9 @@
 [expected]
 args = "run --full --fix renovate-deps"
 exit = 1
-stderr = """
+stderr = '''
 flint: fixed: renovate-deps — commit before pushing
-"""
+'''
 
 [expected.files]
 ".github/renovate-tracked-deps.json" = """

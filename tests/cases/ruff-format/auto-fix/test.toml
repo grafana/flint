@@ -1,9 +1,9 @@
 [expected]
 args = "run --full --fix ruff-format"
 exit = 1
-stderr = """
+stderr = '''
 flint: fixed: ruff-format — commit before pushing
-"""
+'''
 
 [expected.files]
 "main.py" = """

@@ -279,10 +279,10 @@ fn write_test_toml(path: &Path, cfg: &toml::Value, exit: i32, stderr: &str, stdo
     out += &format!("args = \"{}\"\n", toml_escape(args_str));
     out += &format!("exit = {exit}\n");
     if !stderr.is_empty() {
-        out += &format!("stderr = \"\"\"\n{stderr}\"\"\"");
+        out += &format!("stderr = '''\n{stderr}'''");
     }
     if !stdout.is_empty() {
-        out += &format!("stdout = \"\"\"\n{stdout}\"\"\"");
+        out += &format!("stdout = '''\n{stdout}'''");
     }
     if let Some(files) = existing_files {
         out += "\n\n[expected.files]\n";

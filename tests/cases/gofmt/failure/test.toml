@@ -1,7 +1,7 @@
 [expected]
 args = "run --full gofmt"
 exit = 1
-stderr = """
+stderr = '''
 [gofmt]
 diff <REPO>/main.go.orig <REPO>/main.go
 --- <REPO>/main.go.orig
@@ -17,4 +17,4 @@ diff <REPO>/main.go.orig <REPO>/main.go
 
 flint: 1 check failed (gofmt)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
-"""
+'''

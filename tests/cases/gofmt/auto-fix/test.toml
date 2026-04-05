@@ -1,9 +1,9 @@
 [expected]
 args = "run --full --fix gofmt"
 exit = 1
-stderr = """
+stderr = '''
 flint: fixed: gofmt — commit before pushing
-"""
+'''
 
 [expected.files]
 "main.go" = """

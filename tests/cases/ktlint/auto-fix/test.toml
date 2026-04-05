@@ -1,0 +1,13 @@
+[expected]
+args = "run --full --fix ktlint"
+exit = 1
+stderr = '''
+flint: fixed: ktlint — commit before pushing
+'''
+
+[expected.files]
+"Hello.kt" = """
+fun main() {
+    println("Hello")
+}
+"""

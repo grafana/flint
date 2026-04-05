@@ -1,7 +1,7 @@
 [expected]
 args = "run --full prettier"
 exit = 1
-stderr = """
+stderr = '''
 [prettier]
 Checking formatting...
 [warn] config.yml
@@ -9,4 +9,4 @@ Checking formatting...
 
 flint: 1 check failed (prettier)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
-"""
+'''

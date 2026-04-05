@@ -1,7 +1,7 @@
 [expected]
 args = "run --full ruff"
 exit = 1
-stderr = """
+stderr = '''
 [ruff]
 F401 [*] `os` imported but unused
  --> main.py:1:8
@@ -18,4 +18,4 @@ Found 1 error.
 
 flint: 1 check failed (ruff)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
-"""
+'''

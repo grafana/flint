@@ -1,9 +1,9 @@
 [expected]
 args = "run --full --fix cargo-fmt"
 exit = 1
-stderr = """
+stderr = '''
 flint: fixed: cargo-fmt — commit before pushing
-"""
+'''
 
 [expected.files]
 "src/lib.rs" = """

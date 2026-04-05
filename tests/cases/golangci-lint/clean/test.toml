@@ -1,0 +1,3 @@
+[expected]
+args = "run --full golangci-lint"
+exit = 0

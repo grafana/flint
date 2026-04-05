@@ -1,7 +1,7 @@
 [expected]
 args = "run --full hadolint"
 exit = 1
-stderr = """
+stderr = '''
 [hadolint]
 <REPO>/Dockerfile:1 DL3007 warning: Using latest is prone to errors if the image will ever update. Pin the version explicitly to a release tag
 <REPO>/Dockerfile:2 DL3008 warning: Pin versions in apt get install. Instead of `apt-get install <package>` use `apt-get install <package>=<version>`
@@ -9,4 +9,4 @@ stderr = """
 
 flint: 1 check failed (hadolint)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
-"""
+'''

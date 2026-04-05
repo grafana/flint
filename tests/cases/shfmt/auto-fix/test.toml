@@ -1,9 +1,9 @@
 [expected]
 args = "run --full --fix shfmt"
 exit = 1
-stderr = """
+stderr = '''
 flint: fixed: shfmt — commit before pushing
-"""
+'''
 
 [expected.files]
 "script.sh" = """

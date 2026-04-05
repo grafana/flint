@@ -242,7 +242,7 @@ being linted and cannot be redirected via a flag.
 | `gofmt`                | `gofmt`              | `*.go`                                             | yes | —    | file    | —                                  |
 | `google-java-format`   | `google-java-format` | `*.java`                                           | yes | —    | files   | —                                  |
 | `ktlint`               | `ktlint`             | `*.kt *.kts`                                       | yes | —    | files   | —                                  |
-| `dotnet-format`        | `dotnet`             | `*.cs`                                             | yes | yes  | project | —                                  |
+| `dotnet-format`        | `dotnet`             | `*.cs`                                             | yes | —    | project | —                                  |
 | `lychee`               | `lychee`             | (all files)                                        | no  | —    | special | via `[checks.links]` in flint.toml |
 | `renovate-deps`        | `renovate`           | (all files)                                        | yes | yes  | special | —                                  |
 | `license-header`       | (built-in)           | (all files)                                        | no  | —    | special | —                                  |

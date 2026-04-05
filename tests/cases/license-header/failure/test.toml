@@ -1,10 +1,10 @@
 [expected]
 args = "run --full license-header"
 exit = 1
-stderr = """
+stderr = '''
 [license-header]
 Main.java: missing license header
 
 flint: 1 check failed (license-header)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
-"""
+'''

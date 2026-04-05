@@ -1,0 +1,3 @@
+[expected]
+args = "run --full cargo-fmt"
+exit = 0

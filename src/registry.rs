@@ -321,15 +321,19 @@ pub fn builtin() -> Vec<Check> {
         .fix("google-java-format -i {FILES}")
         .mise_tool("github:google/google-java-format")
         .formatter(),
-        Check::files("ktlint", "ktlint {FILES}", &["*.kt", "*.kts"])
-            .fix("ktlint --format {FILES}")
-            .mise_tool("github:pinterest/ktlint")
-            .bin(if cfg!(windows) {
-                "ktlint.bat"
-            } else {
-                "ktlint"
-            })
-            .formatter(),
+        Check::files(
+            "ktlint",
+            "ktlint --log-level=error {FILES}",
+            &["*.kt", "*.kts"],
+        )
+        .fix("ktlint --format --log-level=error {FILES}")
+        .mise_tool("github:pinterest/ktlint")
+        .bin(if cfg!(windows) {
+            "ktlint.bat"
+        } else {
+            "ktlint"
+        })
+        .formatter(),
         Check::project(
             "dotnet-format",
             "dotnet format --verify-no-changes",

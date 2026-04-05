@@ -1,0 +1,13 @@
+[expected]
+args = "run --full editorconfig-checker"
+exit = 1
+stderr = """
+[editorconfig-checker]
+hello.txt:
+	2: Trailing whitespace
+
+1 errors found
+
+flint: 1 check failed (editorconfig-checker)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+"""

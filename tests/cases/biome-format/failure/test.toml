@@ -1,0 +1,17 @@
+[expected]
+args = "run --full biome-format"
+exit = 1
+stderr = """
+[biome-format]
+data.json: Formatter would have printed different content
+
+flint: 1 check failed (biome-format)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+"""
+
+[fake_bins]
+biome = '''
+#!/bin/sh
+printf 'data.json: Formatter would have printed different content\n' >&2
+exit 1
+'''

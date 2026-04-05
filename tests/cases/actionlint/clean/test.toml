@@ -1,0 +1,3 @@
+[expected]
+args = "run --full actionlint"
+exit = 0

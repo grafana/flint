@@ -1,0 +1,13 @@
+[expected]
+args = "run --full actionlint"
+exit = 1
+stderr = """
+[actionlint]
+.github/workflows/ci.yml:9:11: input "invalid_input" is not defined in action "actions/checkout@v4". available inputs are "clean", "fetch-depth", "fetch-tags", "filter", "github-server-url", "lfs", "path", "persist-credentials", "ref", "repository", "set-safe-directory", "show-progress", "sparse-checkout", "sparse-checkout-cone-mode", "ssh-key", "ssh-known-hosts", "ssh-strict", "ssh-user", "submodules", "token" [action]
+  |
+9 |           invalid_input: foo
+  |           ^~~~~~~~~~~~~~
+
+flint: 1 check failed (actionlint)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+"""

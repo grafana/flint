@@ -1,0 +1,13 @@
+[expected]
+args = "run --full --fix prettier"
+exit = 1
+stderr = """
+flint: fixed: prettier — commit before pushing
+"""
+
+[expected.files]
+"config.yml" = """
+name: "test"
+value: 42
+items: ["a", "b"]
+"""

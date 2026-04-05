@@ -1,0 +1,3 @@
+[tools]
+editorconfig-checker = "latest"
+shfmt = "latest"

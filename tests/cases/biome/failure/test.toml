@@ -1,0 +1,20 @@
+[expected]
+args = "run --full biome"
+exit = 1
+stderr = """
+[biome]
+main.js:1:1 lint/suspicious/noDebugger
+
+  x This is an unexpected use of the debugger statement.
+
+
+flint: 1 check failed (biome)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+"""
+
+[fake_bins]
+biome = '''
+#!/bin/sh
+printf 'main.js:1:1 lint/suspicious/noDebugger\n\n  x This is an unexpected use of the debugger statement.\n\n' >&2
+exit 1
+'''

@@ -1,0 +1,9 @@
+[expected]
+args = "run --full biome"
+exit = 0
+
+[fake_bins]
+biome = '''
+#!/bin/sh
+exit 0
+'''

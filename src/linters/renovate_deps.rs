@@ -1,15 +1,22 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use tokio::process::Command;
 
 use crate::config::RenovateDepsConfig;
 use crate::linters::LinterOutput;
 
-const COMMITTED_DIR: &str = ".github";
 const COMMITTED_FILE: &str = "renovate-tracked-deps.json";
-pub(crate) const COMMITTED_DISPLAY: &str = ".github/renovate-tracked-deps.json";
-const RENOVATE_CONFIG_FILE: &str = "renovate.json5";
+pub(crate) const COMMITTED_PATHS: &[&str] = &[COMMITTED_FILE, ".github/renovate-tracked-deps.json"];
+pub(crate) const RENOVATE_CONFIG_PATTERNS: &[&str] = &[
+    "renovate.json",
+    "renovate.json5",
+    ".github/renovate.json",
+    ".github/renovate.json5",
+    ".renovaterc",
+    ".renovaterc.json",
+    ".renovaterc.json5",
+];
 const PACKAGE_FILES_MSG: &str = "packageFiles with updates";
 const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value", "invalid-version"];
 
@@ -28,9 +35,11 @@ async fn run_inner(
     fix: bool,
     project_root: &Path,
 ) -> anyhow::Result<LinterOutput> {
-    let log_bytes = run_renovate(project_root).await?;
+    let config_path = resolve_renovate_config_path(project_root)?;
+    let committed_path = committed_path_for_config(&config_path);
+    let committed_display = display_path(project_root, &committed_path);
+    let log_bytes = run_renovate(project_root, &config_path).await?;
     let generated = extract_deps(&log_bytes, &cfg.exclude_managers)?;
-    let committed_path = project_root.join(COMMITTED_DIR).join(COMMITTED_FILE);
 
     if !committed_path.exists() {
         if fix {
@@ -42,7 +51,7 @@ async fn run_inner(
             });
         }
         return Ok(LinterOutput::err(format!(
-            "ERROR: {COMMITTED_DISPLAY} does not exist.\nRun `flint run --fix renovate-deps` to create it.\n"
+            "ERROR: {committed_display} does not exist.\nRun `flint run --fix renovate-deps` to create it.\n"
         )));
     }
 
@@ -56,7 +65,7 @@ async fn run_inner(
         });
     }
 
-    let diff = unified_diff(&committed, &generated);
+    let diff = unified_diff(&committed, &generated, &committed_display);
 
     if fix {
         write_snapshot(&committed_path, &generated)?;
@@ -80,9 +89,7 @@ async fn run_inner(
 }
 
 /// Runs `renovate --platform=local` and returns the combined stdout+stderr log bytes.
-async fn run_renovate(project_root: &Path) -> anyhow::Result<Vec<u8>> {
-    let config_path = project_root.join(COMMITTED_DIR).join(RENOVATE_CONFIG_FILE);
-
+async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result<Vec<u8>> {
     // Forward env, setting Renovate-specific vars.
     let mut env: Vec<(String, String)> = std::env::vars().collect();
     // Override logging to get parseable JSON output.
@@ -129,6 +136,33 @@ async fn run_renovate(project_root: &Path) -> anyhow::Result<Vec<u8>> {
     }
 
     Ok(combined)
+}
+
+fn resolve_renovate_config_path(project_root: &Path) -> anyhow::Result<PathBuf> {
+    RENOVATE_CONFIG_PATTERNS
+        .iter()
+        .map(|path| project_root.join(path))
+        .find(|path| path.exists())
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "no supported Renovate config file found; tried: {}",
+                RENOVATE_CONFIG_PATTERNS.join(", ")
+            )
+        })
+}
+
+fn committed_path_for_config(config_path: &Path) -> PathBuf {
+    config_path
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .join(COMMITTED_FILE)
+}
+
+fn display_path(project_root: &Path, path: &Path) -> String {
+    path.strip_prefix(project_root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// Parses Renovate's NDJSON log and returns the dep map.
@@ -209,13 +243,13 @@ fn write_snapshot(path: &Path, deps: &DepMap) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn unified_diff(old: &DepMap, new: &DepMap) -> String {
+fn unified_diff(old: &DepMap, new: &DepMap, committed_display: &str) -> String {
     let old_text = serde_json::to_string_pretty(old).unwrap_or_default() + "\n";
     let new_text = serde_json::to_string_pretty(new).unwrap_or_default() + "\n";
 
     let diff = similar::TextDiff::from_lines(&old_text, &new_text);
     diff.unified_diff()
-        .header(COMMITTED_DISPLAY, "generated")
+        .header(committed_display, "generated")
         .to_string()
 }
 
@@ -361,7 +395,7 @@ mod tests {
     fn unified_diff_contains_added_and_removed_lines() {
         let old = dep_map(&[("a.json", &[("npm", &["old-dep"])])]);
         let new = dep_map(&[("a.json", &[("npm", &["new-dep"])])]);
-        let diff = unified_diff(&old, &new);
+        let diff = unified_diff(&old, &new, ".github/renovate-tracked-deps.json");
         assert!(diff.contains("-"), "should have removals");
         assert!(diff.contains("+"), "should have additions");
         assert!(diff.contains("old-dep"));
@@ -372,7 +406,45 @@ mod tests {
     fn unified_diff_header_uses_display_path() {
         let old = dep_map(&[("a.json", &[("npm", &["x"])])]);
         let new = dep_map(&[("a.json", &[("npm", &["y"])])]);
-        let diff = unified_diff(&old, &new);
-        assert!(diff.contains(COMMITTED_DISPLAY));
+        let diff = unified_diff(&old, &new, "renovate-tracked-deps.json");
+        assert!(diff.contains("renovate-tracked-deps.json"));
+    }
+
+    #[test]
+    fn resolves_supported_renovate_config_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join(".renovaterc.json");
+        std::fs::write(&config_path, "{}\n").unwrap();
+
+        let resolved = resolve_renovate_config_path(dir.path()).unwrap();
+
+        assert_eq!(resolved, config_path);
+    }
+
+    #[test]
+    fn missing_supported_renovate_config_file_returns_error() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let err = resolve_renovate_config_path(dir.path()).unwrap_err();
+        let msg = err.to_string();
+
+        assert!(msg.contains("no supported Renovate config file found"));
+        assert!(
+            RENOVATE_CONFIG_PATTERNS
+                .iter()
+                .all(|path| msg.contains(path))
+        );
+    }
+
+    #[test]
+    fn committed_path_uses_same_dir_as_found_config() {
+        assert_eq!(
+            committed_path_for_config(Path::new("renovate.json5")),
+            PathBuf::from("renovate-tracked-deps.json")
+        );
+        assert_eq!(
+            committed_path_for_config(Path::new(".github/renovate.json5")),
+            PathBuf::from(".github/renovate-tracked-deps.json")
+        );
     }
 }

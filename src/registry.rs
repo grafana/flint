@@ -13,15 +13,16 @@ pub enum Scope {
 }
 
 /// Which init profile (and `--fast-only` behaviour) a check belongs to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Category {
-    /// Language/toolchain-specific linter — fast; included in all init profiles.
+    /// Primary programming language linter/formatter (Rust, Python, Go, …) — all init profiles.
     Lang,
-    /// General fast linter — included in `default` and `comprehensive` init profiles.
+    /// Supplementary language check (shell, Docker, CI/CD) — `default` + `comprehensive` only.
+    Style,
+    /// General fast tool (not language-specific) — `default` and `comprehensive` init profiles.
     #[default]
     Default,
-    /// Slow linter — included only in the `comprehensive` init profile;
-    /// skipped when `--fast-only` is passed.
+    /// Slow tool — `comprehensive` init profile only; skipped when `--fast-only` is passed.
     Slow,
 }
 
@@ -275,9 +276,15 @@ impl Check {
         self
     }
 
-    /// Mark as a language-specific linter — included in all init profiles.
+    /// Mark as a primary language analysis check — included in all init profiles.
     pub fn lang(mut self) -> Self {
         self.category = Category::Lang;
+        self
+    }
+
+    /// Mark as a language-specific style/formatter check — included in all init profiles.
+    pub fn style(mut self) -> Self {
+        self.category = Category::Style;
         self
     }
 
@@ -327,11 +334,11 @@ pub fn builtin() -> Vec<Check> {
             &["*.sh", "*.bash", "*.bats"],
         )
         .linter_config(".shellcheckrc", "--rcfile")
-        .lang(),
+        .style(),
         Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"])
             .fix("shfmt -w {FILE}")
             .formatter()
-            .lang(),
+            .style(),
         Check::file("markdownlint-cli2", "markdownlint-cli2 {FILE}", &["*.md"])
             .fix("markdownlint-cli2 --fix {FILE}")
             .linter_config(".markdownlint.json", "--config")
@@ -352,14 +359,14 @@ pub fn builtin() -> Vec<Check> {
             &[".github/workflows/*.yml", ".github/workflows/*.yaml"],
         )
         .linter_config("actionlint.yml", "-config-file")
-        .lang(),
+        .style(),
         Check::file(
             "hadolint",
             "hadolint {FILE}",
             &["Dockerfile", "Dockerfile.*", "*.dockerfile"],
         )
         .linter_config(".hadolint.yaml", "--config")
-        .lang(),
+        .style(),
         Check::files("codespell", "codespell {FILES}", &["*"])
             .fix("codespell --write-changes {FILES}")
             .linter_config(".codespellrc", "--config")

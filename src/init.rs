@@ -6,19 +6,35 @@ use std::process::Command;
 
 use crate::registry::{Category, Check, builtin};
 
-/// Linter profile — controls which linters are included.
+/// Linter profile — shorthand for `--profile` CLI flag; maps to a category set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum Profile {
-    /// Language-specific linters only (shellcheck, ruff, cargo-clippy, …).
+    /// Primary language linters only (ruff, cargo-clippy, golangci-lint, …).
     Lang,
-    /// Lang + fast general linters (+ prettier, codespell, editorconfig-checker, …).
+    /// Lang + supplementary checks + fast general tools (shellcheck, prettier, codespell, …).
     Default,
-    /// Default + slow linters (+ lychee, renovate-deps).
+    /// Default + slow linters (renovate-deps).
     Comprehensive,
+}
+
+fn profile_to_categories(profile: Profile) -> HashSet<Category> {
+    match profile {
+        Profile::Lang => [Category::Lang].into(),
+        Profile::Default => [Category::Lang, Category::Style, Category::Default].into(),
+        Profile::Comprehensive => [
+            Category::Lang,
+            Category::Style,
+            Category::Default,
+            Category::Slow,
+        ]
+        .into(),
+    }
 }
 
 /// Desired tools for a profile: maps each mise tool key to its optional components string.
 type DesiredTools = HashMap<String, Option<&'static str>>;
+
+// --- Change list (step 2) ---
 
 enum ChangeKind {
     Add {
@@ -53,6 +69,39 @@ impl ChangeItem {
     }
 }
 
+// --- Category selection (step 1) ---
+
+struct CategoryItem {
+    selected: bool,
+    category: Category,
+    label: &'static str,
+}
+
+fn default_category_items() -> Vec<CategoryItem> {
+    vec![
+        CategoryItem {
+            selected: true,
+            category: Category::Lang,
+            label: "lang    — primary language linters (ruff, cargo-clippy, golangci-lint, …)",
+        },
+        CategoryItem {
+            selected: true,
+            category: Category::Style,
+            label: "style   — supplementary checks (shellcheck, actionlint, hadolint, …)",
+        },
+        CategoryItem {
+            selected: true,
+            category: Category::Default,
+            label: "general — general tools (codespell, ec, lychee, …)",
+        },
+        CategoryItem {
+            selected: false,
+            category: Category::Slow,
+            label: "slow    — slow linters (renovate-deps)",
+        },
+    ]
+}
+
 pub fn run(project_root: &Path, profile_arg: Option<Profile>, yes: bool) -> Result<()> {
     println!(
         "Tip: flint init detects languages from tracked files (`git ls-files`). \
@@ -65,14 +114,29 @@ Add and stage your source files before running init so the detection is accurate
     // Detect which file patterns have matches in the repo.
     let present_patterns = detect_present_patterns(project_root, &registry)?;
 
-    // Choose profile interactively if not supplied via flag.
-    let profile = match profile_arg {
-        Some(p) => p,
-        None => prompt_profile()?,
+    // Determine the active category set.
+    // --profile maps directly; otherwise ask interactively (skipped with --yes, uses default).
+    let categories: HashSet<Category> = if let Some(profile) = profile_arg {
+        profile_to_categories(profile)
+    } else if yes {
+        // --yes without --profile: use the default category set (lang + style + general).
+        profile_to_categories(Profile::Default)
+    } else {
+        let mut cat_items = default_category_items();
+        if !select_categories(&mut cat_items)? {
+            println!("Aborted.");
+            return Ok(());
+        }
+        println!();
+        cat_items
+            .iter()
+            .filter(|i| i.selected)
+            .map(|i| i.category)
+            .collect()
     };
 
-    // Compute the map of mise tool keys → optional components this profile requires.
-    let desired = compute_desired_tools(&registry, &present_patterns, profile);
+    // Compute the map of mise tool keys → optional components for the selected categories.
+    let desired = compute_desired_tools(&registry, &present_patterns, &categories);
 
     // Read existing mise.toml (may not exist yet).
     let mise_path = project_root.join("mise.toml");
@@ -133,11 +197,11 @@ Add and stage your source files before running init so the detection is accurate
     }
 
     if items.is_empty() {
-        println!("mise.toml [tools] is already up to date for the selected profile.");
+        println!("mise.toml [tools] is already up to date for the selected categories.");
         return Ok(());
     }
 
-    // Interactive selection (skipped with --yes).
+    // Interactive item selection (skipped with --yes).
     if !yes && !interactive_select(&mut items)? {
         println!("Aborted.");
         return Ok(());
@@ -201,12 +265,12 @@ pub fn install_key(check: &Check) -> Option<&'static str> {
     )
 }
 
-/// Compute the map of `tool_key → optional_components` needed for `profile`
-/// given the detected file patterns present in the repo.
+/// Compute the map of `tool_key → optional_components` for the given category set,
+/// filtered to file patterns present in the repo.
 fn compute_desired_tools(
     registry: &[Check],
     present_patterns: &HashSet<String>,
-    profile: Profile,
+    categories: &HashSet<Category>,
 ) -> DesiredTools {
     let mut desired = DesiredTools::new();
     for check in registry {
@@ -217,12 +281,7 @@ fn compute_desired_tools(
         if !files_present(check, present_patterns) {
             continue;
         }
-        let included = match profile {
-            Profile::Lang => check.category == Category::Lang,
-            Profile::Default => check.category != Category::Slow,
-            Profile::Comprehensive => true,
-        };
-        if included {
+        if categories.contains(&check.category) {
             desired.insert(key.to_string(), check.mise_install_components);
         }
     }
@@ -308,8 +367,40 @@ fn format_toml_value(components: &Option<&'static str>) -> String {
     }
 }
 
-/// Present a numbered, toggleable list of planned changes. Returns `true` if
-/// the user confirms (Enter), `false` if they abort (`q`).
+/// Step 1: interactive category selection. Returns `true` to continue, `false` to abort.
+fn select_categories(items: &mut [CategoryItem]) -> Result<bool> {
+    loop {
+        println!("Select categories:");
+        println!();
+        for (i, item) in items.iter().enumerate() {
+            let check = if item.selected { "✓" } else { " " };
+            println!("  {:>2}. {}  {}", i + 1, check, item.label);
+        }
+        print!("\nToggle by number (space-separated), Enter to continue, q to abort: ");
+        io::stdout().flush()?;
+        let mut line = String::new();
+        io::stdin().lock().read_line(&mut line)?;
+        let trimmed = line.trim();
+
+        if trimmed.eq_ignore_ascii_case("q") {
+            return Ok(false);
+        }
+        if trimmed.is_empty() {
+            return Ok(true);
+        }
+        for token in trimmed.split_whitespace() {
+            if let Ok(n) = token.parse::<usize>()
+                && n >= 1
+                && n <= items.len()
+            {
+                items[n - 1].selected = !items[n - 1].selected;
+            }
+        }
+        println!();
+    }
+}
+
+/// Step 2: interactive change-list selection. Returns `true` to apply, `false` to abort.
 fn interactive_select(items: &mut [ChangeItem]) -> Result<bool> {
     loop {
         print_items(items);
@@ -343,26 +434,6 @@ fn print_items(items: &[ChangeItem]) {
         let check = if item.selected { "✓" } else { " " };
         println!("  {:>2}. {}  {}", i + 1, check, item.label());
     }
-}
-
-fn prompt_profile() -> Result<Profile> {
-    println!("Select a profile:");
-    println!("  1) lang          — language linters only (shellcheck, ruff, cargo-clippy, …)");
-    println!(
-        "  2) default       — lang + fast general linters (+ prettier, codespell, ec, lychee, …)"
-    );
-    println!("  3) comprehensive — default + slow linters (+ renovate-deps)");
-    println!();
-    print!("Profile [1-3, default: 2]: ");
-    io::stdout().flush()?;
-
-    let mut line = String::new();
-    io::stdin().lock().read_line(&mut line)?;
-    Ok(match line.trim() {
-        "1" => Profile::Lang,
-        "3" => Profile::Comprehensive,
-        _ => Profile::Default,
-    })
 }
 
 fn apply_changes(
@@ -519,10 +590,15 @@ rust = { version = "1.0", components = "clippy" }
         let mut present = HashSet::new();
         present.insert("*.sh".to_string());
         present.insert("*.bash".to_string());
-        let tools = compute_desired_tools(&registry, &present, Profile::Lang);
-        assert!(tools.contains_key("shellcheck"));
-        assert!(tools.contains_key("shfmt"));
-        // codespell is not lang-only
+        present.insert("*.rs".to_string());
+        let categories = profile_to_categories(Profile::Lang);
+        let tools = compute_desired_tools(&registry, &present, &categories);
+        // Shell checks are supplementary (Style), not included in the lang profile.
+        assert!(!tools.contains_key("shellcheck"));
+        assert!(!tools.contains_key("shfmt"));
+        // Primary language linters are included.
+        assert!(tools.contains_key("rust"));
+        // General tools are not lang-only.
         assert!(!tools.contains_key("pipx:codespell"));
     }
 
@@ -531,7 +607,8 @@ rust = { version = "1.0", components = "clippy" }
         let registry = builtin();
         let mut present = HashSet::new();
         present.insert("*.rs".to_string());
-        let tools = compute_desired_tools(&registry, &present, Profile::Lang);
+        let categories = profile_to_categories(Profile::Lang);
+        let tools = compute_desired_tools(&registry, &present, &categories);
         // Both cargo-clippy and cargo-fmt share the "rust" key with components set.
         assert_eq!(
             tools.get("rust"),
@@ -544,7 +621,8 @@ rust = { version = "1.0", components = "clippy" }
     fn compute_desired_tools_default_excludes_slow() {
         let registry = builtin();
         let present: HashSet<String> = HashSet::new();
-        let tools = compute_desired_tools(&registry, &present, Profile::Default);
+        let categories = profile_to_categories(Profile::Default);
+        let tools = compute_desired_tools(&registry, &present, &categories);
         // renovate-deps is slow — should be absent
         assert!(!tools.contains_key("npm:renovate"));
         // lychee is fast — should be present (empty patterns → always present)
@@ -557,7 +635,8 @@ rust = { version = "1.0", components = "clippy" }
         // Must include renovate config pattern so renovate-deps is considered present.
         let mut present: HashSet<String> = HashSet::new();
         present.insert(".github/renovate.json5".to_string());
-        let tools = compute_desired_tools(&registry, &present, Profile::Comprehensive);
+        let categories = profile_to_categories(Profile::Comprehensive);
+        let tools = compute_desired_tools(&registry, &present, &categories);
         assert!(tools.contains_key("lychee"));
         assert!(tools.contains_key("npm:renovate"));
     }
@@ -567,7 +646,8 @@ rust = { version = "1.0", components = "clippy" }
         let registry = builtin();
         // No renovate config file in present patterns → renovate-deps should be excluded.
         let present: HashSet<String> = HashSet::new();
-        let tools = compute_desired_tools(&registry, &present, Profile::Comprehensive);
+        let categories = profile_to_categories(Profile::Comprehensive);
+        let tools = compute_desired_tools(&registry, &present, &categories);
         assert!(!tools.contains_key("npm:renovate"));
     }
 }

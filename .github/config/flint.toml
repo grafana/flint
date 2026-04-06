@@ -1,10 +1,6 @@
 [settings]
-base_branch = "main"
 exclude = "CHANGELOG\\.md"
 exclude_paths = ["tests/cases/"]
-
-[checks.lychee]
-check_all_local = true
 
 [checks.renovate-deps]
 exclude_managers = ["github-actions", "github-runners", "cargo"]

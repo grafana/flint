@@ -1,5 +1,6 @@
 mod config;
 mod files;
+mod init;
 mod linters;
 mod registry;
 mod runner;
@@ -24,6 +25,8 @@ enum SubCommand {
     Run(RunArgs),
     /// List available linters and their status.
     Linters(LintersArgs),
+    /// Set up linters in mise.toml for this project.
+    Init(InitArgs),
     /// Display the flint version.
     Version,
 }
@@ -33,6 +36,17 @@ struct LintersArgs {
     /// Output as JSON instead of the human-readable table.
     #[arg(long)]
     json: bool,
+}
+
+#[derive(Args, Debug)]
+struct InitArgs {
+    /// Profile to configure: lang, default, or comprehensive.
+    #[arg(long, value_enum)]
+    profile: Option<init::Profile>,
+
+    /// Apply changes without prompting for confirmation.
+    #[arg(long, short = 'y')]
+    yes: bool,
 }
 
 #[derive(Args, Debug)]
@@ -99,6 +113,9 @@ async fn main() -> Result<()> {
                 print_linters(&registry, &mise_tools);
             }
         }
+        SubCommand::Init(args) => {
+            init::run(&project_root, args.profile, args.yes)?;
+        }
         SubCommand::Run(args) => {
             run(args, &project_root, &config_dir, &registry).await?;
         }
@@ -141,7 +158,7 @@ async fn run(
     let active: Vec<&registry::Check> = checks
         .into_iter()
         .filter(|c| registry::check_active(c, &mise_tools))
-        .filter(|c| explicit || !args.fast_only || !c.slow)
+        .filter(|c| explicit || !args.fast_only || c.category != registry::Category::Slow)
         .collect();
 
     if args.verbose {
@@ -326,7 +343,7 @@ pub fn linter_json(check: &registry::Check) -> serde_json::Value {
         "binary": if check.uses_binary() { check.bin_name } else { "(built-in)" },
         "patterns": patterns,
         "fix": check.has_fix(),
-        "slow": check.slow,
+        "slow": check.category == registry::Category::Slow,
         "scope": scope,
         "config_file": config_file,
     })
@@ -374,7 +391,11 @@ fn print_linters(registry: &[registry::Check], mise_tools: &HashMap<String, Stri
         } else {
             "missing"
         };
-        let speed = if check.slow { "slow" } else { "fast" };
+        let speed = if check.category == registry::Category::Slow {
+            "slow"
+        } else {
+            "fast"
+        };
         println!(
             "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  {}",
             check.name,

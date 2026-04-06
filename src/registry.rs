@@ -12,6 +12,19 @@ pub enum Scope {
     Project,
 }
 
+/// Which init profile (and `--fast-only` behaviour) a check belongs to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Category {
+    /// Language/toolchain-specific linter — fast; included in all init profiles.
+    Lang,
+    /// General fast linter — included in `default` and `comprehensive` init profiles.
+    #[default]
+    Default,
+    /// Slow linter — included only in the `comprehensive` init profile;
+    /// skipped when `--fast-only` is passed.
+    Slow,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpecialKind {
     Links,
@@ -54,8 +67,7 @@ pub struct Check {
     /// this check's file list. Used to avoid double-checking files that a
     /// dedicated formatter already owns.
     pub excludes_if_active: &'static [&'static str],
-    /// Slow checks are skipped when `--fast-only` is passed.
-    pub slow: bool,
+    pub category: Category,
     /// When set, look for `(filename, flag)` in config_dir: if the file exists, inject
     /// `flag <abs-path>` into the command right after the binary name.
     pub linter_config: Option<(&'static str, &'static str)>,
@@ -65,6 +77,15 @@ pub struct Check {
     pub defers_to_formatters: bool,
     /// Always considered active regardless of mise.toml (used for config-activated checks).
     pub activate_unconditionally: bool,
+    /// Canonical mise tool key to write when setting up a new project (e.g. `npm:prettier`).
+    /// When `None`, falls back to `mise_tool_name` then `bin_name`.
+    /// Distinct from `mise_tool_name` (lookup key) because existing repos may declare the
+    /// same tool under a bare name (e.g. `ruff = "latest"`) which must still be detected.
+    pub mise_install_key: Option<&'static str>,
+    /// Optional mise toolchain components to request when installing via `flint init`
+    /// (e.g. `"clippy,rustfmt"` for the `rust` toolchain). Produces an inline-table
+    /// entry: `rust = { version = "latest", components = "clippy,rustfmt" }`.
+    pub mise_install_components: Option<&'static str>,
     pub kind: CheckKind,
     /// Optional note shown in the README linter table.
     pub note: Option<&'static str>,
@@ -127,11 +148,13 @@ impl Check {
             version_range: None,
             patterns,
             excludes_if_active: &[],
-            slow: false,
             linter_config: None,
             is_formatter: false,
             defers_to_formatters: false,
             activate_unconditionally: false,
+            category: Category::Default,
+            mise_install_key: None,
+            mise_install_components: None,
             kind: CheckKind::Template {
                 check_cmd,
                 fix_cmd: "",
@@ -152,11 +175,13 @@ impl Check {
             version_range: None,
             patterns: &[],
             excludes_if_active: &[],
-            slow: false,
             linter_config: None,
             is_formatter: false,
             defers_to_formatters: false,
             activate_unconditionally: false,
+            category: Category::Default,
+            mise_install_key: None,
+            mise_install_components: None,
             kind: CheckKind::Special(kind),
             note: None,
         }
@@ -213,9 +238,9 @@ impl Check {
         self
     }
 
-    /// Mark as slow — skipped when `--fast-only` is passed.
+    /// Mark as slow — skipped when `--fast-only` is passed; `comprehensive` init profile only.
     pub fn slow(mut self) -> Self {
-        self.slow = true;
+        self.category = Category::Slow;
         self
     }
 
@@ -240,6 +265,29 @@ impl Check {
     /// Add a note shown in the README linter table.
     pub fn note(mut self, note: &'static str) -> Self {
         self.note = Some(note);
+        self
+    }
+
+    /// Mark as a language-specific linter — included in all init profiles.
+    pub fn lang(mut self) -> Self {
+        self.category = Category::Lang;
+        self
+    }
+
+    /// Set the canonical mise tool key used when installing this linter via `flint init`
+    /// (e.g. `npm:prettier`, `pipx:ruff`). Distinct from `mise_tool_name`, which is the
+    /// lookup key used to detect the tool in an existing mise.toml — existing repos may
+    /// declare the tool under a bare name (`ruff = "latest"`) which is still detectable
+    /// via the alias map but must not be overwritten with the prefixed key.
+    pub fn install_key(mut self, key: &'static str) -> Self {
+        self.mise_install_key = Some(key);
+        self
+    }
+
+    /// Set toolchain components required when installing via `flint init`
+    /// (e.g. `"clippy,rustfmt"` for the `rust` toolchain).
+    pub fn install_components(mut self, components: &'static str) -> Self {
+        self.mise_install_components = Some(components);
         self
     }
 
@@ -271,13 +319,16 @@ pub fn builtin() -> Vec<Check> {
             "shellcheck {FILE}",
             &["*.sh", "*.bash", "*.bats"],
         )
-        .linter_config(".shellcheckrc", "--rcfile"),
+        .linter_config(".shellcheckrc", "--rcfile")
+        .lang(),
         Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"])
             .fix("shfmt -w {FILE}")
-            .formatter(),
+            .formatter()
+            .lang(),
         Check::file("markdownlint-cli2", "markdownlint-cli2 {FILE}", &["*.md"])
             .fix("markdownlint-cli2 --fix {FILE}")
-            .linter_config(".markdownlint.json", "--config"),
+            .linter_config(".markdownlint.json", "--config")
+            .install_key("npm:markdownlint-cli2"),
         Check::files(
             "prettier",
             "prettier --check {FILES}",
@@ -286,22 +337,26 @@ pub fn builtin() -> Vec<Check> {
         .fix("prettier --write {FILES}")
         .full_cmd("prettier --check {ROOT}", "prettier --write {ROOT}")
         .linter_config(".prettierrc", "--config")
-        .formatter(),
+        .formatter()
+        .install_key("npm:prettier"),
         Check::file(
             "actionlint",
             "actionlint {FILE}",
             &[".github/workflows/*.yml", ".github/workflows/*.yaml"],
         )
-        .linter_config("actionlint.yml", "-config-file"),
+        .linter_config("actionlint.yml", "-config-file")
+        .lang(),
         Check::file(
             "hadolint",
             "hadolint {FILE}",
             &["Dockerfile", "Dockerfile.*", "*.dockerfile"],
         )
-        .linter_config(".hadolint.yaml", "--config"),
+        .linter_config(".hadolint.yaml", "--config")
+        .lang(),
         Check::files("codespell", "codespell {FILES}", &["*"])
             .fix("codespell --write-changes {FILES}")
-            .linter_config(".codespellrc", "--config"),
+            .linter_config(".codespellrc", "--config")
+            .install_key("pipx:codespell"),
         // Defer to formatters that enforce line length — those are the ones
         // that conflict with ec's max_line_length editorconfig check.
         // Note: ec's -config flag controls ec's own JSON config, not .editorconfig itself.
@@ -316,21 +371,28 @@ pub fn builtin() -> Vec<Check> {
             &["*.go"],
         )
         .linter_config(".golangci.yml", "--config")
+        .lang()
         .note("uses --new-from-rev to lint only changed code"),
         Check::file("ruff", "ruff check {FILE}", &["*.py"])
             .fix("ruff check --fix {FILE}")
-            .linter_config("ruff.toml", "--config"),
+            .linter_config("ruff.toml", "--config")
+            .install_key("pipx:ruff")
+            .lang(),
         Check::file("ruff-format", "ruff format --check {FILE}", &["*.py"])
             .bin("ruff")
             .fix("ruff format {FILE}")
             .linter_config("ruff.toml", "--config")
-            .formatter(),
+            .formatter()
+            .install_key("pipx:ruff")
+            .lang(),
         Check::file(
             "biome",
             "biome check {FILE}",
             &["*.json", "*.jsonc", "*.js", "*.ts", "*.jsx", "*.tsx"],
         )
-        .fix("biome check --fix {FILE}"),
+        .fix("biome check --fix {FILE}")
+        .install_key("npm:@biomejs/biome")
+        .lang(),
         Check::file(
             "biome-format",
             "biome format {FILE}",
@@ -338,10 +400,14 @@ pub fn builtin() -> Vec<Check> {
         )
         .bin("biome")
         .fix("biome format --write {FILE}")
-        .formatter(),
+        .formatter()
+        .install_key("npm:@biomejs/biome")
+        .lang(),
         Check::project("cargo-clippy", "cargo clippy -q -- -D warnings", &["*.rs"])
             .fix("cargo clippy -q --fix --allow-dirty --allow-staged -- -D warnings")
             .mise_tool("rust")
+            .install_components("clippy,rustfmt")
+            .lang()
             .note("lints all .rs files, not just changed"),
         Check::files(
             "cargo-fmt",
@@ -352,11 +418,14 @@ pub fn builtin() -> Vec<Check> {
         .full_cmd("cargo fmt -- --check", "cargo fmt")
         .bin("rustfmt")
         .mise_tool("rust")
-        .formatter(),
+        .install_components("clippy,rustfmt")
+        .formatter()
+        .lang(),
         Check::file("gofmt", "gofmt -d {FILE}", &["*.go"])
             .fix("gofmt -w {FILE}")
             .mise_tool("go")
-            .formatter(),
+            .formatter()
+            .lang(),
         Check::files(
             "google-java-format",
             "google-java-format --dry-run --set-exit-if-changed {FILES}",
@@ -364,7 +433,8 @@ pub fn builtin() -> Vec<Check> {
         )
         .fix("google-java-format -i {FILES}")
         .mise_tool("github:google/google-java-format")
-        .formatter(),
+        .formatter()
+        .lang(),
         Check::files(
             "ktlint",
             "ktlint --log-level=error {FILES}",
@@ -381,7 +451,8 @@ pub fn builtin() -> Vec<Check> {
         } else {
             "ktlint"
         })
-        .formatter(),
+        .formatter()
+        .lang(),
         Check::files(
             "dotnet-format",
             "dotnet format --verify-no-changes --include {RELFILES}",
@@ -391,7 +462,8 @@ pub fn builtin() -> Vec<Check> {
         .full_cmd("dotnet format --verify-no-changes", "dotnet format")
         .bin("dotnet")
         .mise_tool("dotnet")
-        .formatter(),
+        .formatter()
+        .lang(),
         Check::special("lychee", "lychee", SpecialKind::Links),
         Check::special("renovate-deps", "renovate", SpecialKind::RenovateDeps)
             .mise_tool("npm:renovate")
@@ -684,7 +756,12 @@ mod tests {
             format!("`{}`", check.patterns.join(" "))
         };
         let fix = if check.has_fix() { "yes" } else { "no" }.to_string();
-        let slow = if check.slow { "yes" } else { "—" }.to_string();
+        let slow = if check.category == Category::Slow {
+            "yes"
+        } else {
+            "—"
+        }
+        .to_string();
         let scope = match &check.kind {
             CheckKind::Template { scope, .. } => match scope {
                 Scope::File => "file",

@@ -37,9 +37,6 @@ biome = '''
 cargo-clippy = '''
 #!/bin/sh
 '''
-rustfmt = '''
-#!/bin/sh
-'''
 codespell = '''
 #!/bin/sh
 '''
@@ -59,6 +56,9 @@ renovate = '''
 #!/bin/sh
 '''
 ruff = '''
+#!/bin/sh
+'''
+rustfmt = '''
 #!/bin/sh
 '''
 shellcheck = '''

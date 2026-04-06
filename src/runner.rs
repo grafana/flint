@@ -513,7 +513,7 @@ fn shell_words(cmd: String) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::files::FileList;
-    use crate::registry::{Check, CheckKind, Scope};
+    use crate::registry::{Category, Check, CheckKind, Scope};
     use std::path::PathBuf;
 
     #[test]
@@ -577,11 +577,13 @@ mod tests {
             version_range: None,
             patterns,
             excludes_if_active: &[],
-            slow: false,
             linter_config: None,
             is_formatter: false,
             defers_to_formatters: false,
             activate_unconditionally: false,
+            category: Category::Default,
+            mise_install_key: None,
+            mise_install_components: None,
             kind: CheckKind::Template {
                 check_cmd: "run-it",
                 fix_cmd: "",

@@ -377,10 +377,37 @@ async fn run_invocations(name: &str, invocations: &[Vec<String>], root: &Path) -
         }
     }
 
+    maybe_append_rust_component_note(name, &mut combined_stderr);
+
     LinterOutput {
         ok: all_ok,
         stdout: combined_stdout,
         stderr: combined_stderr,
+    }
+}
+
+fn maybe_append_rust_component_note(name: &str, stderr: &mut Vec<u8>) {
+    let Some(component) = missing_rust_component(name, stderr) else {
+        return;
+    };
+    let note = format!(
+        "NOTE: `{name}` needs the Rust `{component}` component in the active toolchain.\n\
+`mise` may activate an existing Rust toolchain without adding missing components.\n\
+Install it with: `rustup component add {component}`\n"
+    );
+    stderr.extend_from_slice(note.as_bytes());
+}
+
+fn missing_rust_component(name: &str, stderr: &[u8]) -> Option<&'static str> {
+    let stderr = String::from_utf8_lossy(stderr);
+    match name {
+        "cargo-clippy" if stderr.contains("'cargo-clippy' is not installed for the toolchain") => {
+            Some("clippy")
+        }
+        "cargo-fmt" if stderr.contains("'rustfmt' is not installed for the toolchain") => {
+            Some("rustfmt")
+        }
+        _ => None,
     }
 }
 
@@ -651,5 +678,28 @@ mod tests {
             Path::new("/repo"),
         );
         assert_eq!(inv, vec![vec!["run-it".to_string()]]);
+    }
+
+    #[test]
+    fn appends_rust_component_note_for_missing_clippy() {
+        let mut stderr = b"error: 'cargo-clippy' is not installed for the toolchain '1.94.1-x86_64-unknown-linux-gnu'.\n".to_vec();
+
+        maybe_append_rust_component_note("cargo-clippy", &mut stderr);
+
+        let msg = String::from_utf8(stderr).unwrap();
+        assert!(msg.contains("NOTE: `cargo-clippy` needs the Rust `clippy` component"));
+        assert!(msg.contains("rustup component add clippy"));
+    }
+
+    #[test]
+    fn appends_rust_component_note_for_missing_rustfmt() {
+        let mut stderr =
+            b"error: 'rustfmt' is not installed for the toolchain '1.94.1-x86_64-unknown-linux-gnu'.\n".to_vec();
+
+        maybe_append_rust_component_note("cargo-fmt", &mut stderr);
+
+        let msg = String::from_utf8(stderr).unwrap();
+        assert!(msg.contains("NOTE: `cargo-fmt` needs the Rust `rustfmt` component"));
+        assert!(msg.contains("rustup component add rustfmt"));
     }
 }

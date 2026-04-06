@@ -20,6 +20,39 @@ pub enum Profile {
 /// Desired tools for a profile: maps each mise tool key to its optional components string.
 type DesiredTools = HashMap<String, Option<&'static str>>;
 
+enum ChangeKind {
+    Add {
+        key: String,
+        components: Option<&'static str>,
+    },
+    Remove {
+        key: String,
+    },
+    Upgrade {
+        key: String,
+        components: &'static str,
+    },
+}
+
+struct ChangeItem {
+    selected: bool,
+    kind: ChangeKind,
+}
+
+impl ChangeItem {
+    fn label(&self) -> String {
+        match &self.kind {
+            ChangeKind::Add { key, components } => {
+                format!("[+]  {} = {}", key, format_toml_value(components))
+            }
+            ChangeKind::Remove { key } => format!("[-]  {}", key),
+            ChangeKind::Upgrade { key, components } => {
+                format!("[~]  {} (add components: {})", key, components)
+            }
+        }
+    }
+}
+
 pub fn run(project_root: &Path, profile_arg: Option<Profile>, yes: bool) -> Result<()> {
     println!(
         "Tip: flint init detects languages from tracked files (`git ls-files`). \
@@ -72,44 +105,80 @@ Add and stage your source files before running init so the detection is accurate
         .collect();
     to_upgrade.sort_by(|a, b| a.0.cmp(&b.0));
 
-    if to_add.is_empty() && to_remove.is_empty() && to_upgrade.is_empty() {
+    // Build unified change list.
+    let mut items: Vec<ChangeItem> = Vec::new();
+    for (key, components) in &to_add {
+        items.push(ChangeItem {
+            selected: true,
+            kind: ChangeKind::Add {
+                key: key.clone(),
+                components: *components,
+            },
+        });
+    }
+    for key in &to_remove {
+        items.push(ChangeItem {
+            selected: true,
+            kind: ChangeKind::Remove { key: key.clone() },
+        });
+    }
+    for (key, components) in &to_upgrade {
+        items.push(ChangeItem {
+            selected: true,
+            kind: ChangeKind::Upgrade {
+                key: key.clone(),
+                components,
+            },
+        });
+    }
+
+    if items.is_empty() {
         println!("mise.toml [tools] is already up to date for the selected profile.");
         return Ok(());
     }
 
-    // Show planned changes.
-    println!();
-    if !to_add.is_empty() {
-        println!("Adding to [tools]:");
-        for (key, components) in &to_add {
-            println!("  + {} = {}", key, format_toml_value(components));
-        }
-    }
-    if !to_upgrade.is_empty() {
-        println!("Updating [tools] (adding components):");
-        for (key, components) in &to_upgrade {
-            println!("  ~ {key}: add components = \"{components}\"");
-        }
-    }
-    if !to_remove.is_empty() {
-        println!("Removing from [tools]:");
-        for key in &to_remove {
-            println!("  - {}", key);
-        }
-    }
-    println!();
-
-    if !yes && !confirm("Apply changes to mise.toml?")? {
+    // Interactive selection (skipped with --yes).
+    if !yes && !interactive_select(&mut items)? {
         println!("Aborted.");
+        return Ok(());
+    }
+
+    let final_add: Vec<(String, Option<&'static str>)> = items
+        .iter()
+        .filter(|i| i.selected)
+        .filter_map(|i| match &i.kind {
+            ChangeKind::Add { key, components } => Some((key.clone(), *components)),
+            _ => None,
+        })
+        .collect();
+    let final_remove: Vec<String> = items
+        .iter()
+        .filter(|i| i.selected)
+        .filter_map(|i| match &i.kind {
+            ChangeKind::Remove { key } => Some(key.clone()),
+            _ => None,
+        })
+        .collect();
+    let final_upgrade: Vec<(String, &'static str)> = items
+        .iter()
+        .filter(|i| i.selected)
+        .filter_map(|i| match &i.kind {
+            ChangeKind::Upgrade { key, components } => Some((key.clone(), *components)),
+            _ => None,
+        })
+        .collect();
+
+    if final_add.is_empty() && final_remove.is_empty() && final_upgrade.is_empty() {
+        println!("No changes selected.");
         return Ok(());
     }
 
     apply_changes(
         &mise_path,
         &current_content,
-        &to_add,
-        &to_remove,
-        &to_upgrade,
+        &final_add,
+        &final_remove,
+        &final_upgrade,
     )?;
     println!("Done. Run `mise install` to install the new tools.");
     Ok(())
@@ -239,6 +308,43 @@ fn format_toml_value(components: &Option<&'static str>) -> String {
     }
 }
 
+/// Present a numbered, toggleable list of planned changes. Returns `true` if
+/// the user confirms (Enter), `false` if they abort (`q`).
+fn interactive_select(items: &mut [ChangeItem]) -> Result<bool> {
+    loop {
+        print_items(items);
+        print!("\nToggle by number (space-separated), Enter to apply, q to abort: ");
+        io::stdout().flush()?;
+        let mut line = String::new();
+        io::stdin().lock().read_line(&mut line)?;
+        let trimmed = line.trim();
+
+        if trimmed.eq_ignore_ascii_case("q") {
+            return Ok(false);
+        }
+        if trimmed.is_empty() {
+            return Ok(true);
+        }
+        for token in trimmed.split_whitespace() {
+            if let Ok(n) = token.parse::<usize>()
+                && n >= 1
+                && n <= items.len()
+            {
+                items[n - 1].selected = !items[n - 1].selected;
+            }
+        }
+    }
+}
+
+fn print_items(items: &[ChangeItem]) {
+    println!("\nRecommended changes:");
+    println!();
+    for (i, item) in items.iter().enumerate() {
+        let check = if item.selected { "✓" } else { " " };
+        println!("  {:>2}. {}  {}", i + 1, check, item.label());
+    }
+}
+
 fn prompt_profile() -> Result<Profile> {
     println!("Select a profile:");
     println!("  1) lang          — language linters only (shellcheck, ruff, cargo-clippy, …)");
@@ -257,15 +363,6 @@ fn prompt_profile() -> Result<Profile> {
         "3" => Profile::Comprehensive,
         _ => Profile::Default,
     })
-}
-
-fn confirm(prompt: &str) -> Result<bool> {
-    print!("{prompt} [y/N]: ");
-    io::stdout().flush()?;
-    let mut line = String::new();
-    io::stdin().lock().read_line(&mut line)?;
-    let answer = line.trim().to_ascii_lowercase();
-    Ok(answer == "y" || answer == "yes")
 }
 
 fn apply_changes(
@@ -457,9 +554,20 @@ rust = { version = "1.0", components = "clippy" }
     #[test]
     fn compute_desired_tools_comprehensive_includes_slow() {
         let registry = builtin();
-        let present: HashSet<String> = HashSet::new();
+        // Must include renovate config pattern so renovate-deps is considered present.
+        let mut present: HashSet<String> = HashSet::new();
+        present.insert(".github/renovate.json5".to_string());
         let tools = compute_desired_tools(&registry, &present, Profile::Comprehensive);
         assert!(tools.contains_key("lychee"));
         assert!(tools.contains_key("npm:renovate"));
+    }
+
+    #[test]
+    fn renovate_deps_absent_without_renovate_config() {
+        let registry = builtin();
+        // No renovate config file in present patterns → renovate-deps should be excluded.
+        let present: HashSet<String> = HashSet::new();
+        let tools = compute_desired_tools(&registry, &present, Profile::Comprehensive);
+        assert!(!tools.contains_key("npm:renovate"));
     }
 }

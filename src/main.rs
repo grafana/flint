@@ -396,15 +396,28 @@ fn print_linters(registry: &[registry::Check], mise_tools: &HashMap<String, Stri
         } else {
             "fast"
         };
-        println!(
-            "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  {}",
-            check.name,
-            check.bin_name,
-            status,
-            speed,
-            check.patterns.join(" "),
-            name_w = name_w,
-            bin_w = bin_w,
-        );
+        let patterns_str = check.patterns.join(" ");
+        if patterns_str.is_empty() {
+            println!(
+                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}",
+                check.name,
+                check.bin_name,
+                status,
+                speed,
+                name_w = name_w,
+                bin_w = bin_w,
+            );
+        } else {
+            println!(
+                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  {}",
+                check.name,
+                check.bin_name,
+                status,
+                speed,
+                patterns_str,
+                name_w = name_w,
+                bin_w = bin_w,
+            );
+        }
     }
 }

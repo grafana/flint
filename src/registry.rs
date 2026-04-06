@@ -268,6 +268,13 @@ impl Check {
         self
     }
 
+    /// Override the patterns field (useful for Special checks that need init-detection
+    /// patterns but don't use them for file matching at runtime).
+    pub fn patterns(mut self, patterns: &'static [&'static str]) -> Self {
+        self.patterns = patterns;
+        self
+    }
+
     /// Mark as a language-specific linter — included in all init profiles.
     pub fn lang(mut self) -> Self {
         self.category = Category::Lang;
@@ -467,7 +474,16 @@ pub fn builtin() -> Vec<Check> {
         Check::special("lychee", "lychee", SpecialKind::Links),
         Check::special("renovate-deps", "renovate", SpecialKind::RenovateDeps)
             .mise_tool("npm:renovate")
-            .slow(),
+            .slow()
+            .patterns(&[
+                "renovate.json",
+                "renovate.json5",
+                ".github/renovate.json",
+                ".github/renovate.json5",
+                ".renovaterc",
+                ".renovaterc.json",
+                ".renovaterc.json5",
+            ]),
         Check::special(
             "license-header",
             "license-header",

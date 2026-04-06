@@ -28,6 +28,9 @@ jobs:
           version: v2026.4.1
           sha256: c597fa1e4da76d1ea1967111d150a6a655ca51a72f4cd17fdc584be2b9eaa8bd
 
+      - name: Install Rust lint components
+        run: rustup component add clippy rustfmt
+
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
       - name: Lint

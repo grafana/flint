@@ -75,7 +75,19 @@ details — config files are compatible, no changes required there.
 "npm:markdownlint-cli2" = "0.17.2"
 ```
 
-### 6. Verify active linters
+### 6. Move renovate-deps config to `flint.toml`
+
+If you previously used the `RENOVATE_TRACKED_DEPS_EXCLUDE` env var to exclude
+managers, move that to a `flint.toml` at your project root instead:
+
+```toml
+[checks.renovate-deps]
+exclude_managers = ["github-actions", "github-runners", "cargo"]
+```
+
+Remove `RENOVATE_TRACKED_DEPS_EXCLUDE` from `[env]` in `mise.toml`.
+
+### 7. Verify active linters
 
 Run `flint linters` to confirm flint detects all the tools declared in your
 `mise.toml`. Any tool listed as `missing` is not declared and will be skipped.

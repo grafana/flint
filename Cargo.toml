@@ -8,6 +8,7 @@ repository = "https://github.com/grafana/flint"
 
 [dependencies]
 anyhow = "1"
+crossterm = "0.28"
 clap = { version = "4", features = ["derive", "env"] }
 figment = { version = "0.10", features = ["toml", "env"] }
 serde = { version = "1", features = ["derive"] }

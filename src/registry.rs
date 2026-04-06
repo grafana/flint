@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use crate::linters::renovate_deps::RENOVATE_CONFIG_PATTERNS;
+
 /// How a check is invoked relative to the file list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
@@ -420,7 +422,7 @@ pub fn builtin() -> Vec<Check> {
         Check::project("cargo-clippy", "cargo clippy -q -- -D warnings", &["*.rs"])
             .fix("cargo clippy -q --fix --allow-dirty --allow-staged -- -D warnings")
             .mise_tool("rust")
-            .install_components("clippy,rustfmt")
+            .install_components("clippy")
             .lang()
             .note("lints all .rs files, not just changed"),
         Check::files(
@@ -432,7 +434,7 @@ pub fn builtin() -> Vec<Check> {
         .full_cmd("cargo fmt -- --check", "cargo fmt")
         .bin("rustfmt")
         .mise_tool("rust")
-        .install_components("clippy,rustfmt")
+        .install_components("rustfmt")
         .formatter()
         .lang(),
         Check::file("gofmt", "gofmt -d {FILE}", &["*.go"])
@@ -482,15 +484,7 @@ pub fn builtin() -> Vec<Check> {
         Check::special("renovate-deps", "renovate", SpecialKind::RenovateDeps)
             .mise_tool("npm:renovate")
             .slow()
-            .patterns(&[
-                "renovate.json",
-                "renovate.json5",
-                ".github/renovate.json",
-                ".github/renovate.json5",
-                ".renovaterc",
-                ".renovaterc.json",
-                ".renovaterc.json5",
-            ]),
+            .patterns(RENOVATE_CONFIG_PATTERNS),
         Check::special(
             "license-header",
             "license-header",

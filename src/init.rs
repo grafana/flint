@@ -40,23 +40,43 @@ fn profile_to_categories(profile: Profile) -> HashSet<Category> {
 
 /// Desired tools for a profile: maps each mise tool key to its optional components string.
 #[cfg(test)]
-type DesiredTools = HashMap<String, Option<&'static str>>;
+type DesiredTools = HashMap<String, Option<String>>;
 
 // One entry per install key — groups all checks sharing that key.
 struct LinterGroup<'a> {
     key: &'static str,
-    checks: Vec<&'a Check>, // sorted by name
+    checks: Vec<&'a Check>,    // sorted by name
+    check_selected: Vec<bool>, // parallel to checks
     installed: bool,
-    needs_upgrade: bool,
-    selected: bool,
+    current_components: Option<String>,
 }
 
 impl LinterGroup<'_> {
+    fn any_selected(&self) -> bool {
+        self.check_selected.iter().any(|&s| s)
+    }
+
+    /// Components string to write for the currently selected checks, e.g. `"clippy,rustfmt"`.
+    /// Returns `None` when no selected check carries a component requirement.
+    fn selected_components(&self) -> Option<String> {
+        let comps: Vec<&'static str> = self
+            .checks
+            .iter()
+            .zip(&self.check_selected)
+            .filter_map(|(c, &sel)| if sel { c.mise_install_components } else { None })
+            .collect();
+        if comps.is_empty() {
+            None
+        } else {
+            Some(comps.join(","))
+        }
+    }
+
     fn action(&self) -> &'static str {
-        if self.selected {
+        if self.any_selected() {
             if !self.installed {
                 "add"
-            } else if self.needs_upgrade {
+            } else if self.selected_components() != self.current_components {
                 "upgrade"
             } else {
                 "keep"
@@ -157,22 +177,24 @@ Add and stage your source files before running init so the detection is accurate
     }
 
     // Derive changes from final selection state.
-    let mut final_add: Vec<(String, Option<&'static str>)> = Vec::new();
+    let mut final_add: Vec<(String, Option<String>)> = Vec::new();
     let mut final_remove: Vec<String> = Vec::new();
-    let mut final_upgrade: Vec<(String, &'static str)> = Vec::new();
+    let mut final_upgrade: Vec<(String, String)> = Vec::new();
 
     for group in &groups {
-        if group.selected {
+        if group.any_selected() {
             if !group.installed {
-                let components = group.checks.iter().find_map(|c| c.mise_install_components);
-                final_add.push((group.key.to_string(), components));
-            } else if group.needs_upgrade {
-                let components = group
-                    .checks
-                    .iter()
-                    .find_map(|c| c.mise_install_components)
-                    .unwrap();
-                final_upgrade.push((group.key.to_string(), components));
+                final_add.push((group.key.to_string(), group.selected_components()));
+            } else {
+                let target = group.selected_components();
+                if target != group.current_components {
+                    // Upgrade: components changed (added, removed, or reordered).
+                    // If the target has no components (e.g. all component-bearing checks
+                    // deselected), treat as a plain-version install via add+remove.
+                    if let Some(comps) = target {
+                        final_upgrade.push((group.key.to_string(), comps));
+                    }
+                }
             }
         } else if group.installed && known_keys.contains(group.key) {
             final_remove.push(group.key.to_string());
@@ -220,7 +242,8 @@ fn compute_desired_tools(
     present_patterns: &HashSet<String>,
     categories: &HashSet<Category>,
 ) -> DesiredTools {
-    let mut desired = DesiredTools::new();
+    // Collect per-key component lists so multiple checks sharing a key are merged.
+    let mut by_key: HashMap<String, Vec<&'static str>> = HashMap::new();
     for check in registry {
         let key = match install_key(check) {
             Some(k) => k,
@@ -230,10 +253,25 @@ fn compute_desired_tools(
             continue;
         }
         if categories.contains(&check.category) {
-            desired.insert(key.to_string(), check.mise_install_components);
+            let entry = by_key.entry(key.to_string()).or_default();
+            if let Some(comp) = check.mise_install_components {
+                if !entry.contains(&comp) {
+                    entry.push(comp);
+                }
+            }
         }
     }
-    desired
+    by_key
+        .into_iter()
+        .map(|(k, comps)| {
+            let merged = if comps.is_empty() {
+                None
+            } else {
+                Some(comps.join(","))
+            };
+            (k, merged)
+        })
+        .collect()
 }
 
 /// Returns `true` if the repo contains at least one file matching any of the
@@ -286,6 +324,7 @@ fn parse_tool_keys(content: &str) -> HashSet<String> {
 /// Returns `true` if the `[tools]` entry for `key` exists and its `components`
 /// field is absent or differs from `required`. Used to detect entries that need
 /// upgrading (missing components) or correcting (wrong components).
+#[cfg(test)]
 fn entry_components_differ(content: &str, key: &str, required: &str) -> bool {
     let doc: toml_edit::DocumentMut = match content.parse() {
         Ok(d) => d,
@@ -304,6 +343,17 @@ fn entry_components_differ(content: &str, key: &str, required: &str) -> bool {
             _ => false,
         },
         None => false,
+    }
+}
+
+/// Returns the `components` string currently set for `key` in the `[tools]` section,
+/// or `None` if the key is absent, is a plain string entry, or has no `components` field.
+fn get_entry_components(content: &str, key: &str) -> Option<String> {
+    let doc: toml_edit::DocumentMut = content.parse().ok()?;
+    let tools = doc.get("tools")?.as_table()?;
+    match tools.get(key)?.as_value()? {
+        toml_edit::Value::InlineTable(tbl) => tbl.get("components")?.as_str().map(str::to_string),
+        _ => None,
     }
 }
 
@@ -332,21 +382,27 @@ fn build_linter_groups<'a>(
         .map(|(key, mut checks)| {
             checks.sort_by_key(|c| c.name);
             let installed = current_tool_keys.contains(key);
-            let needs_upgrade = checks.iter().any(|c| {
-                c.mise_install_components
-                    .is_some_and(|comp| entry_components_differ(current_content, key, comp))
-            });
-            // Pre-select if any check in the group is in the default categories and its
-            // patterns are present, OR if the key is already installed.
-            let suggested = checks.iter().any(|c| {
-                default_categories.contains(&c.category) && files_present(c, present_patterns)
-            });
+            let current_components = if installed {
+                get_entry_components(current_content, key)
+            } else {
+                None
+            };
+            // Pre-select each check individually: select if its category is in the
+            // default set and its patterns are present, OR if the key is already installed.
+            let check_selected: Vec<bool> = checks
+                .iter()
+                .map(|c| {
+                    let suggested = default_categories.contains(&c.category)
+                        && files_present(c, present_patterns);
+                    suggested || installed
+                })
+                .collect();
             LinterGroup {
                 key,
                 checks,
+                check_selected,
                 installed,
-                needs_upgrade,
-                selected: suggested || installed,
+                current_components,
             }
         })
         .collect();
@@ -356,7 +412,7 @@ fn build_linter_groups<'a>(
 }
 
 fn run_arrow_selector<T>(
-    items: &mut Vec<T>,
+    items: &mut [T],
     print_fn: fn(&mut dyn Write, &[T], usize) -> Result<usize>,
     toggle_fn: fn(&mut T),
 ) -> Result<bool> {
@@ -413,7 +469,7 @@ fn run_arrow_selector<T>(
 
 // --- Step 1: category selection ---
 
-fn select_categories_arrow(items: &mut Vec<CategoryItem>) -> Result<bool> {
+fn select_categories_arrow(items: &mut [CategoryItem]) -> Result<bool> {
     run_arrow_selector(items, print_cat_selector, |item| {
         item.selected = !item.selected
     })
@@ -444,10 +500,72 @@ fn print_cat_selector(
 
 // --- Step 2: linter table selection ---
 
+/// Maps a flat row index (across all checks in all groups) to `(group_idx, check_idx)`.
+fn flat_to_group_check(groups: &[LinterGroup], flat: usize) -> (usize, usize) {
+    let mut remaining = flat;
+    for (gi, group) in groups.iter().enumerate() {
+        if remaining < group.checks.len() {
+            return (gi, remaining);
+        }
+        remaining -= group.checks.len();
+    }
+    (0, 0)
+}
+
 fn interactive_select_linters(groups: &mut Vec<LinterGroup>) -> Result<bool> {
-    run_arrow_selector(groups, print_linter_table, |group| {
-        group.selected = !group.selected
-    })
+    let total_rows = |gs: &[LinterGroup]| gs.iter().map(|g| g.checks.len()).sum::<usize>();
+    let mut cursor = 0usize;
+    terminal::enable_raw_mode()?;
+    let result = (|| -> Result<bool> {
+        let mut stdout = io::stdout();
+        let mut n_lines = print_linter_table(&mut stdout, groups, cursor)?;
+        loop {
+            if let Event::Key(key) = event::read()? {
+                match key.code {
+                    KeyCode::Up if cursor > 0 => cursor -= 1,
+                    KeyCode::Down if cursor + 1 < total_rows(groups) => cursor += 1,
+                    KeyCode::Char(' ') => {
+                        let (gi, ci) = flat_to_group_check(groups, cursor);
+                        groups[gi].check_selected[ci] = !groups[gi].check_selected[ci];
+                    }
+                    KeyCode::Enter => {
+                        execute!(
+                            stdout,
+                            cursor::MoveUp(n_lines as u16),
+                            terminal::Clear(ClearType::FromCursorDown)
+                        )?;
+                        return Ok(true);
+                    }
+                    KeyCode::Char('q') | KeyCode::Esc => {
+                        execute!(
+                            stdout,
+                            cursor::MoveUp(n_lines as u16),
+                            terminal::Clear(ClearType::FromCursorDown)
+                        )?;
+                        return Ok(false);
+                    }
+                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        execute!(
+                            stdout,
+                            cursor::MoveUp(n_lines as u16),
+                            terminal::Clear(ClearType::FromCursorDown)
+                        )?;
+                        return Ok(false);
+                    }
+                    _ => continue,
+                }
+                execute!(
+                    stdout,
+                    cursor::MoveUp(n_lines as u16),
+                    terminal::Clear(ClearType::FromCursorDown)
+                )?;
+                n_lines = print_linter_table(&mut stdout, groups, cursor)?;
+            }
+        }
+    })();
+    let _ = terminal::disable_raw_mode();
+    println!();
+    result
 }
 
 fn print_linter_table(
@@ -489,11 +607,16 @@ fn print_linter_table(
     )?;
     lines += 2;
 
-    for (gi, group) in groups.iter().enumerate() {
+    let mut flat_idx = 0usize;
+    for group in groups.iter() {
         let action = group.action();
-        let sel_mark = if group.selected { "[✓]" } else { "[ ]" };
         for (ci, check) in group.checks.iter().enumerate() {
-            let cursor_mark = if gi == cursor && ci == 0 { ">" } else { " " };
+            let sel_mark = if group.check_selected[ci] {
+                "[✓]"
+            } else {
+                "[ ]"
+            };
+            let cursor_mark = if flat_idx == cursor { ">" } else { " " };
             let speed = if check.category == Category::Slow {
                 "slow"
             } else {
@@ -514,6 +637,7 @@ fn print_linter_table(
                 bin_w = bin_w,
             )?;
             lines += 1;
+            flat_idx += 1;
         }
     }
 
@@ -529,9 +653,9 @@ fn print_linter_table(
 fn apply_changes(
     path: &Path,
     current_content: &str,
-    to_add: &[(String, Option<&'static str>)],
+    to_add: &[(String, Option<String>)],
     to_remove: &[String],
-    to_upgrade: &[(String, &'static str)],
+    to_upgrade: &[(String, String)],
 ) -> Result<()> {
     let mut doc: toml_edit::DocumentMut = current_content
         .parse()
@@ -554,7 +678,7 @@ fn apply_changes(
             Some(comps) => {
                 let mut tbl = toml_edit::InlineTable::new();
                 tbl.insert("version", toml_edit::Value::from("latest"));
-                tbl.insert("components", toml_edit::Value::from(*comps));
+                tbl.insert("components", toml_edit::Value::from(comps.as_str()));
                 tools.insert(
                     key.as_str(),
                     toml_edit::Item::Value(toml_edit::Value::InlineTable(tbl)),
@@ -566,7 +690,7 @@ fn apply_changes(
         }
     }
 
-    // Upgrade existing entries: preserve the current version, add components.
+    // Upgrade existing entries: preserve the current version, update components.
     for (key, components) in to_upgrade {
         let existing_version = tools
             .get(key.as_str())
@@ -583,7 +707,7 @@ fn apply_changes(
 
         let mut tbl = toml_edit::InlineTable::new();
         tbl.insert("version", toml_edit::Value::from(existing_version.as_str()));
-        tbl.insert("components", toml_edit::Value::from(*components));
+        tbl.insert("components", toml_edit::Value::from(components.as_str()));
         tools.insert(
             key.as_str(),
             toml_edit::Item::Value(toml_edit::Value::InlineTable(tbl)),
@@ -648,7 +772,7 @@ mod tests {
             content,
             &[],
             &[],
-            &[("rust".to_string(), "clippy,rustfmt")],
+            &[("rust".to_string(), "clippy,rustfmt".to_string())],
         )
         .unwrap();
         let result = std::fs::read_to_string(tmp.path()).unwrap();
@@ -699,11 +823,11 @@ rust = { version = "1.0", components = "clippy" }
         present.insert("*.rs".to_string());
         let categories = profile_to_categories(Profile::Lang);
         let tools = compute_desired_tools(&registry, &present, &categories);
-        // Both cargo-clippy and cargo-fmt share the "rust" key with components set.
+        // Both cargo-clippy and cargo-fmt share the "rust" key; their components are merged.
         assert_eq!(
             tools.get("rust"),
-            Some(&Some("clippy,rustfmt")),
-            "rust tool entry should carry components"
+            Some(&Some("clippy,rustfmt".to_string())),
+            "rust tool entry should carry merged components"
         );
     }
 

@@ -4,6 +4,7 @@ use std::path::Path;
 use std::process::Command;
 
 use super::LinterGroup;
+use super::detection::parse_tool_keys;
 
 /// Returns the renovate preset entry to inject, e.g. `github>grafana/flint#v0.9.2`.
 /// Pre-release suffixes are stripped so dev builds produce a valid tag reference.
@@ -97,6 +98,26 @@ fn add_to_extends(content: &str, entry: &str) -> Result<String> {
     }
 }
 
+/// Runs `mise use --pin <key>@latest` in the project directory to add a tool
+/// with a pinned version. Returns `true` if the key was written to the config
+/// (checked by re-reading the file), ignoring non-zero exit codes that arise
+/// from post-write steps like shim rebuilds failing in restricted environments.
+fn pin_tool_via_mise(project_root: &Path, key: &str) -> bool {
+    let mise_path = project_root.join("mise.toml");
+    let before = std::fs::read_to_string(&mise_path).unwrap_or_default();
+
+    let _ = Command::new("mise")
+        .args(["use", "--pin", &format!("{key}@latest")])
+        .current_dir(project_root)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+
+    // Success = the key is now present in the config (regardless of exit code).
+    let after = std::fs::read_to_string(&mise_path).unwrap_or_default();
+    after != before && parse_tool_keys(&after).contains(key)
+}
+
 pub(super) fn apply_changes(
     path: &Path,
     current_content: &str,
@@ -104,6 +125,26 @@ pub(super) fn apply_changes(
     to_remove: &[String],
     to_upgrade: &[(String, String)],
 ) -> Result<()> {
+    let project_root = path.parent().unwrap_or(path);
+
+    // Pin new tools via `mise use --pin`. For tools where mise succeeds the
+    // file is already updated; we still open the file below to handle removals,
+    // upgrades, and component additions.
+    let mut pinned_via_mise: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for (key, _) in to_add {
+        if pin_tool_via_mise(project_root, key) {
+            pinned_via_mise.insert(key.clone());
+        } else {
+            eprintln!("  warning: could not pin {key} via mise — writing \"latest\"");
+        }
+    }
+
+    // Re-read the file only if mise actually modified it.
+    let current_content: String = if pinned_via_mise.is_empty() {
+        current_content.to_string()
+    } else {
+        std::fs::read_to_string(path).unwrap_or_else(|_| current_content.to_string())
+    };
     let mut doc: toml_edit::DocumentMut = current_content
         .parse()
         .unwrap_or_else(|_| toml_edit::DocumentMut::new());
@@ -121,10 +162,29 @@ pub(super) fn apply_changes(
     }
 
     for (key, components) in to_add {
+        let already_pinned = pinned_via_mise.contains(key.as_str());
         match components {
             Some(comps) => {
+                // If mise already wrote a plain-string version, upgrade to inline
+                // table to attach the components field.
+                let existing_version = if already_pinned {
+                    tools
+                        .get(key.as_str())
+                        .and_then(|i| i.as_value())
+                        .and_then(|v| match v {
+                            toml_edit::Value::String(s) => Some(s.value().to_string()),
+                            toml_edit::Value::InlineTable(t) => t
+                                .get("version")
+                                .and_then(|v| v.as_str())
+                                .map(str::to_string),
+                            _ => None,
+                        })
+                        .unwrap_or_else(|| "latest".to_string())
+                } else {
+                    "latest".to_string()
+                };
                 let mut tbl = toml_edit::InlineTable::new();
-                tbl.insert("version", toml_edit::Value::from("latest"));
+                tbl.insert("version", toml_edit::Value::from(existing_version.as_str()));
                 tbl.insert("components", toml_edit::Value::from(comps.as_str()));
                 tools.insert(
                     key.as_str(),
@@ -132,7 +192,10 @@ pub(super) fn apply_changes(
                 );
             }
             None => {
-                tools.insert(key.as_str(), toml_edit::value("latest"));
+                if !already_pinned {
+                    tools.insert(key.as_str(), toml_edit::value("latest"));
+                }
+                // Already pinned by mise — leave the entry as-is.
             }
         }
     }
@@ -163,6 +226,53 @@ pub(super) fn apply_changes(
 
     std::fs::write(path, doc.to_string())?;
     Ok(())
+}
+
+/// The mise tool key used to install the flint binary from GitHub releases.
+pub(super) const FLINT_MISE_KEY: &str = "github:grafana/flint";
+
+/// Adds `flint` itself to `[tools]` in `mise.toml` if it is not already present.
+/// Uses `mise use --pin` to resolve and pin the latest release version.
+/// Falls back to `"latest"` if mise is unavailable.
+/// Returns `true` if the file was changed.
+pub(super) fn add_flint_tool(mise_path: &Path) -> Result<bool> {
+    let content = std::fs::read_to_string(mise_path).unwrap_or_default();
+    let doc: toml_edit::DocumentMut = content
+        .parse()
+        .unwrap_or_else(|_| toml_edit::DocumentMut::new());
+
+    // Already present — nothing to do.
+    if doc
+        .get("tools")
+        .and_then(|t| t.as_table())
+        .map(|t| t.contains_key(FLINT_MISE_KEY))
+        .unwrap_or(false)
+    {
+        return Ok(false);
+    }
+
+    let project_root = mise_path.parent().unwrap_or(mise_path);
+    if pin_tool_via_mise(project_root, FLINT_MISE_KEY) {
+        println!("  added {FLINT_MISE_KEY} to [tools]");
+        return Ok(true);
+    }
+
+    // Fallback: write "latest" directly.
+    eprintln!("  warning: could not pin {FLINT_MISE_KEY} via mise — writing \"latest\"");
+    let content = std::fs::read_to_string(mise_path).unwrap_or_default();
+    let mut doc: toml_edit::DocumentMut = content
+        .parse()
+        .unwrap_or_else(|_| toml_edit::DocumentMut::new());
+    if !doc.contains_key("tools") {
+        doc.insert("tools", toml_edit::Item::Table(toml_edit::Table::new()));
+    }
+    doc["tools"]
+        .as_table_mut()
+        .context("[tools] is not a table")?
+        .insert(FLINT_MISE_KEY, toml_edit::value("latest"));
+    std::fs::write(mise_path, doc.to_string())?;
+    println!("  added {FLINT_MISE_KEY} to [tools]");
+    Ok(true)
 }
 
 const FLINT_V1_URL_PREFIX: &str = "https://raw.githubusercontent.com/grafana/flint/";

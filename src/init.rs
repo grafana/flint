@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use std::collections::{HashMap, HashSet};
-use std::io::{self, Write};
+use std::io::{self, BufRead, Write};
 use std::path::Path;
 use std::process::Command;
 
@@ -201,18 +201,45 @@ Add and stage your source files before running init so the detection is accurate
         }
     }
 
-    if final_add.is_empty() && final_remove.is_empty() && final_upgrade.is_empty() {
+    let has_slow = has_slow_selected(&groups);
+    let has_renovate = groups.iter().any(|g| {
+        g.checks
+            .iter()
+            .zip(&g.check_selected)
+            .any(|(c, &sel)| sel && c.name == "renovate-deps")
+    });
+
+    // Prompt for the flint config dir (skipped if already set in mise.toml or --yes).
+    let existing_config_dir = get_existing_config_dir(&current_content);
+    let config_dir_rel = prompt_config_dir(existing_config_dir.as_deref(), yes)?;
+
+    let tools_changed =
+        !final_add.is_empty() || !final_remove.is_empty() || !final_upgrade.is_empty();
+    if tools_changed {
+        apply_changes(
+            &mise_path,
+            &current_content,
+            &final_add,
+            &final_remove,
+            &final_upgrade,
+        )?;
+    }
+
+    let meta_changed = apply_env_and_tasks(&mise_path, &config_dir_rel, has_slow)?;
+
+    let base_branch = detect_base_branch(project_root);
+    let config_dir_path = project_root.join(&config_dir_rel);
+    let toml_generated = generate_flint_toml(&config_dir_path, &base_branch, has_renovate)?;
+    let workflow_generated = generate_lint_workflow(project_root, &base_branch)?;
+
+    if !tools_changed && !meta_changed && !toml_generated && !workflow_generated {
         println!("No changes to apply.");
         return Ok(());
     }
 
-    apply_changes(
-        &mise_path,
-        &current_content,
-        &final_add,
-        &final_remove,
-        &final_upgrade,
-    )?;
+    let hook_task = if has_slow { "lint:pre-commit" } else { "lint" };
+    maybe_install_hook(project_root, hook_task, yes)?;
+
     println!("Done. Run `mise install` to install the new tools.");
     Ok(())
 }
@@ -718,6 +745,267 @@ fn apply_changes(
     Ok(())
 }
 
+// --- Post-linter-selection setup helpers ---
+
+/// Returns true if any currently-selected check has `Category::Slow`.
+fn has_slow_selected(groups: &[LinterGroup]) -> bool {
+    groups.iter().any(|g| {
+        g.checks
+            .iter()
+            .zip(&g.check_selected)
+            .any(|(c, &sel)| sel && c.category == Category::Slow)
+    })
+}
+
+/// Reads the default branch for `origin` from git, falling back to `"main"`.
+fn detect_base_branch(project_root: &Path) -> String {
+    Command::new("git")
+        .args(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+        .current_dir(project_root)
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .and_then(|s| s.trim().strip_prefix("origin/").map(str::to_string))
+        .unwrap_or_else(|| "main".to_string())
+}
+
+/// Reads `FLINT_CONFIG_DIR` from the `[env]` section of a mise.toml string, if present.
+fn get_existing_config_dir(content: &str) -> Option<String> {
+    let doc: toml_edit::DocumentMut = content.parse().ok()?;
+    doc.get("env")?
+        .as_table()?
+        .get("FLINT_CONFIG_DIR")?
+        .as_str()
+        .map(str::to_string)
+}
+
+/// Asks where `flint.toml` should live. Skips the prompt when `--yes` or when
+/// `FLINT_CONFIG_DIR` is already set in the current mise.toml.
+///
+/// Returns a path relative to the project root (e.g. `".github/config"`).
+fn prompt_config_dir(existing: Option<&str>, yes: bool) -> Result<String> {
+    if let Some(dir) = existing {
+        return Ok(dir.to_string());
+    }
+    if yes {
+        return Ok(".github/config".to_string());
+    }
+
+    const CHOICES: &[&str] = &[".github/config", ".github", ".", "other…"];
+    println!("Where should flint.toml live?\n");
+    for (i, choice) in CHOICES.iter().enumerate() {
+        println!("  {}) {}", i + 1, choice);
+    }
+    print!("\nChoice [1]: ");
+    io::stdout().flush()?;
+
+    let mut input = String::new();
+    io::stdin().lock().read_line(&mut input)?;
+    let input = input.trim();
+
+    let idx: usize = if input.is_empty() {
+        0
+    } else {
+        input.parse::<usize>().unwrap_or(1).saturating_sub(1)
+    };
+
+    if idx == CHOICES.len() - 1 {
+        print!("Config dir path: ");
+        io::stdout().flush()?;
+        let mut path = String::new();
+        io::stdin().lock().read_line(&mut path)?;
+        Ok(path.trim().to_string())
+    } else {
+        Ok(CHOICES[idx.min(CHOICES.len() - 2)].to_string())
+    }
+}
+
+/// Writes a skeleton `flint.toml` in `config_dir`. Creates the directory if needed.
+/// Returns `true` if the file was written, `false` if it already existed.
+fn generate_flint_toml(config_dir: &Path, base_branch: &str, has_renovate: bool) -> Result<bool> {
+    let toml_path = config_dir.join("flint.toml");
+    if toml_path.exists() {
+        return Ok(false);
+    }
+    std::fs::create_dir_all(config_dir)?;
+    let mut content = String::from("[settings]\n");
+    if base_branch != "main" {
+        content.push_str(&format!("base_branch = \"{base_branch}\"\n"));
+    }
+    content.push_str("# exclude = \"CHANGELOG\\\\.md\"\n");
+    content.push_str("# exclude_paths = []\n");
+    if has_renovate {
+        content.push_str("\n[checks.renovate-deps]\n");
+        content.push_str("# exclude_managers = []\n");
+    }
+    std::fs::write(&toml_path, &content)?;
+    println!("  wrote {}", toml_path.display());
+    Ok(true)
+}
+
+/// Generates `.github/workflows/lint.yml` if it does not already exist.
+/// Returns `true` if the file was written.
+fn generate_lint_workflow(project_root: &Path, base_branch: &str) -> Result<bool> {
+    let workflows_dir = project_root.join(".github/workflows");
+    let workflow_path = workflows_dir.join("lint.yml");
+    if workflow_path.exists() {
+        return Ok(false);
+    }
+    std::fs::create_dir_all(&workflows_dir)?;
+    let content = format!(
+        r#"name: Lint
+
+on:
+  push:
+    branches: [{base_branch}]
+  pull_request:
+    branches: [{base_branch}]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup mise
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+        with:
+          version: v2026.4.1
+          sha256: c597fa1e4da76d1ea1967111d150a6a655ca51a72f4cd17fdc584be2b9eaa8bd
+
+      - name: Lint
+        env:
+          GITHUB_TOKEN: ${{{{ github.token }}}}
+          GITHUB_HEAD_SHA: ${{{{ github.event.pull_request.head.sha }}}}
+        run: mise run lint
+"#
+    );
+    std::fs::write(&workflow_path, content)?;
+    println!("  wrote {}", workflow_path.display());
+    Ok(true)
+}
+
+/// Adds a `[tasks.<name>]` entry only when it is not already present.
+/// Returns `true` if an entry was added.
+fn add_task_if_absent(
+    tasks: &mut toml_edit::Table,
+    name: &str,
+    description: &str,
+    run: &str,
+) -> bool {
+    if tasks.contains_key(name) {
+        return false;
+    }
+    let mut t = toml_edit::Table::new();
+    t.insert("description", toml_edit::value(description));
+    t.insert("run", toml_edit::value(run));
+    tasks.insert(name, toml_edit::Item::Table(t));
+    true
+}
+
+/// Adds `[env] FLINT_CONFIG_DIR` and the standard `lint*` / `setup:pre-commit-hook`
+/// tasks to `mise.toml`, skipping any that are already present.
+///
+/// Returns `true` if the file was changed.
+fn apply_env_and_tasks(mise_path: &Path, config_dir_rel: &str, has_slow: bool) -> Result<bool> {
+    let content = std::fs::read_to_string(mise_path).unwrap_or_default();
+    let mut doc: toml_edit::DocumentMut = content
+        .parse()
+        .unwrap_or_else(|_| toml_edit::DocumentMut::new());
+    let mut changed = false;
+
+    // [env] — add FLINT_CONFIG_DIR if absent
+    {
+        if !doc.contains_key("env") {
+            doc.insert("env", toml_edit::Item::Table(toml_edit::Table::new()));
+        }
+        let env = doc["env"].as_table_mut().context("[env] is not a table")?;
+        if !env.contains_key("FLINT_CONFIG_DIR") {
+            env.insert("FLINT_CONFIG_DIR", toml_edit::value(config_dir_rel));
+            changed = true;
+        }
+    }
+
+    // [tasks] — add lint / lint:fix / (lint:pre-commit) / setup:pre-commit-hook
+    {
+        if !doc.contains_key("tasks") {
+            doc.insert("tasks", toml_edit::Item::Table(toml_edit::Table::new()));
+        }
+        let tasks = doc["tasks"]
+            .as_table_mut()
+            .context("[tasks] is not a table")?;
+
+        changed |= add_task_if_absent(tasks, "lint", "Run all lints", "flint run");
+        changed |= add_task_if_absent(tasks, "lint:fix", "Auto-fix lint issues", "flint run --fix");
+        if has_slow {
+            changed |= add_task_if_absent(
+                tasks,
+                "lint:pre-commit",
+                "Fast auto-fix lint (skips slow checks) — for pre-commit/pre-push hooks",
+                "flint run --fix --fast-only",
+            );
+        }
+        let hook_task = if has_slow { "lint:pre-commit" } else { "lint" };
+        changed |= add_task_if_absent(
+            tasks,
+            "setup:pre-commit-hook",
+            "Install git pre-commit hook",
+            &format!("mise generate git-pre-commit --write --task={hook_task}"),
+        );
+    }
+
+    if changed {
+        std::fs::write(mise_path, doc.to_string())?;
+    }
+    Ok(changed)
+}
+
+/// Installs the git pre-commit hook by running `mise generate git-pre-commit`.
+/// Prompts the user unless `yes` is true. Silently skips if the hook is already installed.
+fn maybe_install_hook(project_root: &Path, hook_task: &str, yes: bool) -> Result<()> {
+    let hook_path = project_root.join(".git/hooks/pre-commit");
+    if hook_path.exists() {
+        return Ok(());
+    }
+
+    let install = if yes {
+        true
+    } else {
+        print!("Install pre-commit hook (runs `mise run {hook_task}` before each commit)? [Y/n] ");
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().lock().read_line(&mut input)?;
+        !input.trim().eq_ignore_ascii_case("n")
+    };
+
+    if install {
+        let status = Command::new("mise")
+            .args([
+                "generate",
+                "git-pre-commit",
+                "--write",
+                &format!("--task={hook_task}"),
+            ])
+            .current_dir(project_root)
+            .status();
+        match status {
+            Ok(s) if s.success() => println!("  installed pre-commit hook"),
+            _ => println!(
+                "  warning: could not install pre-commit hook — run `mise run setup:pre-commit-hook` later"
+            ),
+        }
+    }
+    Ok(())
+}
+
 // --- Tests ---
 
 #[cfg(test)]
@@ -863,5 +1151,158 @@ rust = { version = "1.0", components = "clippy" }
         let categories = profile_to_categories(Profile::Comprehensive);
         let tools = compute_desired_tools(&registry, &present, &categories);
         assert!(!tools.contains_key("npm:renovate"));
+    }
+
+    #[test]
+    fn has_slow_selected_detects_slow_check() {
+        let registry = builtin();
+        let mut present = HashSet::new();
+        present.insert(".github/renovate.json5".to_string());
+        let categories = profile_to_categories(Profile::Comprehensive);
+        let groups = build_linter_groups(&registry, &present, &HashSet::new(), "", &categories);
+        assert!(has_slow_selected(&groups));
+    }
+
+    #[test]
+    fn has_slow_selected_false_for_default_profile() {
+        let registry = builtin();
+        let present = HashSet::new();
+        let categories = profile_to_categories(Profile::Default);
+        let groups = build_linter_groups(&registry, &present, &HashSet::new(), "", &categories);
+        assert!(!has_slow_selected(&groups));
+    }
+
+    #[test]
+    fn get_existing_config_dir_reads_env_section() {
+        let content = "[env]\nFLINT_CONFIG_DIR = \".github/config\"\n";
+        assert_eq!(
+            get_existing_config_dir(content),
+            Some(".github/config".to_string())
+        );
+    }
+
+    #[test]
+    fn get_existing_config_dir_absent() {
+        let content = "[tools]\nrust = \"latest\"\n";
+        assert_eq!(get_existing_config_dir(content), None);
+    }
+
+    #[test]
+    fn generate_flint_toml_writes_skeleton() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let dir = tmp.path().join("config");
+        let written = generate_flint_toml(&dir, "main", false).unwrap();
+        assert!(written);
+        let content = std::fs::read_to_string(dir.join("flint.toml")).unwrap();
+        assert!(content.contains("[settings]"));
+        assert!(content.contains("# exclude ="));
+        assert!(content.contains("# exclude_paths ="));
+        assert!(!content.contains("base_branch")); // "main" is the default, omitted
+    }
+
+    #[test]
+    fn generate_flint_toml_non_main_branch() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let written = generate_flint_toml(tmp.path(), "master", false).unwrap();
+        assert!(written);
+        let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
+        assert!(content.contains("base_branch = \"master\""));
+    }
+
+    #[test]
+    fn generate_flint_toml_with_renovate() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        generate_flint_toml(tmp.path(), "main", true).unwrap();
+        let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
+        assert!(content.contains("[checks.renovate-deps]"));
+        assert!(content.contains("# exclude_managers ="));
+    }
+
+    #[test]
+    fn generate_flint_toml_skips_existing() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(tmp.path().join("flint.toml"), "existing content").unwrap();
+        let written = generate_flint_toml(tmp.path(), "main", false).unwrap();
+        assert!(!written);
+        let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
+        assert_eq!(content, "existing content");
+    }
+
+    #[test]
+    fn generate_lint_workflow_writes_file() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let written = generate_lint_workflow(tmp.path(), "main").unwrap();
+        assert!(written);
+        let content =
+            std::fs::read_to_string(tmp.path().join(".github/workflows/lint.yml")).unwrap();
+        assert!(content.contains("branches: [main]"));
+        assert!(content.contains("mise run lint"));
+        assert!(content.contains("fetch-depth: 0"));
+        assert!(content.contains("persist-credentials: false"));
+        assert!(content.contains("mise-action"));
+        assert!(content.contains("github.token"));
+    }
+
+    #[test]
+    fn generate_lint_workflow_non_main_branch() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        generate_lint_workflow(tmp.path(), "master").unwrap();
+        let content =
+            std::fs::read_to_string(tmp.path().join(".github/workflows/lint.yml")).unwrap();
+        assert!(content.contains("branches: [master]"));
+    }
+
+    #[test]
+    fn generate_lint_workflow_skips_existing() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir_all(tmp.path().join(".github/workflows")).unwrap();
+        std::fs::write(
+            tmp.path().join(".github/workflows/lint.yml"),
+            "existing content",
+        )
+        .unwrap();
+        let written = generate_lint_workflow(tmp.path(), "main").unwrap();
+        assert!(!written);
+        let content =
+            std::fs::read_to_string(tmp.path().join(".github/workflows/lint.yml")).unwrap();
+        assert_eq!(content, "existing content");
+    }
+
+    #[test]
+    fn apply_env_and_tasks_adds_sections() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), "[tools]\nrust = \"latest\"\n").unwrap();
+        let changed = apply_env_and_tasks(tmp.path(), ".github/config", false).unwrap();
+        assert!(changed);
+        let content = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(content.contains("FLINT_CONFIG_DIR = \".github/config\""));
+        assert!(content.contains("flint run"));
+        assert!(content.contains("flint run --fix"));
+        assert!(!content.contains("--fast-only")); // no slow linters
+        assert!(content.contains("setup:pre-commit-hook"));
+    }
+
+    #[test]
+    fn apply_env_and_tasks_adds_pre_commit_task_when_slow() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), "").unwrap();
+        apply_env_and_tasks(tmp.path(), ".", true).unwrap();
+        let content = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(content.contains("--fast-only"));
+        assert!(content.contains("lint:pre-commit"));
+        // Hook task should point to lint:pre-commit
+        assert!(content.contains("--task=lint:pre-commit"));
+    }
+
+    #[test]
+    fn apply_env_and_tasks_idempotent() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), "").unwrap();
+        apply_env_and_tasks(tmp.path(), ".github/config", false).unwrap();
+        let after_first = std::fs::read_to_string(tmp.path()).unwrap();
+        let changed = apply_env_and_tasks(tmp.path(), ".github/config", false).unwrap();
+        assert!(!changed);
+        let after_second = std::fs::read_to_string(tmp.path()).unwrap();
+        assert_eq!(after_first, after_second);
     }
 }

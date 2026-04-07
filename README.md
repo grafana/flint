@@ -221,6 +221,7 @@ being linted and cannot be redirected via a flag.
 <!-- editorconfig-checker-disable -->
 <!-- registry-table-start -->
 <!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
+
 | Name                   | Binary               | Patterns                                                                                                                   | Fix | Slow | Scope   | Config file                        | Notes                                         |
 | ---------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------- | --- | ---- | ------- | ---------------------------------- | --------------------------------------------- |
 | `shellcheck`           | `shellcheck`         | `*.sh *.bash *.bats`                                                                                                       | no  | —    | file    | `.shellcheckrc`                    | —                                             |
@@ -245,6 +246,7 @@ being linted and cannot be redirected via a flag.
 | `lychee`               | `lychee`             | (all files)                                                                                                                | no  | —    | special | via `[checks.links]` in flint.toml | —                                             |
 | `renovate-deps`        | `renovate`           | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` | yes | —    | special | —                                  | —                                             |
 | `license-header`       | (built-in)           | (all files)                                                                                                                | no  | —    | special | —                                  | —                                             |
+
 <!-- registry-table-end -->
 <!-- editorconfig-checker-enable -->
 

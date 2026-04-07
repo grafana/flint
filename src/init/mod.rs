@@ -1,7 +1,7 @@
 use anyhow::Result;
-use std::collections::HashSet;
 #[cfg(test)]
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::Path;
 
 use crate::registry::{Category, Check, builtin};
@@ -12,9 +12,9 @@ mod ui;
 
 use detection::{build_linter_groups, detect_present_patterns, parse_tool_keys};
 use generation::{
-    apply_changes, apply_env_and_tasks, detect_base_branch, generate_flint_toml,
+    apply_changes, apply_env_and_tasks, detect_base_branch, flint_preset, generate_flint_toml,
     generate_lint_workflow, get_existing_config_dir, has_slow_selected, maybe_install_hook,
-    prompt_config_dir,
+    patch_renovate_extends, prompt_config_dir,
 };
 use ui::{interactive_select_linters, select_categories_arrow};
 
@@ -237,7 +237,24 @@ Add and stage your source files before running init so the detection is accurate
     let toml_generated = generate_flint_toml(&config_dir_path, &base_branch, has_renovate)?;
     let workflow_generated = generate_lint_workflow(project_root, &base_branch)?;
 
-    if !tools_changed && !meta_changed && !toml_generated && !workflow_generated {
+    let renovate_patched = find_renovate_config(project_root)
+        .map(|path| {
+            let result = patch_renovate_extends(&path);
+            if let Ok(true) = result {
+                let rel = path.strip_prefix(project_root).unwrap_or(&path);
+                println!("  patched {} — added {}", rel.display(), flint_preset());
+            }
+            result
+        })
+        .transpose()?
+        .unwrap_or(false);
+
+    if !tools_changed
+        && !meta_changed
+        && !toml_generated
+        && !workflow_generated
+        && !renovate_patched
+    {
         println!("No changes to apply.");
         return Ok(());
     }
@@ -247,6 +264,13 @@ Add and stage your source files before running init so the detection is accurate
 
     println!("Done. Run `mise install` to install the new tools.");
     Ok(())
+}
+
+fn find_renovate_config(project_root: &Path) -> Option<std::path::PathBuf> {
+    crate::linters::renovate_deps::RENOVATE_CONFIG_PATTERNS
+        .iter()
+        .map(|p| project_root.join(p))
+        .find(|p| p.exists())
 }
 
 /// Returns the canonical mise.toml tool key to write when installing this check
@@ -459,7 +483,6 @@ rust = { version = "1.0", components = "clippy" }
         let tools = compute_desired_tools(&registry, &present, &categories);
         assert!(!tools.contains_key("npm:renovate"));
     }
-
 
     #[test]
     fn has_slow_selected_false_for_default_profile() {

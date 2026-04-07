@@ -1,6 +1,7 @@
 use anyhow::Result;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::time::{Duration, Instant};
 use tokio::process::Command;
 use tokio::task::JoinSet;
 
@@ -13,6 +14,7 @@ pub struct RunOptions {
     pub fix: bool,
     pub verbose: bool,
     pub short: bool,
+    pub time: bool,
 }
 
 pub struct CheckResult {
@@ -20,6 +22,7 @@ pub struct CheckResult {
     pub ok: bool,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
+    pub duration: Duration,
 }
 
 /// A check with all inputs pre-resolved, ready to execute without borrowing
@@ -58,6 +61,7 @@ impl PreparedCheck {
 
     async fn execute(self, fix: bool, project_root: &Path) -> CheckResult {
         let name = self.name().to_string();
+        let start = Instant::now();
         let out: LinterOutput = match self {
             Self::Invocations { argv_list, .. } => {
                 run_invocations(&name, &argv_list, project_root).await
@@ -78,6 +82,7 @@ impl PreparedCheck {
             ok: out.ok,
             stdout: out.stdout,
             stderr: out.stderr,
+            duration: start.elapsed(),
         }
     }
 }
@@ -94,6 +99,7 @@ pub async fn run(
         fix,
         verbose,
         short,
+        time,
     } = opts;
     let prepared: Vec<PreparedCheck> = checks
         .iter()
@@ -105,7 +111,7 @@ pub async fn run(
         for task in prepared {
             let r = task.execute(fix, project_root).await;
             if !short && (verbose || !r.ok) {
-                eprintln!("[{}]", r.name);
+                eprintln!("[{}]{}", r.name, format_duration_suffix(time, r.duration));
                 flush_output(&r.stdout, &r.stderr);
             }
             results.push(r);
@@ -116,14 +122,7 @@ pub async fn run(
     let mut set: JoinSet<CheckResult> = JoinSet::new();
     for task in prepared {
         let root = project_root.to_path_buf();
-        set.spawn(async move {
-            let r = task.execute(false, &root).await;
-            if verbose {
-                eprintln!("[{}]", r.name);
-                flush_output(&r.stdout, &r.stderr);
-            }
-            r
-        });
+        set.spawn(async move { task.execute(false, &root).await });
     }
 
     // Collect all results before printing to avoid interleaved output.
@@ -134,10 +133,12 @@ pub async fn run(
     }
     collected.sort_by(|a, b| a.name.cmp(&b.name));
 
-    if !verbose && !short {
+    if !short {
         for r in &collected {
-            if !r.ok {
-                eprintln!("[{}]", r.name);
+            if verbose || !r.ok || time {
+                eprintln!("[{}]{}", r.name, format_duration_suffix(time, r.duration));
+            }
+            if verbose || !r.ok {
                 flush_output(&r.stdout, &r.stderr);
             }
         }
@@ -408,6 +409,18 @@ fn missing_rust_component(name: &str, stderr: &[u8]) -> Option<&'static str> {
             Some("rustfmt")
         }
         _ => None,
+    }
+}
+
+fn format_duration_suffix(time: bool, duration: Duration) -> String {
+    if !time {
+        return String::new();
+    }
+    let ms = duration.as_millis();
+    if ms < 1000 {
+        format!(" {ms}ms")
+    } else {
+        format!(" {:.1}s", duration.as_secs_f64())
     }
 }
 

@@ -1,0 +1,21 @@
+[expected]
+args = "run --full --time shellcheck actionlint"
+exit = 1
+stderr = '''
+[actionlint] Xms
+workflow error: undefined variable
+[shellcheck] Xms
+
+flint: 1 check failed (actionlint)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''
+[fake_bins]
+actionlint = '''
+#!/bin/sh
+printf 'workflow error: undefined variable\n'
+exit 1
+'''
+shellcheck = '''
+#!/bin/sh
+exit 0
+'''

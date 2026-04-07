@@ -81,6 +81,10 @@ struct RunArgs {
     #[arg(long, value_name = "REF", env = "FLINT_TO_REF")]
     to_ref: Option<String>,
 
+    /// Show how long each linter took to run.
+    #[arg(long, env = "FLINT_TIME")]
+    time: bool,
+
     /// Linters to run (default: all discovered). Explicit linters override --fast-only.
     linters: Vec<String>,
 }
@@ -189,6 +193,7 @@ async fn run(
                 fix: false,
                 verbose: false,
                 short: true,
+                time: false,
             },
             project_root,
             &cfg,
@@ -217,6 +222,7 @@ async fn run(
                     fix: true,
                     verbose: false,
                     short: true,
+                    time: false,
                 },
                 project_root,
                 &cfg,
@@ -276,6 +282,7 @@ async fn run(
             fix: false,
             verbose: args.verbose,
             short: args.short,
+            time: args.time,
         },
         project_root,
         &cfg,

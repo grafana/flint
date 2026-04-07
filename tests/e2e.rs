@@ -220,10 +220,12 @@ fn run_case(case: &Path, name: &str, update: bool) {
     let out = flint_with_env(&args, repo.path(), &env_refs);
 
     let repo_str = repo.path().to_string_lossy();
-    let stderr =
-        strip_ansi(&String::from_utf8_lossy(&out.stderr).replace(repo_str.as_ref(), "<REPO>"));
-    let stdout =
-        strip_ansi(&String::from_utf8_lossy(&out.stdout).replace(repo_str.as_ref(), "<REPO>"));
+    let stderr = normalize_timing(&strip_ansi(
+        &String::from_utf8_lossy(&out.stderr).replace(repo_str.as_ref(), "<REPO>"),
+    ));
+    let stdout = normalize_timing(&strip_ansi(
+        &String::from_utf8_lossy(&out.stdout).replace(repo_str.as_ref(), "<REPO>"),
+    ));
 
     if update {
         write_test_toml(
@@ -323,6 +325,16 @@ fn write_test_toml(path: &Path, cfg: &toml::Value, exit: i32, stderr: &str, stdo
 /// Escapes a string for use inside TOML basic double-quoted strings.
 fn toml_escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+/// Normalises timing suffixes on check header lines so snapshots are stable.
+/// `[name] 123ms` and `[name] 1.2s` both become `[name] Xms`.
+fn normalize_timing(s: &str) -> String {
+    use regex::Regex;
+    // Match the timing suffix at the end of a check header line.
+    // Header lines start with "[" and end with " <number>ms" or " <number>.<number>s".
+    let re = Regex::new(r"(?m)^(\[[^\]]+\]) \d+(?:\.\d+)?(?:ms|s)$").unwrap();
+    re.replace_all(s, "$1 Xms").into_owned()
 }
 
 /// Strips ANSI/VT escape sequences (colour codes, character-set switches, etc.).

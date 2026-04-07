@@ -252,7 +252,8 @@ Add and stage your source files before running init so the detection is accurate
         println!("  removing RENOVATE_TRACKED_DEPS_EXCLUDE from [env] (use flint.toml instead)");
     }
 
-    let meta_changed = apply_env_and_tasks(&mise_path, &config_dir_rel, has_slow)?;
+    let meta_changed =
+        apply_env_and_tasks(&mise_path, &config_dir_rel, has_slow, &v1.removed_tasks)?;
 
     let base_branch = detect_base_branch(project_root);
     let config_dir_path = project_root.join(&config_dir_rel);
@@ -658,7 +659,7 @@ rust = { version = "1.0", components = "clippy" }
     fn apply_env_and_tasks_adds_sections() {
         let tmp = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(tmp.path(), "[tools]\nrust = \"latest\"\n").unwrap();
-        let changed = apply_env_and_tasks(tmp.path(), ".github/config", false).unwrap();
+        let changed = apply_env_and_tasks(tmp.path(), ".github/config", false, &[]).unwrap();
         assert!(changed);
         let content = std::fs::read_to_string(tmp.path()).unwrap();
         assert!(content.contains("FLINT_CONFIG_DIR = \".github/config\""));
@@ -672,7 +673,7 @@ rust = { version = "1.0", components = "clippy" }
     fn apply_env_and_tasks_adds_pre_commit_task_when_slow() {
         let tmp = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(tmp.path(), "").unwrap();
-        apply_env_and_tasks(tmp.path(), ".", true).unwrap();
+        apply_env_and_tasks(tmp.path(), ".", true, &[]).unwrap();
         let content = std::fs::read_to_string(tmp.path()).unwrap();
         assert!(content.contains("--fast-only"));
         assert!(content.contains("lint:pre-commit"));
@@ -684,11 +685,59 @@ rust = { version = "1.0", components = "clippy" }
     fn apply_env_and_tasks_idempotent() {
         let tmp = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(tmp.path(), "").unwrap();
-        apply_env_and_tasks(tmp.path(), ".github/config", false).unwrap();
+        apply_env_and_tasks(tmp.path(), ".github/config", false, &[]).unwrap();
         let after_first = std::fs::read_to_string(tmp.path()).unwrap();
-        let changed = apply_env_and_tasks(tmp.path(), ".github/config", false).unwrap();
+        let changed = apply_env_and_tasks(tmp.path(), ".github/config", false, &[]).unwrap();
         assert!(!changed);
         let after_second = std::fs::read_to_string(tmp.path()).unwrap();
         assert_eq!(after_first, after_second);
+    }
+
+    #[test]
+    fn apply_env_and_tasks_replaces_stale_lint_task() {
+        let content = r#"
+[tasks."lint"]
+description = "Run all lints"
+depends = ["lint:fast", "lint:renovate-deps"]
+"#;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), content).unwrap();
+        let removed = vec!["lint:renovate-deps".to_string()];
+        apply_env_and_tasks(tmp.path(), ".github/config", false, &removed).unwrap();
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(
+            result.contains("run = \"flint run\""),
+            "stale lint task replaced: {result}"
+        );
+        assert!(
+            !result.contains("depends"),
+            "old depends array removed: {result}"
+        );
+    }
+
+    #[test]
+    fn apply_env_and_tasks_replaces_stale_hook_task() {
+        let content = r#"
+[tasks."lint"]
+description = "Run all lints"
+depends = ["lint:renovate-deps"]
+
+[tasks."setup:pre-commit-hook"]
+description = "Install pre-commit hook"
+run = "mise generate git-pre-commit --write --task=pre-commit"
+"#;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), content).unwrap();
+        let removed = vec!["lint:renovate-deps".to_string()];
+        apply_env_and_tasks(tmp.path(), ".github/config", false, &removed).unwrap();
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(
+            result.contains("--task=lint"),
+            "hook task updated to lint: {result}"
+        );
+        assert!(
+            !result.contains("--task=pre-commit"),
+            "old hook task reference removed: {result}"
+        );
     }
 }

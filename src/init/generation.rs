@@ -14,7 +14,9 @@ pub(super) fn flint_preset() -> String {
 }
 
 /// Adds the flint renovate preset to the `extends` array in a renovate config file.
-/// Works for both JSON and JSON5. Returns `true` if the file was changed.
+/// Works for both JSON and JSON5. If an unpinned or differently-pinned flint entry
+/// already exists, it is replaced in-place rather than duplicated.
+/// Returns `true` if the file was changed.
 pub(super) fn patch_renovate_extends(path: &Path) -> Result<bool> {
     let entry = flint_preset();
     let content = std::fs::read_to_string(path)?;
@@ -23,8 +25,19 @@ pub(super) fn patch_renovate_extends(path: &Path) -> Result<bool> {
         return Ok(false);
     }
 
-    let new_content = add_to_extends(&content, &entry)
-        .with_context(|| format!("failed to patch extends in {}", path.display()))?;
+    // If an existing flint entry (any pin) is present, replace it in-place.
+    const FLINT_ENTRY_PREFIX: &str = "\"github>grafana/flint";
+    let new_content = if let Some(pos) = content.find(FLINT_ENTRY_PREFIX) {
+        let after_open = pos + 1; // skip leading "
+        let close = content[after_open..]
+            .find('"')
+            .context("unclosed quote in existing flint preset entry")?;
+        let end = after_open + close + 1; // position after closing "
+        format!("{}\"{}\"{}", &content[..pos], entry, &content[end..])
+    } else {
+        add_to_extends(&content, &entry)
+            .with_context(|| format!("failed to patch extends in {}", path.display()))?
+    };
 
     std::fs::write(path, new_content)?;
     Ok(true)
@@ -417,21 +430,49 @@ fn add_task_if_absent(
     if tasks.contains_key(name) {
         return false;
     }
+    write_task(tasks, name, description, run);
+    true
+}
+
+/// Unconditionally writes a `[tasks.<name>]` entry (adds or replaces).
+fn write_task(tasks: &mut toml_edit::Table, name: &str, description: &str, run: &str) {
     let mut t = toml_edit::Table::new();
     t.insert("description", toml_edit::value(description));
     t.insert("run", toml_edit::value(run));
     tasks.insert(name, toml_edit::Item::Table(t));
-    true
+}
+
+/// Returns `true` when the named task has a `depends` array where at least one
+/// entry is in `removed_tasks`. Used to detect tasks made stale by v1 removal.
+fn task_has_removed_dep(tasks: &toml_edit::Table, name: &str, removed: &[String]) -> bool {
+    let Some(item) = tasks.get(name) else {
+        return false;
+    };
+    let Some(task) = item.as_table() else {
+        return false;
+    };
+    let Some(depends) = task.get("depends").and_then(|v| v.as_array()) else {
+        return false;
+    };
+    depends.iter().any(|v| {
+        v.as_str()
+            .map(|s| removed.iter().any(|r| r == s))
+            .unwrap_or(false)
+    })
 }
 
 /// Adds `[env] FLINT_CONFIG_DIR` and the standard `lint*` / `setup:pre-commit-hook`
 /// tasks to `mise.toml`, skipping any that are already present.
+///
+/// When `removed_v1_tasks` is non-empty, standard tasks whose `depends` reference
+/// any of those removed tasks are replaced (they became stale after v1 removal).
 ///
 /// Returns `true` if the file was changed.
 pub(super) fn apply_env_and_tasks(
     mise_path: &Path,
     config_dir_rel: &str,
     has_slow: bool,
+    removed_v1_tasks: &[String],
 ) -> Result<bool> {
     let content = std::fs::read_to_string(mise_path).unwrap_or_default();
     let mut doc: toml_edit::DocumentMut = content
@@ -460,7 +501,16 @@ pub(super) fn apply_env_and_tasks(
             .as_table_mut()
             .context("[tasks] is not a table")?;
 
-        changed |= add_task_if_absent(tasks, "lint", "Run all lints", "flint run");
+        // Replace the lint task when it was made stale by v1 removal (its depends
+        // referenced removed tasks and would now fail). Otherwise add if absent.
+        let lint_stale = task_has_removed_dep(tasks, "lint", removed_v1_tasks);
+        if lint_stale {
+            write_task(tasks, "lint", "Run all lints", "flint run");
+            changed = true;
+        } else {
+            changed |= add_task_if_absent(tasks, "lint", "Run all lints", "flint run");
+        }
+
         changed |= add_task_if_absent(tasks, "lint:fix", "Auto-fix lint issues", "flint run --fix");
         if has_slow {
             changed |= add_task_if_absent(
@@ -471,12 +521,23 @@ pub(super) fn apply_env_and_tasks(
             );
         }
         let hook_task = if has_slow { "lint:pre-commit" } else { "lint" };
-        changed |= add_task_if_absent(
-            tasks,
-            "setup:pre-commit-hook",
-            "Install git pre-commit hook",
-            &format!("mise generate git-pre-commit --write --task={hook_task}"),
-        );
+        // Also replace setup:pre-commit-hook when the lint task was stale — the old hook
+        // was pointing at a v1-era task name and needs to be updated.
+        if lint_stale {
+            write_task(
+                tasks,
+                "setup:pre-commit-hook",
+                "Install git pre-commit hook",
+                &format!("mise generate git-pre-commit --write --task={hook_task}"),
+            );
+        } else {
+            changed |= add_task_if_absent(
+                tasks,
+                "setup:pre-commit-hook",
+                "Install git pre-commit hook",
+                &format!("mise generate git-pre-commit --write --task={hook_task}"),
+            );
+        }
     }
 
     if changed {
@@ -637,7 +698,60 @@ file = "https://raw.githubusercontent.com/some-other-org/some-repo/abc123/task.s
 
 #[cfg(test)]
 mod extends_tests {
-    use super::add_to_extends;
+    use super::{add_to_extends, patch_renovate_extends};
+
+    fn write_tmp(content: &str) -> tempfile::NamedTempFile {
+        let f = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(f.path(), content).unwrap();
+        f
+    }
+
+    #[test]
+    fn replaces_unpinned_flint_entry_in_place() {
+        let input = r#"{ extends: ["config:recommended", "github>grafana/flint"] }"#;
+        let tmp = write_tmp(input);
+        let changed = patch_renovate_extends(tmp.path()).unwrap();
+        assert!(changed);
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(
+            result.contains("github>grafana/flint#v"),
+            "pinned entry written: {result}"
+        );
+        // Only one flint entry — no duplicate
+        assert_eq!(
+            result.matches("grafana/flint").count(),
+            1,
+            "no duplicate: {result}"
+        );
+        assert!(
+            !result.contains("\"github>grafana/flint\""),
+            "unpinned removed: {result}"
+        );
+    }
+
+    #[test]
+    fn replaces_differently_pinned_flint_entry() {
+        let input = r#"{ extends: ["config:recommended", "github>grafana/flint#v0.5.0"] }"#;
+        let tmp = write_tmp(input);
+        let changed = patch_renovate_extends(tmp.path()).unwrap();
+        assert!(changed);
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(!result.contains("v0.5.0"), "old pin removed: {result}");
+        assert_eq!(
+            result.matches("grafana/flint").count(),
+            1,
+            "no duplicate: {result}"
+        );
+    }
+
+    #[test]
+    fn no_op_when_already_pinned_to_current_version() {
+        let entry = super::flint_preset();
+        let input = format!(r#"{{ extends: ["config:recommended", "{entry}"] }}"#);
+        let tmp = write_tmp(&input);
+        let changed = patch_renovate_extends(tmp.path()).unwrap();
+        assert!(!changed);
+    }
 
     #[test]
     fn adds_to_single_line_extends() {

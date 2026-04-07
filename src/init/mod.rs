@@ -256,7 +256,12 @@ Add and stage your source files before running init so the detection is accurate
 
     let base_branch = detect_base_branch(project_root);
     let config_dir_path = project_root.join(&config_dir_rel);
-    let toml_generated = generate_flint_toml(&config_dir_path, &base_branch, has_renovate)?;
+    let toml_generated = generate_flint_toml(
+        &config_dir_path,
+        &base_branch,
+        has_renovate,
+        v1.renovate_exclude_managers.as_deref(),
+    )?;
     let workflow_generated = generate_lint_workflow(project_root, &base_branch)?;
 
     let renovate_patched = find_renovate_config(project_root)
@@ -558,7 +563,7 @@ rust = { version = "1.0", components = "clippy" }
     fn generate_flint_toml_writes_skeleton() {
         let tmp = tempfile::TempDir::new().unwrap();
         let dir = tmp.path().join("config");
-        let written = generate_flint_toml(&dir, "main", false).unwrap();
+        let written = generate_flint_toml(&dir, "main", false, None).unwrap();
         assert!(written);
         let content = std::fs::read_to_string(dir.join("flint.toml")).unwrap();
         assert!(content.contains("[settings]"));
@@ -570,26 +575,40 @@ rust = { version = "1.0", components = "clippy" }
     #[test]
     fn generate_flint_toml_non_main_branch() {
         let tmp = tempfile::TempDir::new().unwrap();
-        let written = generate_flint_toml(tmp.path(), "master", false).unwrap();
+        let written = generate_flint_toml(tmp.path(), "master", false, None).unwrap();
         assert!(written);
         let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
         assert!(content.contains("base_branch = \"master\""));
     }
 
     #[test]
-    fn generate_flint_toml_with_renovate() {
+    fn generate_flint_toml_with_renovate_placeholder() {
         let tmp = tempfile::TempDir::new().unwrap();
-        generate_flint_toml(tmp.path(), "main", true).unwrap();
+        generate_flint_toml(tmp.path(), "main", true, None).unwrap();
         let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
         assert!(content.contains("[checks.renovate-deps]"));
         assert!(content.contains("# exclude_managers ="));
     }
 
     #[test]
+    fn generate_flint_toml_with_renovate_managers() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let managers = vec!["github-actions".to_string(), "cargo".to_string()];
+        generate_flint_toml(tmp.path(), "main", true, Some(&managers)).unwrap();
+        let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
+        assert!(content.contains("[checks.renovate-deps]"));
+        assert!(
+            content.contains("exclude_managers = [\"github-actions\", \"cargo\"]"),
+            "managers written uncommented: {content}"
+        );
+        assert!(!content.contains("# exclude_managers"));
+    }
+
+    #[test]
     fn generate_flint_toml_skips_existing() {
         let tmp = tempfile::TempDir::new().unwrap();
         std::fs::write(tmp.path().join("flint.toml"), "existing content").unwrap();
-        let written = generate_flint_toml(tmp.path(), "main", false).unwrap();
+        let written = generate_flint_toml(tmp.path(), "main", false, None).unwrap();
         assert!(!written);
         let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
         assert_eq!(content, "existing content");

@@ -159,6 +159,8 @@ pub(super) struct V1Removal {
     pub removed_tasks: Vec<String>,
     /// Whether `RENOVATE_TRACKED_DEPS_EXCLUDE` was removed from `[env]`.
     pub removed_renovate_env: bool,
+    /// The manager list from `RENOVATE_TRACKED_DEPS_EXCLUDE`, split on commas, if it was present.
+    pub renovate_exclude_managers: Option<Vec<String>>,
 }
 
 /// Removes v1 HTTP task entries (tasks whose `file` value starts with the
@@ -208,10 +210,20 @@ pub(super) fn remove_v1_tasks(path: &Path) -> Result<V1Removal> {
     }
 
     let mut removed_renovate_env = false;
+    let mut renovate_exclude_managers: Option<Vec<String>> = None;
     if has_v1_renovate
         && let Some(env) = doc.get_mut("env").and_then(|t| t.as_table_mut())
-        && env.contains_key("RENOVATE_TRACKED_DEPS_EXCLUDE")
+        && let Some(val) = env
+            .get("RENOVATE_TRACKED_DEPS_EXCLUDE")
+            .and_then(|v| v.as_str())
     {
+        renovate_exclude_managers = Some(
+            val.split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .collect(),
+        );
         env.remove("RENOVATE_TRACKED_DEPS_EXCLUDE");
         removed_renovate_env = true;
     }
@@ -224,6 +236,7 @@ pub(super) fn remove_v1_tasks(path: &Path) -> Result<V1Removal> {
     Ok(V1Removal {
         removed_tasks,
         removed_renovate_env,
+        renovate_exclude_managers,
     })
 }
 
@@ -304,10 +317,15 @@ pub(super) fn prompt_config_dir(existing: Option<&str>, yes: bool) -> Result<Str
 
 /// Writes a skeleton `flint.toml` in `config_dir`. Creates the directory if needed.
 /// Returns `true` if the file was written, `false` if it already existed.
+///
+/// `exclude_managers`: when `Some`, populates `exclude_managers` in `[checks.renovate-deps]`
+/// with the given list (migrated from `RENOVATE_TRACKED_DEPS_EXCLUDE`). When `None` and
+/// `has_renovate` is true, writes a commented-out placeholder instead.
 pub(super) fn generate_flint_toml(
     config_dir: &Path,
     base_branch: &str,
     has_renovate: bool,
+    exclude_managers: Option<&[String]>,
 ) -> Result<bool> {
     let toml_path = config_dir.join("flint.toml");
     if toml_path.exists() {
@@ -322,7 +340,17 @@ pub(super) fn generate_flint_toml(
     content.push_str("# exclude_paths = []\n");
     if has_renovate {
         content.push_str("\n[checks.renovate-deps]\n");
-        content.push_str("# exclude_managers = []\n");
+        match exclude_managers {
+            Some(managers) if !managers.is_empty() => {
+                let list = managers
+                    .iter()
+                    .map(|m| format!("\"{m}\""))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                content.push_str(&format!("exclude_managers = [{list}]\n"));
+            }
+            _ => content.push_str("# exclude_managers = []\n"),
+        }
     }
     std::fs::write(&toml_path, &content)?;
     println!("  wrote {}", toml_path.display());
@@ -537,7 +565,7 @@ run = "cargo build"
     fn removes_renovate_env_when_v1_renovate_task_present() {
         let content = r#"
 [env]
-RENOVATE_TRACKED_DEPS_EXCLUDE = "github-actions,github-runners"
+RENOVATE_TRACKED_DEPS_EXCLUDE = "github-actions, github-runners"
 
 [tasks."lint:renovate-deps"]
 description = "Check renovate deps"
@@ -547,6 +575,13 @@ file = "https://raw.githubusercontent.com/grafana/flint/abc123/tasks/lint/renova
         let result = remove_v1_tasks(tmp.path()).unwrap();
         assert_eq!(result.removed_tasks, ["lint:renovate-deps"]);
         assert!(result.removed_renovate_env);
+        assert_eq!(
+            result.renovate_exclude_managers,
+            Some(vec![
+                "github-actions".to_string(),
+                "github-runners".to_string()
+            ])
+        );
         let after = std::fs::read_to_string(tmp.path()).unwrap();
         assert!(!after.contains("RENOVATE_TRACKED_DEPS_EXCLUDE"));
     }

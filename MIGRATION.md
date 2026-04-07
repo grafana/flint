@@ -29,44 +29,25 @@ what is declared in `[tools]`.
 "ubi:grafana/flint" = "0.20.0-alpha.1"
 ```
 
-### 3. Replace linting tasks with `flint run`
+### 3. Run `flint init`
 
-```toml
-[tasks.lint]
-run = "flint run"
+After installing flint (`mise install`), run `flint init`. It detects your
+languages from tracked files and takes care of:
 
-[tasks."lint:fix"]
-run = "flint run --fix"
-```
+- adding linters to `[tools]`
+- adding `[env] FLINT_CONFIG_DIR` pointing to your chosen config dir
+- adding `lint`, `lint:fix`, `lint:pre-commit`, and `setup:pre-commit-hook`
+  tasks to `[tasks]`
+- writing a `flint.toml` skeleton in your config dir
+- generating `.github/workflows/lint.yml`
 
-For CI, pass `--short` for compact output suited to AI-assisted review:
+Then run `mise install` to install the new tools and
+`mise run setup:pre-commit-hook` to install the git hook.
 
-```toml
-[tasks.ci]
-run = "flint run --short"
-```
+### 4. Switch `markdownlint-cli` to `markdownlint-cli2`
 
-### 4. Add a pre-commit task
-
-flint v2 provides a fast auto-fix pass intended for git hooks:
-
-```toml
-[tasks."lint:pre-commit"]
-description = "Fast auto-fix lint (skips slow checks) — for pre-commit/pre-push hooks"
-run = "flint run --fix --fast-only"
-
-[tasks."setup:pre-commit-hook"]
-description = "Install git pre-commit hook"
-run = "mise generate git-pre-commit --write --task=lint:pre-commit"
-```
-
-Then run `mise run setup:pre-commit-hook` once to install the hook.
-
-### 5. Switch `markdownlint-cli` to `markdownlint-cli2`
-
-flint v2 only supports `markdownlint-cli2`. See the
-[section below](#replacing-markdownlint-cli-with-markdownlint-cli2) for
-details — config files are compatible, no changes required there.
+flint v2 only supports `markdownlint-cli2`. `flint init` selects it for new
+installs, but for an existing repo you need to rename the key manually:
 
 ```toml
 # Before:
@@ -75,17 +56,38 @@ details — config files are compatible, no changes required there.
 "npm:markdownlint-cli2" = "0.17.2"
 ```
 
-### 6. Move renovate-deps config to `flint.toml`
+Configuration files remain compatible — both tools read `.markdownlint.json`
+(and `.markdownlint.yaml`, `.markdownlint.jsonc`). No changes to your config
+file are required.
+
+### 5. Move renovate-deps config to `flint.toml`
 
 If you previously used the `RENOVATE_TRACKED_DEPS_EXCLUDE` env var to exclude
-managers, move that to a `flint.toml` at your project root instead:
+managers, remove it from `[env]` in `mise.toml` and uncomment the
+`exclude_managers` line that `flint init` wrote to your `flint.toml`:
 
 ```toml
 [checks.renovate-deps]
 exclude_managers = ["github-actions", "github-runners", "cargo"]
 ```
 
-Remove `RENOVATE_TRACKED_DEPS_EXCLUDE` from `[env]` in `mise.toml`.
+### 6. Add the flint renovate preset to `renovate.json5`
+
+Add `"github>grafana/flint#v<version>"` to the `extends` list in your
+`renovate.json5`. This lets renovate keep the flint binary version up to date
+automatically:
+
+```json5
+{
+  extends: [
+    "config:recommended",
+    "github>grafana/flint#v0.20.0",
+    // ...
+  ],
+}
+```
+
+Replace `v0.20.0` with the version you pinned in `[tools]`.
 
 ### 7. Verify active linters
 

@@ -221,7 +221,6 @@ being linted and cannot be redirected via a flag.
 <!-- editorconfig-checker-disable -->
 <!-- registry-table-start -->
 <!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
-
 | Name                   | Binary               | Patterns                                                                                                                   | Fix | Slow | Scope   | Config file                        | Notes                                         |
 | ---------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------- | --- | ---- | ------- | ---------------------------------- | --------------------------------------------- |
 | `shellcheck`           | `shellcheck`         | `*.sh *.bash *.bats`                                                                                                       | no  | —    | file    | `.shellcheckrc`                    | —                                             |
@@ -238,15 +237,14 @@ being linted and cannot be redirected via a flag.
 | `biome`                | `biome`              | `*.json *.jsonc *.js *.ts *.jsx *.tsx`                                                                                     | yes | —    | file    | —                                  | —                                             |
 | `biome-format`         | `biome`              | `*.json *.jsonc *.js *.ts *.jsx *.tsx`                                                                                     | yes | —    | file    | —                                  | —                                             |
 | `cargo-clippy`         | `cargo-clippy`       | `*.rs`                                                                                                                     | yes | —    | project | —                                  | lints all .rs files, not just changed         |
-| `cargo-fmt`            | `rustfmt`            | `*.rs`                                                                                                                     | yes | —    | files   | —                                  | —                                             |
+| `cargo-fmt`            | `rustfmt`            | `*.rs`                                                                                                                     | yes | —    | project | —                                  | formats all .rs files, not just changed       |
 | `gofmt`                | `gofmt`              | `*.go`                                                                                                                     | yes | —    | file    | —                                  | —                                             |
 | `google-java-format`   | `google-java-format` | `*.java`                                                                                                                   | yes | —    | files   | —                                  | —                                             |
 | `ktlint`               | `ktlint`             | `*.kt *.kts`                                                                                                               | yes | —    | files   | —                                  | —                                             |
 | `dotnet-format`        | `dotnet`             | `*.cs`                                                                                                                     | yes | —    | files   | —                                  | —                                             |
 | `lychee`               | `lychee`             | (all files)                                                                                                                | no  | —    | special | via `[checks.links]` in flint.toml | —                                             |
-| `renovate-deps`        | `renovate`           | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` | yes | yes  | special | —                                  | —                                             |
+| `renovate-deps`        | `renovate`           | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` | yes | —    | special | —                                  | —                                             |
 | `license-header`       | (built-in)           | (all files)                                                                                                                | no  | —    | special | —                                  | —                                             |
-
 <!-- registry-table-end -->
 <!-- editorconfig-checker-enable -->
 

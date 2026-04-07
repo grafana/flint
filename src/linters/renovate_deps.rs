@@ -17,7 +17,7 @@ pub(crate) const RENOVATE_CONFIG_PATTERNS: &[&str] = &[
     ".renovaterc.json",
     ".renovaterc.json5",
 ];
-const PACKAGE_FILES_MSG: &str = "packageFiles with updates";
+const PACKAGE_FILES_MSG: &str = "Extracted dependencies";
 const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value", "invalid-version"];
 
 /// `{file_path: {manager: [dep_name, ...]}}` — all collections sorted.
@@ -112,7 +112,11 @@ async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result
     }
 
     let out = Command::new("renovate")
-        .args(["--platform=local", "--require-config=ignored"])
+        .args([
+            "--platform=local",
+            "--require-config=ignored",
+            "--dry-run=extract",
+        ])
         .current_dir(project_root)
         .envs(env)
         .stdin(Stdio::null())
@@ -179,7 +183,7 @@ fn extract_deps(log_bytes: &[u8], exclude_managers: &[String]) -> anyhow::Result
             continue;
         };
         if entry.get("msg").and_then(|v| v.as_str()) == Some(PACKAGE_FILES_MSG) {
-            config_obj = entry.get("config").cloned();
+            config_obj = entry.get("packageFiles").cloned();
         }
     }
 
@@ -258,7 +262,7 @@ mod tests {
     use super::*;
 
     fn log(config_json: &str) -> Vec<u8> {
-        format!(r#"{{"msg":"packageFiles with updates","config":{config_json}}}"#).into_bytes()
+        format!(r#"{{"msg":"Extracted dependencies","packageFiles":{config_json}}}"#).into_bytes()
     }
 
     fn dep_map(entries: &[(&str, &[(&str, &[&str])])]) -> DepMap {
@@ -344,8 +348,8 @@ mod tests {
     fn last_package_files_message_wins() {
         let bytes = format!(
             "{}\n{}\n",
-            r#"{"msg":"packageFiles with updates","config":{"npm":[{"packageFile":"a.json","deps":[{"depName":"old"}]}]}}"#,
-            r#"{"msg":"packageFiles with updates","config":{"npm":[{"packageFile":"b.json","deps":[{"depName":"new"}]}]}}"#,
+            r#"{"msg":"Extracted dependencies","packageFiles":{"npm":[{"packageFile":"a.json","deps":[{"depName":"old"}]}]}}"#,
+            r#"{"msg":"Extracted dependencies","packageFiles":{"npm":[{"packageFile":"b.json","deps":[{"depName":"new"}]}]}}"#,
         )
         .into_bytes();
         let result = extract_deps(&bytes, &[]).unwrap();
@@ -356,7 +360,7 @@ mod tests {
     #[test]
     fn non_json_lines_are_skipped() {
         let bytes =
-            b"not json\n{\"msg\":\"packageFiles with updates\",\"config\":{\"npm\":[{\"packageFile\":\"p.json\",\"deps\":[{\"depName\":\"x\"}]}]}}\nmore garbage\n";
+            b"not json\n{\"msg\":\"Extracted dependencies\",\"packageFiles\":{\"npm\":[{\"packageFile\":\"p.json\",\"deps\":[{\"depName\":\"x\"}]}]}}\nmore garbage\n";
         let result = extract_deps(bytes, &[]).unwrap();
         assert!(result.contains_key("p.json"));
     }

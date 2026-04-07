@@ -24,7 +24,7 @@ google-java-format    google-java-format  missing        fast  *.java
 ktlint                ktlint              missing        fast  *.kt *.kts
 dotnet-format         dotnet              missing        fast  *.cs
 lychee                lychee              active         fast
-renovate-deps         renovate            active         slow  renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5
+renovate-deps         renovate            active         fast  renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5
 license-header        license-header      active         fast
 '''
 [fake_bins]

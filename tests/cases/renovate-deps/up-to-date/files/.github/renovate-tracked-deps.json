@@ -1,4 +1,9 @@
 {
+  "mise.toml": {
+    "mise": [
+      "npm:renovate"
+    ]
+  },
   "package.json": {
     "npm": [
       "express",

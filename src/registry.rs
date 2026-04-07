@@ -425,18 +425,14 @@ pub fn builtin() -> Vec<Check> {
             .install_components("clippy")
             .lang()
             .note("lints all .rs files, not just changed"),
-        Check::files(
-            "cargo-fmt",
-            "rustfmt {CARGO_EDITION_FLAG} --check {FILES}",
-            &["*.rs"],
-        )
-        .fix("rustfmt {CARGO_EDITION_FLAG} {FILES}")
-        .full_cmd("cargo fmt -- --check", "cargo fmt")
-        .bin("rustfmt")
-        .mise_tool("rust")
-        .install_components("rustfmt")
-        .formatter()
-        .lang(),
+        Check::project("cargo-fmt", "cargo fmt -- --check", &["*.rs"])
+            .fix("cargo fmt")
+            .bin("rustfmt")
+            .mise_tool("rust")
+            .install_components("rustfmt")
+            .formatter()
+            .lang()
+            .note("formats all .rs files, not just changed"),
         Check::file("gofmt", "gofmt -d {FILE}", &["*.go"])
             .fix("gofmt -w {FILE}")
             .mise_tool("go")
@@ -483,7 +479,6 @@ pub fn builtin() -> Vec<Check> {
         Check::special("lychee", "lychee", SpecialKind::Links),
         Check::special("renovate-deps", "renovate", SpecialKind::RenovateDeps)
             .mise_tool("npm:renovate")
-            .slow()
             .patterns(RENOVATE_CONFIG_PATTERNS),
         Check::special(
             "license-header",

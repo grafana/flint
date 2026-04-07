@@ -1,9 +1,3 @@
 [expected]
 args = "run --full renovate-deps"
 exit = 0
-
-[fake_bins]
-renovate = '''
-#!/bin/sh
-printf '%s\n' '{"msg":"packageFiles with updates","config":{"npm":[{"packageFile":"package.json","deps":[{"depName":"express"},{"depName":"lodash"}]}]}}'
-'''

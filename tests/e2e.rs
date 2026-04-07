@@ -22,11 +22,11 @@ fn flint_with_env(args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Output {
     cmd.output().expect("failed to spawn flint")
 }
 
-/// Creates a temp directory initialised as a git repo.
+/// Creates a temp directory initialised as a git repo with branch `main`.
 fn git_repo() -> TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     for args in [
-        vec!["init"],
+        vec!["init", "-b", "main"],
         vec!["config", "user.email", "test@test.com"],
         vec!["config", "user.name", "Test"],
     ] {
@@ -193,6 +193,24 @@ fn run_case(case: &Path, name: &str, update: bool) {
         .current_dir(repo.path())
         .output()
         .expect("git add failed");
+    Command::new("git")
+        .args(["commit", "-q", "-m", "init"])
+        .current_dir(repo.path())
+        .output()
+        .expect("git commit failed");
+
+    // If a `changes/` directory exists alongside `files/`, write those files
+    // over the repo and stage them (but don't commit). This lets fixtures test
+    // the changed-files code path (as opposed to --full / all-files mode).
+    let changes_dir = case.join("changes");
+    if changes_dir.exists() {
+        copy_dir_into(&changes_dir, repo.path());
+        Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(repo.path())
+            .output()
+            .expect("git add changes failed");
+    }
 
     let env_vars: Vec<(String, String)> = cfg
         .get("env")

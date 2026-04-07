@@ -5,8 +5,13 @@ stderr = '''
 [renovate-deps]
 --- .github/renovate-tracked-deps.json
 +++ generated
-@@ -1,7 +1,8 @@
+@@ -1,7 +1,13 @@
  {
++  "mise.toml": {
++    "mise": [
++      "npm:renovate"
++    ]
++  },
    "package.json": {
      "npm": [
 -      "old-dep"
@@ -32,8 +37,3 @@ flint: 1 check failed (renovate-deps)
   }
 }
 """
-[fake_bins]
-renovate = '''
-#!/bin/sh
-printf '%s\n' '{"msg":"packageFiles with updates","config":{"npm":[{"packageFile":"package.json","deps":[{"depName":"express"},{"depName":"lodash"}]}]}}'
-'''

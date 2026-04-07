@@ -228,53 +228,6 @@ pub(super) fn apply_changes(
     Ok(())
 }
 
-/// The mise tool key used to install the flint binary from GitHub releases.
-pub(super) const FLINT_MISE_KEY: &str = "ubi:grafana/flint";
-
-/// Adds `flint` itself to `[tools]` in `mise.toml` if it is not already present.
-/// Uses `mise use --pin` to resolve and pin the latest release version.
-/// Falls back to `"latest"` if mise is unavailable.
-/// Returns `true` if the file was changed.
-pub(super) fn add_flint_tool(mise_path: &Path) -> Result<bool> {
-    let content = std::fs::read_to_string(mise_path).unwrap_or_default();
-    let doc: toml_edit::DocumentMut = content
-        .parse()
-        .unwrap_or_else(|_| toml_edit::DocumentMut::new());
-
-    // Already present — nothing to do.
-    if doc
-        .get("tools")
-        .and_then(|t| t.as_table())
-        .map(|t| t.contains_key(FLINT_MISE_KEY))
-        .unwrap_or(false)
-    {
-        return Ok(false);
-    }
-
-    let project_root = mise_path.parent().unwrap_or(mise_path);
-    if pin_tool_via_mise(project_root, FLINT_MISE_KEY) {
-        println!("  added {FLINT_MISE_KEY} to [tools]");
-        return Ok(true);
-    }
-
-    // Fallback: write "latest" directly.
-    eprintln!("  warning: could not pin {FLINT_MISE_KEY} via mise — writing \"latest\"");
-    let content = std::fs::read_to_string(mise_path).unwrap_or_default();
-    let mut doc: toml_edit::DocumentMut = content
-        .parse()
-        .unwrap_or_else(|_| toml_edit::DocumentMut::new());
-    if !doc.contains_key("tools") {
-        doc.insert("tools", toml_edit::Item::Table(toml_edit::Table::new()));
-    }
-    doc["tools"]
-        .as_table_mut()
-        .context("[tools] is not a table")?
-        .insert(FLINT_MISE_KEY, toml_edit::value("latest"));
-    std::fs::write(mise_path, doc.to_string())?;
-    println!("  added {FLINT_MISE_KEY} to [tools]");
-    Ok(true)
-}
-
 const FLINT_V1_URL_PREFIX: &str = "https://raw.githubusercontent.com/grafana/flint/";
 
 pub(super) struct V1Removal {

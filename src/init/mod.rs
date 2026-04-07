@@ -14,9 +14,9 @@ use detection::{
     build_linter_groups, detect_obsolete_keys, detect_present_patterns, parse_tool_keys,
 };
 use generation::{
-    add_flint_tool, apply_changes, apply_env_and_tasks, detect_base_branch, flint_preset,
-    generate_flint_toml, generate_lint_workflow, get_existing_config_dir, has_slow_selected,
-    maybe_install_hook, patch_renovate_extends, prompt_config_dir, remove_v1_tasks,
+    apply_changes, apply_env_and_tasks, detect_base_branch, flint_preset, generate_flint_toml,
+    generate_lint_workflow, get_existing_config_dir, has_slow_selected, maybe_install_hook,
+    patch_renovate_extends, prompt_config_dir, remove_v1_tasks,
 };
 use ui::{interactive_select_linters, select_categories_arrow};
 
@@ -232,13 +232,9 @@ Add and stage your source files before running init so the detection is accurate
     let existing_config_dir = get_existing_config_dir(&current_content);
     let config_dir_rel = prompt_config_dir(existing_config_dir.as_deref(), yes)?;
 
-    let flint_added = add_flint_tool(&mise_path)?;
-
     let tools_changed =
         !final_add.is_empty() || !final_remove.is_empty() || !final_upgrade.is_empty();
     if tools_changed {
-        // Re-read after add_flint_tool may have written to the file.
-        let current_content = std::fs::read_to_string(&mise_path).unwrap_or(current_content);
         apply_changes(
             &mise_path,
             &current_content,
@@ -281,8 +277,7 @@ Add and stage your source files before running init so the detection is accurate
         .transpose()?
         .unwrap_or(false);
 
-    if !flint_added
-        && !tools_changed
+    if !tools_changed
         && v1.removed_tasks.is_empty()
         && !v1.removed_renovate_env
         && !meta_changed

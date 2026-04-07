@@ -10,11 +10,13 @@ mod detection;
 mod generation;
 mod ui;
 
-use detection::{build_linter_groups, detect_present_patterns, parse_tool_keys};
+use detection::{
+    build_linter_groups, detect_obsolete_keys, detect_present_patterns, parse_tool_keys,
+};
 use generation::{
     apply_changes, apply_env_and_tasks, detect_base_branch, flint_preset, generate_flint_toml,
     generate_lint_workflow, get_existing_config_dir, has_slow_selected, maybe_install_hook,
-    patch_renovate_extends, prompt_config_dir,
+    patch_renovate_extends, prompt_config_dir, remove_v1_tasks,
 };
 use ui::{interactive_select_linters, select_categories_arrow};
 
@@ -181,6 +183,13 @@ Add and stage your source files before running init so the detection is accurate
         return Ok(());
     }
 
+    // Detect obsolete tool keys (e.g. npm:markdownlint-cli → npm:markdownlint-cli2).
+    // These are removed regardless of the interactive selection — keeping them serves no purpose.
+    let obsolete = detect_obsolete_keys(&current_tool_keys);
+    for (old_key, replacement) in &obsolete {
+        println!("  removing obsolete linter {old_key} (replaced by {replacement})");
+    }
+
     // Derive changes from final selection state.
     let mut final_add: Vec<(String, Option<String>)> = Vec::new();
     let mut final_remove: Vec<String> = Vec::new();
@@ -204,6 +213,11 @@ Add and stage your source files before running init so the detection is accurate
         } else if group.installed && known_keys.contains(group.key) {
             final_remove.push(group.key.to_string());
         }
+    }
+
+    // Always remove obsolete tool keys (detected before the interactive selection).
+    for (old_key, _) in &obsolete {
+        final_remove.push(old_key.to_string());
     }
 
     let has_slow = has_slow_selected(&groups);
@@ -230,6 +244,14 @@ Add and stage your source files before running init so the detection is accurate
         )?;
     }
 
+    let v1 = remove_v1_tasks(&mise_path)?;
+    for key in &v1.removed_tasks {
+        println!("  removing v1 task {key}");
+    }
+    if v1.removed_renovate_env {
+        println!("  removing RENOVATE_TRACKED_DEPS_EXCLUDE from [env] (use flint.toml instead)");
+    }
+
     let meta_changed = apply_env_and_tasks(&mise_path, &config_dir_rel, has_slow)?;
 
     let base_branch = detect_base_branch(project_root);
@@ -250,6 +272,8 @@ Add and stage your source files before running init so the detection is accurate
         .unwrap_or(false);
 
     if !tools_changed
+        && v1.removed_tasks.is_empty()
+        && !v1.removed_renovate_env
         && !meta_changed
         && !toml_generated
         && !workflow_generated
@@ -342,6 +366,28 @@ mod tests {
         apply_changes, apply_env_and_tasks, generate_flint_toml, generate_lint_workflow,
         get_existing_config_dir, has_slow_selected,
     };
+
+    #[test]
+    fn detect_obsolete_keys_finds_known_stale_key() {
+        use detection::detect_obsolete_keys;
+        let mut keys = HashSet::new();
+        keys.insert("npm:markdownlint-cli".to_string());
+        keys.insert("shellcheck".to_string());
+        let found = detect_obsolete_keys(&keys);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].0, "npm:markdownlint-cli");
+        assert_eq!(found[0].1, "npm:markdownlint-cli2");
+    }
+
+    #[test]
+    fn detect_obsolete_keys_ignores_current_keys() {
+        use detection::detect_obsolete_keys;
+        let mut keys = HashSet::new();
+        keys.insert("npm:markdownlint-cli2".to_string());
+        keys.insert("shellcheck".to_string());
+        let found = detect_obsolete_keys(&keys);
+        assert!(found.is_empty());
+    }
 
     #[test]
     fn all_registry_checks_have_install_key_or_none() {

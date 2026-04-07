@@ -489,6 +489,15 @@ pub fn builtin() -> Vec<Check> {
     ]
 }
 
+/// Mise tool keys that are no longer supported by flint and should be removed
+/// during `flint init`. Each entry is `(old_key, replacement_key)` where
+/// `replacement_key` is the modern equivalent that the registry now uses.
+pub const OBSOLETE_KEYS: &[(&str, &str)] = &[
+    // markdownlint-cli was superseded by markdownlint-cli2 (actively maintained,
+    // faster, supports the same config files). flint only supports the cli2 variant.
+    ("npm:markdownlint-cli", "npm:markdownlint-cli2"),
+];
+
 /// Reads `[tools]` from the consuming repo's mise.toml and returns a map of
 /// tool name → declared version string.
 ///

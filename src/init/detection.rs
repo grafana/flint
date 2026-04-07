@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 
-use crate::registry::{Category, Check};
+use crate::registry::{Category, Check, OBSOLETE_KEYS};
 
 use super::{LinterGroup, install_key};
 
@@ -91,6 +91,17 @@ pub(super) fn get_entry_components(content: &str, key: &str) -> Option<String> {
         toml_edit::Value::InlineTable(tbl) => tbl.get("components")?.as_str().map(str::to_string),
         _ => None,
     }
+}
+
+/// Returns the subset of `OBSOLETE_KEYS` whose old key is present in `current_tool_keys`.
+pub(super) fn detect_obsolete_keys(
+    current_tool_keys: &HashSet<String>,
+) -> Vec<(&'static str, &'static str)> {
+    OBSOLETE_KEYS
+        .iter()
+        .filter(|(old, _)| current_tool_keys.contains(*old))
+        .copied()
+        .collect()
 }
 
 /// Builds one `LinterGroup` per install key, covering all checks whose file patterns

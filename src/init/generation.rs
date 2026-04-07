@@ -229,7 +229,7 @@ pub(super) fn apply_changes(
 }
 
 /// The mise tool key used to install the flint binary from GitHub releases.
-pub(super) const FLINT_MISE_KEY: &str = "github:grafana/flint";
+pub(super) const FLINT_MISE_KEY: &str = "ubi:grafana/flint";
 
 /// Adds `flint` itself to `[tools]` in `mise.toml` if it is not already present.
 /// Uses `mise use --pin` to resolve and pin the latest release version.

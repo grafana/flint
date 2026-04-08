@@ -39,15 +39,16 @@ pub async fn run(
 }
 
 /// Returns `true` if `text` appears anywhere within the first `lines_to_check` lines of `path`.
+/// `text` may be multi-line; the file head is joined with `\n` before the substring search.
 fn check_file(path: &Path, text: &str, lines_to_check: usize) -> std::io::Result<bool> {
     let f = std::fs::File::open(path)?;
     let reader = BufReader::new(f);
-    for line in reader.lines().take(lines_to_check) {
-        if line?.contains(text) {
-            return Ok(true);
-        }
-    }
-    Ok(false)
+    let head = reader
+        .lines()
+        .take(lines_to_check)
+        .collect::<Result<Vec<_>, _>>()?
+        .join("\n");
+    Ok(head.contains(text))
 }
 
 #[cfg(test)]
@@ -68,6 +69,23 @@ mod tests {
         let path = dir.path().join("Foo.java");
         std::fs::write(&path, "public class Foo {}\n").unwrap();
         assert!(!check_file(&path, "Copyright", 5).unwrap());
+    }
+
+    #[test]
+    fn check_file_multiline_text() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("Foo.java");
+        std::fs::write(
+            &path,
+            "/*\n * Copyright Acme\n * SPDX-License-Identifier: Apache-2.0\n */\npublic class Foo {}\n",
+        )
+        .unwrap();
+        let header = "/*\n * Copyright Acme\n * SPDX-License-Identifier: Apache-2.0\n */";
+        assert!(check_file(&path, header, 5).unwrap());
+        // Partial match still works (single-line substring within the joined head)
+        assert!(check_file(&path, "SPDX-License-Identifier: Apache-2.0", 5).unwrap());
+        // Text that spans more lines than the limit is not found
+        assert!(!check_file(&path, header, 2).unwrap());
     }
 
     #[test]

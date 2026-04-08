@@ -327,6 +327,18 @@ a second inventory of the same tools in `.pre-commit-config.yaml`, with its own
 versioning and install lifecycle. That's friction without benefit for repos that
 are already mise-first.
 
+### Why not Spotless (or other Maven formatter plugins)?
+
+Spotless runs `google-java-format` as a Maven build phase, which means format
+failures block compilation and test runs — that's the wrong place for a style
+check. flint's `google-java-format` check runs as a separate lint step, only on
+changed files, and is fast.
+
+To migrate: remove `spotless-maven-plugin` from your `pom.xml` (and any
+`spotless.skip` properties), add `"github:google/google-java-format"` to
+`[tools]` in `mise.toml`, and run `flint run --fix` once to confirm the repo is
+clean.
+
 ### Why not MegaLinter / super-linter?
 
 Container-based linters (super-linter, MegaLinter) ship their own tool versions,

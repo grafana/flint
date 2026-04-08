@@ -444,7 +444,7 @@ pub fn builtin() -> Vec<Check> {
             &["*.java"],
         )
         .fix("google-java-format -i {FILES}")
-        .mise_tool("github:google/google-java-format")
+        .mise_tool("ubi:google/google-java-format")
         .formatter()
         .lang(),
         Check::files(

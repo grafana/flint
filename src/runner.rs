@@ -182,11 +182,30 @@ fn prepare(
             name,
             cfg: cfg.checks.renovate_deps.clone(),
         }),
-        CheckKind::Special(SpecialKind::LicenseHeader) => Some(PreparedCheck::LicenseHeader {
-            name,
-            cfg: cfg.checks.license_header.clone(),
-            files: file_list.files.clone(),
-        }),
+        CheckKind::Special(SpecialKind::LicenseHeader) => {
+            if cfg.checks.license_header.text.is_empty() {
+                return None;
+            }
+            let patterns: Vec<&str> = cfg
+                .checks
+                .license_header
+                .patterns
+                .iter()
+                .map(String::as_str)
+                .collect();
+            let files: Vec<PathBuf> = match_files(&file_list.files, &patterns, &[], project_root)
+                .into_iter()
+                .cloned()
+                .collect();
+            if files.is_empty() {
+                return None;
+            }
+            Some(PreparedCheck::LicenseHeader {
+                name,
+                cfg: cfg.checks.license_header.clone(),
+                files,
+            })
+        }
     }
 }
 

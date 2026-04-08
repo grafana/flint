@@ -10,14 +10,6 @@ pub struct LinterOutput {
 }
 
 impl LinterOutput {
-    pub fn ok() -> Self {
-        Self {
-            ok: true,
-            stdout: vec![],
-            stderr: vec![],
-        }
-    }
-
     pub fn err(stderr: impl Into<Vec<u8>>) -> Self {
         Self {
             ok: false,

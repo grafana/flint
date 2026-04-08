@@ -4,35 +4,19 @@ use std::path::{Path, PathBuf};
 use crate::config::LicenseHeaderConfig;
 use crate::linters::LinterOutput;
 
-/// Checks that each file matching `cfg.patterns` contains `cfg.text` within
-/// the first `cfg.lines_to_check` lines. Returns early (ok=true) when not configured.
+/// Checks that each file contains `cfg.text` within the first `cfg.lines_to_check` lines.
+/// Files are pre-filtered by pattern in the runner; this function checks all of them.
 pub async fn run(
     cfg: &LicenseHeaderConfig,
     project_root: &Path,
     files: &[PathBuf],
 ) -> LinterOutput {
-    if cfg.text.is_empty() {
-        return LinterOutput::ok();
-    }
-
     let mut all_ok = true;
     let mut stderr = Vec::new();
 
     for file in files {
         let rel = file.strip_prefix(project_root).unwrap_or(file);
         let rel_str = rel.to_string_lossy();
-        let file_name = file
-            .file_name()
-            .map(|n| n.to_string_lossy())
-            .unwrap_or_default();
-
-        if !cfg
-            .patterns
-            .iter()
-            .any(|pat| glob_match(pat, &file_name) || glob_match(pat, &rel_str))
-        {
-            continue;
-        }
 
         match check_file(file, &cfg.text, cfg.lines_to_check) {
             Ok(true) => {}
@@ -66,40 +50,9 @@ fn check_file(path: &Path, text: &str, lines_to_check: usize) -> std::io::Result
     Ok(false)
 }
 
-fn glob_match(pattern: &str, name: &str) -> bool {
-    let parts: Vec<&str> = pattern.splitn(2, '*').collect();
-    match parts.as_slice() {
-        [only] => name == *only || name.ends_with(&format!("/{only}")),
-        [prefix, suffix] => {
-            let anchor_start = prefix.is_empty() || name.starts_with(prefix) || {
-                name.contains('/') && {
-                    let after_slash = name.rfind('/').map(|i| &name[i + 1..]).unwrap_or(name);
-                    prefix.is_empty() || after_slash.starts_with(prefix)
-                }
-            };
-            anchor_start && name.ends_with(suffix)
-        }
-        _ => false,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn glob_match_extension() {
-        assert!(glob_match("*.java", "Foo.java"));
-        assert!(glob_match("*.java", "src/main/Foo.java"));
-        assert!(!glob_match("*.java", "Foo.kt"));
-    }
-
-    #[test]
-    fn glob_match_exact() {
-        assert!(glob_match("Makefile", "Makefile"));
-        assert!(glob_match("Makefile", "src/Makefile"));
-        assert!(!glob_match("Makefile", "GNUmakefile"));
-    }
 
     #[test]
     fn check_file_finds_header_in_first_lines() {

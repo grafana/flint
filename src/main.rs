@@ -110,11 +110,12 @@ async fn main() -> Result<()> {
             println!("flint {}", env!("CARGO_PKG_VERSION"));
         }
         SubCommand::Linters(args) => {
+            let cfg = config::load(&config_dir).unwrap_or_default();
             let mise_tools = registry::read_mise_tools(&project_root);
             if args.json {
                 print_linters_json(&registry);
             } else {
-                print_linters(&registry, &mise_tools);
+                print_linters(&registry, &mise_tools, &cfg);
             }
         }
         SubCommand::Init(args) => {
@@ -360,7 +361,11 @@ fn is_fixable(name: &str, active: &[&registry::Check]) -> bool {
     active.iter().any(|c| c.name == name && c.has_fix())
 }
 
-fn print_linters(registry: &[registry::Check], mise_tools: &HashMap<String, String>) {
+fn print_linters(
+    registry: &[registry::Check],
+    mise_tools: &HashMap<String, String>,
+    cfg: &config::Config,
+) {
     // Column widths.
     let name_w = registry
         .iter()
@@ -389,7 +394,11 @@ fn print_linters(registry: &[registry::Check], mise_tools: &HashMap<String, Stri
     for check in registry {
         let status = if registry::check_active(check, mise_tools) {
             if !check.uses_binary() || registry::binary_on_path(check.bin_name) {
-                "active"
+                if check.name == "license-header" && cfg.checks.license_header.text.is_empty() {
+                    "not configured"
+                } else {
+                    "active"
+                }
             } else {
                 "no binary"
             }

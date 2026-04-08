@@ -28,6 +28,9 @@ After installing flint (`mise install`), run `flint init`. It automatically:
 Then run `mise install` to install the new tools and
 `mise run setup:pre-commit-hook` to install the git hook.
 
+Finally, run `flint run --fix renovate-deps` to regenerate
+`renovate-tracked-deps.json` with all the new tools included.
+
 ### 3. Verify active linters
 
 Run `flint linters` to confirm flint detects all the tools declared in your

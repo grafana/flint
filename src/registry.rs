@@ -90,8 +90,10 @@ pub struct Check {
     /// entry: `rust = { version = "latest", components = "clippy,rustfmt" }`.
     pub mise_install_components: Option<&'static str>,
     pub kind: CheckKind,
-    /// Optional note shown in the README linter table.
-    pub note: Option<&'static str>,
+    /// Plain-text description of what the check does — shown in `flint linters` and the README table.
+    pub desc: &'static str,
+    /// Extended markdown documentation shown in the README detail section (behaviour, config examples).
+    pub docs: &'static str,
 }
 
 impl Check {
@@ -165,7 +167,8 @@ impl Check {
                 full_fix_cmd: "",
                 scope,
             },
-            note: None,
+            desc: "",
+            docs: "",
         }
     }
 
@@ -186,7 +189,8 @@ impl Check {
             mise_install_key: None,
             mise_install_components: None,
             kind: CheckKind::Special(kind),
-            note: None,
+            desc: "",
+            docs: "",
         }
     }
 
@@ -265,9 +269,15 @@ impl Check {
         self
     }
 
-    /// Add a note shown in the README linter table.
-    pub fn note(mut self, note: &'static str) -> Self {
-        self.note = Some(note);
+    /// Set the plain-text description shown in `flint linters` and the README table.
+    pub fn desc(mut self, desc: &'static str) -> Self {
+        self.desc = desc;
+        self
+    }
+
+    /// Set extended markdown documentation shown in the README detail section.
+    pub fn docs(mut self, docs: &'static str) -> Self {
+        self.docs = docs;
         self
     }
 
@@ -336,14 +346,17 @@ pub fn builtin() -> Vec<Check> {
             &["*.sh", "*.bash", "*.bats"],
         )
         .linter_config(".shellcheckrc", "--rcfile")
+        .desc("Lint shell scripts for common mistakes")
         .style(),
         Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"])
             .fix("shfmt -w {FILE}")
             .formatter()
+            .desc("Format shell scripts")
             .style(),
         Check::file("markdownlint-cli2", "markdownlint-cli2 {FILE}", &["*.md"])
             .fix("markdownlint-cli2 --fix {FILE}")
             .linter_config(".markdownlint.jsonc", "--config")
+            .desc("Lint Markdown files for style and consistency")
             .install_key("npm:markdownlint-cli2"),
         Check::files(
             "prettier",
@@ -354,6 +367,7 @@ pub fn builtin() -> Vec<Check> {
         .full_cmd("prettier --check {ROOT}", "prettier --write {ROOT}")
         .linter_config(".prettierrc", "--config")
         .formatter()
+        .desc("Format Markdown and YAML files")
         .install_key("npm:prettier"),
         Check::file(
             "actionlint",
@@ -361,6 +375,7 @@ pub fn builtin() -> Vec<Check> {
             &[".github/workflows/*.yml", ".github/workflows/*.yaml"],
         )
         .linter_config("actionlint.yml", "-config-file")
+        .desc("Lint GitHub Actions workflow files")
         .style(),
         Check::file(
             "hadolint",
@@ -368,10 +383,12 @@ pub fn builtin() -> Vec<Check> {
             &["Dockerfile", "Dockerfile.*", "*.dockerfile"],
         )
         .linter_config(".hadolint.yaml", "--config")
+        .desc("Lint Dockerfiles")
         .style(),
         Check::files("codespell", "codespell {FILES}", &["*"])
             .fix("codespell --write-changes {FILES}")
             .linter_config(".codespellrc", "--config")
+            .desc("Check for common spelling mistakes")
             .install_key("pipx:codespell"),
         // Defer to formatters that enforce line length — those are the ones
         // that conflict with ec's max_line_length editorconfig check.
@@ -380,18 +397,20 @@ pub fn builtin() -> Vec<Check> {
             .bin("ec")
             .mise_tool("editorconfig-checker")
             .defer_to_formatters()
-            .linter_config(".editorconfig-checker.json", "-config"),
+            .linter_config(".editorconfig-checker.json", "-config")
+            .desc("Check files comply with EditorConfig settings"),
         Check::project(
             "golangci-lint",
             "golangci-lint run --new-from-rev={MERGE_BASE}",
             &["*.go"],
         )
         .linter_config(".golangci.yml", "--config")
-        .lang()
-        .note("uses --new-from-rev to lint only changed code"),
+        .desc("Lint Go code; uses --new-from-rev to scope analysis to changed code")
+        .lang(),
         Check::file("ruff", "ruff check {FILE}", &["*.py"])
             .fix("ruff check --fix {FILE}")
             .linter_config("ruff.toml", "--config")
+            .desc("Lint Python code")
             .install_key("pipx:ruff")
             .lang(),
         Check::file("ruff-format", "ruff format --check {FILE}", &["*.py"])
@@ -399,6 +418,7 @@ pub fn builtin() -> Vec<Check> {
             .fix("ruff format {FILE}")
             .linter_config("ruff.toml", "--config")
             .formatter()
+            .desc("Format Python code")
             .install_key("pipx:ruff")
             .lang(),
         Check::file(
@@ -407,6 +427,7 @@ pub fn builtin() -> Vec<Check> {
             &["*.json", "*.jsonc", "*.js", "*.ts", "*.jsx", "*.tsx"],
         )
         .fix("biome check --fix {FILE}")
+        .desc("Lint JS/TS/JSON files")
         .install_key("npm:@biomejs/biome")
         .lang(),
         Check::file(
@@ -417,26 +438,28 @@ pub fn builtin() -> Vec<Check> {
         .bin("biome")
         .fix("biome format --write {FILE}")
         .formatter()
+        .desc("Format JS/TS/JSON files")
         .install_key("npm:@biomejs/biome")
         .lang(),
         Check::project("cargo-clippy", "cargo clippy -q -- -D warnings", &["*.rs"])
             .fix("cargo clippy -q --fix --allow-dirty --allow-staged -- -D warnings")
             .mise_tool("rust")
             .install_components("clippy")
-            .lang()
-            .note("lints all .rs files, not just changed"),
+            .desc("Lint Rust code; runs on all .rs files, not just changed")
+            .lang(),
         Check::project("cargo-fmt", "cargo fmt -- --check", &["*.rs"])
             .fix("cargo fmt")
             .bin("rustfmt")
             .mise_tool("rust")
             .install_components("rustfmt")
             .formatter()
-            .lang()
-            .note("formats all .rs files, not just changed"),
+            .desc("Format Rust code; runs on all .rs files, not just changed")
+            .lang(),
         Check::file("gofmt", "gofmt -d {FILE}", &["*.go"])
             .fix("gofmt -w {FILE}")
             .mise_tool("go")
             .formatter()
+            .desc("Format Go code")
             .lang(),
         Check::files(
             "google-java-format",
@@ -446,6 +469,7 @@ pub fn builtin() -> Vec<Check> {
         .fix("google-java-format -i {FILES}")
         .mise_tool("github:google/google-java-format")
         .formatter()
+        .desc("Format Java code")
         .lang(),
         Check::files(
             "ktlint",
@@ -464,6 +488,7 @@ pub fn builtin() -> Vec<Check> {
             "ktlint"
         })
         .formatter()
+        .desc("Lint and format Kotlin code")
         .lang(),
         Check::files(
             "dotnet-format",
@@ -475,17 +500,52 @@ pub fn builtin() -> Vec<Check> {
         .bin("dotnet")
         .mise_tool("dotnet")
         .formatter()
+        .desc("Format C# code")
         .lang(),
-        Check::special("lychee", "lychee", SpecialKind::Links),
+        Check::special("lychee", "lychee", SpecialKind::Links)
+            .desc("Check for broken links")
+            .docs(
+                "Orchestrates [lychee](https://lychee.cli.rs/) for link checking. \
+                Requires `lychee` in `[tools]`.\n\
+                \n\
+                Default behavior: checks all links in changed files. \
+                When `check_all_local = true` in `flint.toml`, adds a second pass \
+                over local links in all files — useful when broken internal links \
+                from unchanged files also matter.\n\
+                \n\
+                Configure via `flint.toml`:\n\
+                \n\
+                ```toml\n\
+                [checks.links]\n\
+                config = \".github/config/lychee.toml\"\n\
+                check_all_local = true\n\
+                ```",
+            ),
         Check::special("renovate-deps", "renovate", SpecialKind::RenovateDeps)
             .mise_tool("npm:renovate")
-            .patterns(RENOVATE_CONFIG_PATTERNS),
+            .patterns(RENOVATE_CONFIG_PATTERNS)
+            .desc("Verify Renovate dependency snapshot is up to date")
+            .docs(
+                "Verifies `.github/renovate-tracked-deps.json` is up to date by running \
+                Renovate locally and comparing its output against the committed snapshot. \
+                Requires `renovate` in `[tools]`.\n\
+                \n\
+                With `--fix`, automatically regenerates and commits the snapshot.\n\
+                \n\
+                Configure via `flint.toml`:\n\
+                \n\
+                ```toml\n\
+                [checks.renovate-deps]\n\
+                exclude_managers = [\"github-actions\", \"github-runners\"]\n\
+                ```",
+            ),
         Check::special(
             "license-header",
             "license-header",
             SpecialKind::LicenseHeader,
         )
-        .activate_unconditionally(),
+        .activate_unconditionally()
+        .desc("Check source files have the required license header"),
     ]
 }
 
@@ -669,18 +729,29 @@ mod tests {
             return;
         }
 
+        // Normalize both sides: strip blank lines that prettier adds around
+        // headings, tables, and code blocks. This keeps the comparison stable
+        // even when docs contain multi-paragraph content with blank lines.
         let actual = extract_readme_table(&readme);
-        if actual != expected {
+        let expected_norm = strip_blank_lines(&expected);
+        if actual != expected_norm {
             panic!(
                 "README linter table is out of sync with the registry.\n\
                  Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate.\n\n\
-                 Expected:\n{expected}\n\nActual:\n{actual}"
+                 Expected:\n{expected_norm}\n\nActual:\n{actual}"
             );
         }
     }
 
     const README_TABLE_START: &str = "<!-- registry-table-start -->";
     const README_TABLE_END: &str = "<!-- registry-table-end -->";
+
+    fn strip_blank_lines(s: &str) -> String {
+        s.lines()
+            .filter(|l| !l.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 
     fn extract_readme_table(readme: &str) -> String {
         let start = readme
@@ -690,12 +761,9 @@ mod tests {
         let end = readme
             .find(README_TABLE_END)
             .expect("README missing <!-- registry-table-end --> marker");
-        // Strip blank lines that prettier inserts around comments and tables.
-        readme[start..end]
-            .lines()
-            .filter(|l| !l.trim().is_empty())
-            .collect::<Vec<_>>()
-            .join("\n")
+        // Strip blank lines that prettier inserts around headings, tables, and
+        // code blocks — and that linter docs contain between paragraphs.
+        strip_blank_lines(&readme[start..end])
     }
 
     fn replace_readme_table(readme: &str, table: &str) -> String {
@@ -717,27 +785,18 @@ mod tests {
     }
 
     fn generate_readme_table(registry: &[Check]) -> String {
-        // Build raw cell values for every row (header + data).
-        let headers = [
-            "Name",
-            "Binary",
-            "Patterns",
-            "Fix",
-            "Slow",
-            "Scope",
-            "Config file",
-            "Notes",
-        ];
-        let rows: Vec<[String; 8]> = registry.iter().map(table_row).collect();
+        let generated_comment = "<!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->";
 
-        // Compute column widths.
+        // Summary table: Name | Description | Fix
+        let headers = ["Name", "Description", "Fix"];
+        let rows: Vec<[String; 3]> = registry.iter().map(summary_row).collect();
+
         let mut widths = headers.map(|h| h.len());
         for row in &rows {
             for (i, cell) in row.iter().enumerate() {
                 widths[i] = widths[i].max(cell.len());
             }
         }
-
         let fmt_row = |cells: &[&str]| -> String {
             let cols: Vec<String> = cells
                 .iter()
@@ -746,12 +805,10 @@ mod tests {
                 .collect();
             format!("| {} |", cols.join(" | "))
         };
-
         let separator: Vec<String> = widths.iter().map(|&w| "-".repeat(w)).collect();
         let sep_row = format!("| {} |", separator.join(" | "));
-
         let header_strs: Vec<&str> = headers.iter().copied().collect();
-        let generated_comment = "<!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->";
+
         let mut lines = vec![
             generated_comment.to_string(),
             fmt_row(&header_strs),
@@ -761,28 +818,67 @@ mod tests {
             let strs: Vec<&str> = row.iter().map(|s| s.as_str()).collect();
             lines.push(fmt_row(&strs));
         }
+
+        // Per-linter detail sections
+        for check in registry {
+            lines.push(format!("#### `{}`", check.name));
+            lines.push(detail_table(check));
+        }
+
         lines.join("\n")
     }
 
-    fn table_row(check: &Check) -> [String; 8] {
+    fn summary_row(check: &Check) -> [String; 3] {
         let name = format!("`{}`", check.name);
+        let desc = if check.desc.is_empty() {
+            "—".to_string()
+        } else {
+            check.desc.to_string()
+        };
+        let fix = if check.has_fix() { "yes" } else { "—" }.to_string();
+        [name, desc, fix]
+    }
+
+    fn detail_table(check: &Check) -> String {
+        let rows = detail_rows(check);
+
+        let col1_w = rows.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
+        let col2_w = rows.iter().map(|(_, v)| v.len()).max().unwrap_or(0);
+
+        let fmt = |k: &str, v: &str| format!("| {:<col1_w$} | {:<col2_w$} |", k, v);
+        let sep = format!("| {} | {} |", "-".repeat(col1_w), "-".repeat(col2_w));
+
+        // Empty header row: markdown requires one, but we don't need visible
+        // column labels — Description and Fix are data rows, not headers.
+        let mut lines = vec![fmt("", ""), sep];
+        for (k, v) in &rows {
+            lines.push(fmt(k, v));
+        }
+        if !check.docs.is_empty() {
+            lines.push(check.docs.to_string());
+        }
+        lines.join("\n")
+    }
+
+    fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
+        let mut rows: Vec<(&'static str, String)> = vec![];
+
+        if !check.desc.is_empty() {
+            rows.push(("Description", check.desc.to_string()));
+        }
+
+        rows.push((
+            "Fix",
+            if check.has_fix() { "yes" } else { "no" }.to_string(),
+        ));
+
         let binary = if check.uses_binary() {
             format!("`{}`", check.bin_name)
         } else {
             "(built-in)".to_string()
         };
-        let patterns = if check.patterns.is_empty() {
-            "(all files)".to_string()
-        } else {
-            format!("`{}`", check.patterns.join(" "))
-        };
-        let fix = if check.has_fix() { "yes" } else { "no" }.to_string();
-        let slow = if check.category == Category::Slow {
-            "yes"
-        } else {
-            "—"
-        }
-        .to_string();
+        rows.push(("Binary", binary));
+
         let scope = match &check.kind {
             CheckKind::Template { scope, .. } => match scope {
                 Scope::File => "file",
@@ -790,19 +886,27 @@ mod tests {
                 Scope::Project => "project",
             },
             CheckKind::Special(_) => "special",
-        }
-        .to_string();
-        let config_file = match check.linter_config {
-            Some((filename, _)) => format!("`{filename}`"),
-            None => match &check.kind {
-                CheckKind::Special(SpecialKind::Links) => {
-                    "via `[checks.links]` in flint.toml".to_string()
-                }
-                _ => "—".to_string(),
-            },
         };
-        let notes = check.note.unwrap_or("—").to_string();
-        [name, binary, patterns, fix, slow, scope, config_file, notes]
+        rows.push(("Scope", format!("[{scope}](#scopes)")));
+
+        if !check.patterns.is_empty() {
+            rows.push(("Patterns", format!("`{}`", check.patterns.join(" "))));
+        }
+
+        match check.linter_config {
+            Some((filename, _)) => rows.push(("Config", format!("`{filename}`"))),
+            None => {
+                if matches!(&check.kind, CheckKind::Special(SpecialKind::Links)) {
+                    rows.push(("Config", "via `[checks.links]` in flint.toml".to_string()));
+                }
+            }
+        }
+
+        if check.category == Category::Slow {
+            rows.push(("Slow", "yes — skipped by `--fast-only`".to_string()));
+        }
+
+        rows
     }
 
     /// Smoke test: every check whose tool key resolves in this repo's expanded

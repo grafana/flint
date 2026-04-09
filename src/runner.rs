@@ -650,7 +650,8 @@ mod tests {
                 full_fix_cmd: "",
                 scope: Scope::Project,
             },
-            note: None,
+            desc: "",
+            docs: "",
         }
     }
 

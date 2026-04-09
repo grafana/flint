@@ -348,6 +348,7 @@ pub fn linter_json(check: &registry::Check) -> serde_json::Value {
     let config_file: Option<&str> = check.linter_config.map(|(filename, _)| filename);
     serde_json::json!({
         "name": check.name,
+        "description": check.desc,
         "binary": if check.uses_binary() { check.bin_name } else { "(built-in)" },
         "patterns": patterns,
         "fix": check.has_fix(),
@@ -379,17 +380,26 @@ fn print_linters(
         .max()
         .unwrap_or(6)
         .max(6);
+    let desc_w = registry
+        .iter()
+        .map(|c| c.desc.len())
+        .max()
+        .unwrap_or(11)
+        .max(11);
 
     println!(
-        "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  PATTERNS",
+        "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  {:<3}  {:<desc_w$}  PATTERNS",
         "NAME",
         "BINARY",
         "STATUS",
         "SPEED",
+        "FIX",
+        "DESCRIPTION",
         name_w = name_w,
         bin_w = bin_w,
+        desc_w = desc_w,
     );
-    println!("{}", "-".repeat(name_w + bin_w + 35));
+    println!("{}", "-".repeat(name_w + bin_w + desc_w + 42));
 
     for check in registry {
         let status = if registry::check_active(check, mise_tools) {
@@ -412,27 +422,34 @@ fn print_linters(
         } else {
             "fast"
         };
+        let fix = if check.has_fix() { "yes" } else { "no" };
         let patterns_str = check.patterns.join(" ");
         if patterns_str.is_empty() {
             println!(
-                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}",
+                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  {:<3}  {:<desc_w$}",
                 check.name,
                 check.bin_name,
                 status,
                 speed,
+                fix,
+                check.desc,
                 name_w = name_w,
                 bin_w = bin_w,
+                desc_w = desc_w,
             );
         } else {
             println!(
-                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  {}",
+                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  {:<3}  {:<desc_w$}  {}",
                 check.name,
                 check.bin_name,
                 status,
                 speed,
+                fix,
+                check.desc,
                 patterns_str,
                 name_w = name_w,
                 bin_w = bin_w,
+                desc_w = desc_w,
             );
         }
     }

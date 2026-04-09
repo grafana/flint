@@ -24,6 +24,8 @@ jobs:
             runner: macos-15-intel
           - target: aarch64-apple-darwin
             runner: macos-latest
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -36,11 +38,13 @@ jobs:
 
       - name: Add target
         if: "!matrix.use_cross"
+        shell: bash
         env:
           TARGET: ${{ matrix.target }}
         run: rustup target add "$TARGET"
 
       - name: Build
+        shell: bash
         env:
           USE_CROSS: ${{ matrix.use_cross }}
           TARGET: ${{ matrix.target }}
@@ -51,7 +55,8 @@ jobs:
             cargo build --release --target "$TARGET"
           fi
 
-      - name: Package
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
         env:
           TARGET: ${{ matrix.target }}
         run: |
@@ -59,10 +64,18 @@ jobs:
           tar czf "flint-${TARGET}.tar.gz" flint
           mv "flint-${TARGET}.tar.gz" "$GITHUB_WORKSPACE/"
 
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        env:
+          TARGET: ${{ matrix.target }}
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "target\$env:TARGET\release\flint.exe" -DestinationPath "flint-$env:TARGET.zip"
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: flint-${{ matrix.target }}
-          path: flint-${{ matrix.target }}.tar.gz
+          path: flint-${{ matrix.target }}.*
 
   release:
     name: Publish release
@@ -91,4 +104,4 @@ jobs:
             --title "$TAG" \
             --generate-notes \
             "${extra_flags[@]}" \
-            flint-*.tar.gz
+            flint-*.tar.gz flint-*.zip

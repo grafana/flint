@@ -72,6 +72,9 @@ fn git_repo() -> TempDir {
 /// Set UPDATE_SNAPSHOTS=1 to regenerate golden output in test.toml.
 /// Set FLINT_CASES=<dir> to run only cases under that directory (e.g. FLINT_CASES=shellcheck
 /// or FLINT_CASES=shellcheck/clean). Top-level groups run in parallel.
+///
+/// Fake binaries are Unix shell scripts — this test is skipped on non-Unix platforms.
+#[cfg(unix)]
 #[test]
 fn cases() {
     let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/cases");

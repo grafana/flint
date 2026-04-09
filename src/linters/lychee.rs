@@ -203,9 +203,7 @@ fn build_global_github_args(server: &str, raw_base: &str) -> Vec<String> {
     );
     push_remap(
         &mut args,
-        format!(
-            r"^{server}/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#:~:text=.*$ {raw_base}/$1/$2/$3"
-        ),
+        format!(r"^{server}/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#:~:text=.*$ {raw_base}/$1/$2/$3"),
     );
     push_remap(
         &mut args,
@@ -220,11 +218,7 @@ fn build_global_github_args(server: &str, raw_base: &str) -> Vec<String> {
     args
 }
 
-async fn build_branch_remap_args(
-    project_root: &Path,
-    server: &str,
-    raw_base: &str,
-) -> Vec<String> {
+async fn build_branch_remap_args(project_root: &Path, server: &str, raw_base: &str) -> Vec<String> {
     let Some(repo) = resolve_repo(project_root, server).await else {
         return vec![];
     };

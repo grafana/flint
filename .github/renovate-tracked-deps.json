@@ -24,5 +24,12 @@
       "shellcheck",
       "shfmt"
     ]
+  },
+  "src/init/generation.rs": {
+    "regex": [
+      "actions/checkout",
+      "jdx/mise-action",
+      "mise"
+    ]
   }
 }

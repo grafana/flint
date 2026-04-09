@@ -32,6 +32,7 @@ pub async fn run(
             &remap_args,
             &["."],
             false,
+            project_root,
         )
         .await;
     }
@@ -49,6 +50,7 @@ pub async fn run(
             &remap_args,
             &["."],
             false,
+            project_root,
         )
         .await;
         let mut stderr = b"Config changes detected, falling back to full check.\n".to_vec();
@@ -82,6 +84,7 @@ pub async fn run(
             &remap_args,
             &file_refs,
             false,
+            project_root,
         )
         .await;
         all_ok &= out.ok;
@@ -98,6 +101,7 @@ pub async fn run(
             &remap_args,
             &["."],
             true,
+            project_root,
         )
         .await;
         all_ok &= out.ok;
@@ -118,6 +122,7 @@ async fn run_lychee_cmd(
     remap_args: &[String],
     files: &[&str],
     local_only: bool,
+    project_root: &Path,
 ) -> LinterOutput {
     let mut argv: Vec<String> = vec![
         "lychee".to_string(),
@@ -139,6 +144,7 @@ async fn run_lychee_cmd(
 
     let result = Command::new(&argv[0])
         .args(&argv[1..])
+        .current_dir(project_root)
         .stdin(Stdio::null())
         .output()
         .await;

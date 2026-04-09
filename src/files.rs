@@ -52,8 +52,13 @@ pub fn changed(
 fn build_exclude_set(cfg: &Config) -> GlobSet {
     let mut builder = GlobSetBuilder::new();
     for pattern in &cfg.settings.exclude {
-        if let Ok(glob) = GlobBuilder::new(pattern).literal_separator(true).build() {
-            builder.add(glob);
+        match GlobBuilder::new(pattern).literal_separator(true).build() {
+            Ok(glob) => {
+                builder.add(glob);
+            }
+            Err(e) => {
+                eprintln!("flint: invalid exclude pattern {pattern:?}: {e}");
+            }
         }
     }
     builder.build().unwrap_or_default()
@@ -115,6 +120,11 @@ fn all_files(project_root: &Path, exclude: &GlobSet) -> Result<FileList> {
         .output()
         .context("git ls-files")?;
 
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        anyhow::bail!("git ls-files failed ({}): {}", out.status, stderr.trim());
+    }
+
     let names: std::collections::BTreeSet<String> = String::from_utf8_lossy(&out.stdout)
         .lines()
         .map(str::to_string)
@@ -135,6 +145,16 @@ fn git_diff_names(project_root: &Path, extra_args: &[&str]) -> Result<Vec<String
         .current_dir(project_root)
         .output()
         .context("git diff --name-only")?;
+
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        anyhow::bail!(
+            "git diff --name-only failed ({}): {}",
+            out.status,
+            stderr.trim()
+        );
+    }
+
     Ok(String::from_utf8_lossy(&out.stdout)
         .lines()
         .map(str::to_string)

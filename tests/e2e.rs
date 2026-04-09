@@ -30,11 +30,17 @@ fn git_repo() -> TempDir {
         vec!["config", "user.email", "test@test.com"],
         vec!["config", "user.name", "Test"],
     ] {
-        Command::new("git")
+        let out = Command::new("git")
             .args(&args)
             .current_dir(dir.path())
             .output()
-            .expect("git failed");
+            .expect("failed to spawn git");
+        assert!(
+            out.status.success(),
+            "git {} failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr)
+        );
     }
     dir
 }
@@ -188,16 +194,26 @@ fn run_case(case: &Path, name: &str, update: bool) {
 
     let files_dir = case.join("files");
     copy_dir_into(&files_dir, repo.path());
-    Command::new("git")
+    let out = Command::new("git")
         .args(["add", "-A"])
         .current_dir(repo.path())
         .output()
-        .expect("git add failed");
-    Command::new("git")
+        .expect("failed to spawn git add");
+    assert!(
+        out.status.success(),
+        "git add failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let out = Command::new("git")
         .args(["commit", "-q", "-m", "init"])
         .current_dir(repo.path())
         .output()
-        .expect("git commit failed");
+        .expect("failed to spawn git commit");
+    assert!(
+        out.status.success(),
+        "git commit failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
     // If a `changes/` directory exists alongside `files/`, write those files
     // over the repo and stage them (but don't commit). This lets fixtures test
@@ -205,11 +221,16 @@ fn run_case(case: &Path, name: &str, update: bool) {
     let changes_dir = case.join("changes");
     if changes_dir.exists() {
         copy_dir_into(&changes_dir, repo.path());
-        Command::new("git")
+        let out = Command::new("git")
             .args(["add", "-A"])
             .current_dir(repo.path())
             .output()
-            .expect("git add changes failed");
+            .expect("failed to spawn git add");
+        assert!(
+            out.status.success(),
+            "git add changes failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
     }
 
     let env_vars: Vec<(String, String)> = cfg

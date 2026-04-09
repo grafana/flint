@@ -178,11 +178,23 @@ async fn run(
     // --fast-only filter (skipped when linters are named explicitly).
     // mise guarantees declared tools are on PATH, so no PATH check needed.
     let mise_tools = registry::read_mise_tools(project_root);
-    let active: Vec<&registry::Check> = checks
-        .into_iter()
-        .filter(|c| registry::check_active(c, &mise_tools))
-        .filter(|c| explicit || !args.fast_only || c.category != registry::Category::Slow)
-        .collect();
+    let active: Vec<&registry::Check> = {
+        let mut out = vec![];
+        for c in checks {
+            if registry::check_active(c, &mise_tools) {
+                if explicit || !args.fast_only || c.category != registry::Category::Slow {
+                    out.push(c);
+                }
+            } else if explicit {
+                eprintln!(
+                    "flint: linter {name} is not active (binary not installed or not declared in mise.toml)",
+                    name = c.name
+                );
+                std::process::exit(1);
+            }
+        }
+        out
+    };
 
     if args.verbose {
         let names: Vec<&str> = active.iter().map(|c| c.name).collect();

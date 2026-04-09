@@ -433,6 +433,20 @@ pub(super) fn generate_flint_toml(
     Ok(true)
 }
 
+/// Generates `.markdownlint.jsonc` in the project root if it does not already exist
+/// and markdownlint-cli2 is being set up.
+/// Returns `true` if the file was written.
+pub(super) fn generate_markdownlint_config(project_root: &Path) -> Result<bool> {
+    let path = project_root.join(".markdownlint.jsonc");
+    if path.exists() {
+        return Ok(false);
+    }
+    let content = "{\n  // Disable line-length enforcement — long lines are common in tables and code links\n  \"MD013\": false,\n}\n";
+    std::fs::write(&path, content)?;
+    println!("  wrote {}", path.display());
+    Ok(true)
+}
+
 /// Generates `.github/workflows/lint.yml` if it does not already exist.
 /// Returns `true` if the file was written.
 pub(super) fn generate_lint_workflow(project_root: &Path, base_branch: &str) -> Result<bool> {

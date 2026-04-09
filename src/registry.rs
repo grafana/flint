@@ -343,7 +343,7 @@ pub fn builtin() -> Vec<Check> {
             .style(),
         Check::file("markdownlint-cli2", "markdownlint-cli2 {FILE}", &["*.md"])
             .fix("markdownlint-cli2 --fix {FILE}")
-            .linter_config(".markdownlint.json", "--config")
+            .linter_config(".markdownlint.jsonc", "--config")
             .install_key("npm:markdownlint-cli2"),
         Check::files(
             "prettier",

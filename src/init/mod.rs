@@ -15,8 +15,9 @@ use detection::{
 };
 use generation::{
     apply_changes, apply_env_and_tasks, detect_base_branch, flint_preset, generate_flint_toml,
-    generate_lint_workflow, get_existing_config_dir, has_slow_selected, maybe_install_hook,
-    patch_renovate_extends, prompt_config_dir, remove_v1_tasks,
+    generate_lint_workflow, generate_markdownlint_config, get_existing_config_dir,
+    has_slow_selected, maybe_install_hook, patch_renovate_extends, prompt_config_dir,
+    remove_v1_tasks,
 };
 use ui::{interactive_select_linters, select_categories_arrow};
 
@@ -227,6 +228,12 @@ Add and stage your source files before running init so the detection is accurate
             .zip(&g.check_selected)
             .any(|(c, &sel)| sel && c.name == "renovate-deps")
     });
+    let has_markdownlint = groups.iter().any(|g| {
+        g.checks
+            .iter()
+            .zip(&g.check_selected)
+            .any(|(c, &sel)| sel && c.name == "markdownlint-cli2")
+    });
 
     // Prompt for the flint config dir (skipped if already set in mise.toml or --yes).
     let existing_config_dir = get_existing_config_dir(&current_content);
@@ -264,6 +271,11 @@ Add and stage your source files before running init so the detection is accurate
         v1.renovate_exclude_managers.as_deref(),
     )?;
     let workflow_generated = generate_lint_workflow(project_root, &base_branch)?;
+    let markdownlint_generated = if has_markdownlint {
+        generate_markdownlint_config(project_root)?
+    } else {
+        false
+    };
 
     let renovate_patched = find_renovate_config(project_root)
         .map(|path| {
@@ -283,6 +295,7 @@ Add and stage your source files before running init so the detection is accurate
         && !meta_changed
         && !toml_generated
         && !workflow_generated
+        && !markdownlint_generated
         && !renovate_patched
     {
         println!("No changes to apply.");
@@ -558,6 +571,27 @@ rust = { version = "1.0", components = "clippy" }
     fn get_existing_config_dir_absent() {
         let content = "[tools]\nrust = \"latest\"\n";
         assert_eq!(get_existing_config_dir(content), None);
+    }
+
+    #[test]
+    fn generate_markdownlint_config_writes_file() {
+        use generation::generate_markdownlint_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let written = generate_markdownlint_config(tmp.path()).unwrap();
+        assert!(written);
+        let content = std::fs::read_to_string(tmp.path().join(".markdownlint.jsonc")).unwrap();
+        assert!(content.contains("\"MD013\": false"));
+    }
+
+    #[test]
+    fn generate_markdownlint_config_skips_existing() {
+        use generation::generate_markdownlint_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(tmp.path().join(".markdownlint.jsonc"), "existing").unwrap();
+        let written = generate_markdownlint_config(tmp.path()).unwrap();
+        assert!(!written);
+        let content = std::fs::read_to_string(tmp.path().join(".markdownlint.jsonc")).unwrap();
+        assert_eq!(content, "existing");
     }
 
     #[test]

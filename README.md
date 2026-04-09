@@ -23,6 +23,7 @@ Linter runner built for speed and consistency:
 
 See [Why / Principles](#why) for background.
 
+> [!TIP]
 > **Legacy v1** (bash task scripts): see [README-V1.md](README-V1.md).
 
 ---
@@ -38,7 +39,7 @@ Add `flint` to your repo's `mise.toml` (once published):
 flint = "0.x.y"
 ```
 
-Until the first release, build from source:
+Until the first published release, build from source:
 
 ```bash
 git clone https://github.com/grafana/flint
@@ -194,15 +195,15 @@ Optional. Place in the repo root (or in `FLINT_CONFIG_DIR` — see below). All s
 
 ```toml
 [settings]
-base_branch = "main"                           # branch to diff against
-exclude = ["CHANGELOG.md", "vendor/**"]       # glob patterns — exclude matching files
+base_branch = "main"                            # branch to diff against
+exclude = ["CHANGELOG.md", "vendor/**"]         # glob patterns — exclude matching files
 
 [checks.links]
-config = ".github/config/lychee.toml"         # lychee config path
-check_all_local = true                         # second pass: local links in all files
+config = ".github/config/lychee.toml"           # lychee config path
+check_all_local = true                           # second pass: local links in all files
 
 [checks.renovate-deps]
-exclude_managers = ["github-actions", "cargo"] # skip these Renovate managers
+exclude_managers = ["github-actions", "cargo"]   # skip these Renovate managers
 ```
 
 ### `FLINT_CONFIG_DIR`
@@ -233,72 +234,29 @@ being linted and cannot be redirected via a flag.
 
 | Name                   | Description                                                         | Fix |
 | ---------------------- | ------------------------------------------------------------------- | --- |
-| `shellcheck`           | Lint shell scripts for common mistakes                              | —   |
-| `shfmt`                | Format shell scripts                                                | yes |
-| `markdownlint-cli2`    | Lint Markdown files for style and consistency                       | yes |
-| `prettier`             | Format Markdown and YAML files                                      | yes |
 | `actionlint`           | Lint GitHub Actions workflow files                                  | —   |
-| `hadolint`             | Lint Dockerfiles                                                    | —   |
-| `xmllint`              | Validate XML files are well-formed                                  | —   |
-| `codespell`            | Check for common spelling mistakes                                  | yes |
-| `editorconfig-checker` | Check files comply with EditorConfig settings                       | —   |
-| `golangci-lint`        | Lint Go code; uses --new-from-rev to scope analysis to changed code | —   |
-| `ruff`                 | Lint Python code                                                    | yes |
-| `ruff-format`          | Format Python code                                                  | yes |
 | `biome`                | Lint JS/TS/JSON files                                               | yes |
 | `biome-format`         | Format JS/TS/JSON files                                             | yes |
 | `cargo-clippy`         | Lint Rust code; runs on all .rs files, not just changed             | yes |
 | `cargo-fmt`            | Format Rust code; runs on all .rs files, not just changed           | yes |
-| `gofmt`                | Format Go code                                                      | yes |
-| `google-java-format`   | Format Java code                                                    | yes |
-| `ktlint`               | Lint and format Kotlin code                                         | yes |
+| `codespell`            | Check for common spelling mistakes                                  | yes |
 | `dotnet-format`        | Format C# code                                                      | yes |
-| `lychee`               | Check for broken links                                              | —   |
-| `renovate-deps`        | Verify Renovate dependency snapshot is up to date                   | yes |
+| `editorconfig-checker` | Check files comply with EditorConfig settings                       | —   |
+| `gofmt`                | Format Go code                                                      | yes |
+| `golangci-lint`        | Lint Go code; uses --new-from-rev to scope analysis to changed code | —   |
+| `google-java-format`   | Format Java code                                                    | yes |
+| `hadolint`             | Lint Dockerfiles                                                    | —   |
+| `ktlint`               | Lint and format Kotlin code                                         | yes |
 | `license-header`       | Check source files have the required license header                 | —   |
-
-#### `shellcheck`
-
-|             |                                        |
-| ----------- | -------------------------------------- |
-| Description | Lint shell scripts for common mistakes |
-| Fix         | no                                     |
-| Binary      | `shellcheck`                           |
-| Scope       | [file](#scopes)                        |
-| Patterns    | `*.sh *.bash *.bats`                   |
-| Config      | `.shellcheckrc`                        |
-
-#### `shfmt`
-
-|             |                      |
-| ----------- | -------------------- |
-| Description | Format shell scripts |
-| Fix         | yes                  |
-| Binary      | `shfmt`              |
-| Scope       | [file](#scopes)      |
-| Patterns    | `*.sh *.bash`        |
-
-#### `markdownlint-cli2`
-
-|             |                                               |
-| ----------- | --------------------------------------------- |
-| Description | Lint Markdown files for style and consistency |
-| Fix         | yes                                           |
-| Binary      | `markdownlint-cli2`                           |
-| Scope       | [file](#scopes)                               |
-| Patterns    | `*.md`                                        |
-| Config      | `.markdownlint.jsonc`                         |
-
-#### `prettier`
-
-|             |                                |
-| ----------- | ------------------------------ |
-| Description | Format Markdown and YAML files |
-| Fix         | yes                            |
-| Binary      | `prettier`                     |
-| Scope       | [files](#scopes)               |
-| Patterns    | `*.md *.yml *.yaml`            |
-| Config      | `.prettierrc`                  |
+| `lychee`               | Check for broken links                                              | —   |
+| `markdownlint-cli2`    | Lint Markdown files for style and consistency                       | yes |
+| `prettier`             | Format Markdown and YAML files                                      | yes |
+| `renovate-deps`        | Verify Renovate dependency snapshot is up to date                   | yes |
+| `ruff`                 | Lint Python code                                                    | yes |
+| `ruff-format`          | Format Python code                                                  | yes |
+| `shellcheck`           | Lint shell scripts for common mistakes                              | —   |
+| `shfmt`                | Format shell scripts                                                | yes |
+| `xmllint`              | Validate XML files are well-formed                                  | —   |
 
 #### `actionlint`
 
@@ -310,82 +268,6 @@ being linted and cannot be redirected via a flag.
 | Scope       | [file](#scopes)                                    |
 | Patterns    | `.github/workflows/*.yml .github/workflows/*.yaml` |
 | Config      | `actionlint.yml`                                   |
-
-#### `hadolint`
-
-|             |                                        |
-| ----------- | -------------------------------------- |
-| Description | Lint Dockerfiles                       |
-| Fix         | no                                     |
-| Binary      | `hadolint`                             |
-| Scope       | [file](#scopes)                        |
-| Patterns    | `Dockerfile Dockerfile.* *.dockerfile` |
-| Config      | `.hadolint.yaml`                       |
-
-#### `xmllint`
-
-|             |                                    |
-| ----------- | ---------------------------------- |
-| Description | Validate XML files are well-formed |
-| Fix         | no                                 |
-| Binary      | `xmllint`                          |
-| Scope       | [files](#scopes)                   |
-| Patterns    | `*.xml`                            |
-
-#### `codespell`
-
-|             |                                    |
-| ----------- | ---------------------------------- |
-| Description | Check for common spelling mistakes |
-| Fix         | yes                                |
-| Binary      | `codespell`                        |
-| Scope       | [files](#scopes)                   |
-| Patterns    | `*`                                |
-| Config      | `.codespellrc`                     |
-
-#### `editorconfig-checker`
-
-|             |                                               |
-| ----------- | --------------------------------------------- |
-| Description | Check files comply with EditorConfig settings |
-| Fix         | no                                            |
-| Binary      | `ec`                                          |
-| Scope       | [files](#scopes)                              |
-| Patterns    | `*`                                           |
-| Config      | `.editorconfig-checker.json`                  |
-
-#### `golangci-lint`
-
-|             |                                                                     |
-| ----------- | ------------------------------------------------------------------- |
-| Description | Lint Go code; uses --new-from-rev to scope analysis to changed code |
-| Fix         | no                                                                  |
-| Binary      | `golangci-lint`                                                     |
-| Scope       | [project](#scopes)                                                  |
-| Patterns    | `*.go`                                                              |
-| Config      | `.golangci.yml`                                                     |
-
-#### `ruff`
-
-|             |                  |
-| ----------- | ---------------- |
-| Description | Lint Python code |
-| Fix         | yes              |
-| Binary      | `ruff`           |
-| Scope       | [file](#scopes)  |
-| Patterns    | `*.py`           |
-| Config      | `ruff.toml`      |
-
-#### `ruff-format`
-
-|             |                    |
-| ----------- | ------------------ |
-| Description | Format Python code |
-| Fix         | yes                |
-| Binary      | `ruff`             |
-| Scope       | [file](#scopes)    |
-| Patterns    | `*.py`             |
-| Config      | `ruff.toml`        |
 
 #### `biome`
 
@@ -427,6 +309,38 @@ being linted and cannot be redirected via a flag.
 | Scope       | [project](#scopes)                                        |
 | Patterns    | `*.rs`                                                    |
 
+#### `codespell`
+
+|             |                                    |
+| ----------- | ---------------------------------- |
+| Description | Check for common spelling mistakes |
+| Fix         | yes                                |
+| Binary      | `codespell`                        |
+| Scope       | [files](#scopes)                   |
+| Patterns    | `*`                                |
+| Config      | `.codespellrc`                     |
+
+#### `dotnet-format`
+
+|             |                  |
+| ----------- | ---------------- |
+| Description | Format C# code   |
+| Fix         | yes              |
+| Binary      | `dotnet`         |
+| Scope       | [files](#scopes) |
+| Patterns    | `*.cs`           |
+
+#### `editorconfig-checker`
+
+|             |                                               |
+| ----------- | --------------------------------------------- |
+| Description | Check files comply with EditorConfig settings |
+| Fix         | no                                            |
+| Binary      | `ec`                                          |
+| Scope       | [files](#scopes)                              |
+| Patterns    | `*`                                           |
+| Config      | `.editorconfig-checker.json`                  |
+
 #### `gofmt`
 
 |             |                 |
@@ -436,6 +350,17 @@ being linted and cannot be redirected via a flag.
 | Binary      | `gofmt`         |
 | Scope       | [file](#scopes) |
 | Patterns    | `*.go`          |
+
+#### `golangci-lint`
+
+|             |                                                                     |
+| ----------- | ------------------------------------------------------------------- |
+| Description | Lint Go code; uses --new-from-rev to scope analysis to changed code |
+| Fix         | no                                                                  |
+| Binary      | `golangci-lint`                                                     |
+| Scope       | [project](#scopes)                                                  |
+| Patterns    | `*.go`                                                              |
+| Config      | `.golangci.yml`                                                     |
 
 #### `google-java-format`
 
@@ -447,6 +372,17 @@ being linted and cannot be redirected via a flag.
 | Scope       | [files](#scopes)     |
 | Patterns    | `*.java`             |
 
+#### `hadolint`
+
+|             |                                        |
+| ----------- | -------------------------------------- |
+| Description | Lint Dockerfiles                       |
+| Fix         | no                                     |
+| Binary      | `hadolint`                             |
+| Scope       | [file](#scopes)                        |
+| Patterns    | `Dockerfile Dockerfile.* *.dockerfile` |
+| Config      | `.hadolint.yaml`                       |
+
 #### `ktlint`
 
 |             |                             |
@@ -457,15 +393,14 @@ being linted and cannot be redirected via a flag.
 | Scope       | [files](#scopes)            |
 | Patterns    | `*.kt *.kts`                |
 
-#### `dotnet-format`
+#### `license-header`
 
-|             |                  |
-| ----------- | ---------------- |
-| Description | Format C# code   |
-| Fix         | yes              |
-| Binary      | `dotnet`         |
-| Scope       | [files](#scopes) |
-| Patterns    | `*.cs`           |
+|             |                                                     |
+| ----------- | --------------------------------------------------- |
+| Description | Check source files have the required license header |
+| Fix         | no                                                  |
+| Binary      | (built-in)                                          |
+| Scope       | [special](#scopes)                                  |
 
 #### `lychee`
 
@@ -489,6 +424,28 @@ config = ".github/config/lychee.toml"
 check_all_local = true
 ```
 
+#### `markdownlint-cli2`
+
+|             |                                               |
+| ----------- | --------------------------------------------- |
+| Description | Lint Markdown files for style and consistency |
+| Fix         | yes                                           |
+| Binary      | `markdownlint-cli2`                           |
+| Scope       | [file](#scopes)                               |
+| Patterns    | `*.md`                                        |
+| Config      | `.markdownlint.jsonc`                         |
+
+#### `prettier`
+
+|             |                                |
+| ----------- | ------------------------------ |
+| Description | Format Markdown and YAML files |
+| Fix         | yes                            |
+| Binary      | `prettier`                     |
+| Scope       | [files](#scopes)               |
+| Patterns    | `*.md *.yml *.yaml`            |
+| Config      | `.prettierrc`                  |
+
 #### `renovate-deps`
 
 |             |                                                                                                                            |
@@ -510,14 +467,58 @@ Configure via `flint.toml`:
 exclude_managers = ["github-actions", "github-runners"]
 ```
 
-#### `license-header`
+#### `ruff`
 
-|             |                                                     |
-| ----------- | --------------------------------------------------- |
-| Description | Check source files have the required license header |
-| Fix         | no                                                  |
-| Binary      | (built-in)                                          |
-| Scope       | [special](#scopes)                                  |
+|             |                  |
+| ----------- | ---------------- |
+| Description | Lint Python code |
+| Fix         | yes              |
+| Binary      | `ruff`           |
+| Scope       | [file](#scopes)  |
+| Patterns    | `*.py`           |
+| Config      | `ruff.toml`      |
+
+#### `ruff-format`
+
+|             |                    |
+| ----------- | ------------------ |
+| Description | Format Python code |
+| Fix         | yes                |
+| Binary      | `ruff`             |
+| Scope       | [file](#scopes)    |
+| Patterns    | `*.py`             |
+| Config      | `ruff.toml`        |
+
+#### `shellcheck`
+
+|             |                                        |
+| ----------- | -------------------------------------- |
+| Description | Lint shell scripts for common mistakes |
+| Fix         | no                                     |
+| Binary      | `shellcheck`                           |
+| Scope       | [file](#scopes)                        |
+| Patterns    | `*.sh *.bash *.bats`                   |
+| Config      | `.shellcheckrc`                        |
+
+#### `shfmt`
+
+|             |                      |
+| ----------- | -------------------- |
+| Description | Format shell scripts |
+| Fix         | yes                  |
+| Binary      | `shfmt`              |
+| Scope       | [file](#scopes)      |
+| Patterns    | `*.sh *.bash`        |
+
+#### `xmllint`
+
+|             |                                    |
+| ----------- | ---------------------------------- |
+| Description | Validate XML files are well-formed |
+| Fix         | no                                 |
+| Binary      | `xmllint`                          |
+| Scope       | [files](#scopes)                   |
+| Patterns    | `*.xml`                            |
 
 <!-- registry-table-end -->
 <!-- editorconfig-checker-enable -->

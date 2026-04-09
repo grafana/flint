@@ -1,5 +1,6 @@
 # flint v1 (legacy)
 
+> [!NOTE]
 > **This is the legacy v1 documentation** (bash task scripts consumed as
 > mise HTTP remote tasks). The current version is [flint v2](README.md) —
 > a single Rust binary.
@@ -55,9 +56,10 @@ radar.
 
 ## Usage
 
-⚠️ **Important**: Always pin to a specific version, never use `main`.
-The main branch may contain breaking changes.
-See [CHANGELOG.md](CHANGELOG.md) for version history.
+> [!WARNING]
+> Always pin to a specific version, never use `main`.
+> The main branch may contain breaking changes.
+> See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 Add whichever tasks you need as HTTP remote tasks in your `mise.toml`,
 pinned to the commit SHA of a release tag with a version comment:

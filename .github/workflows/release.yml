@@ -36,21 +36,28 @@ jobs:
 
       - name: Add target
         if: "!matrix.use_cross"
-        run: rustup target add ${{ matrix.target }}
+        env:
+          TARGET: ${{ matrix.target }}
+        run: rustup target add "$TARGET"
 
       - name: Build
+        env:
+          USE_CROSS: ${{ matrix.use_cross }}
+          TARGET: ${{ matrix.target }}
         run: |
-          if [ "${{ matrix.use_cross }}" = "true" ]; then
-            cross build --release --target ${{ matrix.target }}
+          if [ "${USE_CROSS}" = "true" ]; then
+            cross build --release --target "$TARGET"
           else
-            cargo build --release --target ${{ matrix.target }}
+            cargo build --release --target "$TARGET"
           fi
 
       - name: Package
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
-          cd target/${{ matrix.target }}/release
-          tar czf flint-${{ matrix.target }}.tar.gz flint
-          mv flint-${{ matrix.target }}.tar.gz "$GITHUB_WORKSPACE/"
+          cd "target/${TARGET}/release"
+          tar czf "flint-${TARGET}.tar.gz" flint
+          mv "flint-${TARGET}.tar.gz" "$GITHUB_WORKSPACE/"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -65,7 +72,8 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - name: Download artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           merge-multiple: true
 

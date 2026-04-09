@@ -791,9 +791,11 @@ mod tests {
     fn generate_readme_table(registry: &[Check]) -> String {
         let generated_comment = "<!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->";
 
-        // Summary table: Name | Description | Fix
+        // Summary table: Name | Description | Fix — sorted alphabetically.
         let headers = ["Name", "Description", "Fix"];
-        let rows: Vec<[String; 3]> = registry.iter().map(summary_row).collect();
+        let mut sorted: Vec<&Check> = registry.iter().collect();
+        sorted.sort_by_key(|c| c.name);
+        let rows: Vec<[String; 3]> = sorted.iter().map(|c| summary_row(c)).collect();
 
         let mut widths = headers.map(|h| h.len());
         for row in &rows {
@@ -823,8 +825,8 @@ mod tests {
             lines.push(fmt_row(&strs));
         }
 
-        // Per-linter detail sections
-        for check in registry {
+        // Per-linter detail sections (alphabetical)
+        for check in &sorted {
             lines.push(format!("#### `{}`", check.name));
             lines.push(detail_table(check));
         }

@@ -3,7 +3,7 @@ use std::path::Path;
 
 const HOOK_CONTENT: &str = "#!/bin/sh\n\
 # Installed by flint — run `flint hook install` to reinstall\n\
-flint run --fix --fast-only\n";
+mise exec -- flint run --fix --fast-only\n";
 
 /// Writes `.git/hooks/pre-commit`. Skips silently if the hook already exists.
 pub fn install(project_root: &Path) -> Result<()> {

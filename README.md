@@ -239,6 +239,7 @@ being linted and cannot be redirected via a flag.
 | `prettier`             | Format Markdown and YAML files                                      | yes |
 | `actionlint`           | Lint GitHub Actions workflow files                                  | —   |
 | `hadolint`             | Lint Dockerfiles                                                    | —   |
+| `xmllint`              | Validate XML files are well-formed                                  | —   |
 | `codespell`            | Check for common spelling mistakes                                  | yes |
 | `editorconfig-checker` | Check files comply with EditorConfig settings                       | —   |
 | `golangci-lint`        | Lint Go code; uses --new-from-rev to scope analysis to changed code | —   |
@@ -320,6 +321,16 @@ being linted and cannot be redirected via a flag.
 | Scope       | [file](#scopes)                        |
 | Patterns    | `Dockerfile Dockerfile.* *.dockerfile` |
 | Config      | `.hadolint.yaml`                       |
+
+#### `xmllint`
+
+|             |                                    |
+| ----------- | ---------------------------------- |
+| Description | Validate XML files are well-formed |
+| Fix         | no                                 |
+| Binary      | `xmllint`                          |
+| Scope       | [files](#scopes)                   |
+| Patterns    | `*.xml`                            |
 
 #### `codespell`
 

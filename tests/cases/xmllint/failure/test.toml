@@ -1,0 +1,10 @@
+[expected]
+args = "run --full xmllint"
+exit = 1
+stderr = '''
+[xmllint]
+<REPO>/pom.xml: parse error at 3:1: unexpected end of input in element content
+
+flint: 1 check failed (xmllint)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''

@@ -7,6 +7,7 @@
   "mise.toml": {
     "mise": [
       "actionlint",
+      "cargo:xmloxide",
       "dotnet",
       "editorconfig-checker",
       "github:pinterest/ktlint",

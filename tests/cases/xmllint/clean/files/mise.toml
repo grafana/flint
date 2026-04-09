@@ -1,0 +1,2 @@
+[tools]
+"cargo:xmloxide" = "0.4.1"

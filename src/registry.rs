@@ -385,6 +385,10 @@ pub fn builtin() -> Vec<Check> {
         .linter_config(".hadolint.yaml", "--config")
         .desc("Lint Dockerfiles")
         .style(),
+        Check::files("xmllint", "xmllint --noout {FILES}", &["*.xml"])
+            .mise_tool("cargo:xmloxide")
+            .install_key("cargo:xmloxide")
+            .desc("Validate XML files are well-formed"),
         Check::files("codespell", "codespell {FILES}", &["*"])
             .fix("codespell --write-changes {FILES}")
             .linter_config(".codespellrc", "--config")

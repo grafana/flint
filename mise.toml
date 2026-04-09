@@ -18,6 +18,7 @@ rust = { version = "1.94.1", components = "clippy,rustfmt" }
 hadolint = "2.14.0"
 "github:pinterest/ktlint" = "1.8.0"
 dotnet = "10.0.201"
+"cargo:xmloxide" = "0.4.1"
 
 [tasks."setup:update-super-linter-versions"]
 description = "Generate super-linter version mapping from the super-linter repo"

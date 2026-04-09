@@ -20,16 +20,14 @@ pub struct Config {
 #[serde(default)]
 pub struct Settings {
     pub base_branch: String,
-    pub exclude: Option<String>,
-    pub exclude_paths: Vec<String>,
+    pub exclude: Vec<String>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             base_branch: "main".to_string(),
-            exclude: None,
-            exclude_paths: vec![],
+            exclude: vec![],
         }
     }
 }

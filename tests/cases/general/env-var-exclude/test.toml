@@ -4,4 +4,4 @@ exit = 0
 
 
 [env]
-FLINT_EXCLUDE = "bad\\.sh"
+FLINT_EXCLUDE = '["bad.sh"]'

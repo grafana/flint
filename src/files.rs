@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -25,21 +26,20 @@ pub fn changed(
     from_ref: Option<&str>,
     to_ref: Option<&str>,
 ) -> Result<FileList> {
-    let exclude_re = compile_exclude_re(cfg);
-    let exclude_paths = &cfg.settings.exclude_paths;
+    let exclude = build_exclude_set(cfg);
 
     if full {
-        return all_files(project_root, exclude_re.as_ref(), exclude_paths);
+        return all_files(project_root, &exclude);
     }
 
     let merge_base = resolve_merge_base(project_root, cfg, from_ref)?;
 
     let files = if let Some(ref base) = merge_base {
         let to = to_ref.unwrap_or("HEAD");
-        collect_changed_files(project_root, exclude_re.as_ref(), exclude_paths, base, to)?
+        collect_changed_files(project_root, &exclude, base, to)?
     } else {
         // No merge base (shallow clone etc.) — fall back to all files.
-        return all_files(project_root, exclude_re.as_ref(), exclude_paths);
+        return all_files(project_root, &exclude);
     };
 
     Ok(FileList {
@@ -49,11 +49,14 @@ pub fn changed(
     })
 }
 
-fn compile_exclude_re(cfg: &Config) -> Option<regex::Regex> {
-    cfg.settings
-        .exclude
-        .as_deref()
-        .and_then(|pat| regex::Regex::new(pat).ok())
+fn build_exclude_set(cfg: &Config) -> GlobSet {
+    let mut builder = GlobSetBuilder::new();
+    for pattern in &cfg.settings.exclude {
+        if let Ok(glob) = GlobBuilder::new(pattern).literal_separator(true).build() {
+            builder.add(glob);
+        }
+    }
+    builder.build().unwrap_or_default()
 }
 
 fn resolve_merge_base(
@@ -82,8 +85,7 @@ fn resolve_merge_base(
 
 fn collect_changed_files(
     project_root: &Path,
-    exclude_re: Option<&regex::Regex>,
-    exclude_paths: &[String],
+    exclude: &GlobSet,
     base: &str,
     to: &str,
 ) -> Result<Vec<PathBuf>> {
@@ -103,14 +105,10 @@ fn collect_changed_files(
         names.insert(line);
     }
 
-    Ok(filter_names(project_root, exclude_re, exclude_paths, names))
+    Ok(filter_names(project_root, exclude, names))
 }
 
-fn all_files(
-    project_root: &Path,
-    exclude_re: Option<&regex::Regex>,
-    exclude_paths: &[String],
-) -> Result<FileList> {
+fn all_files(project_root: &Path, exclude: &GlobSet) -> Result<FileList> {
     let out = Command::new("git")
         .args(["ls-files"])
         .current_dir(project_root)
@@ -123,7 +121,7 @@ fn all_files(
         .collect();
 
     Ok(FileList {
-        files: filter_names(project_root, exclude_re, exclude_paths, names),
+        files: filter_names(project_root, exclude, names),
         merge_base: None,
         full: true,
     })
@@ -145,15 +143,13 @@ fn git_diff_names(project_root: &Path, extra_args: &[&str]) -> Result<Vec<String
 
 fn filter_names(
     project_root: &Path,
-    exclude_re: Option<&regex::Regex>,
-    exclude_paths: &[String],
+    exclude: &GlobSet,
     names: std::collections::BTreeSet<String>,
 ) -> Vec<PathBuf> {
     names
         .into_iter()
         .filter(|name| !BUILTIN_EXCLUDES.contains(&name.as_str()))
-        .filter(|name| exclude_re.is_none_or(|re| !re.is_match(name)))
-        .filter(|name| !exclude_paths.iter().any(|p| name.starts_with(p.as_str())))
+        .filter(|name| !exclude.is_match(name))
         .map(|name| project_root.join(name))
         .collect()
 }

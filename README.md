@@ -195,7 +195,7 @@ Optional. Place in the repo root (or in `FLINT_CONFIG_DIR` — see below). All s
 ```toml
 [settings]
 base_branch = "main"                           # branch to diff against
-exclude = "CHANGELOG\\.md|vendor/.*"          # regex — exclude matching files
+exclude = ["CHANGELOG.md", "vendor/**"]       # glob patterns — exclude matching files
 
 [checks.links]
 config = ".github/config/lychee.toml"         # lychee config path

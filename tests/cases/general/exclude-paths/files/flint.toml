@@ -1,2 +1,2 @@
 [settings]
-exclude_paths = ["excluded/"]
+exclude = ["excluded/**"]

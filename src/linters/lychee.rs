@@ -166,38 +166,66 @@ async fn run_lychee_cmd(
     }
 }
 
+/// Returns the GitHub server URL from `GITHUB_SERVER_URL`, defaulting to `https://github.com`.
+fn github_server_url() -> String {
+    std::env::var("GITHUB_SERVER_URL")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "https://github.com".to_string())
+}
+
+/// Returns the base URL for raw file content.
+/// GitHub.com uses a separate subdomain; GitHub Enterprise serves raw content at `{server}/raw`.
+fn raw_content_base(server_url: &str) -> String {
+    if server_url == "https://github.com" {
+        "https://raw.githubusercontent.com".to_string()
+    } else {
+        format!("{server_url}/raw")
+    }
+}
+
 async fn build_remap_args(project_root: &Path) -> Vec<String> {
     if std::env::var("LYCHEE_SKIP_GITHUB_REMAPS").as_deref() == Ok("true") {
         return vec![];
     }
-    let mut args = build_global_github_args();
-    args.extend(build_branch_remap_args(project_root).await);
+    let server = github_server_url();
+    let raw_base = raw_content_base(&server);
+    let mut args = build_global_github_args(&server, &raw_base);
+    args.extend(build_branch_remap_args(project_root, &server, &raw_base).await);
     args
 }
 
-fn build_global_github_args() -> Vec<String> {
+fn build_global_github_args(server: &str, raw_base: &str) -> Vec<String> {
     let mut args = Vec::new();
     push_remap(
         &mut args,
-        r"^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#L[0-9]+.*$ https://raw.githubusercontent.com/$1/$2/$3",
+        format!(r"^{server}/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#L[0-9]+.*$ {raw_base}/$1/$2/$3"),
     );
     push_remap(
         &mut args,
-        r"^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#:~:text=.*$ https://raw.githubusercontent.com/$1/$2/$3",
+        format!(
+            r"^{server}/([^/]+/[^/]+)/blob/([^/]+)/(.*?)#:~:text=.*$ {raw_base}/$1/$2/$3"
+        ),
     );
     push_remap(
         &mut args,
-        r"^https://github.com/([^/]+/[^/]+)/blob/([^/]+)/(.*)$ https://raw.githubusercontent.com/$1/$2/$3",
+        format!(r"^{server}/([^/]+/[^/]+)/blob/([^/]+)/(.*)$ {raw_base}/$1/$2/$3"),
     );
     push_remap(
         &mut args,
-        r"^https://github.com/([^/]+/[^/]+)/(issues|pull)/([0-9]+)#issuecomment-.*$ https://github.com/$1/$2/$3",
+        format!(
+            r"^{server}/([^/]+/[^/]+)/(issues|pull)/([0-9]+)#issuecomment-.*$ {server}/$1/$2/$3"
+        ),
     );
     args
 }
 
-async fn build_branch_remap_args(project_root: &Path) -> Vec<String> {
-    let Some(repo) = resolve_repo(project_root).await else {
+async fn build_branch_remap_args(
+    project_root: &Path,
+    server: &str,
+    raw_base: &str,
+) -> Vec<String> {
+    let Some(repo) = resolve_repo(project_root, server).await else {
         return vec![];
     };
     let base_ref = resolve_base_ref(project_root).await;
@@ -210,7 +238,7 @@ async fn build_branch_remap_args(project_root: &Path) -> Vec<String> {
     }
 
     let head_repo = std::env::var("PR_HEAD_REPO").unwrap_or_else(|_| repo.clone());
-    let base_url = format!("https://github.com/{repo}");
+    let base_url = format!("{server}/{repo}");
     let mut args = Vec::new();
 
     if head_repo == repo {
@@ -236,8 +264,8 @@ async fn build_branch_remap_args(project_root: &Path) -> Vec<String> {
             format!("^{base_url}/tree/{base_ref}/(.*)$ file://{pwd}/$1"),
         );
     } else {
-        let raw_head = format!("https://raw.githubusercontent.com/{head_repo}/{head_ref}");
-        let head_url = format!("https://github.com/{head_repo}");
+        let raw_head = format!("{raw_base}/{head_repo}/{head_ref}");
+        let head_url = format!("{server}/{head_repo}");
         push_remap(
             &mut args,
             format!("^{base_url}/blob/{base_ref}/(.*?)#L[0-9]+.*$ {raw_head}/$1"),
@@ -283,7 +311,7 @@ async fn run_git_output(project_root: &Path, args: &[&str]) -> Option<String> {
     if s.is_empty() { None } else { Some(s) }
 }
 
-async fn resolve_repo(project_root: &Path) -> Option<String> {
+async fn resolve_repo(project_root: &Path, server: &str) -> Option<String> {
     if let Ok(repo) = std::env::var("GITHUB_REPOSITORY")
         && !repo.is_empty()
     {
@@ -291,7 +319,7 @@ async fn resolve_repo(project_root: &Path) -> Option<String> {
     }
     run_git_output(project_root, &["config", "--get", "remote.origin.url"])
         .await
-        .and_then(|url| parse_github_repo(&url))
+        .and_then(|url| parse_github_repo(&url, server))
 }
 
 async fn resolve_base_ref(project_root: &Path) -> String {
@@ -317,16 +345,19 @@ async fn resolve_head_ref(project_root: &Path) -> Option<String> {
     run_git_output(project_root, &["rev-parse", "--abbrev-ref", "HEAD"]).await
 }
 
-fn parse_github_repo(url: &str) -> Option<String> {
-    // HTTPS: https://github.com/owner/repo.git or https://github.com/owner/repo
-    if let Some(rest) = url.strip_prefix("https://github.com/") {
+fn parse_github_repo(url: &str, server: &str) -> Option<String> {
+    // HTTPS: https://<server>/owner/repo.git or https://<server>/owner/repo
+    let https_prefix = format!("{server}/");
+    if let Some(rest) = url.strip_prefix(https_prefix.as_str()) {
         let repo = rest.trim_end_matches(".git");
         if !repo.is_empty() {
             return Some(repo.to_string());
         }
     }
-    // SSH: git@github.com:owner/repo.git or git@github.com:owner/repo
-    if let Some(rest) = url.strip_prefix("git@github.com:") {
+    // SSH: git@<hostname>:owner/repo.git or git@<hostname>:owner/repo
+    let hostname = server.strip_prefix("https://").unwrap_or(server);
+    let ssh_prefix = format!("git@{hostname}:");
+    if let Some(rest) = url.strip_prefix(ssh_prefix.as_str()) {
         let repo = rest.trim_end_matches(".git");
         if !repo.is_empty() {
             return Some(repo.to_string());
@@ -362,7 +393,7 @@ mod tests {
     #[test]
     fn parse_github_repo_https() {
         assert_eq!(
-            parse_github_repo("https://github.com/owner/repo"),
+            parse_github_repo("https://github.com/owner/repo", "https://github.com"),
             Some("owner/repo".to_string())
         );
     }
@@ -370,7 +401,7 @@ mod tests {
     #[test]
     fn parse_github_repo_https_dotgit() {
         assert_eq!(
-            parse_github_repo("https://github.com/owner/repo.git"),
+            parse_github_repo("https://github.com/owner/repo.git", "https://github.com"),
             Some("owner/repo".to_string())
         );
     }
@@ -378,7 +409,7 @@ mod tests {
     #[test]
     fn parse_github_repo_ssh() {
         assert_eq!(
-            parse_github_repo("git@github.com:owner/repo"),
+            parse_github_repo("git@github.com:owner/repo", "https://github.com"),
             Some("owner/repo".to_string())
         );
     }
@@ -386,19 +417,47 @@ mod tests {
     #[test]
     fn parse_github_repo_ssh_dotgit() {
         assert_eq!(
-            parse_github_repo("git@github.com:owner/repo.git"),
+            parse_github_repo("git@github.com:owner/repo.git", "https://github.com"),
             Some("owner/repo".to_string())
         );
     }
 
     #[test]
     fn parse_github_repo_non_github() {
-        assert_eq!(parse_github_repo("https://gitlab.com/owner/repo"), None);
+        assert_eq!(
+            parse_github_repo("https://gitlab.com/owner/repo", "https://github.com"),
+            None
+        );
     }
 
     #[test]
     fn parse_github_repo_empty_path() {
-        assert_eq!(parse_github_repo("https://github.com/"), None);
+        assert_eq!(
+            parse_github_repo("https://github.com/", "https://github.com"),
+            None
+        );
+    }
+
+    #[test]
+    fn parse_github_repo_ghe_https() {
+        assert_eq!(
+            parse_github_repo(
+                "https://github.mycompany.com/owner/repo",
+                "https://github.mycompany.com"
+            ),
+            Some("owner/repo".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_github_repo_ghe_ssh() {
+        assert_eq!(
+            parse_github_repo(
+                "git@github.mycompany.com:owner/repo.git",
+                "https://github.mycompany.com"
+            ),
+            Some("owner/repo".to_string())
+        );
     }
 
     #[test]

@@ -1,5 +1,6 @@
 mod config;
 mod files;
+mod hook;
 mod init;
 mod linters;
 mod registry;
@@ -27,8 +28,22 @@ enum SubCommand {
     Linters(LintersArgs),
     /// Set up linters in mise.toml for this project.
     Init(InitArgs),
+    /// Manage git hooks.
+    Hook(HookArgs),
     /// Display the flint version.
     Version,
+}
+
+#[derive(Args, Debug)]
+struct HookArgs {
+    #[command(subcommand)]
+    command: HookCommand,
+}
+
+#[derive(Subcommand, Debug)]
+enum HookCommand {
+    /// Install a pre-commit hook that runs `flint run --fix --fast-only`.
+    Install,
 }
 
 #[derive(Args, Debug)]
@@ -121,6 +136,9 @@ async fn main() -> Result<()> {
         SubCommand::Init(args) => {
             init::run(&project_root, args.profile, args.yes)?;
         }
+        SubCommand::Hook(args) => match args.command {
+            HookCommand::Install => hook::install(&project_root)?,
+        },
         SubCommand::Run(args) => {
             run(args, &project_root, &config_dir, &registry).await?;
         }

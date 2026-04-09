@@ -32,7 +32,7 @@ mise run lint:fix
 mise run lint
 
 # Install git pre-commit hook (one-time, opt-in)
-mise run setup:pre-commit-hook
+flint hook install
 ```
 
 ## Commit Messages

@@ -2,30 +2,30 @@
 args = "linters"
 exit = 0
 stdout = '''
-NAME                  BINARY              STATUS         SPEED  PATTERNS
--------------------------------------------------------------------------
-shellcheck            shellcheck          active         fast  *.sh *.bash *.bats
-shfmt                 shfmt               active         fast  *.sh *.bash
-markdownlint-cli2     markdownlint-cli2   active         fast  *.md
-prettier              prettier            active         fast  *.md *.yml *.yaml
-actionlint            actionlint          active         fast  .github/workflows/*.yml .github/workflows/*.yaml
-hadolint              hadolint            missing        fast  Dockerfile Dockerfile.* *.dockerfile
-codespell             codespell           active         fast  *
-editorconfig-checker  ec                  active         fast  *
-golangci-lint         golangci-lint       missing        fast  *.go
-ruff                  ruff                active         fast  *.py
-ruff-format           ruff                active         fast  *.py
-biome                 biome               active         fast  *.json *.jsonc *.js *.ts *.jsx *.tsx
-biome-format          biome               active         fast  *.json *.jsonc *.js *.ts *.jsx *.tsx
-cargo-clippy          cargo-clippy        active         fast  *.rs
-cargo-fmt             rustfmt             active         fast  *.rs
-gofmt                 gofmt               missing        fast  *.go
-google-java-format    google-java-format  missing        fast  *.java
-ktlint                ktlint              missing        fast  *.kt *.kts
-dotnet-format         dotnet              missing        fast  *.cs
-lychee                lychee              active         fast
-renovate-deps         renovate            active         fast  renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5
-license-header        license-header      not configured  fast
+NAME                  BINARY              STATUS         SPEED  FIX  DESCRIPTION                                                          PATTERNS
+---------------------------------------------------------------------------------------------------------------------------------------------------
+shellcheck            shellcheck          active         fast  no   Lint shell scripts for common mistakes                               *.sh *.bash *.bats
+shfmt                 shfmt               active         fast  yes  Format shell scripts                                                 *.sh *.bash
+markdownlint-cli2     markdownlint-cli2   active         fast  yes  Lint Markdown files for style and consistency                        *.md
+prettier              prettier            active         fast  yes  Format Markdown and YAML files                                       *.md *.yml *.yaml
+actionlint            actionlint          active         fast  no   Lint GitHub Actions workflow files                                   .github/workflows/*.yml .github/workflows/*.yaml
+hadolint              hadolint            missing        fast  no   Lint Dockerfiles                                                     Dockerfile Dockerfile.* *.dockerfile
+codespell             codespell           active         fast  yes  Check for common spelling mistakes                                   *
+editorconfig-checker  ec                  active         fast  no   Check files comply with EditorConfig settings                        *
+golangci-lint         golangci-lint       missing        fast  no   Lint Go code; uses --new-from-rev to scope analysis to changed code  *.go
+ruff                  ruff                active         fast  yes  Lint Python code                                                     *.py
+ruff-format           ruff                active         fast  yes  Format Python code                                                   *.py
+biome                 biome               active         fast  yes  Lint JS/TS/JSON files                                                *.json *.jsonc *.js *.ts *.jsx *.tsx
+biome-format          biome               active         fast  yes  Format JS/TS/JSON files                                              *.json *.jsonc *.js *.ts *.jsx *.tsx
+cargo-clippy          cargo-clippy        active         fast  yes  Lint Rust code; runs on all .rs files, not just changed              *.rs
+cargo-fmt             rustfmt             active         fast  yes  Format Rust code; runs on all .rs files, not just changed            *.rs
+gofmt                 gofmt               missing        fast  yes  Format Go code                                                       *.go
+google-java-format    google-java-format  missing        fast  yes  Format Java code                                                     *.java
+ktlint                ktlint              missing        fast  yes  Lint and format Kotlin code                                          *.kt *.kts
+dotnet-format         dotnet              missing        fast  yes  Format C# code                                                       *.cs
+lychee                lychee              active         fast  no   Check for broken links                                             
+renovate-deps         renovate            active         fast  yes  Verify Renovate dependency snapshot is up to date                    renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5
+license-header        license-header      not configured  fast  no   Check source files have the required license header                
 '''
 [fake_bins]
 actionlint = '''

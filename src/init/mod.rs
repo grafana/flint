@@ -302,8 +302,7 @@ Add and stage your source files before running init so the detection is accurate
         return Ok(());
     }
 
-    let hook_task = if has_slow { "lint:pre-commit" } else { "lint" };
-    maybe_install_hook(project_root, hook_task, yes)?;
+    maybe_install_hook(project_root, yes)?;
 
     println!("Done. Run `mise install` to install the new tools.");
     Ok(())
@@ -700,7 +699,6 @@ rust = { version = "1.0", components = "clippy" }
         assert!(content.contains("flint run"));
         assert!(content.contains("flint run --fix"));
         assert!(!content.contains("--fast-only")); // no slow linters
-        assert!(content.contains("setup:pre-commit-hook"));
     }
 
     #[test]
@@ -711,8 +709,6 @@ rust = { version = "1.0", components = "clippy" }
         let content = std::fs::read_to_string(tmp.path()).unwrap();
         assert!(content.contains("--fast-only"));
         assert!(content.contains("lint:pre-commit"));
-        // Hook task should point to lint:pre-commit
-        assert!(content.contains("--task=lint:pre-commit"));
     }
 
     #[test]
@@ -746,32 +742,6 @@ depends = ["lint:fast", "lint:renovate-deps"]
         assert!(
             !result.contains("depends"),
             "old depends array removed: {result}"
-        );
-    }
-
-    #[test]
-    fn apply_env_and_tasks_replaces_stale_hook_task() {
-        let content = r#"
-[tasks."lint"]
-description = "Run all lints"
-depends = ["lint:renovate-deps"]
-
-[tasks."setup:pre-commit-hook"]
-description = "Install pre-commit hook"
-run = "mise generate git-pre-commit --write --task=pre-commit"
-"#;
-        let tmp = tempfile::NamedTempFile::new().unwrap();
-        std::fs::write(tmp.path(), content).unwrap();
-        let removed = vec!["lint:renovate-deps".to_string()];
-        apply_env_and_tasks(tmp.path(), ".github/config", false, &removed).unwrap();
-        let result = std::fs::read_to_string(tmp.path()).unwrap();
-        assert!(
-            result.contains("--task=lint"),
-            "hook task updated to lint: {result}"
-        );
-        assert!(
-            !result.contains("--task=pre-commit"),
-            "old hook task reference removed: {result}"
         );
     }
 }

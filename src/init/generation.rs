@@ -538,8 +538,8 @@ fn task_has_removed_dep(tasks: &toml_edit::Table, name: &str, removed: &[String]
     })
 }
 
-/// Adds `[env] FLINT_CONFIG_DIR` and the standard `lint*` / `setup:pre-commit-hook`
-/// tasks to `mise.toml`, skipping any that are already present.
+/// Adds `[env] FLINT_CONFIG_DIR` and the standard `lint*` tasks to `mise.toml`,
+/// skipping any that are already present.
 ///
 /// When `removed_v1_tasks` is non-empty, standard tasks whose `depends` reference
 /// any of those removed tasks are replaced (they became stale after v1 removal).
@@ -569,7 +569,7 @@ pub(super) fn apply_env_and_tasks(
         }
     }
 
-    // [tasks] — add lint / lint:fix / (lint:pre-commit) / setup:pre-commit-hook
+    // [tasks] — add lint / lint:fix / (lint:pre-commit)
     {
         if !doc.contains_key("tasks") {
             doc.insert("tasks", toml_edit::Item::Table(toml_edit::Table::new()));
@@ -597,24 +597,6 @@ pub(super) fn apply_env_and_tasks(
                 "flint run --fix --fast-only",
             );
         }
-        let hook_task = if has_slow { "lint:pre-commit" } else { "lint" };
-        // Also replace setup:pre-commit-hook when the lint task was stale — the old hook
-        // was pointing at a v1-era task name and needs to be updated.
-        if lint_stale {
-            write_task(
-                tasks,
-                "setup:pre-commit-hook",
-                "Install git pre-commit hook",
-                &format!("mise generate git-pre-commit --write --task={hook_task}"),
-            );
-        } else {
-            changed |= add_task_if_absent(
-                tasks,
-                "setup:pre-commit-hook",
-                "Install git pre-commit hook",
-                &format!("mise generate git-pre-commit --write --task={hook_task}"),
-            );
-        }
     }
 
     if changed {
@@ -623,9 +605,9 @@ pub(super) fn apply_env_and_tasks(
     Ok(changed)
 }
 
-/// Installs the git pre-commit hook by running `mise generate git-pre-commit`.
+/// Offers to install the git pre-commit hook via `flint hook install`.
 /// Prompts the user unless `yes` is true. Silently skips if the hook is already installed.
-pub(super) fn maybe_install_hook(project_root: &Path, hook_task: &str, yes: bool) -> Result<()> {
+pub(super) fn maybe_install_hook(project_root: &Path, yes: bool) -> Result<()> {
     let hook_path = project_root.join(".git/hooks/pre-commit");
     if hook_path.exists() {
         return Ok(());
@@ -634,7 +616,9 @@ pub(super) fn maybe_install_hook(project_root: &Path, hook_task: &str, yes: bool
     let install = if yes {
         true
     } else {
-        print!("Install pre-commit hook (runs `mise run {hook_task}` before each commit)? [Y/n] ");
+        print!(
+            "Install pre-commit hook (runs `flint run --fix --fast-only` before each commit)? [Y/n] "
+        );
         io::stdout().flush()?;
         let mut input = String::new();
         io::stdin().lock().read_line(&mut input)?;
@@ -642,21 +626,7 @@ pub(super) fn maybe_install_hook(project_root: &Path, hook_task: &str, yes: bool
     };
 
     if install {
-        let status = Command::new("mise")
-            .args([
-                "generate",
-                "git-pre-commit",
-                "--write",
-                &format!("--task={hook_task}"),
-            ])
-            .current_dir(project_root)
-            .status();
-        match status {
-            Ok(s) if s.success() => println!("  installed pre-commit hook"),
-            _ => println!(
-                "  warning: could not install pre-commit hook — run `mise run setup:pre-commit-hook` later"
-            ),
-        }
+        crate::hook::install(project_root)?;
     }
     Ok(())
 }

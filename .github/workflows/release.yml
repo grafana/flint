@@ -9,31 +9,8 @@ on:
 permissions: {}
 
 jobs:
-  release:
-    name: Create release
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-
-    steps:
-      - name: Create release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          extra_flags=()
-          if echo "$TAG" | grep -qE '\-(alpha|beta|rc)'; then
-            extra_flags+=("--prerelease")
-          fi
-          gh release create "$TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "$TAG" \
-            --generate-notes \
-            "${extra_flags[@]}"
-
   build:
     name: Build ${{ matrix.target }}
-    needs: release
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: write

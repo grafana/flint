@@ -121,6 +121,19 @@ async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result
         env.push(("GITHUB_COM_TOKEN".into(), token));
     }
 
+    // On Windows, mise shims are .cmd files that require cmd.exe to run.
+    #[cfg(windows)]
+    let out = Command::new("cmd.exe")
+        .args([
+            "/C",
+            "renovate",
+            "--platform=local",
+            "--require-config=ignored",
+            "--dry-run=extract",
+        ])
+        .current_dir(project_root)
+        .envs(env);
+    #[cfg(not(windows))]
     let out = Command::new("renovate")
         .args([
             "--platform=local",

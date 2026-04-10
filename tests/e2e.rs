@@ -294,8 +294,15 @@ fn run_case(case: &Path, name: &str, update: bool) {
         //     the repo path strings we use for matching
         #[cfg(windows)]
         let (s, repo_canonical_cmp, repo_str_cmp) = {
+            let s = s.replace('\\', "/");
+            // Strip the \\?\ verbatim UNC prefix that leaks through after \ normalization
+            // (e.g. cargo-fmt outputs "Diff in //?/C:/..." → strip //?/ → "Diff in C:/...")
+            let s = s.replace("//?/", "");
+            // file:///C:/path → after <REPO> substitution becomes file:///<REPO>/path
+            // but snapshots written on Unix have file://<REPO>/path (no extra slash).
+            // Fix by collapsing the extra slash after substitution (done below).
             (
-                s.replace('\\', "/"),
+                s,
                 repo_canonical_str.replace('\\', "/"),
                 repo_str.as_ref().replace('\\', "/"),
             )
@@ -312,7 +319,12 @@ fn run_case(case: &Path, name: &str, update: bool) {
         } else {
             s
         };
-        s.replace(&repo_str_cmp, "<REPO>")
+        let s = s.replace(&repo_str_cmp, "<REPO>");
+        // On Windows, lychee uses file:///C:/path URIs; after C:/... → <REPO>
+        // substitution the triple slash remains. Collapse to match Unix snapshots.
+        #[cfg(windows)]
+        let s = s.replace("file:///<REPO>", "file://<REPO>");
+        s
     };
     let stderr = normalize_timing(&strip_ansi(&normalize(
         String::from_utf8_lossy(&out.stderr).into_owned(),

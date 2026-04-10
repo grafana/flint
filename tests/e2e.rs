@@ -284,20 +284,35 @@ fn run_case(case: &Path, name: &str, update: bool) {
         })
         .unwrap_or_default();
     let normalize = |s: String| -> String {
+        // Normalize CRLF → LF so Windows tool output matches Unix snapshots.
+        let s = s.replace("\r\n", "\n").replace('\r', "\n");
+
+        // On Windows, normalize backslash separators to forward slashes in both
+        // the output and the repo path strings before substitution. This handles:
+        //   - tool output using \ (e.g. shfmt diff headers)
+        //   - file:// URIs already using / (e.g. lychee) — by also normalizing
+        //     the repo path strings we use for matching
+        #[cfg(windows)]
+        let (s, repo_canonical_cmp, repo_str_cmp) = {
+            (
+                s.replace('\\', "/"),
+                repo_canonical_str.replace('\\', "/"),
+                repo_str.as_ref().replace('\\', "/"),
+            )
+        };
+        #[cfg(not(windows))]
+        let (s, repo_canonical_cmp, repo_str_cmp) =
+            (s, repo_canonical_str.clone(), repo_str.as_ref().to_string());
+
         // Replace canonical path first (e.g. /private/var/... on macOS, long name
         // vs 8.3 short name on Windows), then the non-canonical one, so both forms
         // are collapsed to <REPO>.
-        let s = if repo_canonical_str != repo_str.as_ref() {
-            s.replace(&repo_canonical_str, "<REPO>")
+        let s = if repo_canonical_cmp != repo_str_cmp {
+            s.replace(&repo_canonical_cmp, "<REPO>")
         } else {
             s
         };
-        let s = s.replace(repo_str.as_ref(), "<REPO>");
-        // On Windows, normalize backslash path separators to forward slashes so
-        // snapshots written on Unix match tool output on Windows.
-        #[cfg(windows)]
-        let s = s.replace('\\', "/");
-        s
+        s.replace(&repo_str_cmp, "<REPO>")
     };
     let stderr = normalize_timing(&strip_ansi(&normalize(
         String::from_utf8_lossy(&out.stderr).into_owned(),

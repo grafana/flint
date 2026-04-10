@@ -120,12 +120,15 @@ async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result
         env.push(("GITHUB_COM_TOKEN".into(), token));
     }
 
-    let out = super::spawn_command(&[
-        "renovate".to_string(),
-        "--platform=local".to_string(),
-        "--require-config=ignored".to_string(),
-        "--dry-run=extract".to_string(),
-    ])
+    let out = super::spawn_command(
+        &[
+            "renovate".to_string(),
+            "--platform=local".to_string(),
+            "--require-config=ignored".to_string(),
+            "--dry-run=extract".to_string(),
+        ],
+        false,
+    )
     .current_dir(project_root)
     .envs(env)
     .stdin(Stdio::null())

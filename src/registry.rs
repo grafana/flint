@@ -85,6 +85,9 @@ pub struct Check {
     /// (e.g. `"clippy,rustfmt"` for the `rust` toolchain). Produces an inline-table
     /// entry: `rust = { version = "latest", components = "clippy,rustfmt" }`.
     pub mise_install_components: Option<&'static str>,
+    /// On Windows, the binary is a self-executing JAR that cannot be run directly
+    /// or via cmd.exe — invoke as `java -jar <resolved-path>` instead.
+    pub windows_java_jar: bool,
     pub kind: CheckKind,
     /// Binary name format when the backend installs with a versioned name (e.g. `"shfmt_{version}"`
     /// → `"shfmt_v3.12.0"`). `{version}` is replaced with the version declared in mise.toml.
@@ -166,6 +169,7 @@ impl Check {
                 full_fix_cmd: "",
                 scope,
             },
+            windows_java_jar: false,
             versioned_bin_fmt: None,
             desc: "",
             docs: "",
@@ -187,6 +191,7 @@ impl Check {
             activate_unconditionally: false,
             category: Category::Default,
             mise_install_components: None,
+            windows_java_jar: false,
             kind: CheckKind::Special(kind),
             versioned_bin_fmt: None,
             desc: "",
@@ -242,6 +247,13 @@ impl Check {
     #[allow(dead_code)]
     pub fn version_req(mut self, range: &'static str) -> Self {
         self.version_range = Some(range);
+        self
+    }
+
+    /// On Windows, invoke this binary via `java -jar <path>` rather than directly.
+    /// Use for self-executing JARs (e.g. ktlint) that cannot be run via cmd.exe.
+    pub fn java_jar(mut self) -> Self {
+        self.windows_java_jar = true;
         self
     }
 
@@ -539,6 +551,7 @@ fn check_ktlint() -> Check {
         "ktlint --format --log-level=error {ROOT}",
     )
     .mise_tool("github:pinterest/ktlint")
+    .java_jar()
     .formatter()
     .desc("Lint and format Kotlin code")
     .lang()

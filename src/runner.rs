@@ -684,6 +684,7 @@ mod tests {
                 full_fix_cmd: "",
                 scope: Scope::Project,
             },
+            versioned_bin_fmt: None,
             desc: "",
             docs: "",
         }
@@ -711,7 +712,8 @@ mod tests {
                 false,
                 Path::new("/repo"),
                 &[],
-                Path::new("/repo")
+                Path::new("/repo"),
+                &Default::default(),
             )
             .is_empty()
         );
@@ -728,6 +730,7 @@ mod tests {
             Path::new("/repo"),
             &[],
             Path::new("/repo"),
+            &Default::default(),
         );
         assert_eq!(inv, vec![vec!["run-it".to_string()]]);
     }
@@ -743,6 +746,7 @@ mod tests {
             Path::new("/repo"),
             &[],
             Path::new("/repo"),
+            &Default::default(),
         );
         assert_eq!(inv, vec![vec!["run-it".to_string()]]);
     }

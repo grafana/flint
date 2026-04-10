@@ -51,18 +51,6 @@ pub enum CheckKind {
     Special(SpecialKind),
 }
 
-/// Alternative installation path for a check: a different mise tool key that provides
-/// the same binary under a different name (e.g. `"github:mvdan/sh"` installs shfmt as
-/// `shfmt_v3.12.0` rather than `shfmt`).
-#[derive(Debug, Clone)]
-pub struct AltInstall {
-    /// The alternative mise.toml tool key (e.g. `"github:mvdan/sh"`).
-    pub key: &'static str,
-    /// Binary name format string; `{version}` is replaced with the version from mise.toml.
-    /// E.g. `"shfmt_{version}"` with version `"v3.12.0"` → `"shfmt_v3.12.0"`.
-    pub bin_fmt: &'static str,
-}
-
 #[derive(Debug, Clone)]
 pub struct Check {
     pub name: &'static str,
@@ -93,20 +81,15 @@ pub struct Check {
     /// Always considered active regardless of mise.toml (used for config-activated checks).
     pub activate_unconditionally: bool,
     /// Canonical mise tool key to write when setting up a new project (e.g. `npm:prettier`).
-    /// When `None`, falls back to `mise_tool_name` then `bin_name`.
-    /// Distinct from `mise_tool_name` (lookup key) because existing repos may declare the
-    /// same tool under a bare name (e.g. `ruff = "latest"`) which must still be detected.
-    pub mise_install_key: Option<&'static str>,
     /// Optional mise toolchain components to request when installing via `flint init`
     /// (e.g. `"clippy,rustfmt"` for the `rust` toolchain). Produces an inline-table
     /// entry: `rust = { version = "latest", components = "clippy,rustfmt" }`.
     pub mise_install_components: Option<&'static str>,
     pub kind: CheckKind,
-    /// Alternative installation: a different mise tool key that also provides this check,
-    /// with a binary name format that may differ from `bin_name`. The `bin_fmt` field
-    /// uses `{version}` as a placeholder for the installed version from mise.toml
-    /// (e.g. `"shfmt_{version}"` with version `"v3.12.0"` → `"shfmt_v3.12.0"`).
-    pub alt_install: Option<AltInstall>,
+    /// Binary name format when the backend installs with a versioned name (e.g. `"shfmt_{version}"`
+    /// → `"shfmt_v3.12.0"`). `{version}` is replaced with the version declared in mise.toml.
+    /// Paired with `mise_tool_name` when the backend names binaries with a version suffix.
+    pub versioned_bin_fmt: Option<&'static str>,
     /// Plain-text description of what the check does — shown in `flint linters` and the README table.
     pub desc: &'static str,
     /// Extended markdown documentation shown in the README detail section (behaviour, config examples).
@@ -175,7 +158,6 @@ impl Check {
             defers_to_formatters: false,
             activate_unconditionally: false,
             category: Category::Default,
-            mise_install_key: None,
             mise_install_components: None,
             kind: CheckKind::Template {
                 check_cmd,
@@ -184,7 +166,7 @@ impl Check {
                 full_fix_cmd: "",
                 scope,
             },
-            alt_install: None,
+            versioned_bin_fmt: None,
             desc: "",
             docs: "",
         }
@@ -204,10 +186,9 @@ impl Check {
             defers_to_formatters: false,
             activate_unconditionally: false,
             category: Category::Default,
-            mise_install_key: None,
             mise_install_components: None,
             kind: CheckKind::Special(kind),
-            alt_install: None,
+            versioned_bin_fmt: None,
             desc: "",
             docs: "",
         }
@@ -288,10 +269,11 @@ impl Check {
         self
     }
 
-    /// Register an alternative mise tool key for this check, with a versioned binary name.
-    /// Used when a backend installs the binary under a versioned name (e.g. `shfmt_v3.12.0`).
-    pub fn alt_install(mut self, key: &'static str, bin_fmt: &'static str) -> Self {
-        self.alt_install = Some(AltInstall { key, bin_fmt });
+    /// Set a versioned binary name format for tools where the backend installs with a
+    /// version suffix (e.g. `"shfmt_{version}"` → `"shfmt_v3.12.0"`). Paired with
+    /// `.mise_tool()` to identify which key provides the version.
+    pub fn versioned_bin(mut self, fmt: &'static str) -> Self {
+        self.versioned_bin_fmt = Some(fmt);
         self
     }
 
@@ -323,16 +305,6 @@ impl Check {
     /// Mark as a language-specific style/formatter check — included in all init profiles.
     pub fn style(mut self) -> Self {
         self.category = Category::Style;
-        self
-    }
-
-    /// Set the canonical mise tool key used when installing this linter via `flint init`
-    /// (e.g. `npm:prettier`, `pipx:ruff`). Distinct from `mise_tool_name`, which is the
-    /// lookup key used to detect the tool in an existing mise.toml — existing repos may
-    /// declare the tool under a bare name (`ruff = "latest"`) which is still detectable
-    /// via the alias map but must not be overwritten with the prefixed key.
-    pub fn install_key(mut self, key: &'static str) -> Self {
-        self.mise_install_key = Some(key);
         self
     }
 
@@ -379,7 +351,8 @@ fn check_shfmt() -> Check {
     Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"])
         .fix("shfmt -w {FILE}")
         .formatter()
-        .alt_install("github:mvdan/sh", "shfmt_{version}")
+        .mise_tool("github:mvdan/sh")
+        .versioned_bin("shfmt_{version}")
         .desc("Format shell scripts")
         .style()
 }
@@ -389,7 +362,7 @@ fn check_markdownlint_cli2() -> Check {
         .fix("markdownlint-cli2 --fix {FILE}")
         .linter_config(".markdownlint.jsonc", "--config")
         .desc("Lint Markdown files for style and consistency")
-        .install_key("npm:markdownlint-cli2")
+        .mise_tool("npm:markdownlint-cli2")
 }
 
 fn check_prettier() -> Check {
@@ -403,7 +376,7 @@ fn check_prettier() -> Check {
     .linter_config(".prettierrc", "--config")
     .formatter()
     .desc("Format Markdown and YAML files")
-    .install_key("npm:prettier")
+    .mise_tool("npm:prettier")
 }
 
 fn check_actionlint() -> Check {
@@ -431,7 +404,7 @@ fn check_hadolint() -> Check {
 fn check_xmllint() -> Check {
     Check::files("xmllint", "xmllint --noout {FILES}", &["*.xml"])
         .mise_tool("cargo:xmloxide")
-        .install_key("cargo:xmloxide")
+        .mise_tool("cargo:xmloxide")
         .desc("Validate XML files are well-formed")
 }
 
@@ -440,7 +413,7 @@ fn check_codespell() -> Check {
         .fix("codespell --write-changes {FILES}")
         .linter_config(".codespellrc", "--config")
         .desc("Check for common spelling mistakes")
-        .install_key("pipx:codespell")
+        .mise_tool("pipx:codespell")
 }
 
 fn check_editorconfig_checker() -> Check {
@@ -471,7 +444,7 @@ fn check_ruff() -> Check {
         .fix("ruff check --fix {FILE}")
         .linter_config("ruff.toml", "--config")
         .desc("Lint Python code")
-        .install_key("pipx:ruff")
+        .mise_tool("pipx:ruff")
         .lang()
 }
 
@@ -482,7 +455,7 @@ fn check_ruff_format() -> Check {
         .linter_config("ruff.toml", "--config")
         .formatter()
         .desc("Format Python code")
-        .install_key("pipx:ruff")
+        .mise_tool("pipx:ruff")
         .lang()
 }
 
@@ -494,7 +467,7 @@ fn check_biome() -> Check {
     )
     .fix("biome check --fix {FILE}")
     .desc("Lint JS/TS/JSON files")
-    .install_key("npm:@biomejs/biome")
+    .mise_tool("npm:@biomejs/biome")
     .lang()
 }
 
@@ -508,7 +481,7 @@ fn check_biome_format() -> Check {
     .fix("biome format --write {FILE}")
     .formatter()
     .desc("Format JS/TS/JSON files")
-    .install_key("npm:@biomejs/biome")
+    .mise_tool("npm:@biomejs/biome")
     .lang()
 }
 
@@ -734,14 +707,8 @@ pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool
     if check.activate_unconditionally {
         return true;
     }
-    // Check primary key first, then alt_install key.
     let lookup_key = check.mise_tool_name.unwrap_or(check.bin_name);
-    let declared = mise_tools.get(lookup_key).or_else(|| {
-        check
-            .alt_install
-            .as_ref()
-            .and_then(|a| mise_tools.get(a.key))
-    });
+    let declared = mise_tools.get(lookup_key);
     let Some(declared) = declared else {
         return false;
     };
@@ -755,14 +722,15 @@ pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool
 }
 
 /// Returns the binary name to use for this check given the active mise tools.
-/// When the check is installed via its `alt_install` key, the versioned binary
-/// name is derived from `bin_fmt` + the installed version (e.g. `"shfmt_v3.12.0"`).
+/// When `versioned_bin_fmt` is set, the version from mise.toml is substituted
+/// into the format string (e.g. `"shfmt_{version}"` + `"v3.12.0"` → `"shfmt_v3.12.0"`).
 /// Falls back to `check.bin_name` for standard installations.
 pub fn resolve_bin_name(check: &Check, mise_tools: &HashMap<String, String>) -> String {
-    if let Some(alt) = &check.alt_install
-        && let Some(version) = mise_tools.get(alt.key)
-    {
-        return alt.bin_fmt.replace("{version}", version);
+    if let Some(fmt) = check.versioned_bin_fmt {
+        let key = check.mise_tool_name.unwrap_or(check.bin_name);
+        if let Some(version) = mise_tools.get(key) {
+            return fmt.replace("{version}", version);
+        }
     }
     check.bin_name.to_string()
 }

@@ -324,12 +324,7 @@ pub fn install_key(check: &Check) -> Option<&'static str> {
     if !check.uses_binary() || check.activate_unconditionally {
         return None;
     }
-    Some(
-        check
-            .mise_install_key
-            .or(check.mise_tool_name)
-            .unwrap_or(check.bin_name),
-    )
+    Some(check.mise_tool_name.unwrap_or(check.bin_name))
 }
 
 /// Compute the map of `tool_key → optional_components` for the given category set,

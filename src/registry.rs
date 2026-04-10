@@ -708,7 +708,11 @@ pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool
         return true;
     }
     let lookup_key = check.mise_tool_name.unwrap_or(check.bin_name);
-    let declared = mise_tools.get(lookup_key);
+    // When mise_tool_name is set (e.g. "npm:markdownlint-cli2"), also accept
+    // the bare bin_name ("markdownlint-cli2") so repos using either form work.
+    let declared = mise_tools
+        .get(lookup_key)
+        .or_else(|| check.mise_tool_name.and(mise_tools.get(check.bin_name)));
     let Some(declared) = declared else {
         return false;
     };

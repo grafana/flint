@@ -271,17 +271,33 @@ fn run_case(case: &Path, name: &str, update: bool) {
     let repo_canonical_str = repo
         .path()
         .canonicalize()
-        .map(|p| p.to_string_lossy().into_owned())
+        .map(|p| {
+            let s = p.to_string_lossy().into_owned();
+            // Strip Windows verbatim prefix \\?\ — tools receive the stripped path
+            // (main.rs does the same), so the canonical form without \\?\ is what
+            // appears in tool output and must be matched here.
+            #[cfg(windows)]
+            if let Some(stripped) = s.strip_prefix(r"\\?\") {
+                return stripped.to_string();
+            }
+            s
+        })
         .unwrap_or_default();
     let normalize = |s: String| -> String {
-        // Replace canonical path first (e.g. /private/var/... on macOS), then the
-        // non-canonical one, so both forms are collapsed to <REPO>.
+        // Replace canonical path first (e.g. /private/var/... on macOS, long name
+        // vs 8.3 short name on Windows), then the non-canonical one, so both forms
+        // are collapsed to <REPO>.
         let s = if repo_canonical_str != repo_str.as_ref() {
             s.replace(&repo_canonical_str, "<REPO>")
         } else {
             s
         };
-        s.replace(repo_str.as_ref(), "<REPO>")
+        let s = s.replace(repo_str.as_ref(), "<REPO>");
+        // On Windows, normalize backslash path separators to forward slashes so
+        // snapshots written on Unix match tool output on Windows.
+        #[cfg(windows)]
+        let s = s.replace('\\', "/");
+        s
     };
     let stderr = normalize_timing(&strip_ansi(&normalize(
         String::from_utf8_lossy(&out.stderr).into_owned(),

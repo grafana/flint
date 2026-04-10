@@ -38,8 +38,18 @@ async fn run_inner(
     let config_path = resolve_renovate_config_path(project_root)?;
     let committed_path = committed_path_for_config(&config_path);
     let committed_display = display_path(project_root, &committed_path);
-    let log_bytes = run_renovate(project_root, &config_path).await?;
-    let generated = extract_deps(&log_bytes, &cfg.exclude_managers)?;
+
+    // Renovate occasionally produces empty packageFiles on the first run (transient
+    // network or registry issue). Retry up to 3 times with a short delay.
+    let mut generated = DepMap::default();
+    for attempt in 1..=3u32 {
+        let log_bytes = run_renovate(project_root, &config_path).await?;
+        generated = extract_deps(&log_bytes, &cfg.exclude_managers)?;
+        if !generated.is_empty() || attempt == 3 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    }
 
     if !committed_path.exists() {
         if fix {

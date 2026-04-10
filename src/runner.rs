@@ -410,6 +410,18 @@ async fn run_invocations(name: &str, invocations: &[Vec<String>], root: &Path) -
         if argv.is_empty() {
             continue;
         }
+        // On Windows, mise creates tiny .cmd shim files that must be launched via
+        // cmd.exe — CreateProcessW cannot execute .cmd files directly. Using
+        // `cmd.exe /C <program> <args...>` works for both .cmd shims and .exe binaries.
+        #[cfg(windows)]
+        let result = Command::new("cmd.exe")
+            .arg("/C")
+            .args(argv)
+            .current_dir(root)
+            .stdin(Stdio::null())
+            .output()
+            .await;
+        #[cfg(not(windows))]
         let result = Command::new(&argv[0])
             .args(&argv[1..])
             .current_dir(root)

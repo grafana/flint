@@ -1,2 +1,2 @@
 [tools]
-shfmt = "latest"
+"github:mvdan/sh" = "v3.12.0"

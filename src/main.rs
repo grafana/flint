@@ -182,6 +182,11 @@ async fn run(
     // --fast-only filter (skipped when linters are named explicitly).
     // mise guarantees declared tools are on PATH, so no PATH check needed.
     let mise_tools = registry::read_mise_tools(project_root);
+    if let Some((old, new)) = registry::find_obsolete_key(&mise_tools) {
+        eprintln!("flint: obsolete tool key in mise.toml: {old:?}");
+        eprintln!("  Replace it with: {new:?}");
+        std::process::exit(1);
+    }
     let active: Vec<&registry::Check> = {
         let mut out = vec![];
         for c in checks {

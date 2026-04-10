@@ -662,6 +662,15 @@ pub const OBSOLETE_KEYS: &[(&str, &str)] = &[
     ("npm:markdownlint-cli", "npm:markdownlint-cli2"),
 ];
 
+/// Checks whether any obsolete tool keys are present in `mise_tools`.
+/// Returns the first violation found as `(obsolete_key, replacement_key)`.
+pub fn find_obsolete_key(mise_tools: &HashMap<String, String>) -> Option<(&'static str, &'static str)> {
+    OBSOLETE_KEYS
+        .iter()
+        .find(|(old, _)| mise_tools.contains_key(*old))
+        .copied()
+}
+
 /// Reads `[tools]` from the consuming repo's mise.toml and returns a map of
 /// tool name → declared version string.
 ///
@@ -780,6 +789,21 @@ fn coerce_version(s: &str) -> Option<semver::Version> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn find_obsolete_key_detects_superseded_keys() {
+        let mut tools = HashMap::new();
+        tools.insert("npm:markdownlint-cli".to_string(), "0.39.0".to_string());
+        let result = find_obsolete_key(&tools);
+        assert_eq!(result, Some(("npm:markdownlint-cli", "npm:markdownlint-cli2")));
+    }
+
+    #[test]
+    fn find_obsolete_key_returns_none_for_clean_tools() {
+        let mut tools = HashMap::new();
+        tools.insert("npm:markdownlint-cli2".to_string(), "0.17.2".to_string());
+        assert_eq!(find_obsolete_key(&tools), None);
+    }
 
     /// If any entry for a bin_name declares a version_range, every entry for that
     /// bin_name must declare one. A mix of ranged and unranged entries for the same

@@ -142,18 +142,7 @@ async fn run_lychee_cmd(
 
     let mut stdout = format!("==> {description}\n").into_bytes();
 
-    // On Windows, mise shims are .cmd files that require cmd.exe to run.
-    #[cfg(windows)]
-    let result = Command::new("cmd.exe")
-        .arg("/C")
-        .args(&argv)
-        .current_dir(project_root)
-        .stdin(Stdio::null())
-        .output()
-        .await;
-    #[cfg(not(windows))]
-    let result = Command::new(&argv[0])
-        .args(&argv[1..])
+    let result = super::spawn_command(&argv)
         .current_dir(project_root)
         .stdin(Stdio::null())
         .output()

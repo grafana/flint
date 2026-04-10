@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use tokio::process::Command;
 
 use crate::config::RenovateDepsConfig;
 use crate::linters::LinterOutput;
@@ -121,32 +120,19 @@ async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result
         env.push(("GITHUB_COM_TOKEN".into(), token));
     }
 
-    // On Windows, mise shims are .cmd files that require cmd.exe to run.
-    #[cfg(windows)]
-    let out = Command::new("cmd.exe")
-        .args([
-            "/C",
-            "renovate",
-            "--platform=local",
-            "--require-config=ignored",
-            "--dry-run=extract",
-        ])
-        .current_dir(project_root)
-        .envs(env);
-    #[cfg(not(windows))]
-    let out = Command::new("renovate")
-        .args([
-            "--platform=local",
-            "--require-config=ignored",
-            "--dry-run=extract",
-        ])
-        .current_dir(project_root)
-        .envs(env)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .await?;
+    let out = super::spawn_command(&[
+        "renovate".to_string(),
+        "--platform=local".to_string(),
+        "--require-config=ignored".to_string(),
+        "--dry-run=extract".to_string(),
+    ])
+    .current_dir(project_root)
+    .envs(env)
+    .stdin(Stdio::null())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .output()
+    .await?;
 
     // Combine stdout+stderr: Renovate writes JSON log lines to stdout, but
     // some startup messages may appear on stderr.

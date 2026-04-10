@@ -112,18 +112,9 @@ async fn main() -> Result<()> {
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| std::env::current_dir().expect("cannot determine working directory"));
     // Canonicalize to resolve symlinks (e.g. /private/... on macOS).
-    // On Windows, canonicalize() adds a \\?\ verbatim prefix that git and other
-    // tools don't handle; strip it back to a regular path.
-    let project_root = project_root.canonicalize().unwrap_or(project_root);
-    #[cfg(windows)]
-    let project_root = {
-        let s = project_root.to_string_lossy();
-        if let Some(stripped) = s.strip_prefix(r"\\?\") {
-            std::path::PathBuf::from(stripped)
-        } else {
-            project_root
-        }
-    };
+    // dunce::canonicalize strips the \\?\ verbatim prefix on Windows that
+    // git and other tools don't handle.
+    let project_root = dunce::canonicalize(&project_root).unwrap_or(project_root);
 
     let config_dir = std::env::var("FLINT_CONFIG_DIR")
         .map(std::path::PathBuf::from)

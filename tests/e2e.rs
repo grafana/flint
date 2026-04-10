@@ -268,64 +268,9 @@ fn run_case(case: &Path, name: &str, update: bool) {
     let out = flint_with_env(&args, repo.path(), &env_refs);
 
     let repo_str = repo.path().to_string_lossy();
-    let repo_canonical_str = repo
-        .path()
-        .canonicalize()
-        .map(|p| {
-            let s = p.to_string_lossy().into_owned();
-            // Strip Windows verbatim prefix \\?\ — tools receive the stripped path
-            // (main.rs does the same), so the canonical form without \\?\ is what
-            // appears in tool output and must be matched here.
-            #[cfg(windows)]
-            if let Some(stripped) = s.strip_prefix(r"\\?\") {
-                return stripped.to_string();
-            }
-            s
-        })
-        .unwrap_or_default();
-    let normalize = |s: String| -> String {
-        // Normalize CRLF → LF so Windows tool output matches Unix snapshots.
-        let s = s.replace("\r\n", "\n").replace('\r', "\n");
-
-        // On Windows, normalize backslash separators to forward slashes in both
-        // the output and the repo path strings before substitution. This handles:
-        //   - tool output using \ (e.g. shfmt diff headers)
-        //   - file:// URIs already using / (e.g. lychee) — by also normalizing
-        //     the repo path strings we use for matching
-        #[cfg(windows)]
-        let (s, repo_canonical_cmp, repo_str_cmp) = {
-            let s = s.replace('\\', "/");
-            // Strip the \\?\ verbatim UNC prefix that leaks through after \ normalization
-            // (e.g. cargo-fmt outputs "Diff in //?/C:/..." → strip //?/ → "Diff in C:/...")
-            let s = s.replace("//?/", "");
-            // file:///C:/path → after <REPO> substitution becomes file:///<REPO>/path
-            // but snapshots written on Unix have file://<REPO>/path (no extra slash).
-            // Fix by collapsing the extra slash after substitution (done below).
-            (
-                s,
-                repo_canonical_str.replace('\\', "/"),
-                repo_str.as_ref().replace('\\', "/"),
-            )
-        };
-        #[cfg(not(windows))]
-        let (s, repo_canonical_cmp, repo_str_cmp) =
-            (s, repo_canonical_str.clone(), repo_str.as_ref().to_string());
-
-        // Replace canonical path first (e.g. /private/var/... on macOS, long name
-        // vs 8.3 short name on Windows), then the non-canonical one, so both forms
-        // are collapsed to <REPO>.
-        let s = if repo_canonical_cmp != repo_str_cmp {
-            s.replace(&repo_canonical_cmp, "<REPO>")
-        } else {
-            s
-        };
-        let s = s.replace(&repo_str_cmp, "<REPO>");
-        // On Windows, lychee uses file:///C:/path URIs; after C:/... → <REPO>
-        // substitution the triple slash remains. Collapse to match Unix snapshots.
-        #[cfg(windows)]
-        let s = s.replace("file:///<REPO>", "file://<REPO>");
-        s
-    };
+    let repo_canonical_str = canonical_repo_path(repo.path());
+    let normalize =
+        |s: String| -> String { normalize_output(s, repo_str.as_ref(), &repo_canonical_str) };
     let stderr = normalize_timing(&strip_ansi(&normalize(
         String::from_utf8_lossy(&out.stderr).into_owned(),
     )));
@@ -524,4 +469,47 @@ fn copy_dir_into(src: &Path, dst: &Path) {
             std::fs::copy(entry.path(), &target).unwrap();
         }
     }
+}
+
+/// Returns the canonical form of the repo path with platform quirks stripped.
+/// On macOS this resolves /private/... symlinks. On Windows it strips the \\?\
+/// verbatim prefix so the result matches what tools actually emit.
+fn canonical_repo_path(path: &std::path::Path) -> String {
+    // dunce::canonicalize resolves symlinks (/private/... on macOS) and strips
+    // the \\?\ verbatim prefix on Windows that tools don't emit.
+    dunce::canonicalize(path)
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+/// Normalises tool output for snapshot comparison:
+/// - CRLF → LF
+/// - Windows path separators → forward slashes (both output and repo paths)
+/// - Strip residual //?/ UNC prefix (after \ normalisation)
+/// - Replace canonical and non-canonical repo path forms with <REPO>
+/// - Collapse file:///<REPO> → file://<REPO> (lychee Windows URI form)
+fn normalize_output(s: String, repo_str: &str, repo_canonical: &str) -> String {
+    let s = s.replace("\r\n", "\n").replace('\r', "\n");
+
+    #[cfg(windows)]
+    let (s, canonical_cmp, repo_cmp) = {
+        let s = s.replace('\\', "/").replace("//?/", "");
+        (
+            s,
+            repo_canonical.replace('\\', "/"),
+            repo_str.replace('\\', "/"),
+        )
+    };
+    #[cfg(not(windows))]
+    let (s, canonical_cmp, repo_cmp) = (s, repo_canonical.to_string(), repo_str.to_string());
+
+    let s = if canonical_cmp != repo_cmp {
+        s.replace(&canonical_cmp, "<REPO>")
+    } else {
+        s
+    };
+    let s = s.replace(&repo_cmp, "<REPO>");
+    #[cfg(windows)]
+    let s = s.replace("file:///<REPO>", "file://<REPO>");
+    s
 }

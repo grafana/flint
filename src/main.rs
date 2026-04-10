@@ -111,6 +111,7 @@ async fn main() -> Result<()> {
     let project_root = std::env::var("MISE_PROJECT_ROOT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| std::env::current_dir().expect("cannot determine working directory"));
+    let project_root = project_root.canonicalize().unwrap_or(project_root);
 
     let config_dir = std::env::var("FLINT_CONFIG_DIR")
         .map(std::path::PathBuf::from)

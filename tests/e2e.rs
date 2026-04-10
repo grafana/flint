@@ -268,12 +268,27 @@ fn run_case(case: &Path, name: &str, update: bool) {
     let out = flint_with_env(&args, repo.path(), &env_refs);
 
     let repo_str = repo.path().to_string_lossy();
-    let stderr = normalize_timing(&strip_ansi(
-        &String::from_utf8_lossy(&out.stderr).replace(repo_str.as_ref(), "<REPO>"),
-    ));
-    let stdout = normalize_timing(&strip_ansi(
-        &String::from_utf8_lossy(&out.stdout).replace(repo_str.as_ref(), "<REPO>"),
-    ));
+    let repo_canonical_str = repo
+        .path()
+        .canonicalize()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let normalize = |s: String| -> String {
+        // Replace canonical path first (e.g. /private/var/... on macOS), then the
+        // non-canonical one, so both forms are collapsed to <REPO>.
+        let s = if repo_canonical_str != repo_str.as_ref() {
+            s.replace(&repo_canonical_str, "<REPO>")
+        } else {
+            s
+        };
+        s.replace(repo_str.as_ref(), "<REPO>")
+    };
+    let stderr = normalize_timing(&strip_ansi(&normalize(
+        String::from_utf8_lossy(&out.stderr).into_owned(),
+    )));
+    let stdout = normalize_timing(&strip_ansi(&normalize(
+        String::from_utf8_lossy(&out.stdout).into_owned(),
+    )));
 
     if update {
         write_test_toml(

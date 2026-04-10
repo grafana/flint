@@ -575,6 +575,13 @@ a second inventory of the same tools in `.pre-commit-config.yaml`, with its own
 versioning and install lifecycle. That's friction without benefit for repos that
 are already mise-first.
 
+### Why not Husky?
+
+Husky manages git hooks for Node.js projects and requires `npm install` to activate.
+Repos that aren't Node-first still need a `package.json` and a dev dependency just to
+run hooks. `flint hook install` writes a single shell script directly to `.git/hooks/`
+with no install step and no language runtime dependency.
+
 ### Why not Spotless (or other Maven formatter plugins)?
 
 Spotless runs `google-java-format` as a Maven build phase, which means format

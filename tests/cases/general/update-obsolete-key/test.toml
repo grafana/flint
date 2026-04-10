@@ -1,7 +1,7 @@
 [expected]
 args = "update"
 exit = 0
-stdout = '  replaced "npm:markdownlint-cli" → "npm:markdownlint-cli2"\n'
+stdout = "  replaced \"npm:markdownlint-cli\" → \"npm:markdownlint-cli2\"\n"
 
 [expected.files]
 "mise.toml" = '''

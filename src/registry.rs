@@ -251,8 +251,8 @@ impl Check {
     }
 
     /// On Windows, invoke this binary via `java -jar <path>` rather than directly.
-    /// Use for self-executing JARs (e.g. ktlint) that cannot be run via cmd.exe.
-    pub fn java_jar(mut self) -> Self {
+    /// Use for self-executing JARs (e.g. ktlint) that cmd.exe cannot run.
+    pub fn windows_java_jar(mut self) -> Self {
         self.windows_java_jar = true;
         self
     }
@@ -551,7 +551,7 @@ fn check_ktlint() -> Check {
         "ktlint --format --log-level=error {ROOT}",
     )
     .mise_tool("github:pinterest/ktlint")
-    .java_jar()
+    .windows_java_jar()
     .formatter()
     .desc("Lint and format Kotlin code")
     .lang()

@@ -520,19 +520,24 @@ fn normalize_output(s: String, repo_str: &str, repo_canonical: &str) -> String {
     };
     let s = sub(s, &repo_cmp);
 
-    // On Windows, normalize backslashes that are path separators within <REPO>-rooted paths.
-    // Only touches backslashes inside sequences starting with <REPO>, so tool-specific
-    // backslash notations (like dotnet's '\s\s\s\s') are left untouched.
+    // On Windows, normalize backslash path separators to forward slashes.
+    // Skip content inside single quotes to preserve tool-specific notations
+    // like dotnet's whitespace descriptions: Insert '\s\s\s\s'.
     #[cfg(windows)]
     let s = {
-        use regex::Regex;
-        // Match <REPO> followed by path chars (alphanumeric, ., /, \, _, -)
-        // and replace all \ within that match with /.
-        let re = Regex::new(r"<REPO>[A-Za-z0-9_./\\\-]+").unwrap();
-        let s = re
-            .replace_all(&s, |caps: &regex::Captures| caps[0].replace('\\', "/"))
-            .into_owned();
-        s.replace("file:///<REPO>", "file://<REPO>")
+        let mut out = String::with_capacity(s.len());
+        let mut in_single_quote = false;
+        for ch in s.chars() {
+            match ch {
+                '\'' => {
+                    in_single_quote = !in_single_quote;
+                    out.push(ch);
+                }
+                '\\' if !in_single_quote => out.push('/'),
+                other => out.push(other),
+            }
+        }
+        out.replace("file:///<REPO>", "file://<REPO>")
     };
     s
 }

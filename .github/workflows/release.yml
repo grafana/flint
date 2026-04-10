@@ -45,5 +45,6 @@ jobs:
           build-tool: ${{ matrix.build-tool }}
           tar: unix
           zip: windows
+          checksum: sha256
         env:
           GITHUB_TOKEN: ${{ github.token }}

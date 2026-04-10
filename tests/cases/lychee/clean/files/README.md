@@ -1,3 +1,3 @@
 # Test
 
-[valid link](https://example.com)
+[valid link](./existing.md)

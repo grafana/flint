@@ -1,3 +1,3 @@
 # Test
 
-[broken link](https://example.com/does-not-exist)
+[broken link](./nonexistent.md)

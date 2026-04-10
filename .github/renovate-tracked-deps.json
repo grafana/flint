@@ -4,6 +4,11 @@
       "mise"
     ]
   },
+  ".github/workflows/test.yml": {
+    "regex": [
+      "mise"
+    ]
+  },
   "mise.toml": {
     "mise": [
       "actionlint",

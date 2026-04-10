@@ -4,11 +4,6 @@ use std::process::{Command, Output};
 use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
-/// Runs the flint binary in the given directory with the given args.
-fn flint(args: &[&str], cwd: &Path) -> Output {
-    flint_with_env(args, cwd, &[])
-}
-
 /// Runs the flint binary with additional environment variables.
 fn flint_with_env(args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Output {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_flint"));
@@ -73,8 +68,8 @@ fn git_repo() -> TempDir {
 /// Set FLINT_CASES=<dir> to run only cases under that directory (e.g. FLINT_CASES=shellcheck
 /// or FLINT_CASES=shellcheck/clean). Top-level groups run in parallel.
 ///
-/// Fake binaries are Unix shell scripts — this test is skipped on non-Unix platforms.
-#[cfg(unix)]
+/// Cases that declare `[fake_bins]` are skipped on non-Unix platforms because the
+/// fake binaries are shell scripts. All other cases run on every platform.
 #[test]
 fn cases() {
     let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/cases");
@@ -192,6 +187,17 @@ fn run_case(case: &Path, name: &str, update: bool) {
         .get("exit")
         .and_then(|v| v.as_integer())
         .unwrap_or(0) as i32;
+
+    // Skip cases that use shell-script fake binaries on non-Unix platforms.
+    #[cfg(not(unix))]
+    if cfg
+        .get("fake_bins")
+        .and_then(|v| v.as_table())
+        .is_some_and(|t| !t.is_empty())
+    {
+        eprintln!("{name}: skipped (fake_bins requires Unix)");
+        return;
+    }
 
     let repo = git_repo();
 
@@ -373,10 +379,13 @@ fn toml_escape(s: &str) -> String {
 /// `[name] 123ms` and `[name] 1.2s` both become `[name] Xms`.
 fn normalize_timing(s: &str) -> String {
     use regex::Regex;
-    // Match the timing suffix at the end of a check header line.
-    // Header lines start with "[" and end with " <number>ms" or " <number>.<number>s".
+    // Flint check header lines: "[name] 123ms" or "[name] 1.2s"
     let re = Regex::new(r"(?m)^(\[[^\]]+\]) \d+(?:\.\d+)?(?:ms|s)$").unwrap();
-    re.replace_all(s, "$1 Xms").into_owned()
+    let s = re.replace_all(s, "$1 Xms");
+    // Biome summary line: "Checked N file(s) in 1234µs. No fixes applied."
+    let re2 = Regex::new(r"Checked \d+ files? in \d+(?:\.\d+)?(?:µs|ms|s)\.").unwrap();
+    re2.replace_all(&s, "Checked N file(s) in Xµs.")
+        .into_owned()
 }
 
 /// Strips ANSI/VT escape sequences (colour codes, character-set switches, etc.).

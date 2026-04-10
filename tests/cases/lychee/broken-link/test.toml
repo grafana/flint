@@ -4,7 +4,12 @@ exit = 1
 stderr = '''
 [lychee]
 ==> Checking all links in all files
-[404] https://example.com/does-not-exist
+Issues found in 1 input. Find details below.
+
+[./README.md]:
+[ERROR] file://<REPO>/nonexistent.md | Cannot find file: File not found. Check if file exists and path is correct
+
+🔍 1 Total (in 0s) ✅ 0 OK 🚫 1 Error
 
 flint: 1 check failed (lychee)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
@@ -12,10 +17,3 @@ flint: 1 check failed (lychee)
 
 [env]
 LYCHEE_SKIP_GITHUB_REMAPS = "true"
-
-[fake_bins]
-lychee = '''
-#!/bin/sh
-echo "[404] https://example.com/does-not-exist"
-exit 1
-'''

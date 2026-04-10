@@ -9,17 +9,3 @@ flint: fixed: biome-format — commit before pushing
 "data.json" = """
 { "foo": "bar", "baz": 1 }
 """
-[fake_bins]
-biome = '''
-#!/bin/sh
-case "$*" in
-  *--write*)
-    for last; do :; done
-    printf '{ "foo": "bar", "baz": 1 }\n' > "$last"
-    ;;
-  *)
-    printf 'data.json: Formatter would have printed different content\n' >&2
-    exit 1
-    ;;
-esac
-'''

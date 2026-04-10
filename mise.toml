@@ -15,10 +15,15 @@ editorconfig-checker = "v3.6.1"
 "pipx:ruff" = "0.15.0"
 "pipx:codespell" = "2.4.1"
 rust = { version = "1.94.1", components = "clippy,rustfmt" }
+
+# Tools not used to lint this repo, but required for e2e tests
+go = "1.26.2"
 hadolint = "2.14.0"
 "github:pinterest/ktlint" = "1.8.0"
 dotnet = "10.0.201"
 "cargo:xmloxide" = "0.4.1"
+golangci-lint = "2.11.4"
+"github:google/google-java-format" = "1.35.0"
 
 [tasks."setup:update-super-linter-versions"]
 description = "Generate super-linter version mapping from the super-linter repo"

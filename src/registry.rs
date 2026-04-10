@@ -539,11 +539,6 @@ fn check_ktlint() -> Check {
         "ktlint --format --log-level=error {ROOT}",
     )
     .mise_tool("github:pinterest/ktlint")
-    .bin(if cfg!(windows) {
-        "ktlint.bat"
-    } else {
-        "ktlint"
-    })
     .formatter()
     .desc("Lint and format Kotlin code")
     .lang()
@@ -702,6 +697,12 @@ pub fn read_mise_tools(project_root: &Path) -> HashMap<String, String> {
         .collect();
     for (alias, version) in aliases {
         tools.entry(alias).or_insert(version);
+    }
+    // Hard-coded aliases for repos where the binary name differs from the repo name.
+    // "github:mvdan/sh" → last component is "sh", but the binary is "shfmt".
+    // Permanent: consuming repos may use either key and check_active must find shfmt.
+    if let Some(v) = tools.get("sh").cloned() {
+        tools.entry("shfmt".to_string()).or_insert(v);
     }
     tools
 }

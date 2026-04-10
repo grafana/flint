@@ -63,15 +63,15 @@ Add the linting tools your project needs alongside the `flint` binary itself:
 flint   = "0.x.y"
 
 # Add whichever linters apply to your repo:
-shellcheck  = "v0.11.0"
-shfmt       = "v3.12.0"
-actionlint  = "1.7.10"
+shellcheck              = "v0.11.0"
+shfmt                   = "v3.12.0"
+actionlint              = "1.7.10"
 "npm:markdownlint-cli2" = "0.47.0"
-"npm:prettier"         = "3.5.0"
-rust        = "1.87.0"   # activates cargo-fmt + cargo-clippy
-go          = "1.24.0"   # activates gofmt
-lychee      = "0.18.0"   # activates links check
-"npm:renovate" = "39.0.0" # activates renovate-deps check (slow)
+"npm:prettier"          = "3.5.0"
+rust                    = "1.87.0"    # activates cargo-fmt + cargo-clippy
+go                      = "1.24.0"    # activates gofmt
+lychee                  = "0.18.0"    # activates links check
+"npm:renovate"          = "39.0.0"    # activates renovate-deps check (slow)
 ```
 
 Then wire up lint tasks:

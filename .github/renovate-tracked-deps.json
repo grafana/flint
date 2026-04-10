@@ -16,6 +16,8 @@
       "dotnet",
       "editorconfig-checker",
       "github:google/google-java-format",
+      "github:koalaman/shellcheck",
+      "github:mvdan/sh",
       "github:pinterest/ktlint",
       "go",
       "golangci-lint",
@@ -28,9 +30,7 @@
       "npm:renovate",
       "pipx:codespell",
       "pipx:ruff",
-      "rust",
-      "shellcheck",
-      "shfmt"
+      "rust"
     ]
   },
   "src/init/generation.rs": {

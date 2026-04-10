@@ -200,10 +200,10 @@ exclude = ["CHANGELOG.md", "vendor/**"]         # glob patterns — exclude matc
 
 [checks.links]
 config = ".github/config/lychee.toml"           # lychee config path
-check_all_local = true                           # second pass: local links in all files
+check_all_local = true                          # second pass: local links in all files
 
 [checks.renovate-deps]
-exclude_managers = ["github-actions", "cargo"]   # skip these Renovate managers
+exclude_managers = ["github-actions", "cargo"]  # skip these Renovate managers
 ```
 
 ### `FLINT_CONFIG_DIR`

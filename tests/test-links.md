@@ -1,6 +1,6 @@
 # Link remap smoke test
 
-These links exercise the GitHub URL remap rules in `tasks/lint/links.sh`.
+These links exercise the GitHub URL remap rules in `src/linters/lychee.rs`.
 On PR branches, lychee rewrites `blob/main/` URLs to the PR branch —
 these links verify that each remap rule works correctly during CI.
 

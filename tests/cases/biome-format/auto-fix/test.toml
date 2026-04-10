@@ -1,0 +1,11 @@
+[expected]
+args = "run --full --fix biome-format"
+exit = 1
+stderr = '''
+flint: fixed: biome-format — commit before pushing
+'''
+
+[expected.files]
+"data.json" = """
+{ "foo": "bar", "baz": 1 }
+"""

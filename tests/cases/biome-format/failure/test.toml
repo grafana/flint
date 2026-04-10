@@ -1,0 +1,23 @@
+[expected]
+args = "run --full biome-format"
+exit = 1
+stderr = '''
+[biome-format]
+Checked N file(s) in Xµs. No fixes applied.
+Found 1 error.
+data.json format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+    1 │ {·"foo":·"bar",·"baz":·1·}
+      │  +      +      +      + + 
+
+format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some errors were emitted while running checks.
+  
+
+
+flint: 1 check failed (biome-format)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''

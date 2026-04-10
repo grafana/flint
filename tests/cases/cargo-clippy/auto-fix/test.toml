@@ -1,0 +1,13 @@
+[expected]
+args = "run --full --fix cargo-clippy"
+exit = 1
+stderr = '''
+flint: fixed: cargo-clippy — commit before pushing
+'''
+
+[expected.files]
+"src/lib.rs" = """
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+"""

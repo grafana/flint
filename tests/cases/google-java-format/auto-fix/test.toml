@@ -1,0 +1,15 @@
+[expected]
+args = "run --full --fix google-java-format"
+exit = 1
+stderr = '''
+flint: fixed: google-java-format — commit before pushing
+'''
+
+[expected.files]
+"Hello.java" = """
+public class Hello {
+  public static void main(String[] args) {
+    System.out.println("Hello, World!");
+  }
+}
+"""

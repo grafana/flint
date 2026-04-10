@@ -1,0 +1,25 @@
+# Regression: with multiple changed .rs files (including a module root), each
+# formatting issue must appear exactly once. The old per-file rustfmt approach
+# would output math.rs twice: once via `mod math` in main.rs, once directly.
+[expected]
+args = "run cargo-fmt"
+exit = 1
+stderr = '''
+[cargo-fmt]
+Diff in <REPO>/src/main.rs:1:
+ mod math;
+-fn main() { math::add(1, 2); }
++fn main() {
++    math::add(1, 2);
++}
+ 
+Diff in <REPO>/src/math.rs:1:
+-pub fn add(a: i32, b: i32) -> i32 { a + b }
++pub fn add(a: i32, b: i32) -> i32 {
++    a + b
++}
+ 
+
+flint: 1 check failed (cargo-fmt)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''

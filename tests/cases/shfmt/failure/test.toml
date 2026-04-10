@@ -1,0 +1,18 @@
+[expected]
+args = "run --full shfmt"
+exit = 1
+stderr = '''
+[shfmt]
+diff <REPO>/script.sh.orig <REPO>/script.sh
+--- <REPO>/script.sh.orig
++++ <REPO>/script.sh
+@@ -1,4 +1,4 @@
+ #!/bin/sh
+ if true; then
+-  echo "hello"
++	echo "hello"
+ fi
+
+flint: 1 check failed (shfmt)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''

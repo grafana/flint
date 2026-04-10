@@ -1,0 +1,11 @@
+[expected]
+args = "run --full codespell"
+exit = 1
+stderr = '''
+[codespell]
+<REPO>/README.md:3: teh ==> the
+<REPO>/README.md:3: teh ==> the
+
+flint: 1 check failed (codespell)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''

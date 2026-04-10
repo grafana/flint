@@ -1,0 +1,10 @@
+[expected]
+args = "run --full google-java-format"
+exit = 1
+stderr = '''
+[google-java-format]
+<REPO>/Hello.java
+
+flint: 1 check failed (google-java-format)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''

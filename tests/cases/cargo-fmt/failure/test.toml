@@ -1,0 +1,16 @@
+[expected]
+args = "run --full cargo-fmt"
+exit = 1
+stderr = '''
+[cargo-fmt]
+Diff in <REPO>/src/lib.rs:1:
+-pub struct Foo { pub a: u32, pub b: u32 }
++pub struct Foo {
++    pub a: u32,
++    pub b: u32,
++}
+ 
+
+flint: 1 check failed (cargo-fmt)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''

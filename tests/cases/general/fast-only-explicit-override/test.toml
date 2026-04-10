@@ -1,0 +1,11 @@
+# --fast-only is overridden when linters are named explicitly.
+# Naming a linter explicitly must run it regardless of --fast-only.
+[expected]
+args = "run --full --fast-only renovate-deps"
+exit = 0
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"npm":[{"packageFile":"package.json","deps":[{"depName":"express"},{"depName":"lodash"}]}]}}'
+'''

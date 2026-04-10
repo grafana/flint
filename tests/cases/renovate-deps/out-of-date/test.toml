@@ -1,0 +1,39 @@
+[expected]
+args = "run --full renovate-deps"
+exit = 1
+stderr = '''
+[renovate-deps]
+--- .github/renovate-tracked-deps.json
++++ generated
+@@ -1,7 +1,13 @@
+ {
++  "mise.toml": {
++    "mise": [
++      "npm:renovate"
++    ]
++  },
+   "package.json": {
+     "npm": [
+-      "old-dep"
++      "express",
++      "lodash"
+     ]
+   }
+ }
+ERROR: renovate-tracked-deps.json is out of date.
+Run `flint run --fix renovate-deps` to update.
+
+flint: 1 check failed (renovate-deps)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''
+
+[expected.files]
+".github/renovate-tracked-deps.json" = """
+{
+  "package.json": {
+    "npm": [
+      "old-dep"
+    ]
+  }
+}
+"""

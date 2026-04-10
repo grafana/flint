@@ -159,6 +159,7 @@ pub async fn run(
     Ok(collected)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn prepare(
     check: &Check,
     file_list: &FileList,

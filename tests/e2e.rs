@@ -520,23 +520,18 @@ fn normalize_output(s: String, repo_str: &str, repo_canonical: &str) -> String {
     };
     let s = sub(s, &repo_cmp);
 
-    // On Windows, normalize backslashes that are path separators — i.e. flanked by
-    // path-component characters — so snapshots written on Unix match Windows output.
-    // This intentionally skips backslashes inside quoted strings like dotnet's '\s\s\s\s'.
+    // On Windows, normalize backslashes that are path separators within <REPO>-rooted paths.
+    // Only touches backslashes inside sequences starting with <REPO>, so tool-specific
+    // backslash notations (like dotnet's '\s\s\s\s') are left untouched.
     #[cfg(windows)]
     let s = {
         use regex::Regex;
-        // Replace \ when preceded and followed by path-component chars (not ' or whitespace).
-        // Loop because a single pass only handles one \ per two-char window.
-        let re = Regex::new(r"([A-Za-z0-9_.>/\-])\\([A-Za-z0-9_.])").unwrap();
-        let mut s = s;
-        loop {
-            let next = re.replace_all(&s, "$1/$2").into_owned();
-            if next == s {
-                break;
-            }
-            s = next;
-        }
+        // Match <REPO> followed by path chars (alphanumeric, ., /, \, _, -)
+        // and replace all \ within that match with /.
+        let re = Regex::new(r"<REPO>[A-Za-z0-9_./\\\-]+").unwrap();
+        let s = re
+            .replace_all(&s, |caps: &regex::Captures| caps[0].replace('\\', "/"))
+            .into_owned();
         s.replace("file:///<REPO>", "file://<REPO>")
     };
     s

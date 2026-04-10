@@ -48,20 +48,5 @@ jobs:
       - name: Restore cache
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
-      - name: Debug Windows install dirs
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $base = "$env:LOCALAPPDATA\mise\installs"
-          foreach ($dir in @("github-mvdan-sh", "npm-prettier", "npm-biomejs-biome", "github-pinterest-ktlint")) {
-            $full = Get-ChildItem "$base\$dir" -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($full) {
-              Write-Host "=== $dir\$($full.Name) ==="
-              Get-ChildItem "$base\$dir\$($full.Name)" -Recurse -File | Select-Object FullName, Length | Format-Table
-            }
-          }
-          Write-Host "=== shims ==="
-          Get-ChildItem "$env:LOCALAPPDATA\mise\shims" -File | Where-Object { $_.Name -match "shfmt|prettier|biome|ktlint" } | Select-Object Name, Length | Format-Table
-
       - name: Test
         run: cargo test

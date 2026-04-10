@@ -131,9 +131,7 @@ pub fn replace_obsolete_keys(
         Ok(c) => c,
         Err(_) => return Ok(vec![]),
     };
-    let mut doc: toml_edit::DocumentMut = content
-        .parse()
-        .context("failed to parse mise.toml")?;
+    let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse mise.toml")?;
 
     let mut replaced = vec![];
     if let Some(tools) = doc.get_mut("tools").and_then(|t| t.as_table_mut()) {
@@ -672,21 +670,28 @@ mod replace_obsolete_tests {
     fn replaces_old_key_preserving_version() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mise.toml");
-        std::fs::write(
-            &path,
-            "[tools]\n\"npm:markdownlint-cli\" = \"0.39.0\"\n",
+        std::fs::write(&path, "[tools]\n\"npm:markdownlint-cli\" = \"0.39.0\"\n").unwrap();
+        let replaced = replace_obsolete_keys(
+            dir.path(),
+            &[("npm:markdownlint-cli", "npm:markdownlint-cli2")],
         )
         .unwrap();
-        let replaced =
-            replace_obsolete_keys(dir.path(), &[("npm:markdownlint-cli", "npm:markdownlint-cli2")])
-                .unwrap();
         assert_eq!(
             replaced,
-            vec![("npm:markdownlint-cli".to_string(), "npm:markdownlint-cli2".to_string())]
+            vec![(
+                "npm:markdownlint-cli".to_string(),
+                "npm:markdownlint-cli2".to_string()
+            )]
         );
         let result = std::fs::read_to_string(&path).unwrap();
-        assert!(result.contains("npm:markdownlint-cli2"), "new key written: {result}");
-        assert!(!result.contains("\"npm:markdownlint-cli\""), "old key removed: {result}");
+        assert!(
+            result.contains("npm:markdownlint-cli2"),
+            "new key written: {result}"
+        );
+        assert!(
+            !result.contains("\"npm:markdownlint-cli\""),
+            "old key removed: {result}"
+        );
         assert!(result.contains("0.39.0"), "version preserved: {result}");
     }
 
@@ -695,9 +700,11 @@ mod replace_obsolete_tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mise.toml");
         std::fs::write(&path, "[tools]\n\"npm:markdownlint-cli2\" = \"0.17.2\"\n").unwrap();
-        let replaced =
-            replace_obsolete_keys(dir.path(), &[("npm:markdownlint-cli", "npm:markdownlint-cli2")])
-                .unwrap();
+        let replaced = replace_obsolete_keys(
+            dir.path(),
+            &[("npm:markdownlint-cli", "npm:markdownlint-cli2")],
+        )
+        .unwrap();
         assert!(replaced.is_empty());
     }
 }

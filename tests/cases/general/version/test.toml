@@ -1,0 +1,4 @@
+[expected]
+args = "version"
+exit = 0
+stdout = 'flint 0.20.0-alpha.1\n'

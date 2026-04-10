@@ -664,7 +664,9 @@ pub const OBSOLETE_KEYS: &[(&str, &str)] = &[
 
 /// Checks whether any obsolete tool keys are present in `mise_tools`.
 /// Returns the first violation found as `(obsolete_key, replacement_key)`.
-pub fn find_obsolete_key(mise_tools: &HashMap<String, String>) -> Option<(&'static str, &'static str)> {
+pub fn find_obsolete_key(
+    mise_tools: &HashMap<String, String>,
+) -> Option<(&'static str, &'static str)> {
     OBSOLETE_KEYS
         .iter()
         .find(|(old, _)| mise_tools.contains_key(*old))
@@ -795,7 +797,10 @@ mod tests {
         let mut tools = HashMap::new();
         tools.insert("npm:markdownlint-cli".to_string(), "0.39.0".to_string());
         let result = find_obsolete_key(&tools);
-        assert_eq!(result, Some(("npm:markdownlint-cli", "npm:markdownlint-cli2")));
+        assert_eq!(
+            result,
+            Some(("npm:markdownlint-cli", "npm:markdownlint-cli2"))
+        );
     }
 
     #[test]

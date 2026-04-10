@@ -51,6 +51,18 @@ pub enum CheckKind {
     Special(SpecialKind),
 }
 
+/// Alternative installation path for a check: a different mise tool key that provides
+/// the same binary under a different name (e.g. `"github:mvdan/sh"` installs shfmt as
+/// `shfmt_v3.12.0` rather than `shfmt`).
+#[derive(Debug, Clone)]
+pub struct AltInstall {
+    /// The alternative mise.toml tool key (e.g. `"github:mvdan/sh"`).
+    pub key: &'static str,
+    /// Binary name format string; `{version}` is replaced with the version from mise.toml.
+    /// E.g. `"shfmt_{version}"` with version `"v3.12.0"` → `"shfmt_v3.12.0"`.
+    pub bin_fmt: &'static str,
+}
+
 #[derive(Debug, Clone)]
 pub struct Check {
     pub name: &'static str,
@@ -90,6 +102,11 @@ pub struct Check {
     /// entry: `rust = { version = "latest", components = "clippy,rustfmt" }`.
     pub mise_install_components: Option<&'static str>,
     pub kind: CheckKind,
+    /// Alternative installation: a different mise tool key that also provides this check,
+    /// with a binary name format that may differ from `bin_name`. The `bin_fmt` field
+    /// uses `{version}` as a placeholder for the installed version from mise.toml
+    /// (e.g. `"shfmt_{version}"` with version `"v3.12.0"` → `"shfmt_v3.12.0"`).
+    pub alt_install: Option<AltInstall>,
     /// Plain-text description of what the check does — shown in `flint linters` and the README table.
     pub desc: &'static str,
     /// Extended markdown documentation shown in the README detail section (behaviour, config examples).
@@ -167,6 +184,7 @@ impl Check {
                 full_fix_cmd: "",
                 scope,
             },
+            alt_install: None,
             desc: "",
             docs: "",
         }
@@ -189,6 +207,7 @@ impl Check {
             mise_install_key: None,
             mise_install_components: None,
             kind: CheckKind::Special(kind),
+            alt_install: None,
             desc: "",
             docs: "",
         }
@@ -266,6 +285,13 @@ impl Check {
     /// Always considered active regardless of mise.toml (for config-activated checks).
     pub fn activate_unconditionally(mut self) -> Self {
         self.activate_unconditionally = true;
+        self
+    }
+
+    /// Register an alternative mise tool key for this check, with a versioned binary name.
+    /// Used when a backend installs the binary under a versioned name (e.g. `shfmt_v3.12.0`).
+    pub fn alt_install(mut self, key: &'static str, bin_fmt: &'static str) -> Self {
+        self.alt_install = Some(AltInstall { key, bin_fmt });
         self
     }
 
@@ -353,6 +379,7 @@ fn check_shfmt() -> Check {
     Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"])
         .fix("shfmt -w {FILE}")
         .formatter()
+        .alt_install("github:mvdan/sh", "shfmt_{version}")
         .desc("Format shell scripts")
         .style()
 }
@@ -698,12 +725,6 @@ pub fn read_mise_tools(project_root: &Path) -> HashMap<String, String> {
     for (alias, version) in aliases {
         tools.entry(alias).or_insert(version);
     }
-    // Hard-coded aliases for repos where the binary name differs from the repo name.
-    // "github:mvdan/sh" → last component is "sh", but the binary is "shfmt".
-    // Permanent: consuming repos may use either key and check_active must find shfmt.
-    if let Some(v) = tools.get("sh").cloned() {
-        tools.entry("shfmt".to_string()).or_insert(v);
-    }
     tools
 }
 
@@ -713,8 +734,15 @@ pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool
     if check.activate_unconditionally {
         return true;
     }
+    // Check primary key first, then alt_install key.
     let lookup_key = check.mise_tool_name.unwrap_or(check.bin_name);
-    let Some(declared) = mise_tools.get(lookup_key) else {
+    let declared = mise_tools.get(lookup_key).or_else(|| {
+        check
+            .alt_install
+            .as_ref()
+            .and_then(|a| mise_tools.get(a.key))
+    });
+    let Some(declared) = declared else {
         return false;
     };
     let Some(range_str) = check.version_range else {
@@ -724,6 +752,19 @@ pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool
         return false;
     };
     coerce_version(declared).is_some_and(|v| req.matches(&v))
+}
+
+/// Returns the binary name to use for this check given the active mise tools.
+/// When the check is installed via its `alt_install` key, the versioned binary
+/// name is derived from `bin_fmt` + the installed version (e.g. `"shfmt_v3.12.0"`).
+/// Falls back to `check.bin_name` for standard installations.
+pub fn resolve_bin_name(check: &Check, mise_tools: &HashMap<String, String>) -> String {
+    if let Some(alt) = &check.alt_install
+        && let Some(version) = mise_tools.get(alt.key)
+    {
+        return alt.bin_fmt.replace("{version}", version);
+    }
+    check.bin_name.to_string()
 }
 
 /// Returns true if `bin_name` exists as a file in any directory in `path_var`
@@ -792,11 +833,12 @@ mod tests {
     #[test]
     fn all_registry_binaries_found() {
         let registry = builtin();
+        let mise_tools = read_mise_tools(Path::new(env!("CARGO_MANIFEST_DIR")));
 
         let not_found: Vec<&str> = registry
             .iter()
             .filter(|c| c.uses_binary())
-            .filter(|c| !binary_on_path(c.bin_name))
+            .filter(|c| !binary_on_path(&resolve_bin_name(c, &mise_tools)))
             .map(|c| c.name)
             .collect();
 

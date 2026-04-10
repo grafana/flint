@@ -787,10 +787,8 @@ mod tests {
     /// even if they are not declared in this repo's mise.toml.
     ///
     /// This test will fail on machines where not all linter tools are installed,
-    /// which is intentional: it identifies what is missing. Run with
-    /// `cargo test -- --ignored all_registry_binaries_found` to check locally.
+    /// which is intentional: it identifies what is missing.
     #[test]
-    #[ignore]
     fn all_registry_binaries_found() {
         let registry = builtin();
 

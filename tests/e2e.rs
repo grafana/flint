@@ -493,23 +493,51 @@ fn normalize_output(s: String, repo_str: &str, repo_canonical: &str) -> String {
 
     #[cfg(windows)]
     let (s, canonical_cmp, repo_cmp) = {
-        let s = s.replace('\\', "/").replace("//?/", "");
-        (
-            s,
-            repo_canonical.replace('\\', "/"),
-            repo_str.replace('\\', "/"),
-        )
+        // Strip the Windows verbatim UNC prefix \\?\ before substitution.
+        // Also strip //?/ which appears if the UNC prefix got mixed with forward slashes.
+        let s = s.replace(r"\\?\", "").replace("//?/", "");
+        // Substitute using both backslash and forward-slash forms so paths from
+        // different tools (shfmt uses \, lychee uses /) are all collapsed.
+        (s, repo_canonical.to_string(), repo_str.to_string())
     };
     #[cfg(not(windows))]
     let (s, canonical_cmp, repo_cmp) = (s, repo_canonical.to_string(), repo_str.to_string());
 
+    // Substitute using both the canonical form (e.g. long name on Windows, /private/... on
+    // macOS) and the raw form, in both backslash and forward-slash variants.
+    let sub = |s: String, pat: &str| -> String {
+        if pat.is_empty() {
+            return s;
+        }
+        #[cfg(windows)]
+        let s = s.replace(&pat.replace('\\', "/"), "<REPO>");
+        s.replace(pat, "<REPO>")
+    };
     let s = if canonical_cmp != repo_cmp {
-        s.replace(&canonical_cmp, "<REPO>")
+        sub(s, &canonical_cmp)
     } else {
         s
     };
-    let s = s.replace(&repo_cmp, "<REPO>");
+    let s = sub(s, &repo_cmp);
+
+    // On Windows, normalize backslashes that are path separators — i.e. flanked by
+    // path-component characters — so snapshots written on Unix match Windows output.
+    // This intentionally skips backslashes inside quoted strings like dotnet's '\s\s\s\s'.
     #[cfg(windows)]
-    let s = s.replace("file:///<REPO>", "file://<REPO>");
+    let s = {
+        use regex::Regex;
+        // Replace \ when preceded and followed by path-component chars (not ' or whitespace).
+        // Loop because a single pass only handles one \ per two-char window.
+        let re = Regex::new(r"([A-Za-z0-9_.>/\-])\\([A-Za-z0-9_.])").unwrap();
+        let mut s = s;
+        loop {
+            let next = re.replace_all(&s, "$1/$2").into_owned();
+            if next == s {
+                break;
+            }
+            s = next;
+        }
+        s.replace("file:///<REPO>", "file://<REPO>")
+    };
     s
 }

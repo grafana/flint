@@ -675,7 +675,6 @@ mod tests {
             defers_to_formatters: false,
             activate_unconditionally: false,
             category: Category::Default,
-            mise_install_key: None,
             mise_install_components: None,
             kind: CheckKind::Template {
                 check_cmd: "run-it",

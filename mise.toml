@@ -37,10 +37,6 @@ run = "cargo run -q -- run"
 description = "Auto-fix lint issues"
 run = "cargo run -q -- run --fix"
 
-[tasks."lint:pre-commit"]
-description = "Fast auto-fix lint pass (skips slow checks like renovate) — intended for pre-commit/pre-push hooks"
-run = "cargo run -q -- run --fix --fast-only"
-
 [tasks.build]
 description = "Build the project"
 run = "cargo build"

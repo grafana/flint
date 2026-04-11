@@ -12,7 +12,7 @@ crossterm = "0.28"
 clap = { version = "4", features = ["derive", "env"] }
 figment = { version = "0.10", features = ["toml", "env"] }
 serde = { version = "1", features = ["derive"] }
-toml = "0.8"
+toml = "0.9"
 tokio = { version = "1", features = ["full"] }
 semver = "1"
 regex = "1"

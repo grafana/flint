@@ -7,7 +7,7 @@ markdownlint-cli2 <VERSION>
 Finding: <REPO>/README.md
 Linting: 1 file(s)
 Summary: 1 error(s)
-README.md:3:26 error MD009/no-trailing-spaces Trailing spaces [Expected: 0 or 2; Actual: 3]
+README.md:3:26 MD009/no-trailing-spaces Trailing spaces [Expected: 0 or 2; Actual: 3]
 
 flint: 1 check failed (markdownlint-cli2)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.

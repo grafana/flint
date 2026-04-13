@@ -129,7 +129,8 @@ pub fn replace_obsolete_keys(
     let path = project_root.join("mise.toml");
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,
-        Err(_) => return Ok(vec![]),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(vec![]),
+        Err(e) => return Err(e).with_context(|| format!("failed to read {}", path.display())),
     };
     let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse mise.toml")?;
 

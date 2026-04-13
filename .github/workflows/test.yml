@@ -18,10 +18,10 @@ jobs:
         include:
           - os: ubuntu-24.04
             mise_version: v2026.4.10
-            mise_sha256: 78e91794c9139ab787c9a4de5e9e63a56d65b16bce60912884cb09f7114f7275
+            mise_sha256: 84636e19a0e5001d7499f58ae5a868cec8f6ba4f52f9028680bb7cd802564229
           - os: macos-15
             mise_version: v2026.4.10
-            mise_sha256: dd36283b3418070e1606a2e80839577a8d895f02c1df0d23e424e7104efac81c
+            mise_sha256: e09f5ae83369d3c6d44572e9f2de0bf9454718e23ccb41a4138f8f88d28cbb31
           - os: windows-2025
             mise_version: v2026.4.10
             mise_sha256: 2df0ce5b1f42502a4895888a0fe7aae4cf6d1959d2dbb62f29204773cff3d457

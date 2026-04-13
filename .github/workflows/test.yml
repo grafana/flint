@@ -17,14 +17,14 @@ jobs:
       matrix:
         include:
           - os: ubuntu-24.04
-            mise_version: v2026.4.1
-            mise_sha256: c597fa1e4da76d1ea1967111d150a6a655ca51a72f4cd17fdc584be2b9eaa8bd
+            mise_version: v2026.4.10
+            mise_sha256: 78e91794c9139ab787c9a4de5e9e63a56d65b16bce60912884cb09f7114f7275
           - os: macos-15
-            mise_version: v2026.4.1
-            mise_sha256: c85b387148d478dec754ded31d01798e2f4e4e9448f75682dcc6bb7c16c9a4f5
+            mise_version: v2026.4.10
+            mise_sha256: dd36283b3418070e1606a2e80839577a8d895f02c1df0d23e424e7104efac81c
           - os: windows-2025
-            mise_version: v2026.4.1
-            mise_sha256: "" # not published for .exe — https://github.com/jdx/mise/pull/8997
+            mise_version: v2026.4.10
+            mise_sha256: 2df0ce5b1f42502a4895888a0fe7aae4cf6d1959d2dbb62f29204773cff3d457
 
     permissions:
       contents: read

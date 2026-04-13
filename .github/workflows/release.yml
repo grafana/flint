@@ -55,9 +55,9 @@ jobs:
           tar: unix
           zip: windows
           checksum: sha256
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_REF: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4

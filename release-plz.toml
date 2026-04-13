@@ -1,38 +1,18 @@
 [workspace]
 git_release_draft = true
 pr_body = """
-{% macro get_changes(releases, type="text") %}
-{%- for release in releases %}
-{%- if release.title and release.changelog %}{% if releases | length > 1 %}
-## `{{ release.package }}`
-{% endif %}
-<blockquote>
-
-## {{ release.title }}
-
-{{ release.changelog }}
-</blockquote>{% endif %}
-{% endfor %}
-{% endmacro -%}
-
-{% set changes = self::get_changes(releases=releases) %}
-
-## 🤖 New release
 {% for release in releases %}
-* `{{ release.package }}`: {% if release.previous_version and release.previous_version != release.next_version %}{{ release.previous_version }} -> {% endif %}{{ release.next_version }}{% if release.semver_check == "incompatible" %} (⚠ API breaking changes){% elif release.semver_check == "compatible" %} (✓ API compatible changes){% endif %}
-{%- endfor %}
-{%- for release in releases %}{% if release.breaking_changes %}
-
-### ⚠ `{{ release.package }}` breaking changes
+{% if release.title %}## {{ release.title }}
+{% endif %}
+{% if release.breaking_changes %}
+### ⚠ Breaking changes
 
 ```text
 {{ release.breaking_changes }}
-```{% endif %}{% endfor %}
-{% if changes %}
-<details><summary><i><b>Changelog</b></i></summary><p>
-{{ changes }}
-</p></details>
+```
 {% endif %}
+{% if release.changelog %}{{ release.changelog }}{% endif %}
+{% endfor %}
 ---
 This PR was generated with [release-plz](https://github.com/release-plz/release-plz/).
 

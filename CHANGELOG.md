@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.10.0](https://github.com/grafana/flint/compare/v0.9.2...v0.10.0) (2026-04-13)
+
+
+### Features
+
+* add flint v2 Rust binary ([#139](https://github.com/grafana/flint/issues/139)) ([19f2b25](https://github.com/grafana/flint/commit/19f2b2527b4420956f2f3f6b35cc946159370db5))
+
+
+### Bug Fixes
+
+* **deps:** update rust crate crossterm to 0.29 ([#156](https://github.com/grafana/flint/issues/156)) ([c59ae3e](https://github.com/grafana/flint/commit/c59ae3ea3da34782eaa1eeb8faba8552151f558d))
+* **deps:** update rust crate similar to v3 ([#160](https://github.com/grafana/flint/issues/160)) ([684be4e](https://github.com/grafana/flint/commit/684be4e2a1f26da34ab6a2d35dbb0a5369747596))
+* **deps:** update rust crate toml to v1 ([#161](https://github.com/grafana/flint/issues/161)) ([3aae614](https://github.com/grafana/flint/commit/3aae614582b59b0c46bed37b411bdb2753dcee5f))
+* **deps:** update rust crate toml_edit to 0.25 ([#158](https://github.com/grafana/flint/issues/158)) ([42d9efd](https://github.com/grafana/flint/commit/42d9efded7507704e5684bf7c1f06dd4ff667740))
+* run shellcheck on .bats files in native mode ([#137](https://github.com/grafana/flint/issues/137)) ([a4fd3f8](https://github.com/grafana/flint/commit/a4fd3f8ea41d9b155b13805336549e2dcad49bd4))
+
 ## [0.9.2](https://github.com/grafana/flint/compare/v0.9.1...v0.9.2) (2026-03-31)
 
 

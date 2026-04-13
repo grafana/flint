@@ -1,0 +1,4 @@
+[expected]
+args = "update"
+exit = 0
+stdout = "flint: mise.toml is up to date\n"

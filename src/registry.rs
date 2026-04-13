@@ -85,6 +85,9 @@ pub struct Check {
     /// (e.g. `"clippy,rustfmt"` for the `rust` toolchain). Produces an inline-table
     /// entry: `rust = { version = "latest", components = "clippy,rustfmt" }`.
     pub mise_install_components: Option<&'static str>,
+    /// On Windows, the binary is a self-executing JAR that cannot be run directly
+    /// or via cmd.exe — invoke as `java -jar <resolved-path>` instead.
+    pub windows_java_jar: bool,
     pub kind: CheckKind,
     /// Binary name format when the backend installs with a versioned name (e.g. `"shfmt_{version}"`
     /// → `"shfmt_v3.12.0"`). `{version}` is replaced with the version declared in mise.toml.
@@ -166,6 +169,7 @@ impl Check {
                 full_fix_cmd: "",
                 scope,
             },
+            windows_java_jar: false,
             versioned_bin_fmt: None,
             desc: "",
             docs: "",
@@ -187,6 +191,7 @@ impl Check {
             activate_unconditionally: false,
             category: Category::Default,
             mise_install_components: None,
+            windows_java_jar: false,
             kind: CheckKind::Special(kind),
             versioned_bin_fmt: None,
             desc: "",
@@ -242,6 +247,13 @@ impl Check {
     #[allow(dead_code)]
     pub fn version_req(mut self, range: &'static str) -> Self {
         self.version_range = Some(range);
+        self
+    }
+
+    /// On Windows, invoke this binary via `java -jar <path>` rather than directly.
+    /// Use for self-executing JARs (e.g. ktlint) that cmd.exe cannot run.
+    pub fn windows_java_jar(mut self) -> Self {
+        self.windows_java_jar = true;
         self
     }
 
@@ -539,6 +551,7 @@ fn check_ktlint() -> Check {
         "ktlint --format --log-level=error {ROOT}",
     )
     .mise_tool("github:pinterest/ktlint")
+    .windows_java_jar()
     .formatter()
     .desc("Lint and format Kotlin code")
     .lang()
@@ -647,7 +660,25 @@ pub const OBSOLETE_KEYS: &[(&str, &str)] = &[
     // markdownlint-cli was superseded by markdownlint-cli2 (actively maintained,
     // faster, supports the same config files). flint only supports the cli2 variant.
     ("npm:markdownlint-cli", "npm:markdownlint-cli2"),
+    // ubi: was deprecated in mise; the github: backend is the modern replacement.
+    // Repos that adopted flint before this change may still have ubi: keys.
+    (
+        "ubi:google/google-java-format",
+        "github:google/google-java-format",
+    ),
+    ("ubi:pinterest/ktlint", "github:pinterest/ktlint"),
 ];
+
+/// Checks whether any obsolete tool keys are present in `mise_tools`.
+/// Returns the first violation found as `(obsolete_key, replacement_key)`.
+pub fn find_obsolete_key(
+    mise_tools: &HashMap<String, String>,
+) -> Option<(&'static str, &'static str)> {
+    OBSOLETE_KEYS
+        .iter()
+        .find(|(old, _)| mise_tools.contains_key(*old))
+        .copied()
+}
 
 /// Reads `[tools]` from the consuming repo's mise.toml and returns a map of
 /// tool name → declared version string.
@@ -728,7 +759,10 @@ pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool
 /// Returns the binary name to use for this check given the active mise tools.
 /// When `versioned_bin_fmt` is set, the version from mise.toml is substituted
 /// into the format string (e.g. `"shfmt_{version}"` + `"v3.12.0"` → `"shfmt_v3.12.0"`).
-/// Falls back to `check.bin_name` for standard installations.
+/// This is needed for shfmt because mise's `github:` backend preserves the version
+/// suffix in the installed binary name. The backend's binary-name cleaning logic matches
+/// binaries against the repo name (e.g. `"mvdan/sh"`), so it cannot map `"shfmt"` →
+/// `"mvdan/sh"` and leaves the name as `"shfmt_v3.12.0"` rather than stripping it.
 pub fn resolve_bin_name(check: &Check, mise_tools: &HashMap<String, String>) -> String {
     if let Some(fmt) = check.versioned_bin_fmt {
         let key = check.mise_tool_name.unwrap_or(check.bin_name);
@@ -767,6 +801,24 @@ fn coerce_version(s: &str) -> Option<semver::Version> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn find_obsolete_key_detects_superseded_keys() {
+        let mut tools = HashMap::new();
+        tools.insert("npm:markdownlint-cli".to_string(), "0.39.0".to_string());
+        let result = find_obsolete_key(&tools);
+        assert_eq!(
+            result,
+            Some(("npm:markdownlint-cli", "npm:markdownlint-cli2"))
+        );
+    }
+
+    #[test]
+    fn find_obsolete_key_returns_none_for_clean_tools() {
+        let mut tools = HashMap::new();
+        tools.insert("npm:markdownlint-cli2".to_string(), "0.17.2".to_string());
+        assert_eq!(find_obsolete_key(&tools), None);
+    }
 
     /// If any entry for a bin_name declares a version_range, every entry for that
     /// bin_name must declare one. A mix of ranged and unranged entries for the same

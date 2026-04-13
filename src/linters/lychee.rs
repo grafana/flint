@@ -142,7 +142,7 @@ async fn run_lychee_cmd(
 
     let mut stdout = format!("==> {description}\n").into_bytes();
 
-    let result = super::spawn_command(&argv)
+    let result = super::spawn_command(&argv, false)
         .current_dir(project_root)
         .stdin(Stdio::null())
         .output()

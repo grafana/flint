@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to release (e.g. v0.20.0)"
+        description: "Bare tag name to release (e.g. v0.20.0, not refs/tags/v0.20.0)"
         required: true
 
 permissions: {}
@@ -42,7 +42,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
           persist-credentials: false
 
       - name: Build and upload
@@ -55,7 +55,7 @@ jobs:
           tar: unix
           zip: windows
           checksum: sha256
-          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
 

@@ -1,0 +1,3 @@
+[tools]
+"npm:markdownlint-cli2" = "0.17.2"
+shellcheck = "v0.11.0"

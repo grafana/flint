@@ -7,7 +7,7 @@ use std::path::Path;
 use crate::registry::{Category, Check, builtin};
 
 mod detection;
-mod generation;
+pub(crate) mod generation;
 mod ui;
 
 use detection::{

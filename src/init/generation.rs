@@ -118,6 +118,38 @@ fn pin_tool_via_mise(project_root: &Path, key: &str) -> bool {
     after != before && parse_tool_keys(&after).contains(key)
 }
 
+/// Replaces obsolete tool keys in mise.toml with their modern equivalents,
+/// preserving the existing version value. Returns the list of replacements made
+/// as `(old_key, new_key)` pairs. No-ops if the file doesn't exist or has no
+/// obsolete keys.
+pub fn replace_obsolete_keys(
+    project_root: &Path,
+    obsolete: &[(&str, &str)],
+) -> Result<Vec<(String, String)>> {
+    let path = project_root.join("mise.toml");
+    let content = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(vec![]),
+        Err(e) => return Err(e).with_context(|| format!("failed to read {}", path.display())),
+    };
+    let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse mise.toml")?;
+
+    let mut replaced = vec![];
+    if let Some(tools) = doc.get_mut("tools").and_then(|t| t.as_table_mut()) {
+        for &(old_key, new_key) in obsolete {
+            if let Some(value) = tools.remove(old_key) {
+                tools.insert(new_key, value);
+                replaced.push((old_key.to_string(), new_key.to_string()));
+            }
+        }
+    }
+
+    if !replaced.is_empty() {
+        std::fs::write(&path, doc.to_string()).context("failed to write mise.toml")?;
+    }
+    Ok(replaced)
+}
+
 pub(super) fn apply_changes(
     path: &Path,
     current_content: &str,
@@ -629,6 +661,53 @@ pub(super) fn maybe_install_hook(project_root: &Path, yes: bool) -> Result<()> {
         crate::hook::install(project_root)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod replace_obsolete_tests {
+    use super::replace_obsolete_keys;
+
+    #[test]
+    fn replaces_old_key_preserving_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        std::fs::write(&path, "[tools]\n\"npm:markdownlint-cli\" = \"0.39.0\"\n").unwrap();
+        let replaced = replace_obsolete_keys(
+            dir.path(),
+            &[("npm:markdownlint-cli", "npm:markdownlint-cli2")],
+        )
+        .unwrap();
+        assert_eq!(
+            replaced,
+            vec![(
+                "npm:markdownlint-cli".to_string(),
+                "npm:markdownlint-cli2".to_string()
+            )]
+        );
+        let result = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            result.contains("npm:markdownlint-cli2"),
+            "new key written: {result}"
+        );
+        assert!(
+            !result.contains("\"npm:markdownlint-cli\""),
+            "old key removed: {result}"
+        );
+        assert!(result.contains("0.39.0"), "version preserved: {result}");
+    }
+
+    #[test]
+    fn noop_when_no_obsolete_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        std::fs::write(&path, "[tools]\n\"npm:markdownlint-cli2\" = \"0.17.2\"\n").unwrap();
+        let replaced = replace_obsolete_keys(
+            dir.path(),
+            &[("npm:markdownlint-cli", "npm:markdownlint-cli2")],
+        )
+        .unwrap();
+        assert!(replaced.is_empty());
+    }
 }
 
 #[cfg(test)]

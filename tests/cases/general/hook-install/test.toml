@@ -1,0 +1,11 @@
+[expected]
+args = "hook install"
+exit = 0
+stdout = "installed pre-commit hook (.git/hooks/pre-commit)\n"
+
+[expected.files]
+".git/hooks/pre-commit" = '''
+#!/bin/sh
+# Installed by flint — run `flint hook install` to reinstall
+mise exec -- flint run --fix --fast-only
+'''

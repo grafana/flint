@@ -58,11 +58,12 @@ jobs:
           persist-credentials: false
 
       - name: Setup mise
-        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1 # zizmor: ignore[cache-poisoning]
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
         with:
           version: ${{ matrix.mise_version }}
           sha256: ${{ matrix.mise_sha256 }}
           install_args: rust
+          cache: false
 
       - name: Install cross
         if: matrix.build-tool == 'cross'

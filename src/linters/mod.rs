@@ -52,27 +52,31 @@ pub fn spawn_command(argv: &[String], windows_java_jar: bool) -> tokio::process:
     }
 }
 
-/// On Windows, look for `binary` (exact name, no extension) in each PATH
-/// directory. If found and it starts with the PE magic bytes `MZ`, return
-/// its full path so it can be executed directly via `CreateProcessW`.
+/// On Windows, look for `binary` (exact name or with `.exe`) in each PATH
+/// directory. If found as a PE binary (MZ magic), return its full path so it
+/// can be executed directly via `CreateProcessW`. Checking `.exe` handles
+/// native Windows binaries installed by cargo, which always use that extension.
 #[cfg(windows)]
 fn find_pe_binary(binary: &str) -> Option<std::path::PathBuf> {
     use std::io::Read;
     let path_var = std::env::var("PATH").ok()?;
+    let exe = format!("{}.exe", binary);
     for dir in std::env::split_paths(&path_var) {
-        let candidate = dir.join(binary);
-        if !candidate.is_file() {
-            continue;
-        }
-        let is_pe = std::fs::File::open(&candidate)
-            .and_then(|mut f| {
-                let mut buf = [0u8; 2];
-                f.read_exact(&mut buf)?;
-                Ok(buf == [b'M', b'Z'])
-            })
-            .unwrap_or(false);
-        if is_pe {
-            return Some(candidate);
+        for name in [binary, exe.as_str()] {
+            let candidate = dir.join(name);
+            if !candidate.is_file() {
+                continue;
+            }
+            let is_pe = std::fs::File::open(&candidate)
+                .and_then(|mut f| {
+                    let mut buf = [0u8; 2];
+                    f.read_exact(&mut buf)?;
+                    Ok(buf == [b'M', b'Z'])
+                })
+                .unwrap_or(false);
+            if is_pe {
+                return Some(candidate);
+            }
         }
     }
     None

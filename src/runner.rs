@@ -30,6 +30,7 @@ enum PreparedCheck {
     Invocations {
         name: String,
         argv_list: Vec<Vec<String>>,
+        windows_java_jar: bool,
     },
     Links {
         name: String,
@@ -62,9 +63,11 @@ impl PreparedCheck {
         let name = self.name().to_string();
         let start = Instant::now();
         let out: LinterOutput = match self {
-            Self::Invocations { argv_list, .. } => {
-                run_invocations(&name, &argv_list, project_root).await
-            }
+            Self::Invocations {
+                argv_list,
+                windows_java_jar,
+                ..
+            } => run_invocations(&name, &argv_list, windows_java_jar, project_root).await,
             Self::Links {
                 cfg,
                 file_list,
@@ -184,7 +187,11 @@ fn prepare(
             if argv_list.is_empty() {
                 return None;
             }
-            Some(PreparedCheck::Invocations { name, argv_list })
+            Some(PreparedCheck::Invocations {
+                name,
+                argv_list,
+                windows_java_jar: check.windows_java_jar,
+            })
         }
         CheckKind::Special(SpecialKind::Links) => Some(PreparedCheck::Links {
             name,
@@ -400,7 +407,12 @@ fn inject_config(mut argv: Vec<String>, config_args: &[String]) -> Vec<String> {
 
 /// Runs all invocations for one check.
 /// Never prints — callers decide when and whether to flush output.
-async fn run_invocations(name: &str, invocations: &[Vec<String>], root: &Path) -> LinterOutput {
+async fn run_invocations(
+    name: &str,
+    invocations: &[Vec<String>],
+    windows_java_jar: bool,
+    root: &Path,
+) -> LinterOutput {
     let mut all_ok = true;
     let mut combined_stdout = Vec::new();
     let mut combined_stderr = Vec::new();
@@ -409,7 +421,7 @@ async fn run_invocations(name: &str, invocations: &[Vec<String>], root: &Path) -
         if argv.is_empty() {
             continue;
         }
-        let result = crate::linters::spawn_command(argv)
+        let result = crate::linters::spawn_command(argv, windows_java_jar)
             .current_dir(root)
             .stdin(Stdio::null())
             .output()
@@ -675,6 +687,7 @@ mod tests {
             activate_unconditionally: false,
             category: Category::Default,
             mise_install_components: None,
+            windows_java_jar: false,
             kind: CheckKind::Template {
                 check_cmd: "run-it",
                 fix_cmd: "",

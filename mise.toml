@@ -9,10 +9,10 @@ node = "24.14.1"
 "github:mvdan/sh" = "v3.12.0"
 actionlint = "1.7.10"
 editorconfig-checker = "v3.6.1"
-"npm:markdownlint-cli2" = "0.17.2"
-"npm:prettier" = "3.8.1"
-"npm:@biomejs/biome" = "2.3.14"
-"pipx:ruff" = "0.15.0"
+"npm:markdownlint-cli2" = "0.22.0"
+"npm:prettier" = "3.8.2"
+"npm:@biomejs/biome" = "2.4.11"
+"pipx:ruff" = "0.15.10"
 "pipx:codespell" = "2.4.2"
 rust = { version = "1.94.1", components = "clippy,rustfmt" }
 
@@ -36,10 +36,6 @@ run = "cargo run -q -- run"
 [tasks."lint:fix"]
 description = "Auto-fix lint issues"
 run = "cargo run -q -- run --fix"
-
-[tasks."lint:pre-commit"]
-description = "Fast auto-fix lint pass (skips slow checks like renovate) — intended for pre-commit/pre-push hooks"
-run = "cargo run -q -- run --fix --fast-only"
 
 [tasks.build]
 description = "Build the project"

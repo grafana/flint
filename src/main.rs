@@ -28,6 +28,8 @@ enum SubCommand {
     Linters(LintersArgs),
     /// Set up linters in mise.toml for this project.
     Init(InitArgs),
+    /// Apply non-interactive migrations to mise.toml (replace obsolete tool keys).
+    Update,
     /// Manage git hooks.
     Hook(HookArgs),
     /// Display the flint version.
@@ -140,6 +142,17 @@ async fn main() -> Result<()> {
         SubCommand::Init(args) => {
             init::run(&project_root, args.profile, args.yes)?;
         }
+        SubCommand::Update => {
+            let replaced =
+                init::generation::replace_obsolete_keys(&project_root, registry::OBSOLETE_KEYS)?;
+            if replaced.is_empty() {
+                println!("flint: mise.toml is up to date");
+            } else {
+                for (old, new) in &replaced {
+                    println!("  replaced {old:?} → {new:?}");
+                }
+            }
+        }
         SubCommand::Hook(args) => match args.command {
             HookCommand::Install => hook::install(&project_root)?,
         },
@@ -182,6 +195,11 @@ async fn run(
     // --fast-only filter (skipped when linters are named explicitly).
     // mise guarantees declared tools are on PATH, so no PATH check needed.
     let mise_tools = registry::read_mise_tools(project_root);
+    if let Some((old, new)) = registry::find_obsolete_key(&mise_tools) {
+        eprintln!("flint: obsolete tool key in mise.toml: {old:?} (replaced by {new:?})");
+        eprintln!("  Run `flint update` to apply the migration automatically.");
+        std::process::exit(1);
+    }
     let active: Vec<&registry::Check> = {
         let mut out = vec![];
         for c in checks {

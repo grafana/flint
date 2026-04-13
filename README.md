@@ -119,6 +119,7 @@ run = "flint run --fix"
 
 ```text
 flint run [OPTIONS] [LINTERS...]
+flint update
 flint linters
 flint version
 ```
@@ -176,6 +177,15 @@ Pass one or more linter names to run only those:
 ```bash
 flint run shellcheck shfmt        # run only shellcheck and shfmt
 flint run --fix prettier          # fix only prettier
+```
+
+`flint update` applies non-interactive migrations to `mise.toml` — replaces obsolete
+tool keys with their modern equivalents, preserving the declared version. Run it when
+`flint run` reports an obsolete key error:
+
+```text
+flint: obsolete tool key in mise.toml: "npm:markdownlint-cli" (replaced by "npm:markdownlint-cli2")
+  Run `flint update` to apply the migration automatically.
 ```
 
 `flint linters` shows every check with its status:
@@ -564,6 +574,13 @@ already declare their tools in `mise.toml` — pre-commit would require maintain
 a second inventory of the same tools in `.pre-commit-config.yaml`, with its own
 versioning and install lifecycle. That's friction without benefit for repos that
 are already mise-first.
+
+### Why not Husky?
+
+Husky manages git hooks for Node.js projects and requires `npm install` to activate.
+Repos that aren't Node-first still need a `package.json` and a dev dependency just to
+run hooks. `flint hook install` writes a single shell script directly to `.git/hooks/`
+with no install step and no language runtime dependency.
 
 ### Why not Spotless (or other Maven formatter plugins)?
 

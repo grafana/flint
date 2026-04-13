@@ -17,14 +17,14 @@ jobs:
       matrix:
         include:
           - os: ubuntu-24.04
-            mise_version: v2026.4.1
-            mise_sha256: c597fa1e4da76d1ea1967111d150a6a655ca51a72f4cd17fdc584be2b9eaa8bd
+            mise_version: v2026.4.10
+            mise_sha256: 84636e19a0e5001d7499f58ae5a868cec8f6ba4f52f9028680bb7cd802564229
           - os: macos-15
-            mise_version: v2026.4.1
-            mise_sha256: c85b387148d478dec754ded31d01798e2f4e4e9448f75682dcc6bb7c16c9a4f5
+            mise_version: v2026.4.10
+            mise_sha256: e09f5ae83369d3c6d44572e9f2de0bf9454718e23ccb41a4138f8f88d28cbb31
           - os: windows-2025
-            mise_version: v2026.4.1
-            mise_sha256: "" # not published for .exe — https://github.com/jdx/mise/pull/8997
+            mise_version: v2026.4.10
+            mise_sha256: 2df0ce5b1f42502a4895888a0fe7aae4cf6d1959d2dbb62f29204773cff3d457
 
     permissions:
       contents: read
@@ -41,6 +41,7 @@ jobs:
         with:
           version: ${{ matrix.mise_version }}
           sha256: ${{ matrix.mise_sha256 }}
+          cache_key_prefix: mise-v2
 
       - name: Install Rust lint components
         run: rustup component add clippy rustfmt

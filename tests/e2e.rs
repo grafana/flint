@@ -271,12 +271,12 @@ fn run_case(case: &Path, name: &str, update: bool) {
     let repo_canonical_str = canonical_repo_path(repo.path());
     let normalize =
         |s: String| -> String { normalize_output(s, repo_str.as_ref(), &repo_canonical_str) };
-    let stderr = normalize_timing(&strip_ansi(&normalize(
+    let stderr = normalize_tool_versions(&normalize_timing(&strip_ansi(&normalize(
         String::from_utf8_lossy(&out.stderr).into_owned(),
-    )));
-    let stdout = normalize_timing(&strip_ansi(&normalize(
+    ))));
+    let stdout = normalize_tool_versions(&normalize_timing(&strip_ansi(&normalize(
         String::from_utf8_lossy(&out.stdout).into_owned(),
-    )));
+    ))));
 
     if update {
         write_test_toml(
@@ -388,6 +388,17 @@ fn normalize_timing(s: &str) -> String {
     // Biome summary line: "Checked N file(s) in 1234µs. No fixes applied."
     let re2 = Regex::new(r"Checked \d+ files? in \d+(?:\.\d+)?(?:µs|ms|s)\.").unwrap();
     re2.replace_all(&s, "Checked N file(s) in Xµs.")
+        .into_owned()
+}
+
+/// Replaces tool version banners with a stable `<VERSION>` placeholder so
+/// snapshots don't need updating on every dependency bump.
+fn normalize_tool_versions(s: &str) -> String {
+    use regex::Regex;
+    // markdownlint-cli2 vX.Y.Z (markdownlint vA.B.C)
+    let re = Regex::new(r"markdownlint-cli2 v\d+\.\d+\.\d+ \(markdownlint v\d+\.\d+\.\d+\)")
+        .unwrap();
+    re.replace_all(s, "markdownlint-cli2 <VERSION>")
         .into_owned()
 }
 

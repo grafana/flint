@@ -76,7 +76,7 @@ jobs:
           ARCHIVE="flint-${{ matrix.target }}.tar.gz"
           tar czf "$ARCHIVE" -C "target/${{ matrix.target }}/release" flint
           sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
-          echo "ARCHIVE=$ARCHIVE" >> $GITHUB_ENV
+          echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
 
       - name: Archive (Windows)
         if: runner.os == 'Windows'
@@ -85,7 +85,7 @@ jobs:
           ARCHIVE="flint-${{ matrix.target }}.zip"
           7z a "$ARCHIVE" "./target/${{ matrix.target }}/release/flint.exe"
           sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
-          echo "ARCHIVE=$ARCHIVE" >> $GITHUB_ENV
+          echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4

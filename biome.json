@@ -1,10 +1,14 @@
 {
-	"files": {
-		"ignoreUnknown": true,
-		"includes": [
-			"**",
-			"!!**/.github/renovate-tracked-deps.json",
-			"!!**/.claude"
-		]
-	}
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2
+  },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": [
+      "**",
+      "!!**/.github/renovate-tracked-deps.json",
+      "!!**/.claude"
+    ]
+  }
 }

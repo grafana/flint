@@ -4,19 +4,15 @@ pub mod renovate_deps;
 
 /// Build a [`tokio::process::Command`] for the given argv.
 ///
-/// On Windows, mise shims come in several forms depending on whether
-/// `mise-shim.exe` is available:
+/// On Windows, mise shims are `.exe` files (copies of `mise-shim.exe`) when
+/// `mise-shim.exe` is available — the normal case. Some tools are also
+/// installed as native PE binaries without a `.exe` extension; we detect
+/// both via MZ magic and spawn them directly via `CreateProcessW`.
+/// Everything else (`.cmd` shims, older mise) routes through `cmd.exe /C`.
 ///
-/// - **exe mode**: `<tool>.exe` is a copy of `mise-shim.exe` — detected as PE
-///   (MZ magic) and spawned directly via `CreateProcessW`.
-/// - **file mode** (fallback when `mise-shim.exe` is absent): `<tool>` is an
-///   extensionless bash script (`#!/bin/bash`) that calls `mise exec`. cmd.exe
-///   cannot execute these, so we invoke them via `bash`.
-/// - **`.cmd` shims** (older mise behaviour): routed through `cmd.exe /C`.
-///
-/// Some tools are self-executing JARs (e.g. ktlint) that cmd.exe cannot run
-/// at all. When `windows_java_jar` is true, the binary is resolved to its
-/// full path and invoked as `java -jar <path>`.
+/// Self-executing JARs (e.g. ktlint) cannot run via cmd.exe at all.
+/// When `windows_java_jar` is true the binary is resolved to its full path
+/// and invoked as `java -jar <path>`.
 pub fn spawn_command(argv: &[String], windows_java_jar: bool) -> tokio::process::Command {
     #[cfg(windows)]
     {
@@ -27,18 +23,12 @@ pub fn spawn_command(argv: &[String], windows_java_jar: bool) -> tokio::process:
                 return cmd;
             }
         } else if let Some(path) = find_pe_binary(&argv[0]) {
-            // Native PE binary (exe-mode shim or unextensioned binary).
+            // PE binary (exe-mode shim or extensionless native binary).
             let mut cmd = tokio::process::Command::new(path);
             cmd.args(&argv[1..]);
             return cmd;
-        } else if let Some(path) = find_bash_shim(&argv[0]) {
-            // File-mode mise shim: an extensionless bash script.
-            // Git Bash (bash.exe) is available on all Windows CI runners.
-            let mut cmd = tokio::process::Command::new("bash");
-            cmd.arg(path).args(&argv[1..]);
-            return cmd;
         }
-        // Fall back to cmd.exe for .cmd shims (older mise behaviour).
+        // .cmd shims and anything else: let cmd.exe resolve the name.
         let mut cmd = tokio::process::Command::new("cmd.exe");
         cmd.arg("/C").args(argv);
         cmd
@@ -77,32 +67,6 @@ fn find_pe_binary(binary: &str) -> Option<std::path::PathBuf> {
             if is_pe {
                 return Some(candidate);
             }
-        }
-    }
-    None
-}
-
-/// On Windows, look for `binary` in PATH and return its full path if it looks
-/// like a bash script (starts with `#!`). Used to detect mise "file" mode
-/// shims, which are extensionless `#!/bin/bash` scripts that must be invoked
-/// via `bash` rather than `cmd.exe`.
-#[cfg(windows)]
-fn find_bash_shim(binary: &str) -> Option<std::path::PathBuf> {
-    use std::io::Read;
-    let path_var = std::env::var("PATH").ok()?;
-    for dir in std::env::split_paths(&path_var) {
-        let candidate = dir.join(binary);
-        if !candidate.is_file() {
-            continue;
-        }
-        let is_bash = std::fs::File::open(&candidate)
-            .and_then(|mut f| {
-                let mut buf = [0u8; 2];
-                f.read_exact(&mut buf).map(|_| buf == [b'#', b'!'])
-            })
-            .unwrap_or(false);
-        if is_bash {
-            return Some(candidate);
         }
     }
     None

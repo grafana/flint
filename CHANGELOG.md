@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.20.0](https://github.com/grafana/flint/compare/flint-v0.19.0...flint-v0.20.0) (2026-04-13)
+
+
+### Features
+
+* add flint v2 Rust binary ([#139](https://github.com/grafana/flint/issues/139)) ([19f2b25](https://github.com/grafana/flint/commit/19f2b2527b4420956f2f3f6b35cc946159370db5))
+* add native linting mode and version mapping infrastructure ([#93](https://github.com/grafana/flint/issues/93)) ([24b06da](https://github.com/grafana/flint/commit/24b06da3eeeb97722cf280b5815c75c3ec31f134))
+* add Renovate shareable preset for consuming repos ([#17](https://github.com/grafana/flint/issues/17)) ([8a06590](https://github.com/grafana/flint/commit/8a06590741fc0db0a801a84337928d5388e22d1a))
+* consolidate link checking and add autofix flags ([#7](https://github.com/grafana/flint/issues/7)) ([086a5e9](https://github.com/grafana/flint/commit/086a5e9c942a373a276e6a77853066187ed2c268))
+* flint update command, explicit JAR flag, v0.20.0 ([#146](https://github.com/grafana/flint/issues/146)) ([b43bf52](https://github.com/grafana/flint/commit/b43bf523b5ee6944ce67f7082ea4b4aea496e9ea))
+* handle line-number anchors and issue comments globally ([#56](https://github.com/grafana/flint/issues/56)) ([cf751df](https://github.com/grafana/flint/commit/cf751df1093a06d8dfac60c9918ef129944494e4))
+* **links:** add GitHub URL remaps for line-number and fragment anchors ([#28](https://github.com/grafana/flint/issues/28)) ([5b59065](https://github.com/grafana/flint/commit/5b590653fbd24963fba8e99e409b9977ec2410fc))
+* **links:** auto-remap base-branch GitHub URLs to PR branch ([#18](https://github.com/grafana/flint/issues/18)) ([dd6cc61](https://github.com/grafana/flint/commit/dd6cc616792680be71ca364d37150a90644db3d4))
+* **renovate:** support SHA-pinned URLs in Renovate preset ([#21](https://github.com/grafana/flint/issues/21)) ([4fd1f28](https://github.com/grafana/flint/commit/4fd1f28c2ced164e15c8663e5fc3ac28f9217ca8))
+* **super-linter:** default to slim image ([#24](https://github.com/grafana/flint/issues/24)) ([c8eeab8](https://github.com/grafana/flint/commit/c8eeab82e5db39f0cf8b57a5ee7ac1fc7106a1b0))
+* support NATIVE env var for container-free linting ([#107](https://github.com/grafana/flint/issues/107)) ([0a8193d](https://github.com/grafana/flint/commit/0a8193d5b0c264430b7a78c56a0fe0418173ff37))
+
+
+### Bug Fixes
+
+* activate mise environment in native lint mode ([#123](https://github.com/grafana/flint/issues/123)) ([d0fec45](https://github.com/grafana/flint/commit/d0fec4574c1905efb22e7e75bcca7ba7c2db64cf))
+* add 'mise run fix' hint to lint failure output ([#90](https://github.com/grafana/flint/issues/90)) ([5b4ad5d](https://github.com/grafana/flint/commit/5b4ad5d2a2fc53e0d11de924b183adb4fb4f5a90))
+* decouple version mapping generation from pinned super-linter version ([#112](https://github.com/grafana/flint/issues/112)) ([5370e77](https://github.com/grafana/flint/commit/5370e77a864084c146502f9c265792d035517376))
+* **deps:** update rust crate crossterm to 0.29 ([#156](https://github.com/grafana/flint/issues/156)) ([c59ae3e](https://github.com/grafana/flint/commit/c59ae3ea3da34782eaa1eeb8faba8552151f558d))
+* **deps:** update rust crate similar to v3 ([#160](https://github.com/grafana/flint/issues/160)) ([684be4e](https://github.com/grafana/flint/commit/684be4e2a1f26da34ab6a2d35dbb0a5369747596))
+* **deps:** update rust crate toml to v1 ([#161](https://github.com/grafana/flint/issues/161)) ([3aae614](https://github.com/grafana/flint/commit/3aae614582b59b0c46bed37b411bdb2753dcee5f))
+* **deps:** update rust crate toml_edit to 0.25 ([#158](https://github.com/grafana/flint/issues/158)) ([42d9efd](https://github.com/grafana/flint/commit/42d9efded7507704e5684bf7c1f06dd4ff667740))
+* exclude GitHub compare links from lychee checks ([#10](https://github.com/grafana/flint/issues/10)) ([e714608](https://github.com/grafana/flint/commit/e714608d1d7550c5540f9e79cb6f14c9ed86a5ad))
+* fail native lint when enabled tools are missing ([#111](https://github.com/grafana/flint/issues/111)) ([163bb6b](https://github.com/grafana/flint/commit/163bb6b31e558af4a977c94cf8489311a085fc54))
+* improve link checker reliability against GitHub rate limiting ([#95](https://github.com/grafana/flint/issues/95)) ([7a5282d](https://github.com/grafana/flint/commit/7a5282de91df8a67dad3fd6ac8fc2b082434d8df))
+* include staged files in native lint file list ([#135](https://github.com/grafana/flint/issues/135)) ([34412d6](https://github.com/grafana/flint/commit/34412d69d9af0b189dbe8de5a5549a964d8cfe80))
+* **links:** add regex anchors to remap patterns ([#19](https://github.com/grafana/flint/issues/19)) ([2e17348](https://github.com/grafana/flint/commit/2e1734890548f9694c768a87d650f3f80a253f89))
+* native lint in worktrees, trust toml, use ec binary, drop isort ([#134](https://github.com/grafana/flint/issues/134)) ([8594bba](https://github.com/grafana/flint/commit/8594bbabd4de528da476d0f6ead9dfb49913dd8a))
+* **release-please:** fix footer not appearing on release PRs ([#40](https://github.com/grafana/flint/issues/40)) ([d7a55e4](https://github.com/grafana/flint/commit/d7a55e4a2ea3754afb84c5c31eeb742b374c21e0))
+* remap same-repo GitHub URLs to local file paths ([#100](https://github.com/grafana/flint/issues/100)) ([b4feadd](https://github.com/grafana/flint/commit/b4feaddd9af690574eaefc112f465b556bf9c345))
+* **renovate-deps:** forward GITHUB_TOKEN as GITHUB_COM_TOKEN ([#132](https://github.com/grafana/flint/issues/132)) ([4d6510b](https://github.com/grafana/flint/commit/4d6510b78361f2fe0bfd1d0cfe27ce8e26256054))
+* replace broken release-please PR comment with docs ([#12](https://github.com/grafana/flint/issues/12)) ([817b37d](https://github.com/grafana/flint/commit/817b37df94fcd6be43fa61594d94e9988d3c6c8d))
+* run shellcheck on .bats files in native mode ([#137](https://github.com/grafana/flint/issues/137)) ([a4fd3f8](https://github.com/grafana/flint/commit/a4fd3f8ea41d9b155b13805336549e2dcad49bd4))
+* strip Scroll to Text Fragment anchors in link checks ([#86](https://github.com/grafana/flint/issues/86)) ([b630cdf](https://github.com/grafana/flint/commit/b630cdfdd53c67f2e1f744ff89787fe18342e389))
+* tighten markdownlint config for native mode ([#106](https://github.com/grafana/flint/issues/106)) ([6ef25b2](https://github.com/grafana/flint/commit/6ef25b2fd3f3887e4be9918317526ddc77b65575))
+* use remap instead of exclude for issue comment anchors ([#58](https://github.com/grafana/flint/issues/58)) ([656f355](https://github.com/grafana/flint/commit/656f355db5280a86c885da957f34193d1efc800e))
+
 ## [0.9.2](https://github.com/grafana/flint/compare/v0.9.1...v0.9.2) (2026-03-31)
 
 

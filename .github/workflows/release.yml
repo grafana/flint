@@ -5,6 +5,11 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.20.0)"
+        required: true
 
 permissions: {}
 
@@ -37,6 +42,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          ref: ${{ inputs.tag || github.ref }}
           persist-credentials: false
 
       - name: Build and upload
@@ -51,6 +57,7 @@ jobs:
           checksum: sha256
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REF: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4

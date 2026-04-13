@@ -660,6 +660,13 @@ pub const OBSOLETE_KEYS: &[(&str, &str)] = &[
     // markdownlint-cli was superseded by markdownlint-cli2 (actively maintained,
     // faster, supports the same config files). flint only supports the cli2 variant.
     ("npm:markdownlint-cli", "npm:markdownlint-cli2"),
+    // ubi: was deprecated in mise; the github: backend is the modern replacement.
+    // Repos that adopted flint before this change may still have ubi: keys.
+    (
+        "ubi:google/google-java-format",
+        "github:google/google-java-format",
+    ),
+    ("ubi:pinterest/ktlint", "github:pinterest/ktlint"),
 ];
 
 /// Checks whether any obsolete tool keys are present in `mise_tools`.
@@ -752,8 +759,10 @@ pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool
 /// Returns the binary name to use for this check given the active mise tools.
 /// When `versioned_bin_fmt` is set, the version from mise.toml is substituted
 /// into the format string (e.g. `"shfmt_{version}"` + `"v3.12.0"` → `"shfmt_v3.12.0"`).
-/// This is needed because ubi (used by mise's github: backend) installs binaries
-/// with the version suffix preserved in the filename on all platforms.
+/// This is needed for shfmt because mise's `github:` backend preserves the version
+/// suffix in the installed binary name. The backend's binary-name cleaning logic matches
+/// binaries against the repo name (e.g. `"mvdan/sh"`), so it cannot map `"shfmt"` →
+/// `"mvdan/sh"` and leaves the name as `"shfmt_v3.12.0"` rather than stripping it.
 pub fn resolve_bin_name(check: &Check, mise_tools: &HashMap<String, String>) -> String {
     if let Some(fmt) = check.versioned_bin_fmt {
         let key = check.mise_tool_name.unwrap_or(check.bin_name);

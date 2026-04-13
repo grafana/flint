@@ -3,7 +3,7 @@ args = "run --full markdownlint-cli2"
 exit = 1
 stderr = '''
 [markdownlint-cli2]
-markdownlint-cli2 v0.17.2 (markdownlint v0.37.4)
+markdownlint-cli2 <VERSION>
 Finding: <REPO>/README.md
 Linting: 1 file(s)
 Summary: 1 error(s)

@@ -750,10 +750,12 @@ pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool
 }
 
 /// Returns the binary name to use for this check given the active mise tools.
-/// When `versioned_bin_fmt` is set, the version from mise.toml is substituted
+/// When `versioned_bin_fmt` is set on Windows, the version from mise.toml is substituted
 /// into the format string (e.g. `"shfmt_{version}"` + `"v3.12.0"` → `"shfmt_v3.12.0"`).
-/// Falls back to `check.bin_name` for standard installations.
+/// On non-Windows platforms ubi renames the downloaded binary to the plain tool name, so
+/// `versioned_bin_fmt` is ignored and `check.bin_name` is returned directly.
 pub fn resolve_bin_name(check: &Check, mise_tools: &HashMap<String, String>) -> String {
+    #[cfg(windows)]
     if let Some(fmt) = check.versioned_bin_fmt {
         let key = check.mise_tool_name.unwrap_or(check.bin_name);
         if let Some(version) = mise_tools.get(key) {

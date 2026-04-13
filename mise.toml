@@ -11,7 +11,7 @@ actionlint = "1.7.10"
 editorconfig-checker = "v3.6.1"
 "npm:markdownlint-cli2" = "0.17.2"
 "npm:prettier" = "3.8.2"
-"npm:@biomejs/biome" = "2.3.14"
+"npm:@biomejs/biome" = "2.4.11"
 "pipx:ruff" = "0.15.10"
 "pipx:codespell" = "2.4.2"
 rust = { version = "1.94.1", components = "clippy,rustfmt" }

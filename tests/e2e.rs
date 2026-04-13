@@ -396,8 +396,8 @@ fn normalize_timing(s: &str) -> String {
 fn normalize_tool_versions(s: &str) -> String {
     use regex::Regex;
     // markdownlint-cli2 vX.Y.Z (markdownlint vA.B.C)
-    let re = Regex::new(r"markdownlint-cli2 v\d+\.\d+\.\d+ \(markdownlint v\d+\.\d+\.\d+\)")
-        .unwrap();
+    let re =
+        Regex::new(r"markdownlint-cli2 v\d+\.\d+\.\d+ \(markdownlint v\d+\.\d+\.\d+\)").unwrap();
     re.replace_all(s, "markdownlint-cli2 <VERSION>")
         .into_owned()
 }

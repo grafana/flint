@@ -754,11 +754,11 @@ pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool
 /// into the format string (e.g. `"shfmt_{version}"` + `"v3.12.0"` → `"shfmt_v3.12.0"`).
 /// On non-Windows platforms ubi renames the downloaded binary to the plain tool name, so
 /// `versioned_bin_fmt` is ignored and `check.bin_name` is returned directly.
-pub fn resolve_bin_name(check: &Check, mise_tools: &HashMap<String, String>) -> String {
+pub fn resolve_bin_name(check: &Check, _mise_tools: &HashMap<String, String>) -> String {
     #[cfg(windows)]
     if let Some(fmt) = check.versioned_bin_fmt {
         let key = check.mise_tool_name.unwrap_or(check.bin_name);
-        if let Some(version) = mise_tools.get(key) {
+        if let Some(version) = _mise_tools.get(key) {
             return fmt.replace("{version}", version);
         }
     }

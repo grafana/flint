@@ -33,7 +33,9 @@ jobs:
     # Runs on every push to main. Keeps an open PR that bumps Cargo.toml version
     # and updates CHANGELOG.md based on conventional commits since the last release.
     # Merging this PR triggers the release job above.
+    # Depends on release so the new git tag exists before we compute the next version.
     name: Release PR
+    needs: [release]
     runs-on: ubuntu-24.04
     if: ${{ github.repository == 'grafana/flint' }}
     permissions:

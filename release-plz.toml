@@ -1,20 +1,7 @@
 [workspace]
 git_release_draft = true
 pr_body = """
-{% for release in releases %}
-{% if release.title %}## {{ release.title }}
-{% endif %}
-{% if release.breaking_changes %}
-### ⚠ Breaking changes
-
-```text
-{{ release.breaking_changes }}
-```
-{% endif %}
-{% if release.changelog %}{{ release.changelog }}{% endif %}
-{% endfor %}
----
-This PR was generated with [release-plz](https://github.com/release-plz/release-plz/).
+{{ changelog }}
 
 > [!IMPORTANT]
 > Close and reopen this PR to trigger CI checks.

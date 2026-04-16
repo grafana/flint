@@ -75,7 +75,7 @@ jobs:
         shell: bash
         run: ${{ matrix.build-tool || 'cargo' }} build --release --target ${{ matrix.target }}
 
-      - name: Archive (Unix)
+      - name: Archive (non-Windows)
         if: runner.os != 'Windows'
         shell: bash
         run: |
@@ -110,20 +110,20 @@ jobs:
         run: |
           # gh release upload uses GET /releases/tags/{tag}, which returns 404
           # for draft releases. Use the list API to find the release instead.
-          RELEASE_ID=$(gh api "repos/${{ github.repository }}/releases" --paginate \
+          RELEASE_ID=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
             --jq ".[] | select(.tag_name == \"$TAG\") | .id" | head -1)
           if [[ -z "$RELEASE_ID" ]]; then
             echo "Error: no release found for tag $TAG" >&2
             exit 1
           fi
-          UPLOAD_URL=$(gh api "repos/${{ github.repository }}/releases/$RELEASE_ID" \
+          UPLOAD_URL=$(gh api "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" \
             --jq '.upload_url' | sed 's/{?name,label}//')
           for asset in "$ARCHIVE" "$ARCHIVE.sha256"; do
             ASSET_NAME=$(basename "$asset")
             # Delete pre-existing asset to support workflow re-runs
-            gh api "repos/${{ github.repository }}/releases/$RELEASE_ID/assets" \
+            gh api "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID/assets" \
               --jq ".[] | select(.name == \"$ASSET_NAME\") | .id" \
-              | xargs -I{} gh api "repos/${{ github.repository }}/releases/assets/{}" -X DELETE \
+              | xargs -I{} gh api "repos/${GITHUB_REPOSITORY}/releases/assets/{}" -X DELETE \
               || true
             curl --fail --silent --show-error \
               -H "Authorization: Bearer $GITHUB_TOKEN" \
@@ -144,4 +144,4 @@ jobs:
       - name: Publish draft release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: gh release edit "$TAG" --draft=false --repo ${{ github.repository }}
+        run: gh release edit "$TAG" --draft=false --repo "${GITHUB_REPOSITORY}"

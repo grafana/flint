@@ -500,10 +500,10 @@ fn check_biome_format() -> Check {
 fn check_cargo_clippy() -> Check {
     Check::project(
         "cargo-clippy",
-        "cargo clippy -q --tests -- -D warnings",
+        "cargo clippy -q --all-targets -- -D warnings",
         &["*.rs"],
     )
-    .fix("cargo clippy -q --tests --fix --allow-dirty --allow-staged -- -D warnings")
+    .fix("cargo clippy -q --all-targets --fix --allow-dirty --allow-staged -- -D warnings")
     .mise_tool("rust")
     .install_components("clippy")
     .desc("Lint Rust code; runs on all .rs files, not just changed")

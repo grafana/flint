@@ -897,7 +897,7 @@ mod tests {
     #[test]
     fn all_registry_binaries_found() {
         let registry = builtin();
-        let _mise_tools = read_mise_tools(Path::new(env!("CARGO_MANIFEST_DIR")));
+        let mise_tools = read_mise_tools(Path::new(env!("CARGO_MANIFEST_DIR")));
 
         let not_found: Vec<&str> = registry
             .iter()

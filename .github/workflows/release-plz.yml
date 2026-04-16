@@ -10,6 +10,9 @@ permissions: {}
 
 jobs:
   release:
+    # Runs on every push to main. If the release PR was just merged (i.e. Cargo.toml
+    # version was bumped), creates a git tag and a draft GitHub release. The release.yml
+    # workflow then picks up the tag, builds binaries, and publishes the release.
     name: Release
     runs-on: ubuntu-24.04
     if: ${{ github.repository == 'grafana/flint' }}
@@ -27,6 +30,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-pr:
+    # Runs on every push to main. Keeps an open PR that bumps Cargo.toml version
+    # and updates CHANGELOG.md based on conventional commits since the last release.
+    # Merging this PR triggers the release job above.
     name: Release PR
     runs-on: ubuntu-24.04
     if: ${{ github.repository == 'grafana/flint' }}

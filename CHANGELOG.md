@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.20.1](https://github.com/grafana/flint/compare/v0.20.0...v0.20.1) (2026-04-16)
+
+
+### Bug Fixes
+
+* **release:** add workflow_dispatch to retrigger for existing tags ([#167](https://github.com/grafana/flint/issues/167)) ([0ffb495](https://github.com/grafana/flint/commit/0ffb495ae907397dbd8d3dc6777f9c3f355417a9))
+* **release:** suppress component prefix in release-please tags ([#166](https://github.com/grafana/flint/issues/166)) ([949fbf1](https://github.com/grafana/flint/commit/949fbf159ed23e0309a7fada6d32b2e62f06ce89))
+
 ## [0.20.0](https://github.com/grafana/flint/compare/flint-v0.19.0...flint-v0.20.0) (2026-04-13)
 
 

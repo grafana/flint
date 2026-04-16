@@ -21,6 +21,8 @@ jobs:
       contents: write
       id-token: write
       attestations: write
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
 
     strategy:
       fail-fast: false
@@ -28,38 +30,118 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-24.04
+            mise_version: v2026.4.10
+            mise_sha256: 84636e19a0e5001d7499f58ae5a868cec8f6ba4f52f9028680bb7cd802564229
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04
             build-tool: cross
+            mise_version: v2026.4.10
+            mise_sha256: 84636e19a0e5001d7499f58ae5a868cec8f6ba4f52f9028680bb7cd802564229
           - target: x86_64-apple-darwin
             runner: macos-15-intel
+            mise_version: v2026.4.10
+            mise_sha256: cd2c39806ba3dba475ab9c145376c467012200cf4eea098cbeb7e4febb4b0717
           - target: aarch64-apple-darwin
             runner: macos-latest
+            mise_version: v2026.4.10
+            mise_sha256: e09f5ae83369d3c6d44572e9f2de0bf9454718e23ccb41a4138f8f88d28cbb31
           - target: x86_64-pc-windows-msvc
             runner: windows-latest
+            mise_version: v2026.4.10
+            mise_sha256: 2df0ce5b1f42502a4895888a0fe7aae4cf6d1959d2dbb62f29204773cff3d457
 
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
           persist-credentials: false
 
-      - name: Build and upload
-        uses: taiki-e/upload-rust-binary-action@10c1cf6a3da113ad4e60018e386570529aa5f1d3 # v1.30.0
+      - name: Setup mise
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
         with:
-          bin: flint
-          target: ${{ matrix.target }}
-          archive: flint-$target
-          build-tool: ${{ matrix.build-tool }}
-          tar: unix
-          zip: windows
-          checksum: sha256
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+          version: ${{ matrix.mise_version }}
+          sha256: ${{ matrix.mise_sha256 }}
+          install_args: rust
+          cache: false
+
+      - name: Install cross
+        if: matrix.build-tool == 'cross'
+        uses: taiki-e/install-action@d0f23220b09a75c6db730f13bb37c4f8144b4382 # v2
+        with:
+          tool: cross
+
+      - name: Build
+        shell: bash
+        run: ${{ matrix.build-tool || 'cargo' }} build --release --target ${{ matrix.target }}
+
+      - name: Archive (non-Windows)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          ARCHIVE="flint-${{ matrix.target }}.tar.gz"
+          tar czf "$ARCHIVE" -C "target/${{ matrix.target }}/release" flint
+          # macOS ships shasum; Linux ships sha256sum
+          if command -v sha256sum &>/dev/null; then
+            sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
+          else
+            shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
+          fi
+          echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
+
+      - name: Archive (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          ARCHIVE="flint-${{ matrix.target }}.zip"
+          7z a "$ARCHIVE" "./target/${{ matrix.target }}/release/flint.exe"
+          sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
+          echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4
         with:
-          subject-path: flint-${{ matrix.target }}.*
+          subject-path: ${{ env.ARCHIVE }}
+
+      - name: Upload to draft release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # gh release upload uses GET /releases/tags/{tag}, which returns 404
+          # for draft releases. Use the list API to find the release instead.
+          RELEASE_ID=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"$TAG\") | .id" | head -1)
+          if [[ -z "$RELEASE_ID" ]]; then
+            echo "Error: no release found for tag $TAG" >&2
+            exit 1
+          fi
+          UPLOAD_URL=$(gh api "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" \
+            --jq '.upload_url' | sed 's/{?name,label}//')
+          for asset in "$ARCHIVE" "$ARCHIVE.sha256"; do
+            ASSET_NAME=$(basename "$asset")
+            # Delete pre-existing asset to support workflow re-runs
+            gh api "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID/assets" \
+              --jq ".[] | select(.name == \"$ASSET_NAME\") | .id" \
+              | xargs -I{} gh api "repos/${GITHUB_REPOSITORY}/releases/assets/{}" -X DELETE \
+              || true
+            curl --fail --silent --show-error \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Content-Type: application/octet-stream" \
+              "${UPLOAD_URL}?name=$ASSET_NAME" \
+              --data-binary "@$asset"
+          done
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - name: Publish draft release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: gh release edit "$TAG" --draft=false --repo "${GITHUB_REPOSITORY}"

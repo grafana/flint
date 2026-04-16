@@ -1,0 +1,8 @@
+[workspace]
+git_release_draft = true
+pr_body = """
+{{ changelog }}
+
+> [!IMPORTANT]
+> Close and reopen this PR to trigger CI checks.
+"""

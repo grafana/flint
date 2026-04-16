@@ -4,6 +4,11 @@
       "mise"
     ]
   },
+  ".github/workflows/release.yml": {
+    "regex": [
+      "mise"
+    ]
+  },
   ".github/workflows/test.yml": {
     "regex": [
       "mise"

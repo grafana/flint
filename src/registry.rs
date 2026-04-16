@@ -498,12 +498,16 @@ fn check_biome_format() -> Check {
 }
 
 fn check_cargo_clippy() -> Check {
-    Check::project("cargo-clippy", "cargo clippy -q --tests -- -D warnings", &["*.rs"])
-        .fix("cargo clippy -q --tests --fix --allow-dirty --allow-staged -- -D warnings")
-        .mise_tool("rust")
-        .install_components("clippy")
-        .desc("Lint Rust code; runs on all .rs files, not just changed")
-        .lang()
+    Check::project(
+        "cargo-clippy",
+        "cargo clippy -q --tests -- -D warnings",
+        &["*.rs"],
+    )
+    .fix("cargo clippy -q --tests --fix --allow-dirty --allow-staged -- -D warnings")
+    .mise_tool("rust")
+    .install_components("clippy")
+    .desc("Lint Rust code; runs on all .rs files, not just changed")
+    .lang()
 }
 
 fn check_cargo_fmt() -> Check {
@@ -893,7 +897,7 @@ mod tests {
     #[test]
     fn all_registry_binaries_found() {
         let registry = builtin();
-        let mise_tools = read_mise_tools(Path::new(env!("CARGO_MANIFEST_DIR")));
+        let _mise_tools = read_mise_tools(Path::new(env!("CARGO_MANIFEST_DIR")));
 
         let not_found: Vec<&str> = registry
             .iter()
@@ -1008,7 +1012,7 @@ mod tests {
         };
         let separator: Vec<String> = widths.iter().map(|&w| "-".repeat(w)).collect();
         let sep_row = format!("| {} |", separator.join(" | "));
-        let header_strs: Vec<&str> = headers.iter().copied().collect();
+        let header_strs: Vec<&str> = headers.to_vec();
 
         let mut lines = vec![
             generated_comment.to_string(),

@@ -1,5 +1,6 @@
 [workspace]
 git_release_draft = true
+publish = false
 pr_body = """
 {% for release in releases %}{{ release.changelog }}{% endfor %}
 

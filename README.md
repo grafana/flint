@@ -1,7 +1,7 @@
 <!-- editorconfig-checker-disable -->
 <!-- markdownlint-disable MD033 MD041 -->
 <p align="center">
-  <img src=".idea/icon.svg" width="128" height="128" alt="flint logo">
+  <img src="assets/icon.svg" width="128" height="128" alt="flint logo">
 </p>
 
 <h1 align="center">flint — fast lint</h1>

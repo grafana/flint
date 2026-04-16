@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.20.1](https://github.com/grafana/flint/compare/v0.20.0...v0.20.1) - 2026-04-16
+
+### Added
+
+- *(release)* migrate from release-please to release-plz ([#171](https://github.com/grafana/flint/pull/171))
+
+### Fixed
+
+- *(release)* use correct template variable in pr_body ([#178](https://github.com/grafana/flint/pull/178))
+- *(release)* suppress component prefix in release-please tags ([#166](https://github.com/grafana/flint/pull/166))
+- *(release)* add workflow_dispatch to retrigger for existing tags ([#167](https://github.com/grafana/flint/pull/167))
+
+### Other
+
+- move icon to assets/ to fix release-plz ([#177](https://github.com/grafana/flint/pull/177))
+- *(deps)* update dependency npm:renovate to v43.102.11 [security] ([#174](https://github.com/grafana/flint/pull/174))
+- *(deps)* update rust crate similar to v3.1.0 ([#173](https://github.com/grafana/flint/pull/173))
+- *(deps)* update dependency github:mvdan/sh to v3.13.1 ([#163](https://github.com/grafana/flint/pull/163))
+
 ## [0.20.0](https://github.com/grafana/flint/compare/flint-v0.19.0...flint-v0.20.0) (2026-04-13)
 
 

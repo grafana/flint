@@ -395,10 +395,13 @@ fn normalize_timing(s: &str) -> String {
 /// snapshots don't need updating on every dependency bump.
 fn normalize_tool_versions(s: &str) -> String {
     use regex::Regex;
+    // flint X.Y.Z (version command output)
+    let re = Regex::new(r"flint \d+\.\d+\.\d+").unwrap();
+    let s = re.replace_all(s, "flint <VERSION>").into_owned();
     // markdownlint-cli2 vX.Y.Z (markdownlint vA.B.C)
     let re =
         Regex::new(r"markdownlint-cli2 v\d+\.\d+\.\d+ \(markdownlint v\d+\.\d+\.\d+\)").unwrap();
-    re.replace_all(s, "markdownlint-cli2 <VERSION>")
+    re.replace_all(&s, "markdownlint-cli2 <VERSION>")
         .into_owned()
 }
 

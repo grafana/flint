@@ -1,4 +1,9 @@
 {
+  ".github/workflows/bench-win-extract.yml": {
+    "regex": [
+      "mise"
+    ]
+  },
   ".github/workflows/lint.yml": {
     "regex": [
       "mise"

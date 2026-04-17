@@ -498,12 +498,16 @@ fn check_biome_format() -> Check {
 }
 
 fn check_cargo_clippy() -> Check {
-    Check::project("cargo-clippy", "cargo clippy -q -- -D warnings", &["*.rs"])
-        .fix("cargo clippy -q --fix --allow-dirty --allow-staged -- -D warnings")
-        .mise_tool("rust")
-        .install_components("clippy")
-        .desc("Lint Rust code; runs on all .rs files, not just changed")
-        .lang()
+    Check::project(
+        "cargo-clippy",
+        "cargo clippy -q --all-targets -- -D warnings",
+        &["*.rs"],
+    )
+    .fix("cargo clippy -q --all-targets --fix --allow-dirty --allow-staged -- -D warnings")
+    .mise_tool("rust")
+    .install_components("clippy")
+    .desc("Lint Rust code; runs on all .rs files, not just changed")
+    .lang()
 }
 
 fn check_cargo_fmt() -> Check {
@@ -1008,7 +1012,7 @@ mod tests {
         };
         let separator: Vec<String> = widths.iter().map(|&w| "-".repeat(w)).collect();
         let sep_row = format!("| {} |", separator.join(" | "));
-        let header_strs: Vec<&str> = headers.iter().copied().collect();
+        let header_strs: Vec<&str> = headers.to_vec();
 
         let mut lines = vec![
             generated_comment.to_string(),

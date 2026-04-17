@@ -277,6 +277,7 @@ mod tests {
         format!(r#"{{"msg":"Extracted dependencies","packageFiles":{config_json}}}"#).into_bytes()
     }
 
+    #[allow(clippy::type_complexity)]
     fn dep_map(entries: &[(&str, &[(&str, &[&str])])]) -> DepMap {
         entries
             .iter()

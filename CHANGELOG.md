@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.20.2](https://github.com/grafana/flint/compare/v0.20.1...v0.20.2) - 2026-04-17
+
+### Fixed
+
+- *(release)* run release-pr after release to avoid race ([#184](https://github.com/grafana/flint/pull/184))
+
 ## [0.20.1](https://github.com/grafana/flint/compare/v0.20.0...v0.20.1) - 2026-04-16
 
 ### Added

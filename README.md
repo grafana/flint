@@ -21,7 +21,7 @@ Linter runner built for speed and consistency:
 - **Cross-platform** — Linux, macOS, Windows
 - **Autofix** — `--fix` fixes what's fixable; reports what still needs review
 
-See [Why / Principles](#why) for background.
+See [docs/why.md](docs/why.md) for background and principles.
 
 > [!TIP]
 > **Legacy v1** (bash task scripts): see [README-V1.md](README-V1.md).
@@ -32,21 +32,15 @@ See [Why / Principles](#why) for background.
 
 ### Installation
 
-Add `flint` to your repo's `mise.toml` (once published):
+Add `flint` to your repo's `mise.toml`:
 
 ```toml
 [tools]
-flint = "0.x.y"
+"github:grafana/flint" = "0.20.2"
 ```
 
-Until the first published release, build from source:
-
-```bash
-git clone https://github.com/grafana/flint
-cd flint
-cargo build --release
-# Binary at target/release/flint
-```
+Bootstrap a repo with `flint init` (scaffolds config). Install a
+pre-commit hook with `flint hook install`.
 
 ### mise.toml setup
 
@@ -60,7 +54,7 @@ Add the linting tools your project needs alongside the `flint` binary itself:
 
 ```toml
 [tools]
-flint   = "0.x.y"
+"github:grafana/flint" = "0.20.2"
 
 # Add whichever linters apply to your repo:
 shellcheck              = "v0.11.0"
@@ -117,87 +111,7 @@ run = "flint run --fix"
 
 ### CLI
 
-```text
-flint run [OPTIONS] [LINTERS...]
-flint update
-flint linters
-flint version
-```
-
-Commands and flags follow [golangci-lint](https://golangci-lint.run/) conventions — teams already using it don't need to re-learn the interface.
-
-`flint run` flags:
-
-| Flag                 | Description                                                                                    |
-| -------------------- | ---------------------------------------------------------------------------------------------- |
-| `--fix`              | Fix what's fixable, report what still needs review; exit 1 if anything changed or needs review |
-| `--full`             | Lint all files instead of only changed files                                                   |
-| `--fast-only`        | Skip slow checks (e.g. `renovate-deps`). Overridden by explicit linter names.                  |
-| `--short`            | Compact summary output, no per-check noise                                                     |
-| `--verbose`          | Show all linter output, not just failures                                                      |
-| `--new-from-rev REV` | Diff base (default: merge base with base branch)                                               |
-| `--to-ref REF`       | Diff head (default: HEAD)                                                                      |
-
-Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`, `FLINT_FAST_ONLY`,
-`FLINT_VERBOSE`, `FLINT_SHORT`, `FLINT_NEW_FROM_REV`, `FLINT_TO_REF`.
-
-#### Intended use by context
-
-| Context                      | Command                                | Why                                                               |
-| ---------------------------- | -------------------------------------- | ----------------------------------------------------------------- |
-| Interactive development      | `flint run` or `flint run --fast-only` | Full output so you can read the details                           |
-| Human wanting a summary      | `flint run --short`                    | Compact output, no per-check noise                                |
-| Pre-push hook (CC / agentic) | `flint run --fix --fast-only`          | Fixes what it can silently, surfaces only what needs human review |
-| CI                           | `flint run`                            | Full output for humans reading CI logs                            |
-
-**`--short` output** — failed checks partitioned by fixability, fixable ones
-expressed as the exact command to run:
-
-```text
-flint: 2 checks failed — flint run --fix prettier cargo-fmt | review: shellcheck
-```
-
-**`--fix` output** — fixes what's fixable, then prints the full output of
-any checks that still need review, followed by a summary line. Exits 1 if
-anything was fixed (so the caller commits the fixes before pushing) or if
-anything still needs review. Exits 0 only if everything was already clean:
-
-```text
-[shellcheck]
-
-In bad.sh line 2:
-echo $1
-     ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
-...
-flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
-```
-
-Pass one or more linter names to run only those:
-
-```bash
-flint run shellcheck shfmt        # run only shellcheck and shfmt
-flint run --fix prettier          # fix only prettier
-```
-
-`flint update` applies non-interactive migrations to `mise.toml` — replaces obsolete
-tool keys with their modern equivalents, preserving the declared version. Run it when
-`flint run` reports an obsolete key error:
-
-```text
-flint: obsolete tool key in mise.toml: "npm:markdownlint-cli" (replaced by "npm:markdownlint-cli2")
-  Run `flint update` to apply the migration automatically.
-```
-
-`flint linters` shows every check with its status:
-
-```text
-NAME            BINARY          STATUS     SPEED  PATTERNS
--------------------------------------------------------------------
-shellcheck      shellcheck      installed  fast   *.sh *.bash *.bats
-cargo-fmt       cargo-fmt       missing    fast   *.rs
-renovate-deps   renovate        installed  slow
-...
-```
+See [docs/cli.md](docs/cli.md) for command and flag reference.
 
 ### Config (`flint.toml`)
 
@@ -238,397 +152,41 @@ being linted and cannot be redirected via a flag.
 
 ### Built-in linter registry
 
+Click a linter name for its detail page. See [docs/linters.md](docs/linters.md)
+for scope semantics and per-linter notes.
+
 <!-- editorconfig-checker-disable -->
 <!-- registry-table-start -->
 <!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
 
-| Name                   | Description                                                         | Fix |
-| ---------------------- | ------------------------------------------------------------------- | --- |
-| `actionlint`           | Lint GitHub Actions workflow files                                  | —   |
-| `biome`                | Lint JS/TS/JSON files                                               | yes |
-| `biome-format`         | Format JS/TS/JSON files                                             | yes |
-| `cargo-clippy`         | Lint Rust code; runs on all .rs files, not just changed             | yes |
-| `cargo-fmt`            | Format Rust code; runs on all .rs files, not just changed           | yes |
-| `codespell`            | Check for common spelling mistakes                                  | yes |
-| `dotnet-format`        | Format C# code                                                      | yes |
-| `editorconfig-checker` | Check files comply with EditorConfig settings                       | —   |
-| `gofmt`                | Format Go code                                                      | yes |
-| `golangci-lint`        | Lint Go code; uses --new-from-rev to scope analysis to changed code | —   |
-| `google-java-format`   | Format Java code                                                    | yes |
-| `hadolint`             | Lint Dockerfiles                                                    | —   |
-| `ktlint`               | Lint and format Kotlin code                                         | yes |
-| `license-header`       | Check source files have the required license header                 | —   |
-| `lychee`               | Check for broken links                                              | —   |
-| `markdownlint-cli2`    | Lint Markdown files for style and consistency                       | yes |
-| `prettier`             | Format Markdown and YAML files                                      | yes |
-| `renovate-deps`        | Verify Renovate dependency snapshot is up to date                   | yes |
-| `ruff`                 | Lint Python code                                                    | yes |
-| `ruff-format`          | Format Python code                                                  | yes |
-| `shellcheck`           | Lint shell scripts for common mistakes                              | —   |
-| `shfmt`                | Format shell scripts                                                | yes |
-| `xmllint`              | Validate XML files are well-formed                                  | —   |
-
-#### `actionlint`
-
-|             |                                                    |
-| ----------- | -------------------------------------------------- |
-| Description | Lint GitHub Actions workflow files                 |
-| Fix         | no                                                 |
-| Binary      | `actionlint`                                       |
-| Scope       | [file](#scopes)                                    |
-| Patterns    | `.github/workflows/*.yml .github/workflows/*.yaml` |
-| Config      | `actionlint.yml`                                   |
-
-#### `biome`
-
-|             |                                        |
-| ----------- | -------------------------------------- |
-| Description | Lint JS/TS/JSON files                  |
-| Fix         | yes                                    |
-| Binary      | `biome`                                |
-| Scope       | [file](#scopes)                        |
-| Patterns    | `*.json *.jsonc *.js *.ts *.jsx *.tsx` |
-
-#### `biome-format`
-
-|             |                                        |
-| ----------- | -------------------------------------- |
-| Description | Format JS/TS/JSON files                |
-| Fix         | yes                                    |
-| Binary      | `biome`                                |
-| Scope       | [file](#scopes)                        |
-| Patterns    | `*.json *.jsonc *.js *.ts *.jsx *.tsx` |
-
-#### `cargo-clippy`
-
-|             |                                                         |
-| ----------- | ------------------------------------------------------- |
-| Description | Lint Rust code; runs on all .rs files, not just changed |
-| Fix         | yes                                                     |
-| Binary      | `cargo-clippy`                                          |
-| Scope       | [project](#scopes)                                      |
-| Patterns    | `*.rs`                                                  |
-
-#### `cargo-fmt`
-
-|             |                                                           |
-| ----------- | --------------------------------------------------------- |
-| Description | Format Rust code; runs on all .rs files, not just changed |
-| Fix         | yes                                                       |
-| Binary      | `rustfmt`                                                 |
-| Scope       | [project](#scopes)                                        |
-| Patterns    | `*.rs`                                                    |
-
-#### `codespell`
-
-|             |                                    |
-| ----------- | ---------------------------------- |
-| Description | Check for common spelling mistakes |
-| Fix         | yes                                |
-| Binary      | `codespell`                        |
-| Scope       | [files](#scopes)                   |
-| Patterns    | `*`                                |
-| Config      | `.codespellrc`                     |
-
-#### `dotnet-format`
-
-|             |                  |
-| ----------- | ---------------- |
-| Description | Format C# code   |
-| Fix         | yes              |
-| Binary      | `dotnet`         |
-| Scope       | [files](#scopes) |
-| Patterns    | `*.cs`           |
-
-#### `editorconfig-checker`
-
-|             |                                               |
-| ----------- | --------------------------------------------- |
-| Description | Check files comply with EditorConfig settings |
-| Fix         | no                                            |
-| Binary      | `ec`                                          |
-| Scope       | [files](#scopes)                              |
-| Patterns    | `*`                                           |
-| Config      | `.editorconfig-checker.json`                  |
-
-#### `gofmt`
-
-|             |                 |
-| ----------- | --------------- |
-| Description | Format Go code  |
-| Fix         | yes             |
-| Binary      | `gofmt`         |
-| Scope       | [file](#scopes) |
-| Patterns    | `*.go`          |
-
-#### `golangci-lint`
-
-|             |                                                                     |
-| ----------- | ------------------------------------------------------------------- |
-| Description | Lint Go code; uses --new-from-rev to scope analysis to changed code |
-| Fix         | no                                                                  |
-| Binary      | `golangci-lint`                                                     |
-| Scope       | [project](#scopes)                                                  |
-| Patterns    | `*.go`                                                              |
-| Config      | `.golangci.yml`                                                     |
-
-#### `google-java-format`
-
-|             |                      |
-| ----------- | -------------------- |
-| Description | Format Java code     |
-| Fix         | yes                  |
-| Binary      | `google-java-format` |
-| Scope       | [files](#scopes)     |
-| Patterns    | `*.java`             |
-
-#### `hadolint`
-
-|             |                                        |
-| ----------- | -------------------------------------- |
-| Description | Lint Dockerfiles                       |
-| Fix         | no                                     |
-| Binary      | `hadolint`                             |
-| Scope       | [file](#scopes)                        |
-| Patterns    | `Dockerfile Dockerfile.* *.dockerfile` |
-| Config      | `.hadolint.yaml`                       |
-
-#### `ktlint`
-
-|             |                             |
-| ----------- | --------------------------- |
-| Description | Lint and format Kotlin code |
-| Fix         | yes                         |
-| Binary      | `ktlint`                    |
-| Scope       | [files](#scopes)            |
-| Patterns    | `*.kt *.kts`                |
-
-#### `license-header`
-
-|             |                                                     |
-| ----------- | --------------------------------------------------- |
-| Description | Check source files have the required license header |
-| Fix         | no                                                  |
-| Binary      | (built-in)                                          |
-| Scope       | [special](#scopes)                                  |
-
-#### `lychee`
-
-|             |                                    |
-| ----------- | ---------------------------------- |
-| Description | Check for broken links             |
-| Fix         | no                                 |
-| Binary      | `lychee`                           |
-| Scope       | [special](#scopes)                 |
-| Config      | via `[checks.links]` in flint.toml |
-
-Orchestrates [lychee](https://lychee.cli.rs/) for link checking. Requires `lychee` in `[tools]`.
-
-Default behavior: checks all links in changed files. When `check_all_local = true` in `flint.toml`, adds a second pass over local links in all files — useful when broken internal links from unchanged files also matter.
-
-Configure via `flint.toml`:
-
-```toml
-[checks.links]
-config = ".github/config/lychee.toml"
-check_all_local = true
-```
-
-#### `markdownlint-cli2`
-
-|             |                                               |
-| ----------- | --------------------------------------------- |
-| Description | Lint Markdown files for style and consistency |
-| Fix         | yes                                           |
-| Binary      | `markdownlint-cli2`                           |
-| Scope       | [file](#scopes)                               |
-| Patterns    | `*.md`                                        |
-| Config      | `.markdownlint.jsonc`                         |
-
-#### `prettier`
-
-|             |                                |
-| ----------- | ------------------------------ |
-| Description | Format Markdown and YAML files |
-| Fix         | yes                            |
-| Binary      | `prettier`                     |
-| Scope       | [files](#scopes)               |
-| Patterns    | `*.md *.yml *.yaml`            |
-| Config      | `.prettierrc`                  |
-
-#### `renovate-deps`
-
-|             |                                                                                                                            |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Description | Verify Renovate dependency snapshot is up to date                                                                          |
-| Fix         | yes                                                                                                                        |
-| Binary      | `renovate`                                                                                                                 |
-| Scope       | [special](#scopes)                                                                                                         |
-| Patterns    | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
-
-Verifies `.github/renovate-tracked-deps.json` is up to date by running Renovate locally and comparing its output against the committed snapshot. Requires `renovate` in `[tools]`.
-
-With `--fix`, automatically regenerates and commits the snapshot.
-
-Configure via `flint.toml`:
-
-```toml
-[checks.renovate-deps]
-exclude_managers = ["github-actions", "github-runners"]
-```
-
-#### `ruff`
-
-|             |                  |
-| ----------- | ---------------- |
-| Description | Lint Python code |
-| Fix         | yes              |
-| Binary      | `ruff`           |
-| Scope       | [file](#scopes)  |
-| Patterns    | `*.py`           |
-| Config      | `ruff.toml`      |
-
-#### `ruff-format`
-
-|             |                    |
-| ----------- | ------------------ |
-| Description | Format Python code |
-| Fix         | yes                |
-| Binary      | `ruff`             |
-| Scope       | [file](#scopes)    |
-| Patterns    | `*.py`             |
-| Config      | `ruff.toml`        |
-
-#### `shellcheck`
-
-|             |                                        |
-| ----------- | -------------------------------------- |
-| Description | Lint shell scripts for common mistakes |
-| Fix         | no                                     |
-| Binary      | `shellcheck`                           |
-| Scope       | [file](#scopes)                        |
-| Patterns    | `*.sh *.bash *.bats`                   |
-| Config      | `.shellcheckrc`                        |
-
-#### `shfmt`
-
-|             |                      |
-| ----------- | -------------------- |
-| Description | Format shell scripts |
-| Fix         | yes                  |
-| Binary      | `shfmt`              |
-| Scope       | [file](#scopes)      |
-| Patterns    | `*.sh *.bash`        |
-
-#### `xmllint`
-
-|             |                                    |
-| ----------- | ---------------------------------- |
-| Description | Validate XML files are well-formed |
-| Fix         | no                                 |
-| Binary      | `xmllint`                          |
-| Scope       | [files](#scopes)                   |
-| Patterns    | `*.xml`                            |
+| Name                                                           | Description                                                         | Fix |
+| -------------------------------------------------------------- | ------------------------------------------------------------------- | --- |
+| [`actionlint`](docs/linters.md#actionlint)                     | Lint GitHub Actions workflow files                                  | —   |
+| [`biome`](docs/linters.md#biome)                               | Lint JS/TS/JSON files                                               | yes |
+| [`biome-format`](docs/linters.md#biome-format)                 | Format JS/TS/JSON files                                             | yes |
+| [`cargo-clippy`](docs/linters.md#cargo-clippy)                 | Lint Rust code; runs on all .rs files, not just changed             | yes |
+| [`cargo-fmt`](docs/linters.md#cargo-fmt)                       | Format Rust code; runs on all .rs files, not just changed           | yes |
+| [`codespell`](docs/linters.md#codespell)                       | Check for common spelling mistakes                                  | yes |
+| [`dotnet-format`](docs/linters.md#dotnet-format)               | Format C# code                                                      | yes |
+| [`editorconfig-checker`](docs/linters.md#editorconfig-checker) | Check files comply with EditorConfig settings                       | —   |
+| [`gofmt`](docs/linters.md#gofmt)                               | Format Go code                                                      | yes |
+| [`golangci-lint`](docs/linters.md#golangci-lint)               | Lint Go code; uses --new-from-rev to scope analysis to changed code | —   |
+| [`google-java-format`](docs/linters.md#google-java-format)     | Format Java code                                                    | yes |
+| [`hadolint`](docs/linters.md#hadolint)                         | Lint Dockerfiles                                                    | —   |
+| [`ktlint`](docs/linters.md#ktlint)                             | Lint and format Kotlin code                                         | yes |
+| [`license-header`](docs/linters.md#license-header)             | Check source files have the required license header                 | —   |
+| [`lychee`](docs/linters.md#lychee)                             | Check for broken links                                              | —   |
+| [`markdownlint-cli2`](docs/linters.md#markdownlint-cli2)       | Lint Markdown files for style and consistency                       | yes |
+| [`prettier`](docs/linters.md#prettier)                         | Format Markdown and YAML files                                      | yes |
+| [`renovate-deps`](docs/linters.md#renovate-deps)               | Verify Renovate dependency snapshot is up to date                   | yes |
+| [`ruff`](docs/linters.md#ruff)                                 | Lint Python code                                                    | yes |
+| [`ruff-format`](docs/linters.md#ruff-format)                   | Format Python code                                                  | yes |
+| [`shellcheck`](docs/linters.md#shellcheck)                     | Lint shell scripts for common mistakes                              | —   |
+| [`shfmt`](docs/linters.md#shfmt)                               | Format shell scripts                                                | yes |
+| [`xmllint`](docs/linters.md#xmllint)                           | Validate XML files are well-formed                                  | —   |
 
 <!-- registry-table-end -->
 <!-- editorconfig-checker-enable -->
-
-**Note:** Biome's config flag (`--config-path`) takes a directory, not a file path —
-config injection for `biome` and `biome-format` is not yet implemented.
-
-#### Scopes
-
-- `file` — invoked once per matched file
-- `files` — invoked once with all matched files as args; only changed files are passed
-- `project` — invoked once with no file args; for checks with patterns set
-  (e.g. `cargo-clippy`), skipped entirely if no matching files changed, but runs on
-  the whole project when it does run. `golangci-lint` is the exception — it uses
-  `--new-from-rev` to scope analysis to changed code even within the project run.
-
-**Slow checks** (Slow = yes) are skipped by `--fast-only`. Use `--fast-only` for
-local/pre-push feedback and the full set in CI.
-
-**`editorconfig-checker` deference**: `editorconfig-checker` runs on all files, but
-automatically skips file types owned by an active line-length-enforcing
-formatter. When `cargo-fmt`, `ruff-format`, `biome-format`, or `prettier`
-are active, their file types are excluded from `editorconfig-checker` — those formatters
-already enforce line length and would conflict with `editorconfig-checker`'s
-`max_line_length` editorconfig check. If none of those formatters are
-installed, `editorconfig-checker` checks those files itself.
-
-## Why
-
-The bash task scripts (v1) have two problems:
-
-**Local ≠ CI**: `--native` runs a subset of linters; CI runs full super-linter
-in Docker. Different tools, different behavior. Passing locally does not mean
-passing in CI.
-
-**Bash has limits**: the registry pattern was already at the edge of what bash
-does cleanly. Adding built-in checks (links, renovate) would make it worse.
-
-### Why not pre-commit?
-
-pre-commit adds a parallel tool management system on top of mise. Consuming repos
-already declare their tools in `mise.toml` — pre-commit would require maintaining
-a second inventory of the same tools in `.pre-commit-config.yaml`, with its own
-versioning and install lifecycle. That's friction without benefit for repos that
-are already mise-first.
-
-### Why not Husky?
-
-Husky manages git hooks for Node.js projects and requires `npm install` to activate.
-Repos that aren't Node-first still need a `package.json` and a dev dependency just to
-run hooks. `flint hook install` writes a single shell script directly to `.git/hooks/`
-with no install step and no language runtime dependency.
-
-### Why not Spotless (or other Maven formatter plugins)?
-
-Spotless runs `google-java-format` as a Maven build phase, which means format
-failures block compilation and test runs — that's the wrong place for a style
-check. flint's `google-java-format` check runs as a separate lint step, only on
-changed files, and is fast.
-
-To migrate: remove `spotless-maven-plugin` from your `pom.xml` (and any
-`spotless.skip` properties), add `"github:google/google-java-format"` to
-`[tools]` in `mise.toml`, and run `flint run --fix` once to confirm the repo is
-clean.
-
-### Why not MegaLinter / super-linter?
-
-Container-based linters (super-linter, MegaLinter) ship their own tool versions,
-independent of what the repo pins in `mise.toml`. This breaks the "declare once,
-use everywhere" promise of mise. Container startup also adds latency to every run.
-
-## Principles
-
-1. **Fast** — the primary goal; everything else serves it:
-   - Native execution only (no Docker); linters run in parallel (Rust binary, short startup)
-   - Small binary, cached by mise — fast install, near-zero overhead between runs
-   - Diff-aware: only changed files are linted by default; `--full` to check everything
-   - Opt-in via `mise.toml`: undeclared tools are skipped entirely
-   - Slow checks (e.g. `renovate-deps`) tagged and skippable with `--fast-only`
-
-2. **Local same as CI** — one binary, one config, identical behavior.
-   No "native mode subset" distinction. If it passes locally, it passes in CI.
-
-3. **AI-friendly** — `--fix` fixes what's fixable silently, prints output
-   only for issues needing review, and exits with a structured summary:
-
-   ```text
-   [shellcheck]
-   ...
-   flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
-   ```
-
-   Only unfixable issues surface for review — no reasoning step required.
-
-4. **Cross-platform** — runs on Linux, macOS, and Windows. The built-in
-   registry accounts for platform differences (e.g. binary names, path quoting).
-
-5. **Autofix where possible** — `--fix` checks first, fixes what's fixable,
-   reports what needs review. Fix mode runs serially to avoid concurrent writes.
-   Pass specific linter names to limit which fixers run (`flint run --fix prettier shfmt`).
 
 ## Versioning
 

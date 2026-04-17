@@ -909,41 +909,68 @@ mod tests {
         );
     }
 
-    /// Verifies the README linter table is in sync with the registry.
-    /// Every column is checked against the registry except `config_file`, which
-    /// may contain hand-written footnotes or prose (e.g. the lychee config note).
+    /// Verifies README summary table and docs/linters.md detail sections stay
+    /// in sync with the registry. The summary table lives in README.md between
+    /// `registry-table-*` markers; the per-linter detail sections live in
+    /// docs/linters.md between `linter-details-*` markers.
     ///
     /// Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate.
     #[test]
     fn readme_linter_table_in_sync() {
-        let readme_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("README.md");
+        let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let readme_path = manifest_dir.join("README.md");
+        let details_path = manifest_dir.join("docs/linters.md");
         let readme = std::fs::read_to_string(&readme_path).expect("README.md must be readable");
+        let details =
+            std::fs::read_to_string(&details_path).expect("docs/linters.md must be readable");
         let registry = builtin();
 
-        let expected = generate_readme_table(&registry);
+        let expected_summary = generate_summary_table(&registry);
+        let expected_details = generate_linter_details(&registry);
 
         if std::env::var("UPDATE_README").is_ok() {
-            let updated = replace_readme_table(&readme, &expected);
-            std::fs::write(&readme_path, updated).expect("failed to write README.md");
+            let updated_readme = replace_section(
+                &readme,
+                README_TABLE_START,
+                README_TABLE_END,
+                &expected_summary,
+            );
+            let updated_details =
+                replace_section(&details, DETAILS_START, DETAILS_END, &expected_details);
+            std::fs::write(&readme_path, updated_readme).expect("failed to write README.md");
+            std::fs::write(&details_path, updated_details)
+                .expect("failed to write docs/linters.md");
             return;
         }
 
         // Normalize both sides: strip blank lines that prettier adds around
         // headings, tables, and code blocks. This keeps the comparison stable
         // even when docs contain multi-paragraph content with blank lines.
-        let actual = extract_readme_table(&readme);
-        let expected_norm = strip_blank_lines(&expected);
-        if actual != expected_norm {
+        let actual_summary = extract_section(&readme, README_TABLE_START, README_TABLE_END);
+        let actual_details = extract_section(&details, DETAILS_START, DETAILS_END);
+        let expected_summary_norm = strip_blank_lines(&expected_summary);
+        let expected_details_norm = strip_blank_lines(&expected_details);
+        if actual_summary != expected_summary_norm {
             panic!(
-                "README linter table is out of sync with the registry.\n\
+                "README summary table is out of sync with the registry.\n\
                  Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate.\n\n\
-                 Expected:\n{expected_norm}\n\nActual:\n{actual}"
+                 Expected:\n{expected_summary_norm}\n\nActual:\n{actual_summary}"
+            );
+        }
+        if actual_details != expected_details_norm {
+            panic!(
+                "docs/linters.md detail sections out of sync with the registry.\n\
+                 Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate.\n\n\
+                 Expected:\n{expected_details_norm}\n\nActual:\n{actual_details}"
             );
         }
     }
 
     const README_TABLE_START: &str = "<!-- registry-table-start -->";
     const README_TABLE_END: &str = "<!-- registry-table-end -->";
+    const DETAILS_START: &str = "<!-- linter-details-start -->";
+    const DETAILS_END: &str = "<!-- linter-details-end -->";
+    const GENERATED_COMMENT: &str = "<!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->";
 
     fn strip_blank_lines(s: &str) -> String {
         s.lines()
@@ -952,41 +979,37 @@ mod tests {
             .join("\n")
     }
 
-    fn extract_readme_table(readme: &str) -> String {
-        let start = readme
-            .find(README_TABLE_START)
-            .expect("README missing <!-- registry-table-start --> marker")
-            + README_TABLE_START.len();
-        let end = readme
-            .find(README_TABLE_END)
-            .expect("README missing <!-- registry-table-end --> marker");
-        // Strip blank lines that prettier inserts around headings, tables, and
-        // code blocks — and that linter docs contain between paragraphs.
-        strip_blank_lines(&readme[start..end])
+    fn extract_section(haystack: &str, start_marker: &str, end_marker: &str) -> String {
+        let start = haystack
+            .find(start_marker)
+            .unwrap_or_else(|| panic!("missing {start_marker} marker"))
+            + start_marker.len();
+        let end = haystack
+            .find(end_marker)
+            .unwrap_or_else(|| panic!("missing {end_marker} marker"));
+        strip_blank_lines(&haystack[start..end])
     }
 
-    fn replace_readme_table(readme: &str, table: &str) -> String {
-        // `start` points just after the opening marker; `&readme[..start]` includes it.
-        let start = readme
-            .find(README_TABLE_START)
-            .expect("README missing <!-- registry-table-start --> marker")
-            + README_TABLE_START.len();
-        let end = readme
-            .find(README_TABLE_END)
-            .expect("README missing <!-- registry-table-end --> marker");
+    fn replace_section(haystack: &str, start_marker: &str, end_marker: &str, body: &str) -> String {
+        let start = haystack
+            .find(start_marker)
+            .unwrap_or_else(|| panic!("missing {start_marker} marker"))
+            + start_marker.len();
+        let end = haystack
+            .find(end_marker)
+            .unwrap_or_else(|| panic!("missing {end_marker} marker"));
         format!(
             "{}\n{}\n{}{}",
-            &readme[..start],
-            table,
-            README_TABLE_END,
-            &readme[end + README_TABLE_END.len()..]
+            &haystack[..start],
+            body,
+            end_marker,
+            &haystack[end + end_marker.len()..]
         )
     }
 
-    fn generate_readme_table(registry: &[Check]) -> String {
-        let generated_comment = "<!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->";
-
+    fn generate_summary_table(registry: &[Check]) -> String {
         // Summary table: Name | Description | Fix — sorted alphabetically.
+        // Name column links to the matching detail section in docs/linters.md.
         let headers = ["Name", "Description", "Fix"];
         let mut sorted: Vec<&Check> = registry.iter().collect();
         sorted.sort_by_key(|c| c.name);
@@ -1011,7 +1034,7 @@ mod tests {
         let header_strs: Vec<&str> = headers.iter().copied().collect();
 
         let mut lines = vec![
-            generated_comment.to_string(),
+            GENERATED_COMMENT.to_string(),
             fmt_row(&header_strs),
             sep_row,
         ];
@@ -1019,18 +1042,25 @@ mod tests {
             let strs: Vec<&str> = row.iter().map(|s| s.as_str()).collect();
             lines.push(fmt_row(&strs));
         }
+        lines.join("\n")
+    }
 
-        // Per-linter detail sections (alphabetical)
+    fn generate_linter_details(registry: &[Check]) -> String {
+        let mut sorted: Vec<&Check> = registry.iter().collect();
+        sorted.sort_by_key(|c| c.name);
+
+        let mut lines = vec![GENERATED_COMMENT.to_string()];
         for check in &sorted {
-            lines.push(format!("#### `{}`", check.name));
+            lines.push(format!("## `{}`", check.name));
             lines.push(detail_table(check));
         }
-
         lines.join("\n")
     }
 
     fn summary_row(check: &Check) -> [String; 3] {
-        let name = format!("`{}`", check.name);
+        // docs/linters.md uses `## `<name>`` — GitHub strips backticks and
+        // lowercases to produce the anchor `<name>`.
+        let name = format!("[`{0}`](docs/linters.md#{0})", check.name);
         let desc = if check.desc.is_empty() {
             "—".to_string()
         } else {

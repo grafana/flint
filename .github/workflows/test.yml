@@ -36,6 +36,13 @@ jobs:
           persist-credentials: false
           fetch-depth: 0 # needed for merge-base in e2e tests
 
+      # Defender real-time scan dominates mise cache extract on Windows
+      # (tar -xf of ~570MB many-small-files takes ~80s). Exclude before restore.
+      - name: Exclude mise dir from Defender (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Add-MpPreference -ExclusionPath "$env:LOCALAPPDATA\mise"
+
       - name: Setup mise
         uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
         with:

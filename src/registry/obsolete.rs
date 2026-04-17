@@ -14,6 +14,11 @@ pub const OBSOLETE_KEYS: &[(&str, &str)] = &[
         "github:google/google-java-format",
     ),
     ("ubi:pinterest/ktlint", "github:pinterest/ktlint"),
+    // Bare `shfmt` resolves via aqua registry, which is broken in current mise
+    // releases. `github:mvdan/sh` works — paired with `versioned_bin("shfmt_{version}")`
+    // in the registry. Remove this entry once aqua registry is fixed upstream
+    // (tracked in flint#175).
+    ("shfmt", "github:mvdan/sh"),
 ];
 
 /// Checks whether any obsolete tool keys are present in `mise_tools`.

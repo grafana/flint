@@ -58,7 +58,7 @@ Add the linting tools your project needs alongside the `flint` binary itself:
 
 # Add whichever linters apply to your repo:
 shellcheck              = "v0.11.0"
-shfmt                   = "v3.12.0"
+"github:mvdan/sh"       = "v3.13.1"  # activates shfmt
 actionlint              = "1.7.10"
 "npm:markdownlint-cli2" = "0.47.0"
 "npm:prettier"          = "3.5.0"

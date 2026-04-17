@@ -1,0 +1,117 @@
+---
+name: Bench Win extract
+
+# Windows runners show ~80s for mise cache extract (568 MB, many-small-files).
+# This workflow measures archiver alternatives head-to-head to decide whether
+# proposing 7z to jdx/mise-action is worth it. Run via workflow_dispatch.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/bench-win-extract.yml
+
+permissions: {}
+
+jobs:
+  bench:
+    name: Bench (${{ matrix.defender }})
+    runs-on: windows-2025
+    strategy:
+      fail-fast: false
+      matrix:
+        defender: [on, excluded]
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Exclude mise dir from Defender
+        if: matrix.defender == 'excluded'
+        shell: pwsh
+        run: Add-MpPreference -ExclusionPath "$env:LOCALAPPDATA\mise"
+
+      - name: Setup mise (populate install dir)
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+        with:
+          version: v2026.4.10
+          sha256: 2df0ce5b1f42502a4895888a0fe7aae4cf6d1959d2dbb62f29204773cff3d457
+          cache_key_prefix: mise-v2
+
+      - name: Benchmark extract
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $src = "$env:LOCALAPPDATA\mise"
+          $tmp = "$env:RUNNER_TEMP\bench"
+          New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+
+          $msysTar = "C:\Program Files\Git\usr\bin\tar.exe"
+          $bsdTar  = "C:\Windows\System32\tar.exe"
+          $sevenZ  = (Get-Command 7z).Source
+
+          $bytes = (Get-ChildItem -Recurse -File $src -ErrorAction SilentlyContinue |
+                    Measure-Object Length -Sum).Sum
+          $files = (Get-ChildItem -Recurse -File $src -ErrorAction SilentlyContinue |
+                    Measure-Object).Count
+
+          $rows = @()
+          function Bench($name, $archive, [scriptblock]$create, [scriptblock]$extract) {
+            $outDir = "$tmp\out-$name"
+            if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir }
+            New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+            $sw = [Diagnostics.Stopwatch]::StartNew()
+            & $create
+            $sw.Stop(); $cSec = [math]::Round($sw.Elapsed.TotalSeconds, 1)
+
+            $archMB = [math]::Round((Get-Item $archive).Length / 1MB, 1)
+
+            $sw.Restart()
+            & $extract
+            $sw.Stop(); $xSec = [math]::Round($sw.Elapsed.TotalSeconds, 1)
+
+            $script:rows += [PSCustomObject]@{
+              archiver = $name
+              create_s = $cSec
+              extract_s = $xSec
+              size_MB  = $archMB
+            }
+            Remove-Item -Recurse -Force $outDir
+          }
+
+          # MSYS tar + zstd (what @actions/cache currently uses on Windows)
+          $msysArch = "$tmp\msys.tar.zst"
+          Bench 'msys-tar+zstd' $msysArch `
+            { & $msysTar --use-compress-program 'zstd -T0 -3' -cf $msysArch -C $src . } `
+            { & $msysTar --use-compress-program 'zstd -d' -xf $msysArch -C "$tmp\out-msys-tar+zstd" }
+
+          # bsdtar (Windows built-in) + zstd
+          $bsdArch = "$tmp\bsd.tar.zst"
+          Bench 'bsdtar+zstd' $bsdArch `
+            { & $bsdTar --use-compress-program 'zstd -T0 -3' -cf $bsdArch -C $src . } `
+            { & $bsdTar --use-compress-program 'zstd -d' -xf $bsdArch -C "$tmp\out-bsdtar+zstd" }
+
+          # 7z (LZMA2 default)
+          $sevenArch = "$tmp\mise.7z"
+          Bench '7z-lzma2' $sevenArch `
+            { & $sevenZ a -mx3 -mmt=on $sevenArch "$src\*" | Out-Null } `
+            { & $sevenZ x $sevenArch "-o$tmp\out-7z-lzma2" -y | Out-Null }
+
+          # 7z with zstd (if supported — 7-Zip 22+ via plugin; skip if fails)
+          # Not run: default GH runner 7z doesn't ship zstd codec.
+
+          $summary = "## Bench results (defender=${{ matrix.defender }})`n`n"
+          $summary += "Raw: $files files, $([math]::Round($bytes/1MB,1)) MB`n`n"
+          $summary += "| archiver | create (s) | extract (s) | archive (MB) |`n"
+          $summary += "|---|---:|---:|---:|`n"
+          foreach ($r in $rows) {
+            $summary += "| $($r.archiver) | $($r.create_s) | $($r.extract_s) | $($r.size_MB) |`n"
+          }
+          Write-Host $summary
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $summary

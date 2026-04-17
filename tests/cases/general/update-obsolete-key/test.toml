@@ -6,6 +6,7 @@ stdout = "  replaced \"npm:markdownlint-cli\" → \"npm:markdownlint-cli2\"\n"
 [expected.files]
 "mise.toml" = '''
 [tools]
+node = "24.14.1"
 shellcheck = "v0.11.0"
 "npm:markdownlint-cli2" = "0.39.0"
 '''

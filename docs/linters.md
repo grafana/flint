@@ -1,7 +1,7 @@
 # Built-in linter registry
 
-Every supported check, its config file (when applicable), and its scope. See
-the [README](../README.md#built-in-linter-registry) for the summary table.
+Every supported check, its config file (when applicable), and its scope. The
+[summary table lives in the README](../README.md#built-in-linter-registry).
 
 **Note:** Biome's config flag (`--config-path`) takes a directory, not a file path —
 config injection for `biome` and `biome-format` is not yet implemented.
@@ -284,8 +284,9 @@ exclude_managers = ["github-actions", "github-runners"]
   the whole project when it does run. `golangci-lint` is the exception — it uses
   `--new-from-rev` to scope analysis to changed code even within the project run.
 
-**Slow checks** (Slow = yes) are skipped by `--fast-only`. Use `--fast-only` for
-local/pre-push feedback and the full set in CI.
+Checks tagged slow in the registry are skipped by `--fast-only`. Use
+`--fast-only` for local/pre-push feedback and the full set in CI. (No
+builtin is currently marked slow, but the mechanism is preserved.)
 
 **`editorconfig-checker` deference**: `editorconfig-checker` runs on all files, but
 automatically skips file types owned by an active line-length-enforcing

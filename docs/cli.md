@@ -17,7 +17,7 @@ Commands and flags follow [golangci-lint](https://golangci-lint.run/) convention
 | -------------------- | ---------------------------------------------------------------------------------------------- |
 | `--fix`              | Fix what's fixable, report what still needs review; exit 1 if anything changed or needs review |
 | `--full`             | Lint all files instead of only changed files                                                   |
-| `--fast-only`        | Skip slow checks (e.g. `renovate-deps`). Overridden by explicit linter names.                  |
+| `--fast-only`        | Skip checks tagged as slow in the registry. Overridden by explicit linter names.               |
 | `--short`            | Compact summary output, no per-check noise                                                     |
 | `--verbose`          | Show all linter output, not just failures                                                      |
 | `--new-from-rev REV` | Diff base (default: merge base with base branch)                                               |
@@ -84,6 +84,6 @@ NAME            BINARY          STATUS     SPEED  PATTERNS
 -------------------------------------------------------------------
 shellcheck      shellcheck      installed  fast   *.sh *.bash *.bats
 cargo-fmt       cargo-fmt       missing    fast   *.rs
-renovate-deps   renovate        installed  slow
+renovate-deps   renovate        installed  fast
 ...
 ```

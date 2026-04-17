@@ -21,7 +21,7 @@ Linter runner built for speed and consistency:
 - **Cross-platform** — Linux, macOS, Windows
 - **Autofix** — `--fix` fixes what's fixable; reports what still needs review
 
-See [docs/why.md](docs/why.md) for background and principles.
+Read the [background and principles](docs/why.md).
 
 > [!TIP]
 > **Legacy v1** (bash task scripts): see [README-V1.md](README-V1.md).
@@ -65,7 +65,7 @@ actionlint              = "1.7.10"
 rust                    = "1.87.0"    # activates cargo-fmt + cargo-clippy
 go                      = "1.24.0"    # activates gofmt
 lychee                  = "0.18.0"    # activates links check
-"npm:renovate"          = "39.0.0"    # activates renovate-deps check (slow)
+"npm:renovate"          = "39.0.0"    # activates renovate-deps check
 ```
 
 Then wire up lint tasks:
@@ -111,7 +111,7 @@ run = "flint run --fix"
 
 ### CLI
 
-See [docs/cli.md](docs/cli.md) for command and flag reference.
+See the [CLI reference](docs/cli.md) for commands and flags.
 
 ### Config (`flint.toml`)
 
@@ -152,8 +152,8 @@ being linted and cannot be redirected via a flag.
 
 ### Built-in linter registry
 
-Click a linter name for its detail page. See [docs/linters.md](docs/linters.md)
-for scope semantics and per-linter notes.
+Click a name in the table below for details. See the
+[linter reference](docs/linters.md) for scope semantics and per-linter notes.
 
 <!-- editorconfig-checker-disable -->
 <!-- registry-table-start -->

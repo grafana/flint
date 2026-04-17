@@ -51,7 +51,7 @@ use everywhere" promise of mise. Container startup also adds latency to every ru
    - Small binary, cached by mise — fast install, near-zero overhead between runs
    - Diff-aware: only changed files are linted by default; `--full` to check everything
    - Opt-in via `mise.toml`: undeclared tools are skipped entirely
-   - Slow checks (e.g. `renovate-deps`) tagged and skippable with `--fast-only`
+   - Checks can be tagged slow in the registry and skipped via `--fast-only`
 
 2. **Local same as CI** — one binary, one config, identical behavior.
    No "native mode subset" distinction. If it passes locally, it passes in CI.

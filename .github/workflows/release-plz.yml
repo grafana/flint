@@ -11,12 +11,13 @@ permissions: {}
 jobs:
   release:
     # Runs on every push to main. If the release PR was just merged (i.e. Cargo.toml
-    # version was bumped), creates a git tag and a draft GitHub release. The release.yml
-    # workflow then picks up the tag, builds binaries, and publishes the release.
+    # version was bumped), creates a git tag and a draft GitHub release, then triggers
+    # release.yml to build platform binaries and publish the release.
     name: Release
     runs-on: ubuntu-24.04
     if: ${{ github.repository == 'grafana/flint' }}
     permissions:
+      actions: write
       contents: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -24,16 +25,26 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: release-plz/action@1528104d2ca23787631a1c1f022abb64b34c1e11 # v0.5
+        id: release-plz
         with:
           command: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Trigger binary release
+        if: ${{ steps.release-plz.outputs.releases_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          gh workflow run release.yml
+          -f tag=${{ fromJSON(steps.release-plz.outputs.releases)[0].tag }}
 
   release-pr:
     # Runs on every push to main. Keeps an open PR that bumps Cargo.toml version
     # and updates CHANGELOG.md based on conventional commits since the last release.
     # Merging this PR triggers the release job above.
+    # Depends on release so the new git tag exists before we compute the next version.
     name: Release PR
+    needs: [release]
     runs-on: ubuntu-24.04
     if: ${{ github.repository == 'grafana/flint' }}
     permissions:

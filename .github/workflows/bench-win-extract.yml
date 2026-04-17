@@ -46,7 +46,7 @@ jobs:
       - name: Benchmark extract
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
+          $ErrorActionPreference = 'Continue'
           $src = "$env:LOCALAPPDATA\mise"
           $tmp = "$env:RUNNER_TEMP\bench"
           New-Item -ItemType Directory -Force -Path $tmp | Out-Null
@@ -66,45 +66,48 @@ jobs:
             if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir }
             New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
-            $sw = [Diagnostics.Stopwatch]::StartNew()
-            & $create
-            $sw.Stop(); $cSec = [math]::Round($sw.Elapsed.TotalSeconds, 1)
+            $cSec = 'ERR'; $xSec = 'ERR'; $archMB = 'ERR'
+            try {
+              $sw = [Diagnostics.Stopwatch]::StartNew()
+              & $create
+              if ($LASTEXITCODE -ne 0) { throw "create failed exit $LASTEXITCODE" }
+              $sw.Stop(); $cSec = [math]::Round($sw.Elapsed.TotalSeconds, 1)
+              $archMB = [math]::Round((Get-Item $archive).Length / 1MB, 1)
 
-            $archMB = [math]::Round((Get-Item $archive).Length / 1MB, 1)
-
-            $sw.Restart()
-            & $extract
-            $sw.Stop(); $xSec = [math]::Round($sw.Elapsed.TotalSeconds, 1)
-
+              $sw.Restart()
+              & $extract
+              if ($LASTEXITCODE -ne 0) { throw "extract failed exit $LASTEXITCODE" }
+              $sw.Stop(); $xSec = [math]::Round($sw.Elapsed.TotalSeconds, 1)
+            } catch {
+              Write-Host "::warning::$name failed: $_"
+            }
             $script:rows += [PSCustomObject]@{
               archiver = $name
               create_s = $cSec
               extract_s = $xSec
               size_MB  = $archMB
             }
-            Remove-Item -Recurse -Force $outDir
+            if (Test-Path $outDir) { Remove-Item -Recurse -Force $outDir }
           }
 
-          # MSYS tar + zstd (what @actions/cache currently uses on Windows)
+          # MSYS tar + zstd — what @actions/cache uses on Windows.
+          # --force-local stops MSYS tar from parsing "D:" as hostname.
           $msysArch = "$tmp\msys.tar.zst"
           Bench 'msys-tar+zstd' $msysArch `
-            { & $msysTar --use-compress-program 'zstd -T0 -3' -cf $msysArch -C $src . } `
-            { & $msysTar --use-compress-program 'zstd -d' -xf $msysArch -C "$tmp\out-msys-tar+zstd" }
+            { & $msysTar --force-local --use-compress-program 'zstd -T0 -3' -cf $msysArch -C $src . } `
+            { & $msysTar --force-local --use-compress-program 'zstd -d' -xf $msysArch -C "$tmp\out-msys-tar+zstd" }
 
-          # bsdtar (Windows built-in) + zstd
+          # bsdtar (Windows built-in, libarchive) with native --zstd.
           $bsdArch = "$tmp\bsd.tar.zst"
           Bench 'bsdtar+zstd' $bsdArch `
-            { & $bsdTar --use-compress-program 'zstd -T0 -3' -cf $bsdArch -C $src . } `
-            { & $bsdTar --use-compress-program 'zstd -d' -xf $bsdArch -C "$tmp\out-bsdtar+zstd" }
+            { & $bsdTar --zstd -cf $bsdArch -C $src . } `
+            { & $bsdTar --zstd -xf $bsdArch -C "$tmp\out-bsdtar+zstd" }
 
-          # 7z (LZMA2 default)
+          # 7z (LZMA2, -mx3 ~= zstd -3)
           $sevenArch = "$tmp\mise.7z"
           Bench '7z-lzma2' $sevenArch `
             { & $sevenZ a -mx3 -mmt=on $sevenArch "$src\*" | Out-Null } `
             { & $sevenZ x $sevenArch "-o$tmp\out-7z-lzma2" -y | Out-Null }
-
-          # 7z with zstd (if supported — 7-Zip 22+ via plugin; skip if fails)
-          # Not run: default GH runner 7z doesn't ship zstd codec.
 
           $summary = "## Bench results (defender=${{ matrix.defender }})`n`n"
           $summary += "Raw: $files files, $([math]::Round($bytes/1MB,1)) MB`n`n"

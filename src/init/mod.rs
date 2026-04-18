@@ -485,13 +485,16 @@ rust = { version = "1.95.0", components = "clippy,rustfmt" }
         let actionlint_pos = result.find("actionlint =").expect("actionlint present");
         let lychee_pos = result.find("lychee =").expect("lychee present");
         let prettier_pos = result.find("\"npm:prettier\"").expect("prettier present");
-        assert!(node_pos < header_pos, "runtimes above header");
-        assert!(rust_pos < header_pos, "runtimes above header");
-        assert!(node_pos < rust_pos, "runtimes sorted (node < rust)");
+        // rust is the only true toolchain here; node lives with linters because
+        // it's only pinned as a prereq for npm:* backend tools.
+        assert!(rust_pos < header_pos, "toolchains above header");
+        assert!(node_pos > header_pos, "node below header (linter prereq)");
         assert!(actionlint_pos > header_pos, "linters below header");
         assert!(
-            actionlint_pos < lychee_pos && lychee_pos < prettier_pos,
-            "linters sorted"
+            actionlint_pos < lychee_pos
+                && lychee_pos < node_pos
+                && node_pos < prettier_pos,
+            "linters sorted alphabetically"
         );
 
         // Idempotent: second call returns false and leaves content unchanged.

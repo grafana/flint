@@ -745,7 +745,9 @@ pub(super) fn apply_env_and_tasks(
     // [tasks] — add lint / lint:fix / (lint:pre-commit)
     {
         if !doc.contains_key("tasks") {
-            doc.insert("tasks", toml_edit::Item::Table(toml_edit::Table::new()));
+            let mut tasks_table = toml_edit::Table::new();
+            tasks_table.set_implicit(true);
+            doc.insert("tasks", toml_edit::Item::Table(tasks_table));
         }
         let tasks = doc["tasks"]
             .as_table_mut()

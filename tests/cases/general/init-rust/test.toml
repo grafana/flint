@@ -30,13 +30,13 @@ MD013: false
 '''
 "mise.toml" = '''
 [tools]
-node = "1.0.0"
 rust = { version = "1.0.0", components = "clippy,rustfmt" }
 
 # Linters
 actionlint = "1.0.0"
 editorconfig-checker = "1.0.0"
 lychee = "1.0.0"
+node = "1.0.0"
 "npm:@biomejs/biome" = "1.0.0"
 "npm:markdownlint-cli2" = "1.0.0"
 "npm:prettier" = "1.0.0"
@@ -44,8 +44,6 @@ lychee = "1.0.0"
 
 [env]
 FLINT_CONFIG_DIR = ".github/config"
-
-[tasks]
 
 [tasks.lint]
 description = "Run all lints"
@@ -61,18 +59,24 @@ mise = '''
 #!/bin/sh
 # Fake mise: handles `mise use --pin <key>@latest` by appending to mise.toml.
 # Real mise also installs the tool; the fake skips that since the test only
-# cares about the file mutation.
+# cares about the file mutation. Requires `--pin` so regressions that forget
+# the flag (and would write soft `latest` pins in real use) fail the test.
 cmd=$1
 shift
 [ "$cmd" = "use" ] || exit 0
 key=""
+saw_pin=0
 while [ $# -gt 0 ]; do
     case "$1" in
-        --pin) ;;
+        --pin) saw_pin=1 ;;
         *@*) key="${1%@*}" ;;
     esac
     shift
 done
+if [ "$saw_pin" -ne 1 ]; then
+    echo "fake mise: refusing \`mise use\` without --pin (got: $*)" >&2
+    exit 1
+fi
 [ -n "$key" ] || exit 0
 : "${MISE_PROJECT_ROOT:=.}"
 mise_toml="$MISE_PROJECT_ROOT/mise.toml"

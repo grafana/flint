@@ -301,6 +301,67 @@ pub(super) fn apply_changes(
     Ok(())
 }
 
+/// Sorts `[tools]` entries and inserts the `# Linters` header when they are not
+/// already in canonical form. Returns `true` if the file was rewritten.
+pub(super) fn normalize_tools_section(path: &Path) -> Result<bool> {
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(_) => return Ok(false),
+    };
+    let mut doc: toml_edit::DocumentMut = match content.parse() {
+        Ok(d) => d,
+        Err(_) => return Ok(false),
+    };
+    let Some(tools) = doc.get_mut("tools").and_then(|i| i.as_table_mut()) else {
+        return Ok(false);
+    };
+    sort_and_group_tools(tools);
+    let new_content = doc.to_string();
+    if new_content == content {
+        return Ok(false);
+    }
+    std::fs::write(path, new_content)?;
+    println!("  normalized [tools] in {}", path.display());
+    Ok(true)
+}
+
+/// Sorts `[tools]` entries alphabetically and inserts a `# Linters` comment
+/// before the first linter entry. Toolchain keys (derived from registry checks
+/// marked `.toolchain()`, plus `node`) stay above the header; every other key
+/// goes below.
+fn sort_and_group_tools(tools: &mut toml_edit::Table) {
+    let mut entries: Vec<(String, toml_edit::Item)> = tools
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.clone()))
+        .collect();
+    if entries.is_empty() {
+        return;
+    }
+    let toolchains = crate::registry::toolchain_keys();
+    let (mut runtimes, mut linters): (Vec<_>, Vec<_>) = entries
+        .drain(..)
+        .partition(|(k, _)| toolchains.contains(k.as_str()));
+    runtimes.sort_by(|a, b| a.0.cmp(&b.0));
+    linters.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let keys: Vec<String> = tools.iter().map(|(k, _)| k.to_string()).collect();
+    for k in keys {
+        tools.remove(&k);
+    }
+    for (k, v) in runtimes {
+        tools.insert(&k, v);
+    }
+    let first_linter_key = linters.first().map(|(k, _)| k.clone());
+    for (k, v) in linters {
+        tools.insert(&k, v);
+    }
+    if let Some(k) = first_linter_key
+        && let Some(mut key_mut) = tools.key_mut(&k)
+    {
+        key_mut.leaf_decor_mut().set_prefix("\n# Linters\n");
+    }
+}
+
 const FLINT_V1_URL_PREFIX: &str = "https://raw.githubusercontent.com/grafana/flint/";
 
 pub(super) struct V1Removal {
@@ -506,35 +567,70 @@ pub(super) fn generate_flint_toml(
     Ok(true)
 }
 
-/// Generates `.markdownlint.jsonc` in the project root if it does not already exist
-/// and markdownlint-cli2 is being set up.
-/// Returns `true` if the file was written.
+/// Generates `.markdownlint.yml` in the project root when markdownlint-cli2 is
+/// being set up alongside editorconfig-checker.
+/// Returns `true` if the file was written (or an older variant was replaced).
+///
+/// Target format is `.markdownlint.yml` for uniformity across consumer repos.
+/// Older variants (`.markdownlint.{json,jsonc,yaml}`,
+/// `.markdownlint-cli2.{jsonc,yaml,yml,cjs,mjs}`) are replaced.
 pub(super) fn generate_markdownlint_config(project_root: &Path) -> Result<bool> {
-    let path = project_root.join(".markdownlint.jsonc");
-    if path.exists() {
+    const LEGACY_CONFIG_NAMES: &[&str] = &[
+        ".markdownlint.json",
+        ".markdownlint.jsonc",
+        ".markdownlint.yaml",
+        ".markdownlint-cli2.jsonc",
+        ".markdownlint-cli2.yaml",
+        ".markdownlint-cli2.yml",
+        ".markdownlint-cli2.cjs",
+        ".markdownlint-cli2.mjs",
+    ];
+    let target = project_root.join(".markdownlint.yml");
+    if target.exists() {
         return Ok(false);
     }
-    let content = "{\n  // Disable line-length enforcement — long lines are common in tables and code links\n  \"MD013\": false,\n}\n";
-    std::fs::write(&path, content)?;
-    println!("  wrote {}", path.display());
+    for name in LEGACY_CONFIG_NAMES {
+        let legacy = project_root.join(name);
+        if legacy.exists() {
+            std::fs::remove_file(&legacy)?;
+            println!("  removed {} (replaced by .markdownlint.yml)", legacy.display());
+        }
+    }
+    let content = "# Line length is enforced by editorconfig-checker via .editorconfig\nMD013: false\n";
+    std::fs::write(&target, content)?;
+    println!("  wrote {}", target.display());
     Ok(true)
 }
 
 /// Generates `.github/workflows/lint.yml` if it does not already exist.
 /// Returns `true` if the file was written.
-pub(super) fn generate_lint_workflow(project_root: &Path, base_branch: &str) -> Result<bool> {
+pub(super) fn generate_lint_workflow(
+    project_root: &Path,
+    base_branch: &str,
+    has_rust: bool,
+) -> Result<bool> {
     let workflows_dir = project_root.join(".github/workflows");
     let workflow_path = workflows_dir.join("lint.yml");
     if workflow_path.exists() {
         return Ok(false);
     }
     std::fs::create_dir_all(&workflows_dir)?;
+    let push_comment = if has_rust {
+        " # warms the Rust cache so PR branches get a cache hit"
+    } else {
+        ""
+    };
+    let rust_steps = if has_rust {
+        "\n      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1\n\n      - name: Install Rust lint components\n        run: rustup component add clippy rustfmt\n"
+    } else {
+        ""
+    };
     let content = format!(
         r#"name: Lint
 
 on:
   push:
-    branches: [{base_branch}]
+    branches: [{base_branch}]{push_comment}
   pull_request:
     branches: [{base_branch}]
 
@@ -554,9 +650,9 @@ jobs:
       - name: Setup mise
         uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
         with:
-          version: v2026.4.1
-          sha256: c597fa1e4da76d1ea1967111d150a6a655ca51a72f4cd17fdc584be2b9eaa8bd
-
+          version: v2026.4.16
+          sha256: 69d321fca47d6ece2924bd95ab2343e3e1c7704d6b6cb5de15e4f753d8c54be1
+{rust_steps}
       - name: Lint
         env:
           GITHUB_TOKEN: ${{{{ github.token }}}}

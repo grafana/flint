@@ -1,0 +1,60 @@
+[expected]
+args = "init --yes"
+exit = 0
+stdout = '''
+Tip: flint init detects languages from tracked files (`git ls-files`). Add and stage your source files before running init so the detection is accurate.
+
+  added node (LTS) — required by npm: backend tools
+  normalized [tools] in <REPO>/mise.toml
+  wrote <REPO>/.github/config/flint.toml
+  wrote <REPO>/.github/workflows/lint.yml
+  removed <REPO>/.markdownlint.json (replaced by .markdownlint.yml)
+  wrote <REPO>/.markdownlint.yml
+installed pre-commit hook (.git/hooks/pre-commit)
+Done. Run `mise install` to install the new tools.
+'''
+
+# .github/workflows/lint.yml content is NOT asserted here:
+# renovate bumps the mise-action version + sha256 pin, which would flake this
+# snapshot on every bump. Rust-specific workflow content is covered by the
+# `generate_lint_workflow_with_rust` unit test in src/init/mod.rs.
+[expected.files]
+".github/config/flint.toml" = '''
+[settings]
+# exclude = "CHANGELOG\\.md"
+# exclude_paths = []
+'''
+".markdownlint.yml" = '''
+# Line length is enforced by editorconfig-checker via .editorconfig
+MD013: false
+'''
+
+[fake_bins]
+mise = '''
+#!/bin/sh
+# Fake mise: handles `mise use --pin <key>@latest` by appending to mise.toml.
+# Real mise also installs the tool; the fake skips that since the test only
+# cares about the file mutation.
+cmd=$1
+shift
+[ "$cmd" = "use" ] || exit 0
+key=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --pin) ;;
+        *@*) key="${1%@*}" ;;
+    esac
+    shift
+done
+[ -n "$key" ] || exit 0
+: "${MISE_PROJECT_ROOT:=.}"
+mise_toml="$MISE_PROJECT_ROOT/mise.toml"
+[ -f "$mise_toml" ] || printf '[tools]\n' > "$mise_toml"
+case "$key" in
+    *:*|*/*) qkey="\"$key\"" ;;
+    *) qkey="$key" ;;
+esac
+if ! grep -Fq "$qkey =" "$mise_toml" 2>/dev/null; then
+    printf '%s = "1.0.0"\n' "$qkey" >> "$mise_toml"
+fi
+'''

@@ -98,16 +98,17 @@ fn add_to_extends(content: &str, entry: &str) -> Result<String> {
     }
 }
 
-/// Runs `mise use --pin <key>@latest` in the project directory to add a tool
-/// with a pinned version. Returns `true` if the key was written to the config
-/// (checked by re-reading the file), ignoring non-zero exit codes that arise
-/// from post-write steps like shim rebuilds failing in restricted environments.
-fn pin_tool_via_mise(project_root: &Path, key: &str) -> bool {
+/// Runs `mise use --pin <key>@<version>` in the project directory to add a tool
+/// with a pinned version (mise resolves `latest`/`lts` to a concrete version at
+/// write time). Returns `true` if the key was written to the config (checked by
+/// re-reading the file), ignoring non-zero exit codes that arise from post-write
+/// steps like shim rebuilds failing in restricted environments.
+fn pin_tool_via_mise(project_root: &Path, key: &str, version: &str) -> bool {
     let mise_path = project_root.join("mise.toml");
     let before = std::fs::read_to_string(&mise_path).unwrap_or_default();
 
     let _ = Command::new("mise")
-        .args(["use", "--pin", &format!("{key}@latest")])
+        .args(["use", "--pin", &format!("{key}@{version}")])
         .current_dir(project_root)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -116,6 +117,46 @@ fn pin_tool_via_mise(project_root: &Path, key: &str) -> bool {
     // Success = the key is now present in the config (regardless of exit code).
     let after = std::fs::read_to_string(&mise_path).unwrap_or_default();
     after != before && parse_tool_keys(&after).contains(key)
+}
+
+/// True when `[tools]` contains at least one `npm:*` key but no `node` entry.
+/// The npm backend needs a Node.js runtime; without an explicit pin, mise falls
+/// back to system node — may be absent, wrong version, or drift across machines.
+fn needs_node_for_npm(content: &str) -> bool {
+    let Ok(doc) = content.parse::<toml_edit::DocumentMut>() else {
+        return false;
+    };
+    let Some(tools) = doc.get("tools").and_then(|t| t.as_table()) else {
+        return false;
+    };
+    let has_npm = tools.iter().any(|(k, _)| k.starts_with("npm:"));
+    let has_node = tools.contains_key("node");
+    has_npm && !has_node
+}
+
+/// Ensures a `node` entry exists in mise.toml when any `npm:*` backend tool is
+/// present. Prefers `mise use --pin node@lts` so the version resolves to a
+/// concrete release at write time; falls back to writing `node = "lts"` directly
+/// via toml_edit when mise isn't available.
+///
+/// Returns `true` if a `node` entry was added.
+pub(crate) fn ensure_node_for_npm(project_root: &Path) -> Result<bool> {
+    let mise_path = project_root.join("mise.toml");
+    let content = std::fs::read_to_string(&mise_path).unwrap_or_default();
+    if !needs_node_for_npm(&content) {
+        return Ok(false);
+    }
+    if pin_tool_via_mise(project_root, "node", "lts") {
+        return Ok(true);
+    }
+    // Fallback: write a soft pin so mise.toml still declares the prereq.
+    let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse mise.toml")?;
+    let tools = doc["tools"]
+        .as_table_mut()
+        .context("[tools] is not a table")?;
+    tools.insert("node", toml_edit::value("lts"));
+    std::fs::write(&mise_path, doc.to_string())?;
+    Ok(true)
 }
 
 /// Replaces obsolete tool keys in mise.toml with their modern equivalents,
@@ -164,7 +205,7 @@ pub(super) fn apply_changes(
     // upgrades, and component additions.
     let mut pinned_via_mise: std::collections::HashSet<String> = std::collections::HashSet::new();
     for (key, _) in to_add {
-        if pin_tool_via_mise(project_root, key) {
+        if pin_tool_via_mise(project_root, key, "latest") {
             pinned_via_mise.insert(key.clone());
         } else {
             eprintln!("  warning: could not pin {key} via mise — writing \"latest\"");
@@ -661,6 +702,61 @@ pub(super) fn maybe_install_hook(project_root: &Path, yes: bool) -> Result<()> {
         crate::hook::install(project_root)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod node_prereq_tests {
+    use super::{ensure_node_for_npm, needs_node_for_npm};
+
+    // Full end-to-end ensure_node_for_npm coverage (npm-present, node-absent →
+    // node added, file modified) lives in the e2e case `general/update-adds-node`.
+    // That case drives the flint binary and exercises the real mise subprocess.
+
+    #[test]
+    fn needs_node_when_npm_key_without_node() {
+        let content = "[tools]\n\"npm:prettier\" = \"3.8.1\"\n";
+        assert!(needs_node_for_npm(content));
+    }
+
+    #[test]
+    fn no_node_needed_when_no_npm_keys() {
+        let content = "[tools]\nshellcheck = \"v0.11.0\"\n";
+        assert!(!needs_node_for_npm(content));
+    }
+
+    #[test]
+    fn no_node_needed_when_node_already_declared() {
+        let content = "[tools]\nnode = \"20\"\n\"npm:prettier\" = \"3.8.1\"\n";
+        assert!(!needs_node_for_npm(content));
+    }
+
+    #[test]
+    fn no_node_needed_when_tools_section_missing() {
+        assert!(!needs_node_for_npm(""));
+        assert!(!needs_node_for_npm("[env]\nFOO = \"bar\"\n"));
+    }
+
+    #[test]
+    fn noop_when_node_already_present() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        let original = "[tools]\nnode = \"20\"\n\"npm:prettier\" = \"3.8.1\"\n";
+        std::fs::write(&path, original).unwrap();
+        let added = ensure_node_for_npm(dir.path()).unwrap();
+        assert!(!added);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+    }
+
+    #[test]
+    fn noop_without_npm_tools() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        let original = "[tools]\nshellcheck = \"v0.11.0\"\n";
+        std::fs::write(&path, original).unwrap();
+        let added = ensure_node_for_npm(dir.path()).unwrap();
+        assert!(!added);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+    }
 }
 
 #[cfg(test)]

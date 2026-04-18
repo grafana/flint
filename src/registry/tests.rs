@@ -21,6 +21,16 @@ fn find_obsolete_key_returns_none_for_clean_tools() {
     assert_eq!(find_obsolete_key(&tools), None);
 }
 
+#[test]
+fn find_obsolete_key_detects_bare_shfmt() {
+    let mut tools = HashMap::new();
+    tools.insert("shfmt".to_string(), "v3.12.0".to_string());
+    assert_eq!(
+        find_obsolete_key(&tools),
+        Some(("shfmt", "github:mvdan/sh"))
+    );
+}
+
 /// If any entry for a bin_name declares a version_range, every entry for that
 /// bin_name must declare one. A mix of ranged and unranged entries for the same
 /// binary is ambiguous — it would be impossible to guarantee exactly one activates.

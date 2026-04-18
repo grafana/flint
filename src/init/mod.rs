@@ -14,10 +14,10 @@ use detection::{
     build_linter_groups, detect_obsolete_keys, detect_present_patterns, parse_tool_keys,
 };
 use generation::{
-    apply_changes, apply_env_and_tasks, detect_base_branch, flint_preset, generate_flint_toml,
-    generate_lint_workflow, generate_markdownlint_config, get_existing_config_dir,
-    has_slow_selected, maybe_install_hook, patch_renovate_extends, prompt_config_dir,
-    remove_v1_tasks,
+    apply_changes, apply_env_and_tasks, detect_base_branch, ensure_node_for_npm, flint_preset,
+    generate_flint_toml, generate_lint_workflow, generate_markdownlint_config,
+    get_existing_config_dir, has_slow_selected, maybe_install_hook, patch_renovate_extends,
+    prompt_config_dir, remove_v1_tasks,
 };
 use ui::{interactive_select_linters, select_categories_arrow};
 
@@ -251,6 +251,11 @@ Add and stage your source files before running init so the detection is accurate
         )?;
     }
 
+    let node_added = ensure_node_for_npm(project_root)?;
+    if node_added {
+        println!("  added node (LTS) — required by npm: backend tools");
+    }
+
     let v1 = remove_v1_tasks(&mise_path)?;
     for key in &v1.removed_tasks {
         println!("  removing v1 task {key}");
@@ -290,6 +295,7 @@ Add and stage your source files before running init so the detection is accurate
         .unwrap_or(false);
 
     if !tools_changed
+        && !node_added
         && v1.removed_tasks.is_empty()
         && !v1.removed_renovate_env
         && !meta_changed

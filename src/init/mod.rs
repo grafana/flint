@@ -491,9 +491,7 @@ rust = { version = "1.95.0", components = "clippy,rustfmt" }
         assert!(node_pos > header_pos, "node below header (linter prereq)");
         assert!(actionlint_pos > header_pos, "linters below header");
         assert!(
-            actionlint_pos < lychee_pos
-                && lychee_pos < node_pos
-                && node_pos < prettier_pos,
+            actionlint_pos < lychee_pos && lychee_pos < node_pos && node_pos < prettier_pos,
             "linters sorted alphabetically"
         );
 

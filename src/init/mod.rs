@@ -14,10 +14,10 @@ use detection::{
     build_linter_groups, detect_obsolete_keys, detect_present_patterns, parse_tool_keys,
 };
 use generation::{
-    apply_changes, apply_env_and_tasks, detect_base_branch, ensure_node_for_npm, flint_preset,
-    generate_flint_toml, generate_lint_workflow, generate_markdownlint_config,
-    get_existing_config_dir, has_slow_selected, maybe_install_hook, normalize_tools_section,
-    patch_renovate_extends, prompt_config_dir, remove_v1_tasks,
+    apply_changes, apply_env_and_tasks, detect_base_branch, ensure_flint_self_pin,
+    ensure_node_for_npm, flint_preset, generate_flint_toml, generate_lint_workflow,
+    generate_markdownlint_config, get_existing_config_dir, has_slow_selected, maybe_install_hook,
+    normalize_tools_section, patch_renovate_extends, prompt_config_dir, remove_v1_tasks,
 };
 use ui::{interactive_select_linters, select_categories_arrow};
 
@@ -269,6 +269,10 @@ Add and stage your source files before running init so the detection is accurate
     if node_added {
         println!("  added node (LTS) — required by npm: backend tools");
     }
+    let flint_pinned = ensure_flint_self_pin(project_root)?;
+    if flint_pinned {
+        println!("  pinned flint itself — reproducible lint runs across contributors");
+    }
     let tools_normalized = normalize_tools_section(&mise_path)?;
 
     let v1 = remove_v1_tasks(&mise_path)?;
@@ -313,6 +317,7 @@ Add and stage your source files before running init so the detection is accurate
 
     if !tools_changed
         && !node_added
+        && !flint_pinned
         && !tools_normalized
         && v1.removed_tasks.is_empty()
         && !v1.removed_renovate_env

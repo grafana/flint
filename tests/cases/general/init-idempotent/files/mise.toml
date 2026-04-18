@@ -4,6 +4,7 @@ rust = { version = "1.0.0", components = "clippy,rustfmt" }
 # Linters
 actionlint = "1.0.0"
 editorconfig-checker = "1.0.0"
+"github:grafana/flint" = "1.0.0"
 lychee = "1.0.0"
 node = "1.0.0"
 "npm:markdownlint-cli2" = "1.0.0"

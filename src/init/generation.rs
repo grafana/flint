@@ -159,6 +159,40 @@ pub(crate) fn ensure_node_for_npm(project_root: &Path) -> Result<bool> {
     Ok(true)
 }
 
+/// Pins `github:grafana/flint` in mise.toml at the calling binary's version so
+/// contributors all run the same flint release. Skips when the key already
+/// exists (any pin — never overwrite the user's explicit choice). Pre-release
+/// suffixes are stripped to match [`flint_preset`].
+///
+/// Returns `true` if a flint entry was added.
+pub(crate) fn ensure_flint_self_pin(project_root: &Path) -> Result<bool> {
+    const KEY: &str = "github:grafana/flint";
+    let mise_path = project_root.join("mise.toml");
+    let content = std::fs::read_to_string(&mise_path).unwrap_or_default();
+    if let Ok(doc) = content.parse::<toml_edit::DocumentMut>()
+        && let Some(tools) = doc.get("tools").and_then(|t| t.as_table())
+        && tools.contains_key(KEY)
+    {
+        return Ok(false);
+    }
+    let ver = env!("CARGO_PKG_VERSION");
+    let ver = ver.split('-').next().unwrap_or(ver);
+    if pin_tool_via_mise(project_root, KEY, ver) {
+        return Ok(true);
+    }
+    let mut doc: toml_edit::DocumentMut = if content.is_empty() {
+        "[tools]\n".parse().unwrap()
+    } else {
+        content.parse().context("failed to parse mise.toml")?
+    };
+    let tools = doc["tools"]
+        .as_table_mut()
+        .context("[tools] is not a table")?;
+    tools.insert(KEY, toml_edit::value(ver));
+    std::fs::write(&mise_path, doc.to_string())?;
+    Ok(true)
+}
+
 /// Replaces obsolete tool keys in mise.toml with their modern equivalents,
 /// preserving the existing version value. Returns the list of replacements made
 /// as `(old_key, new_key)` pairs. No-ops if the file doesn't exist or has no

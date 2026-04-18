@@ -5,6 +5,7 @@ stdout = '''
 Tip: flint init detects languages from tracked files (`git ls-files`). Add and stage your source files before running init so the detection is accurate.
 
   added node (LTS) — required by npm: backend tools
+  pinned flint itself — reproducible lint runs across contributors
   normalized [tools] in <REPO>/mise.toml
   wrote <REPO>/.github/config/flint.toml
   wrote <REPO>/.github/workflows/lint.yml
@@ -35,6 +36,7 @@ rust = { version = "1.0.0", components = "clippy,rustfmt" }
 # Linters
 actionlint = "1.0.0"
 editorconfig-checker = "1.0.0"
+"github:grafana/flint" = "1.0.0"
 lychee = "1.0.0"
 node = "1.0.0"
 "npm:@biomejs/biome" = "1.0.0"

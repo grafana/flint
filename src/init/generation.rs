@@ -593,10 +593,14 @@ pub(super) fn generate_markdownlint_config(project_root: &Path) -> Result<bool> 
         let legacy = project_root.join(name);
         if legacy.exists() {
             std::fs::remove_file(&legacy)?;
-            println!("  removed {} (replaced by .markdownlint.yml)", legacy.display());
+            println!(
+                "  removed {} (replaced by .markdownlint.yml)",
+                legacy.display()
+            );
         }
     }
-    let content = "# Line length is enforced by editorconfig-checker via .editorconfig\nMD013: false\n";
+    let content =
+        "# Line length is enforced by editorconfig-checker via .editorconfig\nMD013: false\n";
     std::fs::write(&target, content)?;
     println!("  wrote {}", target.display());
     Ok(true)

@@ -401,8 +401,7 @@ mod tests {
     use detection::entry_components_differ;
     use generation::{
         apply_changes, apply_env_and_tasks, generate_flint_toml, generate_lint_workflow,
-        normalize_tools_section,
-        get_existing_config_dir, has_slow_selected,
+        get_existing_config_dir, has_slow_selected, normalize_tools_section,
     };
 
     #[test]

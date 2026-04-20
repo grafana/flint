@@ -288,7 +288,7 @@ Checks tagged slow in the registry are skipped by `--fast-only`. Use
 `--fast-only` for local/pre-push feedback and the full set in CI. (No
 builtin is currently marked slow, but the mechanism is preserved.)
 
-**`editorconfig-checker` deference**: `editorconfig-checker` runs on all files, but
+**`editorconfig-checker` defers to formatters**: `editorconfig-checker` runs on all files, but
 automatically skips file types owned by an active line-length-enforcing
 formatter. When `cargo-fmt`, `ruff-format`, `biome-format`, or `prettier`
 are active, their file types are excluded from `editorconfig-checker` — those formatters

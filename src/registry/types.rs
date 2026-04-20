@@ -328,7 +328,8 @@ impl Check {
         self
     }
 
-    /// Mark as a language-specific style/formatter check — included in all init profiles.
+    /// Mark as a language-specific style/formatter check — included in the
+    /// `default` and `comprehensive` init profiles (not `lang`).
     pub fn style(mut self) -> Self {
         self.category = Category::Style;
         self

@@ -81,7 +81,6 @@ fn check_hadolint() -> Check {
 fn check_xmllint() -> Check {
     Check::files("xmllint", "xmllint --noout {FILES}", &["*.xml"])
         .mise_tool("cargo:xmloxide")
-        .mise_tool("cargo:xmloxide")
         .desc("Validate XML files are well-formed")
 }
 

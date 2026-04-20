@@ -347,26 +347,26 @@ fn write_test_toml(path: &Path, cfg: &toml::Value, exit: i32, stderr: &str, stdo
         }
     }
 
-    if let Some(env) = cfg.get("env").and_then(|v| v.as_table()) {
-        if !env.is_empty() {
-            out += "\n\n[env]\n";
-            for (k, v) in env {
-                if let Some(s) = v.as_str() {
-                    out += &format!("{k} = \"{}\"\n", toml_escape(s));
-                }
+    if let Some(env) = cfg.get("env").and_then(|v| v.as_table())
+        && !env.is_empty()
+    {
+        out += "\n\n[env]\n";
+        for (k, v) in env {
+            if let Some(s) = v.as_str() {
+                out += &format!("{k} = \"{}\"\n", toml_escape(s));
             }
         }
     }
 
     // Serialize as multiline literal strings so shell scripts stay readable.
     // TOML trims the first newline after ''', so '''\n{s}''' roundtrips cleanly.
-    if let Some(bins) = cfg.get("fake_bins").and_then(|v| v.as_table()) {
-        if !bins.is_empty() {
-            out += "\n[fake_bins]\n";
-            for (k, v) in bins {
-                if let Some(s) = v.as_str() {
-                    out += &format!("{k} = '''\n{s}'''\n");
-                }
+    if let Some(bins) = cfg.get("fake_bins").and_then(|v| v.as_table())
+        && !bins.is_empty()
+    {
+        out += "\n[fake_bins]\n";
+        for (k, v) in bins {
+            if let Some(s) = v.as_str() {
+                out += &format!("{k} = '''\n{s}'''\n");
             }
         }
     }

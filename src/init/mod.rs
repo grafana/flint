@@ -378,10 +378,10 @@ fn compute_desired_tools(
         }
         if categories.contains(&check.category) {
             let entry = by_key.entry(key.to_string()).or_default();
-            if let Some(comp) = check.components() {
-                if !entry.contains(&comp) {
-                    entry.push(comp);
-                }
+            if let Some(comp) = check.components()
+                && !entry.contains(&comp)
+            {
+                entry.push(comp);
             }
         }
     }

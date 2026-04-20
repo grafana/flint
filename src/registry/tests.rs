@@ -204,7 +204,7 @@ fn generate_summary_table(registry: &[Check]) -> String {
     };
     let separator: Vec<String> = widths.iter().map(|&w| "-".repeat(w)).collect();
     let sep_row = format!("| {} |", separator.join(" | "));
-    let header_strs: Vec<&str> = headers.iter().copied().collect();
+    let header_strs: Vec<&str> = headers.to_vec();
 
     let mut lines = vec![
         GENERATED_COMMENT.to_string(),

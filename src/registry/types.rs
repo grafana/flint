@@ -75,11 +75,17 @@ pub struct Check {
     pub defers_to_formatters: bool,
     /// Always considered active regardless of mise.toml (used for config-activated checks).
     pub activate_unconditionally: bool,
-    /// Canonical mise tool key to write when setting up a new project (e.g. `npm:prettier`).
-    /// Optional mise toolchain components to request when installing via `flint init`
-    /// (e.g. `"clippy,rustfmt"` for the `rust` toolchain). Produces an inline-table
-    /// entry: `rust = { version = "latest", components = "clippy,rustfmt" }`.
-    pub mise_install_components: Option<&'static str>,
+    /// Toolchain status and optional components for `mise_tool_name`.
+    ///
+    /// - `None` — `mise_tool_name` is a standalone linter binary.
+    /// - `Some(None)` — `mise_tool_name` is a language runtime/SDK (e.g. `go`,
+    ///   `dotnet`) with no per-tool components.
+    /// - `Some(Some("clippy,rustfmt"))` — toolchain with components; produces an
+    ///   inline-table entry like `rust = { version = "latest", components = "…" }`.
+    ///
+    /// Toolchain keys stay above the `# Linters` header in `mise.toml` so they're
+    /// visually separated from lint-only entries.
+    pub toolchain: Option<Option<&'static str>>,
     /// On Windows, the binary is a self-executing JAR that cannot be run directly
     /// or via cmd.exe — invoke as `java -jar <resolved-path>` instead.
     pub windows_java_jar: bool,
@@ -107,6 +113,19 @@ impl Check {
     /// Returns false for checks implemented entirely in-process with no external binary.
     pub fn uses_binary(&self) -> bool {
         !matches!(self.kind, CheckKind::Special(SpecialKind::LicenseHeader))
+    }
+
+    /// True when `mise_tool_name` refers to a language runtime/SDK rather than a
+    /// standalone linter binary.
+    pub fn is_toolchain(&self) -> bool {
+        self.toolchain.is_some()
+    }
+
+    /// Toolchain components to request when installing via mise, if any
+    /// (e.g. `"clippy,rustfmt"` for rust). `None` for non-toolchains and for
+    /// toolchains without components.
+    pub fn components(&self) -> Option<&'static str> {
+        self.toolchain.flatten()
     }
 
     // --- Constructors ---
@@ -156,7 +175,7 @@ impl Check {
             defers_to_formatters: false,
             activate_unconditionally: false,
             category: Category::Default,
-            mise_install_components: None,
+            toolchain: None,
             kind: CheckKind::Template {
                 check_cmd,
                 fix_cmd: "",
@@ -185,7 +204,7 @@ impl Check {
             defers_to_formatters: false,
             activate_unconditionally: false,
             category: Category::Default,
-            mise_install_components: None,
+            toolchain: None,
             windows_java_jar: false,
             kind: CheckKind::Special(kind),
             versioned_bin_fmt: None,
@@ -315,10 +334,20 @@ impl Check {
         self
     }
 
-    /// Set toolchain components required when installing via `flint init`
-    /// (e.g. `"clippy,rustfmt"` for the `rust` toolchain).
-    pub fn install_components(mut self, components: &'static str) -> Self {
-        self.mise_install_components = Some(components);
+    /// Mark `mise_tool_name` as a language runtime/SDK (e.g. `go`, `dotnet`)
+    /// with no per-tool components. `flint init` keeps toolchain keys above the
+    /// `# Linters` header in `mise.toml`.
+    pub fn toolchain(mut self) -> Self {
+        self.toolchain = Some(None);
+        self
+    }
+
+    /// Mark `mise_tool_name` as a language toolchain and request the given
+    /// components when installing via `flint init` (e.g. `"clippy,rustfmt"` for
+    /// the `rust` toolchain). Produces an inline-table entry like
+    /// `rust = { version = "latest", components = "clippy,rustfmt" }`.
+    pub fn toolchain_components(mut self, components: &'static str) -> Self {
+        self.toolchain = Some(Some(components));
         self
     }
 

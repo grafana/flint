@@ -45,6 +45,7 @@
   },
   "src/init/generation.rs": {
     "regex": [
+      "Swatinem/rust-cache",
       "actions/checkout",
       "jdx/mise-action",
       "mise"

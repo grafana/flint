@@ -17,14 +17,14 @@ jobs:
       matrix:
         include:
           - os: ubuntu-24.04
-            mise_version: v2026.4.10
-            mise_sha256: 84636e19a0e5001d7499f58ae5a868cec8f6ba4f52f9028680bb7cd802564229
+            mise_version: v2026.4.15
+            mise_sha256: c55befc52e5694f388b927ef304362ca7b9e919d97d43c342fca57f2eccea255
           - os: macos-15
-            mise_version: v2026.4.10
-            mise_sha256: e09f5ae83369d3c6d44572e9f2de0bf9454718e23ccb41a4138f8f88d28cbb31
+            mise_version: v2026.4.15
+            mise_sha256: 165916aab9cd842bda00fba58b7f0eb59b051312e5dab7eee7166fed429006ea
           - os: windows-2025
-            mise_version: v2026.4.10
-            mise_sha256: 2df0ce5b1f42502a4895888a0fe7aae4cf6d1959d2dbb62f29204773cff3d457
+            mise_version: v2026.4.15
+            mise_sha256: ba6367da9431540f714370df91d6afd9ac7aa837af60f975492f876e5f981d50
 
     permissions:
       contents: read

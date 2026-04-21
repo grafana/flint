@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.20.3](https://github.com/grafana/flint/compare/v0.20.2...v0.20.3) - 2026-04-21
+
+### Fixed
+
+- *(registry)* add --tests to cargo-clippy, add test coverage ([#176](https://github.com/grafana/flint/pull/176))
+
+### Other
+
+- *(deps)* update dependency npm:renovate to v43.129.0 ([#200](https://github.com/grafana/flint/pull/200))
+- restructure README/docs and split registry module ([#187](https://github.com/grafana/flint/pull/187))
+- *(deps)* update dependency mise to v2026.4.15 ([#199](https://github.com/grafana/flint/pull/199))
+
 ## [0.20.2](https://github.com/grafana/flint/compare/v0.20.1...v0.20.2) - 2026-04-17
 
 ### Fixed

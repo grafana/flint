@@ -166,6 +166,7 @@ fn check_cargo_clippy() -> Check {
         &["*.rs"],
     )
     .fix("cargo clippy -q --all-targets --fix --allow-dirty --allow-staged -- -D warnings")
+    .partial_fix()
     .mise_tool("rust")
     .toolchain_components("clippy")
     .desc("Lint Rust code; runs on all .rs files, not just changed")

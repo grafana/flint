@@ -1,0 +1,18 @@
+[expected]
+args = "run --full --fix cargo-clippy"
+exit = 1
+stderr = '''
+[cargo-clippy]
+error: equal expressions as operands to `==`
+ --> src/lib.rs:2:5
+  |
+2 |     x == x
+  |     ^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-<VERSION>/index.html#eq_op
+  = note: `#[deny(clippy::eq_op)]` on by default
+
+error: could not compile `test` (lib) due to 1 previous error
+error: could not compile `test` (lib test) due to 1 previous error
+flint: review: cargo-clippy
+'''

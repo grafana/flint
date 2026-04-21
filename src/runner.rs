@@ -654,6 +654,7 @@ mod tests {
             category: Category::Default,
             toolchain: None,
             windows_java_jar: false,
+            fix_behavior: crate::registry::FixBehavior::Definitive,
             kind: CheckKind::Template {
                 check_cmd: "run-it",
                 fix_cmd: "",

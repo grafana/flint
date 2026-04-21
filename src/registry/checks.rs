@@ -28,8 +28,6 @@ fn check_shfmt() -> Check {
     Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"])
         .fix("shfmt -w {FILE}")
         .formatter()
-        .mise_tool("github:mvdan/sh")
-        .versioned_bin("shfmt_{version}")
         .desc("Format shell scripts")
         .style()
 }

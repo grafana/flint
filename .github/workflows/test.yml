@@ -17,14 +17,14 @@ jobs:
       matrix:
         include:
           - os: ubuntu-24.04
-            mise_version: v2026.4.15
-            mise_sha256: c55befc52e5694f388b927ef304362ca7b9e919d97d43c342fca57f2eccea255
+            mise_version: v2026.4.18
+            mise_sha256: 6ae2d5f0f23a2f2149bc5d9bf264fe0922a1da843f1903e453516c462b23cc1f
           - os: macos-15
-            mise_version: v2026.4.15
-            mise_sha256: 165916aab9cd842bda00fba58b7f0eb59b051312e5dab7eee7166fed429006ea
+            mise_version: v2026.4.18
+            mise_sha256: 2aea25721f57ec9f3fe04ea8d634a80b3d82d7e5c0e0acf4b3c63a3062b146f6
           - os: windows-2025
-            mise_version: v2026.4.15
-            mise_sha256: ba6367da9431540f714370df91d6afd9ac7aa837af60f975492f876e5f981d50
+            mise_version: v2026.4.18
+            mise_sha256: 3d02ac38e6cfcda6fe506d8cf4832daf3b8a228a9df13ef0f0260529991cca3e
 
     permissions:
       contents: read
@@ -35,6 +35,19 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0 # needed for merge-base in e2e tests
+
+      # Defender real-time scan dominates mise cache extract on Windows
+      # (tar -xf of ~570MB many-small-files takes ~80s). Exclude before restore.
+      - name: Exclude mise dir from Defender (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          try {
+            Add-MpPreference -ExclusionPath "$env:LOCALAPPDATA\mise" -ErrorAction Stop
+          } catch {
+            Write-Warning "Could not add Defender exclusion for mise directory; continuing without it. $($_.Exception.Message)"
+          }
 
       - name: Setup mise
         uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1

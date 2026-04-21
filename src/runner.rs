@@ -7,7 +7,7 @@ use tokio::task::JoinSet;
 use crate::config::{Config, LicenseHeaderConfig, LycheeConfig, RenovateDepsConfig};
 use crate::files::FileList;
 use crate::linters::{LinterOutput, license_header, lychee, renovate_deps};
-use crate::registry::{self, Check, CheckKind, Scope, SpecialKind};
+use crate::registry::{Check, CheckKind, Scope, SpecialKind};
 
 pub struct RunOptions {
     pub fix: bool,
@@ -96,7 +96,6 @@ pub async fn run(
     project_root: &Path,
     cfg: &Config,
     config_dir: &Path,
-    mise_tools: &std::collections::HashMap<String, String>,
 ) -> Result<Vec<CheckResult>> {
     let RunOptions {
         fix,
@@ -106,18 +105,7 @@ pub async fn run(
     } = opts;
     let prepared: Vec<PreparedCheck> = checks
         .iter()
-        .filter_map(|&check| {
-            prepare(
-                check,
-                file_list,
-                fix,
-                project_root,
-                checks,
-                cfg,
-                config_dir,
-                mise_tools,
-            )
-        })
+        .filter_map(|&check| prepare(check, file_list, fix, project_root, checks, cfg, config_dir))
         .collect();
 
     if fix {
@@ -170,7 +158,6 @@ fn prepare(
     active_checks: &[&Check],
     cfg: &Config,
     config_dir: &Path,
-    mise_tools: &std::collections::HashMap<String, String>,
 ) -> Option<PreparedCheck> {
     let name = check.name.to_string();
     match &check.kind {
@@ -182,7 +169,6 @@ fn prepare(
                 project_root,
                 active_checks,
                 config_dir,
-                mise_tools,
             );
             if argv_list.is_empty() {
                 return None;
@@ -238,9 +224,7 @@ fn build_invocations(
     project_root: &Path,
     active_checks: &[&Check],
     config_dir: &Path,
-    mise_tools: &std::collections::HashMap<String, String>,
 ) -> Vec<Vec<String>> {
-    let resolved_bin = registry::resolve_bin_name(check, mise_tools);
     let CheckKind::Template {
         check_cmd,
         fix_cmd,
@@ -252,28 +236,10 @@ fn build_invocations(
         return vec![];
     };
 
-    // Substitute resolved binary name at the start of each command template.
-    // When installed via alt_install (e.g. "github:mvdan/sh" → "shfmt_v3.12.0"),
-    // the template's leading binary name must be replaced before execution.
-    let sub_bin = |t: &str| -> String {
-        if resolved_bin == check.bin_name {
-            return t.to_string();
-        }
-        match t.strip_prefix(check.bin_name) {
-            Some(rest) if rest.is_empty() || rest.starts_with(' ') => {
-                format!("{}{}", resolved_bin, rest)
-            }
-            _ => t.to_string(),
-        }
-    };
-
-    let cmd_template_buf;
     let cmd_template: &str = if fix && check.has_fix() {
-        cmd_template_buf = sub_bin(fix_cmd);
-        &cmd_template_buf
+        fix_cmd
     } else {
-        cmd_template_buf = sub_bin(check_cmd);
-        &cmd_template_buf
+        check_cmd
     };
 
     // Collect patterns from checks that are active and listed in excludes_if_active.
@@ -331,7 +297,7 @@ fn build_invocations(
                     None
                 };
                 if let Some(cmd) = effective {
-                    let cmd = sub_bin(cmd).replace("{ROOT}", &quote_path(project_root));
+                    let cmd = cmd.replace("{ROOT}", &quote_path(project_root));
                     return vec![inject_config(shell_words(cmd), &config_args)];
                 }
             }
@@ -695,7 +661,6 @@ mod tests {
                 full_fix_cmd: "",
                 scope: Scope::Project,
             },
-            versioned_bin_fmt: None,
             desc: "",
             docs: "",
         }
@@ -724,7 +689,6 @@ mod tests {
                 Path::new("/repo"),
                 &[],
                 Path::new("/repo"),
-                &Default::default(),
             )
             .is_empty()
         );
@@ -741,7 +705,6 @@ mod tests {
             Path::new("/repo"),
             &[],
             Path::new("/repo"),
-            &Default::default(),
         );
         assert_eq!(inv, vec![vec!["run-it".to_string()]]);
     }
@@ -757,7 +720,6 @@ mod tests {
             Path::new("/repo"),
             &[],
             Path::new("/repo"),
-            &Default::default(),
         );
         assert_eq!(inv, vec![vec!["run-it".to_string()]]);
     }

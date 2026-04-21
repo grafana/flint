@@ -14,7 +14,7 @@ editorconfig-checker = "v3.6.1"
 "npm:@biomejs/biome" = "2.4.11"
 "pipx:ruff" = "0.15.11"
 "pipx:codespell" = "2.4.2"
-rust = { version = "1.94.1", components = "clippy,rustfmt" }
+rust = { version = "1.95.0", components = "clippy,rustfmt" }
 
 # Tools not used to lint this repo, but required for e2e tests
 go = "1.26.2"

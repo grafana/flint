@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.20.3](https://github.com/grafana/flint/compare/v0.20.2...v0.20.3) - 2026-04-21
+
+### Added
+
+- *(registry)* switch shfmt to aqua backend ([#175](https://github.com/grafana/flint/pull/175))
+
+### Fixed
+
+- treat cargo-clippy as a partial fixer ([#197](https://github.com/grafana/flint/pull/197))
+- *(registry)* add --tests to cargo-clippy, add test coverage ([#176](https://github.com/grafana/flint/pull/176))
+
+### Other
+
+- *(deps)* update taiki-e/install-action digest to 055f5df ([#180](https://github.com/grafana/flint/pull/180))
+- *(deps)* update dependency npm:@biomejs/biome to v2.4.12 ([#191](https://github.com/grafana/flint/pull/191))
+- *(deps)* update rust crate clap to v4.6.1 ([#196](https://github.com/grafana/flint/pull/196))
+- *(deps)* update rust crate tokio to v1.52.1 ([#192](https://github.com/grafana/flint/pull/192))
+- *(deps)* update dependency pipx:ruff to v0.15.11 ([#198](https://github.com/grafana/flint/pull/198))
+- *(deps)* update node.js to v24.15.0 ([#194](https://github.com/grafana/flint/pull/194))
+- *(deps)* update dependency npm:prettier to v3.8.3 ([#193](https://github.com/grafana/flint/pull/193))
+- exclude mise install dir from Windows Defender ([#188](https://github.com/grafana/flint/pull/188))
+- *(deps)* update dependency npm:renovate to v43.129.0 ([#200](https://github.com/grafana/flint/pull/200))
+- restructure README/docs and split registry module ([#187](https://github.com/grafana/flint/pull/187))
+- *(deps)* update dependency mise to v2026.4.15 ([#199](https://github.com/grafana/flint/pull/199))
+
 ## [0.20.2](https://github.com/grafana/flint/compare/v0.20.1...v0.20.2) - 2026-04-17
 
 ### Fixed

@@ -31,6 +31,16 @@
     },
     {
       customType: "regex",
+      description: "Update flint version in README.md install snippets",
+      managerFilePatterns: ["/^README\\.md$/"],
+      matchStrings: ['"github:grafana/flint"\\s*=\\s*"(?<currentValue>[^"]+)"'],
+      datasourceTemplate: "github-releases",
+      depNameTemplate: "grafana/flint",
+      packageNameTemplate: "grafana/flint",
+      extractVersionTemplate: "^v?(?<version>.+)$",
+    },
+    {
+      customType: "regex",
       description: "Update mise version in GitHub Actions workflows",
       managerFilePatterns: ["/(^|/)(workflow-templates|\\.(?:github|gitea|forgejo)/(?:workflows|actions))/.+\\.ya?ml$/", "/(^|/)action\\.ya?ml$/"],
       datasourceTemplate: "github-release-attachments",

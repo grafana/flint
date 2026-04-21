@@ -95,7 +95,7 @@ fn check_env_sections() -> Vec<(String, String)> {
         .collect();
     // Dedup by prefix (multiple checks can share a name after normalisation is unlikely,
     // but be safe) then sort longest-first to avoid short prefixes shadowing longer ones.
-    sections.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+    sections.sort_by_key(|section| std::cmp::Reverse(section.0.len()));
     sections.dedup_by(|a, b| a.0 == b.0);
     sections
 }

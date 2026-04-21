@@ -27,7 +27,6 @@
       "editorconfig-checker",
       "github:google/google-java-format",
       "github:koalaman/shellcheck",
-      "github:mvdan/sh",
       "github:pinterest/ktlint",
       "go",
       "golangci-lint",
@@ -40,7 +39,8 @@
       "npm:renovate",
       "pipx:codespell",
       "pipx:ruff",
-      "rust"
+      "rust",
+      "shfmt"
     ]
   },
   "src/init/generation.rs": {

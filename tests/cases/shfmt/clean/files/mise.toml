@@ -1,2 +1,2 @@
 [tools]
-"github:mvdan/sh" = "v3.12.0"
+shfmt = "v3.12.0"

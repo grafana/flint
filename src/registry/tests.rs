@@ -22,12 +22,12 @@ fn find_obsolete_key_returns_none_for_clean_tools() {
 }
 
 #[test]
-fn find_obsolete_key_detects_bare_shfmt() {
+fn find_obsolete_key_detects_legacy_shfmt_backend() {
     let mut tools = HashMap::new();
-    tools.insert("shfmt".to_string(), "v3.12.0".to_string());
+    tools.insert("github:mvdan/sh".to_string(), "v3.12.0".to_string());
     assert_eq!(
         find_obsolete_key(&tools),
-        Some(("shfmt", "github:mvdan/sh"))
+        Some(("github:mvdan/sh", "shfmt"))
     );
 }
 
@@ -68,12 +68,11 @@ fn version_ranges_must_not_be_mixed_with_unranged_entries() {
 #[test]
 fn all_registry_binaries_found() {
     let registry = builtin();
-    let mise_tools = read_mise_tools(Path::new(env!("CARGO_MANIFEST_DIR")));
 
     let not_found: Vec<&str> = registry
         .iter()
         .filter(|c| c.uses_binary())
-        .filter(|c| !binary_on_path(&resolve_bin_name(c, &mise_tools)))
+        .filter(|c| !binary_on_path(c.bin_name))
         .map(|c| c.name)
         .collect();
 

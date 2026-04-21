@@ -255,7 +255,6 @@ async fn run(
             project_root,
             &cfg,
             config_dir,
-            &mise_tools,
         )
         .await?;
 
@@ -285,7 +284,6 @@ async fn run(
                 project_root,
                 &cfg,
                 config_dir,
-                &mise_tools,
             )
             .await?;
             for r in fix_results {
@@ -346,7 +344,6 @@ async fn run(
         project_root,
         &cfg,
         config_dir,
-        &mise_tools,
     )
     .await?;
 

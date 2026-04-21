@@ -90,10 +90,6 @@ pub struct Check {
     /// or via cmd.exe — invoke as `java -jar <resolved-path>` instead.
     pub windows_java_jar: bool,
     pub kind: CheckKind,
-    /// Binary name format when the backend installs with a versioned name (e.g. `"shfmt_{version}"`
-    /// → `"shfmt_v3.12.0"`). `{version}` is replaced with the version declared in mise.toml.
-    /// Paired with `mise_tool_name` when the backend names binaries with a version suffix.
-    pub versioned_bin_fmt: Option<&'static str>,
     /// Plain-text description of what the check does — shown in `flint linters` and the README table.
     pub desc: &'static str,
     /// Extended markdown documentation shown in the README detail section (behaviour, config examples).
@@ -184,7 +180,6 @@ impl Check {
                 scope,
             },
             windows_java_jar: false,
-            versioned_bin_fmt: None,
             desc: "",
             docs: "",
         }
@@ -207,7 +202,6 @@ impl Check {
             toolchain: None,
             windows_java_jar: false,
             kind: CheckKind::Special(kind),
-            versioned_bin_fmt: None,
             desc: "",
             docs: "",
         }
@@ -292,14 +286,6 @@ impl Check {
     /// Always considered active regardless of mise.toml (for config-activated checks).
     pub fn activate_unconditionally(mut self) -> Self {
         self.activate_unconditionally = true;
-        self
-    }
-
-    /// Set a versioned binary name format for tools where the backend installs with a
-    /// version suffix (e.g. `"shfmt_{version}"` → `"shfmt_v3.12.0"`). Paired with
-    /// `.mise_tool()` to identify which key provides the version.
-    pub fn versioned_bin(mut self, fmt: &'static str) -> Self {
-        self.versioned_bin_fmt = Some(fmt);
         self
     }
 

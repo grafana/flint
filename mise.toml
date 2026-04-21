@@ -3,7 +3,7 @@ FLINT_CONFIG_DIR = ".github/config"
 
 [tools]
 lychee = "0.22.0"
-node = "24.14.1"
+node = "24.15.0"
 "npm:renovate" = "43.129.0"
 "github:koalaman/shellcheck" = "v0.11.0"
 "github:mvdan/sh" = "v3.13.1"

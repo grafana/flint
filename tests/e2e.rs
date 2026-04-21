@@ -439,8 +439,15 @@ fn normalize_tool_versions(s: &str) -> String {
     // markdownlint-cli2 vX.Y.Z (markdownlint vA.B.C)
     let re =
         Regex::new(r"markdownlint-cli2 v\d+\.\d+\.\d+ \(markdownlint v\d+\.\d+\.\d+\)").unwrap();
-    re.replace_all(&s, "markdownlint-cli2 <VERSION>")
-        .into_owned()
+    let s = re
+        .replace_all(&s, "markdownlint-cli2 <VERSION>")
+        .into_owned();
+    let re = Regex::new(r"https://rust-lang\.github\.io/rust-clippy/rust-\d+\.\d+\.\d+/").unwrap();
+    re.replace_all(
+        &s,
+        "https://rust-lang.github.io/rust-clippy/rust-<VERSION>/",
+    )
+    .into_owned()
 }
 
 /// Cargo may emit multiple "could not compile" summary lines in either order

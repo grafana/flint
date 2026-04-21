@@ -30,6 +30,13 @@ pub enum SpecialKind {
     LicenseHeader,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FixBehavior {
+    #[default]
+    Definitive,
+    PartialNeedsVerify,
+}
+
 #[derive(Debug, Clone)]
 pub enum CheckKind {
     Template {
@@ -89,6 +96,7 @@ pub struct Check {
     /// On Windows, the binary is a self-executing JAR that cannot be run directly
     /// or via cmd.exe — invoke as `java -jar <resolved-path>` instead.
     pub windows_java_jar: bool,
+    pub fix_behavior: FixBehavior,
     pub kind: CheckKind,
     /// Plain-text description of what the check does — shown in `flint linters` and the README table.
     pub desc: &'static str,
@@ -109,6 +117,14 @@ impl Check {
     /// Returns false for checks implemented entirely in-process with no external binary.
     pub fn uses_binary(&self) -> bool {
         !matches!(self.kind, CheckKind::Special(SpecialKind::LicenseHeader))
+    }
+
+    pub fn fix_behavior(&self) -> FixBehavior {
+        if self.has_fix() {
+            self.fix_behavior
+        } else {
+            FixBehavior::Definitive
+        }
     }
 
     /// True when `mise_tool_name` refers to a language runtime/SDK rather than a
@@ -180,6 +196,7 @@ impl Check {
                 scope,
             },
             windows_java_jar: false,
+            fix_behavior: FixBehavior::Definitive,
             desc: "",
             docs: "",
         }
@@ -201,6 +218,7 @@ impl Check {
             category: Category::Default,
             toolchain: None,
             windows_java_jar: false,
+            fix_behavior: FixBehavior::Definitive,
             kind: CheckKind::Special(kind),
             desc: "",
             docs: "",
@@ -231,6 +249,11 @@ impl Check {
         {
             *f = fix_cmd;
         }
+        self
+    }
+
+    pub fn partial_fix(mut self) -> Self {
+        self.fix_behavior = FixBehavior::PartialNeedsVerify;
         self
     }
 

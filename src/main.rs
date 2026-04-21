@@ -265,6 +265,7 @@ async fn run(
 
         let mut fixed = vec![];
         let mut fix_failed = vec![];
+        let mut post_fix_failed = vec![];
         if !fixable.is_empty() {
             let fixable_names: Vec<&str> = fixable.iter().map(|r| r.name.as_str()).collect();
             let to_fix: Vec<&registry::Check> = active
@@ -286,18 +287,54 @@ async fn run(
                 config_dir,
             )
             .await?;
+            let mut to_verify = vec![];
             for r in fix_results {
                 if r.ok {
-                    fixed.push(r.name);
+                    if let Some(check) = active.iter().find(|c| c.name == r.name) {
+                        if check.fix_behavior() == registry::FixBehavior::PartialNeedsVerify {
+                            to_verify.push(r.name);
+                        } else {
+                            fixed.push(r.name);
+                        }
+                    }
                 } else {
                     fix_failed.push(r.name);
+                }
+            }
+            if !to_verify.is_empty() {
+                let verify_names: Vec<&str> = to_verify.iter().map(String::as_str).collect();
+                let to_verify_checks: Vec<&registry::Check> = active
+                    .iter()
+                    .filter(|c| verify_names.contains(&c.name))
+                    .copied()
+                    .collect();
+                let verify_results = runner::run(
+                    &to_verify_checks,
+                    &file_list,
+                    RunOptions {
+                        fix: false,
+                        verbose: false,
+                        short: true,
+                        time: false,
+                    },
+                    project_root,
+                    &cfg,
+                    config_dir,
+                )
+                .await?;
+                for r in verify_results {
+                    if r.ok {
+                        fixed.push(r.name);
+                    } else {
+                        post_fix_failed.push(r);
+                    }
                 }
             }
         }
 
         // Emit linter output for checks that need manual review so the caller
         // has the failure details without a second flint invocation.
-        for r in &reviewable {
+        for r in reviewable.iter().chain(post_fix_failed.iter()) {
             eprintln!("[{}]", r.name);
             if !r.stdout.is_empty() {
                 eprint!("{}", String::from_utf8_lossy(&r.stdout));
@@ -310,6 +347,7 @@ async fn run(
         let remaining: Vec<&str> = reviewable
             .iter()
             .map(|r| r.name.as_str())
+            .chain(post_fix_failed.iter().map(|r| r.name.as_str()))
             .chain(fix_failed.iter().map(String::as_str))
             .collect();
 

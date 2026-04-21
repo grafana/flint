@@ -8,7 +8,7 @@ pub use checks::builtin;
 pub use mise::{check_active, read_mise_tools};
 pub use obsolete::{OBSOLETE_KEYS, find_obsolete_key};
 pub use resolve::binary_on_path;
-pub use types::{Category, Check, CheckKind, Scope, SpecialKind};
+pub use types::{Category, Check, CheckKind, FixBehavior, Scope, SpecialKind};
 
 /// Returns the set of `mise.toml` tool keys that name language runtimes/SDKs
 /// (e.g. `rust`, `go`, `dotnet`). Derived from registry checks marked

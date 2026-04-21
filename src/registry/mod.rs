@@ -7,7 +7,7 @@ mod types;
 pub use checks::builtin;
 pub use mise::{check_active, read_mise_tools};
 pub use obsolete::{OBSOLETE_KEYS, find_obsolete_key};
-pub use resolve::{binary_on_path, resolve_bin_name};
+pub use resolve::binary_on_path;
 pub use types::{Category, Check, CheckKind, Scope, SpecialKind};
 
 /// Returns the set of `mise.toml` tool keys that name language runtimes/SDKs

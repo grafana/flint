@@ -1,0 +1,19 @@
+[expected]
+args = "run --full cargo-clippy"
+exit = 1
+stderr = '''
+[cargo-clippy]
+error: unused variable: `result`
+  --> src/lib.rs:11:13
+   |
+11 |         let result = add(1, 2);
+   |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+   |
+   = note: `-D unused-variables` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(unused_variables)]`
+
+error: could not compile `test` (lib test) due to 1 previous error
+
+flint: 1 check failed (cargo-clippy)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''

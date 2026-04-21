@@ -1,0 +1,15 @@
+[expected]
+args = "init --yes"
+exit = 0
+stdout = '''
+Tip: flint init detects languages from tracked files (`git ls-files`). Add and stage your source files before running init so the detection is accurate.
+
+No changes to apply.
+'''
+
+[fake_bins]
+mise = '''
+#!/bin/sh
+# Fake mise: idempotent — never modifies mise.toml since everything is already pinned.
+exit 0
+'''

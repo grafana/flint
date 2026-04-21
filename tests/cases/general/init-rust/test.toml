@@ -1,0 +1,93 @@
+[expected]
+args = "init --yes"
+exit = 0
+stdout = '''
+Tip: flint init detects languages from tracked files (`git ls-files`). Add and stage your source files before running init so the detection is accurate.
+
+  added node (LTS) — required by npm: backend tools
+  pinned flint itself — reproducible lint runs across contributors
+  normalized [tools] in <REPO>/mise.toml
+  wrote <REPO>/.github/config/flint.toml
+  wrote <REPO>/.github/workflows/lint.yml
+  removed <REPO>/.markdownlint.json (replaced by .markdownlint.yml)
+  wrote <REPO>/.markdownlint.yml
+installed pre-commit hook (.git/hooks/pre-commit)
+Done. Run `mise install` to install the new tools.
+'''
+
+# .github/workflows/lint.yml content is NOT asserted here:
+# renovate bumps the mise-action version + sha256 pin, which would flake this
+# snapshot on every bump. Rust-specific workflow content is covered by the
+# `generate_lint_workflow_with_rust` unit test in src/init/mod.rs.
+[expected.files]
+".github/config/flint.toml" = '''
+[settings]
+# exclude = "CHANGELOG\\.md"
+# exclude_paths = []
+'''
+".markdownlint.yml" = '''
+# Line length is enforced by editorconfig-checker via .editorconfig
+MD013: false
+'''
+"mise.toml" = '''
+[tools]
+rust = { version = "1.0.0", components = "clippy,rustfmt" }
+
+# Linters
+actionlint = "1.0.0"
+editorconfig-checker = "1.0.0"
+"github:grafana/flint" = "1.0.0"
+lychee = "1.0.0"
+node = "1.0.0"
+"npm:@biomejs/biome" = "1.0.0"
+"npm:markdownlint-cli2" = "1.0.0"
+"npm:prettier" = "1.0.0"
+"pipx:codespell" = "1.0.0"
+
+[env]
+FLINT_CONFIG_DIR = ".github/config"
+
+[tasks.lint]
+description = "Run all lints"
+run = "flint run"
+
+[tasks."lint:fix"]
+description = "Auto-fix lint issues"
+run = "flint run --fix"
+'''
+
+[fake_bins]
+mise = '''
+#!/bin/sh
+# Fake mise: handles `mise use --pin <key>@latest` by appending to mise.toml.
+# Real mise also installs the tool; the fake skips that since the test only
+# cares about the file mutation. Requires `--pin` so regressions that forget
+# the flag (and would write soft `latest` pins in real use) fail the test.
+cmd=$1
+shift
+[ "$cmd" = "use" ] || exit 0
+key=""
+saw_pin=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --pin) saw_pin=1 ;;
+        *@*) key="${1%@*}" ;;
+    esac
+    shift
+done
+if [ "$saw_pin" -ne 1 ]; then
+    echo "fake mise: refusing \`mise use\` without --pin (got: $*)" >&2
+    exit 1
+fi
+[ -n "$key" ] || exit 0
+: "${MISE_PROJECT_ROOT:=.}"
+mise_toml="$MISE_PROJECT_ROOT/mise.toml"
+[ -f "$mise_toml" ] || printf '[tools]\n' > "$mise_toml"
+case "$key" in
+    *:*|*/*) qkey="\"$key\"" ;;
+    *) qkey="$key" ;;
+esac
+if ! grep -Fq "$qkey =" "$mise_toml" 2>/dev/null; then
+    printf '%s = "1.0.0"\n' "$qkey" >> "$mise_toml"
+fi
+'''

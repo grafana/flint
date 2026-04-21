@@ -14,10 +14,10 @@ use detection::{
     build_linter_groups, detect_obsolete_keys, detect_present_patterns, parse_tool_keys,
 };
 use generation::{
-    apply_changes, apply_env_and_tasks, detect_base_branch, flint_preset, generate_flint_toml,
-    generate_lint_workflow, generate_markdownlint_config, get_existing_config_dir,
-    has_slow_selected, maybe_install_hook, patch_renovate_extends, prompt_config_dir,
-    remove_v1_tasks,
+    apply_changes, apply_env_and_tasks, detect_base_branch, ensure_flint_self_pin,
+    ensure_node_for_npm, flint_preset, generate_flint_toml, generate_lint_workflow,
+    generate_markdownlint_config, get_existing_config_dir, has_slow_selected, maybe_install_hook,
+    normalize_tools_section, patch_renovate_extends, prompt_config_dir, remove_v1_tasks,
 };
 use ui::{interactive_select_linters, select_categories_arrow};
 
@@ -71,7 +71,7 @@ impl LinterGroup<'_> {
             .checks
             .iter()
             .zip(&self.check_selected)
-            .filter_map(|(c, &sel)| if sel { c.mise_install_components } else { None })
+            .filter_map(|(c, &sel)| if sel { c.components() } else { None })
             .collect();
         if comps.is_empty() {
             None
@@ -138,7 +138,16 @@ Add and stage your source files before running init so the detection is accurate
     println!();
 
     let registry = builtin();
-    let present_patterns = detect_present_patterns(project_root, &registry)?;
+    let mut present_patterns = detect_present_patterns(project_root, &registry)?;
+
+    // If init will generate `.github/workflows/lint.yml`, treat the workflow
+    // patterns as present so actionlint gets selected in the same run.
+    // Without this, init would be non-idempotent: the second run would see the
+    // newly-generated workflow and add actionlint then.
+    if !project_root.join(".github/workflows/lint.yml").exists() {
+        present_patterns.insert(".github/workflows/*.yml".to_string());
+        present_patterns.insert(".github/workflows/*.yaml".to_string());
+    }
 
     // Step 1: determine which categories set the initial pre-selection.
     let default_categories: HashSet<Category> = if let Some(profile) = profile_arg {
@@ -234,6 +243,12 @@ Add and stage your source files before running init so the detection is accurate
             .zip(&g.check_selected)
             .any(|(c, &sel)| sel && c.name == "markdownlint-cli2")
     });
+    let has_editorconfig_checker = groups.iter().any(|g| {
+        g.checks
+            .iter()
+            .zip(&g.check_selected)
+            .any(|(c, &sel)| sel && c.name == "editorconfig-checker")
+    });
 
     // Prompt for the flint config dir (skipped if already set in mise.toml or --yes).
     let existing_config_dir = get_existing_config_dir(&current_content);
@@ -250,6 +265,15 @@ Add and stage your source files before running init so the detection is accurate
             &final_upgrade,
         )?;
     }
+    let node_added = ensure_node_for_npm(project_root)?;
+    if node_added {
+        println!("  added node (LTS) — required by npm: backend tools");
+    }
+    let flint_pinned = ensure_flint_self_pin(project_root)?;
+    if flint_pinned {
+        println!("  pinned flint itself — reproducible lint runs across contributors");
+    }
+    let tools_normalized = normalize_tools_section(&mise_path)?;
 
     let v1 = remove_v1_tasks(&mise_path)?;
     for key in &v1.removed_tasks {
@@ -270,8 +294,10 @@ Add and stage your source files before running init so the detection is accurate
         has_renovate,
         v1.renovate_exclude_managers.as_deref(),
     )?;
-    let workflow_generated = generate_lint_workflow(project_root, &base_branch)?;
-    let markdownlint_generated = if has_markdownlint {
+    let has_rust = final_add.iter().any(|(k, _)| k == "rust")
+        || (current_tool_keys.contains("rust") && !final_remove.iter().any(|k| k == "rust"));
+    let workflow_generated = generate_lint_workflow(project_root, &base_branch, has_rust)?;
+    let markdownlint_generated = if has_markdownlint && has_editorconfig_checker {
         generate_markdownlint_config(project_root)?
     } else {
         false
@@ -290,6 +316,9 @@ Add and stage your source files before running init so the detection is accurate
         .unwrap_or(false);
 
     if !tools_changed
+        && !node_added
+        && !flint_pinned
+        && !tools_normalized
         && v1.removed_tasks.is_empty()
         && !v1.removed_renovate_env
         && !meta_changed
@@ -349,7 +378,7 @@ fn compute_desired_tools(
         }
         if categories.contains(&check.category) {
             let entry = by_key.entry(key.to_string()).or_default();
-            if let Some(comp) = check.mise_install_components
+            if let Some(comp) = check.components()
                 && !entry.contains(&comp)
             {
                 entry.push(comp);
@@ -377,7 +406,7 @@ mod tests {
     use detection::entry_components_differ;
     use generation::{
         apply_changes, apply_env_and_tasks, generate_flint_toml, generate_lint_workflow,
-        get_existing_config_dir, has_slow_selected,
+        get_existing_config_dir, has_slow_selected, normalize_tools_section,
     };
 
     #[test]
@@ -439,6 +468,43 @@ mod tests {
     fn entry_components_differ_inline_table_correct_components() {
         let content = "[tools]\nrust = { version = \"1.80.0\", components = \"clippy,rustfmt\" }\n";
         assert!(!entry_components_differ(content, "rust", "clippy,rustfmt"));
+    }
+
+    #[test]
+    fn normalize_tools_section_sorts_and_inserts_linters_header() {
+        let content = r#"[tools]
+lychee = "0.22.0"
+node = "24.0.0"
+actionlint = "1.7.0"
+"npm:prettier" = "3.8.0"
+rust = { version = "1.95.0", components = "clippy,rustfmt" }
+"#;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), content).unwrap();
+        let changed = normalize_tools_section(tmp.path()).unwrap();
+        assert!(changed);
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        let header_pos = result.find("# Linters").expect("header present");
+        let node_pos = result.find("node =").expect("node present");
+        let rust_pos = result.find("rust =").expect("rust present");
+        let actionlint_pos = result.find("actionlint =").expect("actionlint present");
+        let lychee_pos = result.find("lychee =").expect("lychee present");
+        let prettier_pos = result.find("\"npm:prettier\"").expect("prettier present");
+        // rust is the only true toolchain here; node lives with linters because
+        // it's only pinned as a prereq for npm:* backend tools.
+        assert!(rust_pos < header_pos, "toolchains above header");
+        assert!(node_pos > header_pos, "node below header (linter prereq)");
+        assert!(actionlint_pos > header_pos, "linters below header");
+        assert!(
+            actionlint_pos < lychee_pos && lychee_pos < node_pos && node_pos < prettier_pos,
+            "linters sorted alphabetically"
+        );
+
+        // Idempotent: second call returns false and leaves content unchanged.
+        let changed_again = normalize_tools_section(tmp.path()).unwrap();
+        assert!(!changed_again);
+        let result_again = std::fs::read_to_string(tmp.path()).unwrap();
+        assert_eq!(result, result_again);
     }
 
     #[test]
@@ -573,19 +639,32 @@ rust = { version = "1.0", components = "clippy" }
         let tmp = tempfile::TempDir::new().unwrap();
         let written = generate_markdownlint_config(tmp.path()).unwrap();
         assert!(written);
-        let content = std::fs::read_to_string(tmp.path().join(".markdownlint.jsonc")).unwrap();
-        assert!(content.contains("\"MD013\": false"));
+        let content = std::fs::read_to_string(tmp.path().join(".markdownlint.yml")).unwrap();
+        assert!(content.contains("MD013: false"));
+        assert!(content.contains("editorconfig-checker"));
     }
 
     #[test]
-    fn generate_markdownlint_config_skips_existing() {
+    fn generate_markdownlint_config_skips_when_target_exists() {
         use generation::generate_markdownlint_config;
         let tmp = tempfile::TempDir::new().unwrap();
-        std::fs::write(tmp.path().join(".markdownlint.jsonc"), "existing").unwrap();
+        std::fs::write(tmp.path().join(".markdownlint.yml"), "existing").unwrap();
         let written = generate_markdownlint_config(tmp.path()).unwrap();
         assert!(!written);
-        let content = std::fs::read_to_string(tmp.path().join(".markdownlint.jsonc")).unwrap();
+        let content = std::fs::read_to_string(tmp.path().join(".markdownlint.yml")).unwrap();
         assert_eq!(content, "existing");
+    }
+
+    #[test]
+    fn generate_markdownlint_config_replaces_legacy_json() {
+        use generation::generate_markdownlint_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(tmp.path().join(".markdownlint.json"), r#"{"MD013":false}"#).unwrap();
+        let written = generate_markdownlint_config(tmp.path()).unwrap();
+        assert!(written);
+        assert!(!tmp.path().join(".markdownlint.json").exists());
+        let content = std::fs::read_to_string(tmp.path().join(".markdownlint.yml")).unwrap();
+        assert!(content.contains("MD013: false"));
     }
 
     #[test]
@@ -646,7 +725,7 @@ rust = { version = "1.0", components = "clippy" }
     #[test]
     fn generate_lint_workflow_writes_file() {
         let tmp = tempfile::TempDir::new().unwrap();
-        let written = generate_lint_workflow(tmp.path(), "main").unwrap();
+        let written = generate_lint_workflow(tmp.path(), "main", false).unwrap();
         assert!(written);
         let content =
             std::fs::read_to_string(tmp.path().join(".github/workflows/lint.yml")).unwrap();
@@ -656,12 +735,14 @@ rust = { version = "1.0", components = "clippy" }
         assert!(content.contains("persist-credentials: false"));
         assert!(content.contains("mise-action"));
         assert!(content.contains("github.token"));
+        assert!(!content.contains("rust-cache"));
+        assert!(!content.contains("rustup component"));
     }
 
     #[test]
     fn generate_lint_workflow_non_main_branch() {
         let tmp = tempfile::TempDir::new().unwrap();
-        generate_lint_workflow(tmp.path(), "master").unwrap();
+        generate_lint_workflow(tmp.path(), "master", false).unwrap();
         let content =
             std::fs::read_to_string(tmp.path().join(".github/workflows/lint.yml")).unwrap();
         assert!(content.contains("branches: [master]"));
@@ -676,11 +757,22 @@ rust = { version = "1.0", components = "clippy" }
             "existing content",
         )
         .unwrap();
-        let written = generate_lint_workflow(tmp.path(), "main").unwrap();
+        let written = generate_lint_workflow(tmp.path(), "main", false).unwrap();
         assert!(!written);
         let content =
             std::fs::read_to_string(tmp.path().join(".github/workflows/lint.yml")).unwrap();
         assert_eq!(content, "existing content");
+    }
+
+    #[test]
+    fn generate_lint_workflow_with_rust() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        generate_lint_workflow(tmp.path(), "main", true).unwrap();
+        let content =
+            std::fs::read_to_string(tmp.path().join(".github/workflows/lint.yml")).unwrap();
+        assert!(content.contains("Swatinem/rust-cache"));
+        assert!(content.contains("rustup component add clippy rustfmt"));
+        assert!(content.contains("warms the Rust cache"));
     }
 
     #[test]

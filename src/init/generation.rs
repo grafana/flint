@@ -98,16 +98,17 @@ fn add_to_extends(content: &str, entry: &str) -> Result<String> {
     }
 }
 
-/// Runs `mise use --pin <key>@latest` in the project directory to add a tool
-/// with a pinned version. Returns `true` if the key was written to the config
-/// (checked by re-reading the file), ignoring non-zero exit codes that arise
-/// from post-write steps like shim rebuilds failing in restricted environments.
-fn pin_tool_via_mise(project_root: &Path, key: &str) -> bool {
+/// Runs `mise use --pin <key>@<version>` in the project directory to add a tool
+/// with a pinned version (mise resolves `latest`/`lts` to a concrete version at
+/// write time). Returns `true` if the key was written to the config (checked by
+/// re-reading the file), ignoring non-zero exit codes that arise from post-write
+/// steps like shim rebuilds failing in restricted environments.
+fn pin_tool_via_mise(project_root: &Path, key: &str, version: &str) -> bool {
     let mise_path = project_root.join("mise.toml");
     let before = std::fs::read_to_string(&mise_path).unwrap_or_default();
 
     let _ = Command::new("mise")
-        .args(["use", "--pin", &format!("{key}@latest")])
+        .args(["use", "--pin", &format!("{key}@{version}")])
         .current_dir(project_root)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -116,6 +117,80 @@ fn pin_tool_via_mise(project_root: &Path, key: &str) -> bool {
     // Success = the key is now present in the config (regardless of exit code).
     let after = std::fs::read_to_string(&mise_path).unwrap_or_default();
     after != before && parse_tool_keys(&after).contains(key)
+}
+
+/// True when `[tools]` contains at least one `npm:*` key but no `node` entry.
+/// The npm backend needs a Node.js runtime; without an explicit pin, mise falls
+/// back to system node — may be absent, wrong version, or drift across machines.
+fn needs_node_for_npm(content: &str) -> bool {
+    let Ok(doc) = content.parse::<toml_edit::DocumentMut>() else {
+        return false;
+    };
+    let Some(tools) = doc.get("tools").and_then(|t| t.as_table()) else {
+        return false;
+    };
+    let has_npm = tools.iter().any(|(k, _)| k.starts_with("npm:"));
+    let has_node = tools.contains_key("node");
+    has_npm && !has_node
+}
+
+/// Ensures a `node` entry exists in mise.toml when any `npm:*` backend tool is
+/// present. Prefers `mise use --pin node@lts` so the version resolves to a
+/// concrete release at write time; falls back to writing `node = "lts"` directly
+/// via toml_edit when mise isn't available.
+///
+/// Returns `true` if a `node` entry was added.
+pub(crate) fn ensure_node_for_npm(project_root: &Path) -> Result<bool> {
+    let mise_path = project_root.join("mise.toml");
+    let content = std::fs::read_to_string(&mise_path).unwrap_or_default();
+    if !needs_node_for_npm(&content) {
+        return Ok(false);
+    }
+    if pin_tool_via_mise(project_root, "node", "lts") {
+        return Ok(true);
+    }
+    // Fallback: write a soft pin so mise.toml still declares the prereq.
+    let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse mise.toml")?;
+    let tools = doc["tools"]
+        .as_table_mut()
+        .context("[tools] is not a table")?;
+    tools.insert("node", toml_edit::value("lts"));
+    std::fs::write(&mise_path, doc.to_string())?;
+    Ok(true)
+}
+
+/// Pins `github:grafana/flint` in mise.toml at the calling binary's version so
+/// contributors all run the same flint release. Skips when the key already
+/// exists (any pin — never overwrite the user's explicit choice). Pre-release
+/// suffixes are stripped to match [`flint_preset`].
+///
+/// Returns `true` if a flint entry was added.
+pub(crate) fn ensure_flint_self_pin(project_root: &Path) -> Result<bool> {
+    const KEY: &str = "github:grafana/flint";
+    let mise_path = project_root.join("mise.toml");
+    let content = std::fs::read_to_string(&mise_path).unwrap_or_default();
+    if let Ok(doc) = content.parse::<toml_edit::DocumentMut>()
+        && let Some(tools) = doc.get("tools").and_then(|t| t.as_table())
+        && tools.contains_key(KEY)
+    {
+        return Ok(false);
+    }
+    let ver = env!("CARGO_PKG_VERSION");
+    let ver = ver.split('-').next().unwrap_or(ver);
+    if pin_tool_via_mise(project_root, KEY, ver) {
+        return Ok(true);
+    }
+    let mut doc: toml_edit::DocumentMut = if content.is_empty() {
+        "[tools]\n".parse().unwrap()
+    } else {
+        content.parse().context("failed to parse mise.toml")?
+    };
+    let tools = doc["tools"]
+        .as_table_mut()
+        .context("[tools] is not a table")?;
+    tools.insert(KEY, toml_edit::value(ver));
+    std::fs::write(&mise_path, doc.to_string())?;
+    Ok(true)
 }
 
 /// Replaces obsolete tool keys in mise.toml with their modern equivalents,
@@ -164,7 +239,7 @@ pub(super) fn apply_changes(
     // upgrades, and component additions.
     let mut pinned_via_mise: std::collections::HashSet<String> = std::collections::HashSet::new();
     for (key, _) in to_add {
-        if pin_tool_via_mise(project_root, key) {
+        if pin_tool_via_mise(project_root, key, "latest") {
             pinned_via_mise.insert(key.clone());
         } else {
             eprintln!("  warning: could not pin {key} via mise — writing \"latest\"");
@@ -258,6 +333,67 @@ pub(super) fn apply_changes(
 
     std::fs::write(path, doc.to_string())?;
     Ok(())
+}
+
+/// Sorts `[tools]` entries and inserts the `# Linters` header when they are not
+/// already in canonical form. Returns `true` if the file was rewritten.
+pub(super) fn normalize_tools_section(path: &Path) -> Result<bool> {
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(_) => return Ok(false),
+    };
+    let mut doc: toml_edit::DocumentMut = match content.parse() {
+        Ok(d) => d,
+        Err(_) => return Ok(false),
+    };
+    let Some(tools) = doc.get_mut("tools").and_then(|i| i.as_table_mut()) else {
+        return Ok(false);
+    };
+    sort_and_group_tools(tools);
+    let new_content = doc.to_string();
+    if new_content == content {
+        return Ok(false);
+    }
+    std::fs::write(path, new_content)?;
+    println!("  normalized [tools] in {}", path.display());
+    Ok(true)
+}
+
+/// Sorts `[tools]` entries alphabetically and inserts a `# Linters` comment
+/// before the first linter entry. Toolchain keys (derived from registry checks
+/// marked `.toolchain()`, plus `node`) stay above the header; every other key
+/// goes below.
+fn sort_and_group_tools(tools: &mut toml_edit::Table) {
+    let mut entries: Vec<(String, toml_edit::Item)> = tools
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.clone()))
+        .collect();
+    if entries.is_empty() {
+        return;
+    }
+    let toolchains = crate::registry::toolchain_keys();
+    let (mut runtimes, mut linters): (Vec<_>, Vec<_>) = entries
+        .drain(..)
+        .partition(|(k, _)| toolchains.contains(k.as_str()));
+    runtimes.sort_by(|a, b| a.0.cmp(&b.0));
+    linters.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let keys: Vec<String> = tools.iter().map(|(k, _)| k.to_string()).collect();
+    for k in keys {
+        tools.remove(&k);
+    }
+    for (k, v) in runtimes {
+        tools.insert(&k, v);
+    }
+    let first_linter_key = linters.first().map(|(k, _)| k.clone());
+    for (k, v) in linters {
+        tools.insert(&k, v);
+    }
+    if let Some(k) = first_linter_key
+        && let Some(mut key_mut) = tools.key_mut(&k)
+    {
+        key_mut.leaf_decor_mut().set_prefix("\n# Linters\n");
+    }
 }
 
 const FLINT_V1_URL_PREFIX: &str = "https://raw.githubusercontent.com/grafana/flint/";
@@ -465,35 +601,74 @@ pub(super) fn generate_flint_toml(
     Ok(true)
 }
 
-/// Generates `.markdownlint.jsonc` in the project root if it does not already exist
-/// and markdownlint-cli2 is being set up.
-/// Returns `true` if the file was written.
+/// Generates `.markdownlint.yml` in the project root when markdownlint-cli2 is
+/// being set up alongside editorconfig-checker.
+/// Returns `true` if the file was written (or an older variant was replaced).
+///
+/// Target format is `.markdownlint.yml` for uniformity across consumer repos.
+/// Older variants (`.markdownlint.{json,jsonc,yaml}`,
+/// `.markdownlint-cli2.{jsonc,yaml,yml,cjs,mjs}`) are replaced.
 pub(super) fn generate_markdownlint_config(project_root: &Path) -> Result<bool> {
-    let path = project_root.join(".markdownlint.jsonc");
-    if path.exists() {
+    const LEGACY_CONFIG_NAMES: &[&str] = &[
+        ".markdownlint.json",
+        ".markdownlint.jsonc",
+        ".markdownlint.yaml",
+        ".markdownlint-cli2.jsonc",
+        ".markdownlint-cli2.yaml",
+        ".markdownlint-cli2.yml",
+        ".markdownlint-cli2.cjs",
+        ".markdownlint-cli2.mjs",
+    ];
+    let target = project_root.join(".markdownlint.yml");
+    if target.exists() {
         return Ok(false);
     }
-    let content = "{\n  // Disable line-length enforcement — long lines are common in tables and code links\n  \"MD013\": false,\n}\n";
-    std::fs::write(&path, content)?;
-    println!("  wrote {}", path.display());
+    for name in LEGACY_CONFIG_NAMES {
+        let legacy = project_root.join(name);
+        if legacy.exists() {
+            std::fs::remove_file(&legacy)?;
+            println!(
+                "  removed {} (replaced by .markdownlint.yml)",
+                legacy.display()
+            );
+        }
+    }
+    let content =
+        "# Line length is enforced by editorconfig-checker via .editorconfig\nMD013: false\n";
+    std::fs::write(&target, content)?;
+    println!("  wrote {}", target.display());
     Ok(true)
 }
 
 /// Generates `.github/workflows/lint.yml` if it does not already exist.
 /// Returns `true` if the file was written.
-pub(super) fn generate_lint_workflow(project_root: &Path, base_branch: &str) -> Result<bool> {
+pub(super) fn generate_lint_workflow(
+    project_root: &Path,
+    base_branch: &str,
+    has_rust: bool,
+) -> Result<bool> {
     let workflows_dir = project_root.join(".github/workflows");
     let workflow_path = workflows_dir.join("lint.yml");
     if workflow_path.exists() {
         return Ok(false);
     }
     std::fs::create_dir_all(&workflows_dir)?;
+    let push_comment = if has_rust {
+        " # warms the Rust cache so PR branches get a cache hit"
+    } else {
+        ""
+    };
+    let rust_steps = if has_rust {
+        "\n      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1\n\n      - name: Install Rust lint components\n        run: rustup component add clippy rustfmt\n"
+    } else {
+        ""
+    };
     let content = format!(
         r#"name: Lint
 
 on:
   push:
-    branches: [{base_branch}]
+    branches: [{base_branch}]{push_comment}
   pull_request:
     branches: [{base_branch}]
 
@@ -513,9 +688,9 @@ jobs:
       - name: Setup mise
         uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
         with:
-          version: v2026.4.15
-          sha256: c55befc52e5694f388b927ef304362ca7b9e919d97d43c342fca57f2eccea255
-
+          version: v2026.4.16
+          sha256: 69d321fca47d6ece2924bd95ab2343e3e1c7704d6b6cb5de15e4f753d8c54be1
+{rust_steps}
       - name: Lint
         env:
           GITHUB_TOKEN: ${{{{ github.token }}}}
@@ -604,7 +779,9 @@ pub(super) fn apply_env_and_tasks(
     // [tasks] — add lint / lint:fix / (lint:pre-commit)
     {
         if !doc.contains_key("tasks") {
-            doc.insert("tasks", toml_edit::Item::Table(toml_edit::Table::new()));
+            let mut tasks_table = toml_edit::Table::new();
+            tasks_table.set_implicit(true);
+            doc.insert("tasks", toml_edit::Item::Table(tasks_table));
         }
         let tasks = doc["tasks"]
             .as_table_mut()
@@ -661,6 +838,61 @@ pub(super) fn maybe_install_hook(project_root: &Path, yes: bool) -> Result<()> {
         crate::hook::install(project_root)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod node_prereq_tests {
+    use super::{ensure_node_for_npm, needs_node_for_npm};
+
+    // Full end-to-end ensure_node_for_npm coverage (npm-present, node-absent →
+    // node added, file modified) lives in the e2e case `general/update-adds-node`.
+    // That case drives the flint binary and exercises the real mise subprocess.
+
+    #[test]
+    fn needs_node_when_npm_key_without_node() {
+        let content = "[tools]\n\"npm:prettier\" = \"3.8.1\"\n";
+        assert!(needs_node_for_npm(content));
+    }
+
+    #[test]
+    fn no_node_needed_when_no_npm_keys() {
+        let content = "[tools]\nshellcheck = \"v0.11.0\"\n";
+        assert!(!needs_node_for_npm(content));
+    }
+
+    #[test]
+    fn no_node_needed_when_node_already_declared() {
+        let content = "[tools]\nnode = \"20\"\n\"npm:prettier\" = \"3.8.1\"\n";
+        assert!(!needs_node_for_npm(content));
+    }
+
+    #[test]
+    fn no_node_needed_when_tools_section_missing() {
+        assert!(!needs_node_for_npm(""));
+        assert!(!needs_node_for_npm("[env]\nFOO = \"bar\"\n"));
+    }
+
+    #[test]
+    fn noop_when_node_already_present() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        let original = "[tools]\nnode = \"20\"\n\"npm:prettier\" = \"3.8.1\"\n";
+        std::fs::write(&path, original).unwrap();
+        let added = ensure_node_for_npm(dir.path()).unwrap();
+        assert!(!added);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+    }
+
+    #[test]
+    fn noop_without_npm_tools() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        let original = "[tools]\nshellcheck = \"v0.11.0\"\n";
+        std::fs::write(&path, original).unwrap();
+        let added = ensure_node_for_npm(dir.path()).unwrap();
+        assert!(!added);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+    }
 }
 
 #[cfg(test)]

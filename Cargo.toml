@@ -1,6 +1,6 @@
 [package]
 name = "flint"
-version = "0.20.2"
+version = "0.20.3"
 edition = "2024"
 description = "mise-native lint orchestrator"
 license = "Apache-2.0"

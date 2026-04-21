@@ -256,11 +256,46 @@ fn run_case(case: &Path, name: &str, update: bool) {
     // The tempdir must stay alive until after flint_with_env returns.
     let fake_bin_dir = tempfile::tempdir().expect("fake_bin tempdir");
     let fake_path = setup_fake_bins(&cfg, name, fake_bin_dir.path());
+    let runtime_dir = tempfile::tempdir().expect("runtime tempdir");
+    let cache_dir = runtime_dir.path().join(".cache");
+    let tmp_dir = runtime_dir.path().join(".tmp");
+    let home_dir = runtime_dir.path().join(".home");
+    std::fs::create_dir_all(cache_dir.join("go-build")).expect("create go cache dir");
+    std::fs::create_dir_all(cache_dir.join("golangci-lint"))
+        .expect("create golangci-lint cache dir");
+    std::fs::create_dir_all(&tmp_dir).expect("create temp dir");
+    std::fs::create_dir_all(&home_dir).expect("create home dir");
 
     let mut env_refs: Vec<(&str, &str)> = env_vars
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))
         .collect();
+    let mut injected_env = vec![
+        ("HOME".to_string(), home_dir.to_string_lossy().into_owned()),
+        (
+            "XDG_CACHE_HOME".to_string(),
+            cache_dir.to_string_lossy().into_owned(),
+        ),
+        (
+            "GOCACHE".to_string(),
+            cache_dir.join("go-build").to_string_lossy().into_owned(),
+        ),
+        (
+            "GOLANGCI_LINT_CACHE".to_string(),
+            cache_dir
+                .join("golangci-lint")
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        ("TMPDIR".to_string(), tmp_dir.to_string_lossy().into_owned()),
+    ];
+    if !env_vars.iter().any(|(k, _)| k == "DOTNET_CLI_HOME") {
+        injected_env.push((
+            "DOTNET_CLI_HOME".to_string(),
+            home_dir.join(".dotnet").to_string_lossy().into_owned(),
+        ));
+    }
+    env_refs.extend(injected_env.iter().map(|(k, v)| (k.as_str(), v.as_str())));
     if let Some(ref p) = fake_path {
         env_refs.push(("PATH", p.as_str()));
     }
@@ -271,12 +306,14 @@ fn run_case(case: &Path, name: &str, update: bool) {
     let repo_canonical_str = canonical_repo_path(repo.path());
     let normalize =
         |s: String| -> String { normalize_output(s, repo_str.as_ref(), &repo_canonical_str) };
-    let stderr = normalize_tool_versions(&normalize_timing(&strip_ansi(&normalize(
-        String::from_utf8_lossy(&out.stderr).into_owned(),
-    ))));
-    let stdout = normalize_tool_versions(&normalize_timing(&strip_ansi(&normalize(
-        String::from_utf8_lossy(&out.stdout).into_owned(),
-    ))));
+    let stderr =
+        normalize_rust_compile_summaries(&normalize_tool_versions(&normalize_timing(&strip_ansi(
+            &normalize(String::from_utf8_lossy(&out.stderr).into_owned()),
+        ))));
+    let stdout =
+        normalize_rust_compile_summaries(&normalize_tool_versions(&normalize_timing(&strip_ansi(
+            &normalize(String::from_utf8_lossy(&out.stdout).into_owned()),
+        ))));
 
     if update {
         write_test_toml(
@@ -332,16 +369,17 @@ fn write_test_toml(path: &Path, cfg: &toml::Value, exit: i32, stderr: &str, stdo
     out += &format!("args = \"{}\"\n", toml_escape(args_str));
     out += &format!("exit = {exit}\n");
     if !stderr.is_empty() {
-        out += &format!("stderr = '''\n{stderr}'''");
+        out += &format!("stderr = '''\n{stderr}'''\n");
     }
     if !stdout.is_empty() {
-        out += &format!("stdout = '''\n{stdout}'''");
+        out += &format!("stdout = '''\n{stdout}'''\n");
     }
     if let Some(files) = existing_files {
-        out += "\n\n[expected.files]\n";
+        out += "\n[expected.files]\n";
         for (k, v) in files {
             if let Some(s) = v.as_str() {
-                out += &format!("\"{k}\" = \"\"\"\n{s}\"\"\"");
+                // Literal multi-line strings ('''…''') to avoid escape processing.
+                out += &format!("\"{k}\" = '''\n{s}'''\n");
             }
         }
     }
@@ -403,6 +441,50 @@ fn normalize_tool_versions(s: &str) -> String {
         Regex::new(r"markdownlint-cli2 v\d+\.\d+\.\d+ \(markdownlint v\d+\.\d+\.\d+\)").unwrap();
     re.replace_all(&s, "markdownlint-cli2 <VERSION>")
         .into_owned()
+}
+
+/// Cargo may emit multiple "could not compile" summary lines in either order
+/// when both lib and lib test targets fail. Sort only that contiguous block so
+/// snapshots remain stable while preserving the surrounding output verbatim.
+fn normalize_rust_compile_summaries(s: &str) -> String {
+    let is_summary = |line: &str| {
+        line.starts_with("error: could not compile `")
+            && (line.ends_with(" previous error") || line.ends_with(" previous errors"))
+    };
+    let summary_rank = |line: &str| {
+        if line.contains("(lib) ") {
+            0_u8
+        } else if line.contains("(lib test) ") {
+            1_u8
+        } else {
+            2_u8
+        }
+    };
+
+    let mut out = Vec::new();
+    let mut block = Vec::new();
+
+    for line in s.split_inclusive('\n') {
+        if is_summary(line.trim_end_matches('\n')) {
+            block.push(line);
+            continue;
+        }
+
+        if !block.is_empty() {
+            block.sort_unstable_by(|a, b| {
+                summary_rank(a).cmp(&summary_rank(b)).then_with(|| a.cmp(b))
+            });
+            out.append(&mut block);
+        }
+        out.push(line);
+    }
+
+    if !block.is_empty() {
+        block.sort_unstable_by(|a, b| summary_rank(a).cmp(&summary_rank(b)).then_with(|| a.cmp(b)));
+        out.append(&mut block);
+    }
+
+    out.concat()
 }
 
 /// Strips ANSI/VT escape sequences (colour codes, character-set switches, etc.).

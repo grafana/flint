@@ -686,7 +686,7 @@ mod tests {
             defers_to_formatters: false,
             activate_unconditionally: false,
             category: Category::Default,
-            mise_install_components: None,
+            toolchain: None,
             windows_java_jar: false,
             kind: CheckKind::Template {
                 check_cmd: "run-it",

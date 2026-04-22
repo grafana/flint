@@ -5,7 +5,6 @@ use std::process::Stdio;
 use crate::config::RenovateDepsConfig;
 use crate::files::FileList;
 use crate::linters::LinterOutput;
-use crate::registry::binary_on_path;
 
 const COMMITTED_FILE: &str = "renovate-tracked-deps.json";
 pub(crate) const COMMITTED_PATHS: &[&str] = &[COMMITTED_FILE, ".github/renovate-tracked-deps.json"];
@@ -150,26 +149,7 @@ async fn run_inner(
     })
 }
 
-fn renovate_argv() -> anyhow::Result<Vec<String>> {
-    if binary_on_path("mise") {
-        return Ok(vec![
-            "mise".to_string(),
-            "exec".to_string(),
-            "node@24".to_string(),
-            "npm:renovate".to_string(),
-            "--".to_string(),
-            "renovate".to_string(),
-            "--platform=local".to_string(),
-            "--require-config=ignored".to_string(),
-            "--dry-run=extract".to_string(),
-        ]);
-    }
-
-    anyhow::bail!("mise is required to run renovate-deps")
-}
-
-/// Runs Renovate in a mise-managed environment and returns the combined
-/// stdout+stderr log bytes.
+/// Runs `renovate --platform=local` and returns the combined stdout+stderr log bytes.
 async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result<Vec<u8>> {
     // Forward env, setting Renovate-specific vars.
     let mut env: Vec<(String, String)> = std::env::vars().collect();
@@ -192,14 +172,22 @@ async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result
         env.push(("GITHUB_COM_TOKEN".into(), token));
     }
 
-    let out = super::spawn_command(&renovate_argv()?, false)
-        .current_dir(project_root)
-        .envs(env)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .await?;
+    let out = super::spawn_command(
+        &[
+            "renovate".to_string(),
+            "--platform=local".to_string(),
+            "--require-config=ignored".to_string(),
+            "--dry-run=extract".to_string(),
+        ],
+        false,
+    )
+    .current_dir(project_root)
+    .envs(env)
+    .stdin(Stdio::null())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .output()
+    .await?;
 
     // Combine stdout+stderr: Renovate writes JSON log lines to stdout, but
     // some startup messages may appear on stderr.
@@ -207,37 +195,15 @@ async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result
     combined.extend_from_slice(&out.stderr);
 
     if !out.status.success() {
-        let snippet = summarize_log_excerpt(&combined, 12);
+        let snippet = String::from_utf8_lossy(&combined);
         anyhow::bail!(
             "renovate exited with status {}: {}",
             out.status.code().unwrap_or(-1),
-            snippet
+            snippet.lines().take(20).collect::<Vec<_>>().join("\n")
         );
     }
 
     Ok(combined)
-}
-
-fn summarize_log_excerpt(log_bytes: &[u8], max_lines: usize) -> String {
-    let log = String::from_utf8_lossy(log_bytes);
-    let lines: Vec<&str> = log.lines().collect();
-
-    if lines.len() <= max_lines {
-        return lines.join("\n");
-    }
-
-    let head_count = max_lines / 2;
-    let tail_count = max_lines - head_count;
-    let mut excerpt = Vec::with_capacity(max_lines + 1);
-    excerpt.extend(lines.iter().take(head_count).copied());
-    excerpt.push("...");
-    excerpt.extend(
-        lines
-            .iter()
-            .skip(lines.len().saturating_sub(tail_count))
-            .copied(),
-    );
-    excerpt.join("\n")
 }
 
 fn resolve_renovate_config_path(project_root: &Path) -> anyhow::Result<PathBuf> {
@@ -514,15 +480,6 @@ mod tests {
     }
 
     #[test]
-    fn summarize_log_excerpt_keeps_head_and_tail() {
-        let log = b"1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n";
-
-        let excerpt = summarize_log_excerpt(log, 6);
-
-        assert_eq!(excerpt, "1\n2\n3\n...\n8\n9\n10");
-    }
-
-    #[test]
     fn resolves_supported_renovate_config_file() {
         let dir = tempfile::tempdir().unwrap();
         let config_path = dir.path().join(".renovaterc.json");
@@ -558,33 +515,6 @@ mod tests {
             committed_path_for_config(Path::new(".github/renovate.json5")),
             PathBuf::from(".github/renovate-tracked-deps.json")
         );
-    }
-
-    #[test]
-    fn renovate_argv_requires_mise_and_uses_exec() {
-        let argv = renovate_argv();
-
-        if binary_on_path("mise") {
-            assert_eq!(
-                argv.unwrap(),
-                vec![
-                    "mise",
-                    "exec",
-                    "node@24",
-                    "npm:renovate",
-                    "--",
-                    "renovate",
-                    "--platform=local",
-                    "--require-config=ignored",
-                    "--dry-run=extract",
-                ]
-            );
-        } else {
-            assert_eq!(
-                argv.unwrap_err().to_string(),
-                "mise is required to run renovate-deps"
-            );
-        }
     }
 
     fn file_list(paths: &[&str], full: bool) -> FileList {

@@ -23,6 +23,7 @@ dotnet = "10.0.201"
 "cargo:xmloxide" = "0.4.1"
 golangci-lint = "2.11.4"
 "github:google/google-java-format" = "1.35.0"
+node = "24.15.0"
 
 [tasks."setup:update-super-linter-versions"]
 description = "Generate super-linter version mapping from the super-linter repo"

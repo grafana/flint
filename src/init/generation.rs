@@ -733,14 +733,16 @@ pub(super) fn generate_biome_config(project_root: &Path) -> Result<bool> {
     }
 
     let target = project_root.join("biome.json");
-    let content = concat!(
-        "{\n",
-        "  \"formatter\": {\n",
-        "    \"indentStyle\": \"space\",\n",
-        "    \"indentWidth\": 2\n",
-        "  }\n",
-        "}\n"
-    );
+    let content = [
+        "{",
+        "  \"formatter\": {",
+        "    \"indentStyle\": \"space\",",
+        "    \"indentWidth\": 2",
+        "  }",
+        "}",
+        "",
+    ]
+    .join("\n");
     std::fs::write(&target, content)?;
     println!("  wrote {}", target.display());
     Ok(true)

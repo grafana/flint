@@ -8,7 +8,7 @@ mod runner;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
-use registry::{CheckKind, Scope};
+use registry::{CheckKind, RunPolicy, Scope, SpecialKind};
 use runner::{CheckResult, RunOptions};
 use std::collections::HashMap;
 
@@ -195,9 +195,17 @@ async fn run(
         registry.iter().collect()
     };
 
+    let file_list = files::changed(
+        project_root,
+        &cfg,
+        args.full,
+        args.new_from_rev.as_deref(),
+        args.to_ref.as_deref(),
+    )?;
+
     // Discover which checks are declared in the consuming repo's mise.toml, and apply
-    // --fast-only filter (skipped when linters are named explicitly).
-    // mise guarantees declared tools are on PATH, so no PATH check needed.
+    // --fast-only policy (skipped when linters are named explicitly, relevance-gated for
+    // adaptive checks). mise guarantees declared tools are on PATH, so no PATH check needed.
     let mise_tools = registry::read_mise_tools(project_root);
     if let Some((old, new)) = registry::find_obsolete_key(&mise_tools) {
         eprintln!("flint: obsolete tool key in mise.toml: {old:?} (replaced by {new:?})");
@@ -208,7 +216,21 @@ async fn run(
         let mut out = vec![];
         for c in checks {
             if registry::check_active(c, &mise_tools) {
-                if explicit || !args.fast_only || c.category != registry::Category::Slow {
+                let include = if explicit || !args.fast_only {
+                    true
+                } else {
+                    match c.run_policy {
+                        RunPolicy::Fast => true,
+                        RunPolicy::Slow => false,
+                        RunPolicy::Adaptive => match &c.kind {
+                            CheckKind::Special(SpecialKind::RenovateDeps) => {
+                                linters::renovate_deps::is_relevant(&file_list, project_root)
+                            }
+                            _ => true,
+                        },
+                    }
+                };
+                if include {
                     out.push(c);
                 }
             } else if explicit {
@@ -230,14 +252,6 @@ async fn run(
             eprintln!("flint: active linters: {}", names.join(", "));
         }
     }
-
-    let file_list = files::changed(
-        project_root,
-        &cfg,
-        args.full,
-        args.new_from_rev.as_deref(),
-        args.to_ref.as_deref(),
-    )?;
 
     if args.fix {
         // Pre-check, fix what's fixable, report outcome.
@@ -446,10 +460,19 @@ pub fn linter_json(check: &registry::Check) -> serde_json::Value {
         "binary": if check.uses_binary() { check.bin_name } else { "(built-in)" },
         "patterns": patterns,
         "fix": check.has_fix(),
-        "slow": check.category == registry::Category::Slow,
+        "run_policy": run_policy_label(check.run_policy),
+        "slow": check.run_policy == RunPolicy::Slow,
         "scope": scope,
         "config_file": config_file,
     })
+}
+
+fn run_policy_label(run_policy: RunPolicy) -> &'static str {
+    match run_policy {
+        RunPolicy::Fast => "fast",
+        RunPolicy::Slow => "slow",
+        RunPolicy::Adaptive => "adaptive",
+    }
 }
 
 fn is_fixable(name: &str, active: &[&registry::Check]) -> bool {
@@ -482,7 +505,7 @@ fn print_linters(
         .max(11);
 
     println!(
-        "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  {:<3}  {:<desc_w$}  PATTERNS",
+        "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {:<desc_w$}  PATTERNS",
         "NAME",
         "BINARY",
         "STATUS",
@@ -493,7 +516,7 @@ fn print_linters(
         bin_w = bin_w,
         desc_w = desc_w,
     );
-    println!("{}", "-".repeat(name_w + bin_w + desc_w + 42));
+    println!("{}", "-".repeat(name_w + bin_w + desc_w + 46));
 
     for check in registry {
         let status = if registry::check_active(check, mise_tools) {
@@ -511,16 +534,12 @@ fn print_linters(
         } else {
             "missing"
         };
-        let speed = if check.category == registry::Category::Slow {
-            "slow"
-        } else {
-            "fast"
-        };
+        let speed = run_policy_label(check.run_policy);
         let fix = if check.has_fix() { "yes" } else { "no" };
         let patterns_str = check.patterns.join(" ");
         if patterns_str.is_empty() {
             println!(
-                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  {:<3}  {:<desc_w$}",
+                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {:<desc_w$}",
                 check.name,
                 check.bin_name,
                 status,
@@ -533,7 +552,7 @@ fn print_linters(
             );
         } else {
             println!(
-                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  {:<3}  {:<desc_w$}  {}",
+                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {:<desc_w$}  {}",
                 check.name,
                 check.bin_name,
                 status,

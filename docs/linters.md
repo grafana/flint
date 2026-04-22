@@ -7,6 +7,7 @@ Every supported check, its config file (when applicable), and its scope. The
 config injection for `biome` and `biome-format` is not yet implemented.
 
 <!-- editorconfig-checker-disable -->
+<!-- markdownlint-disable MD013 -->
 <!-- linter-details-start -->
 <!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
 
@@ -207,6 +208,7 @@ check_all_local = true
 | Binary      | `renovate`                                                                                                                 |
 | Scope       | [special](#scopes)                                                                                                         |
 | Patterns    | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
+| Run policy  | adaptive — runs in `--fast-only` only when relevant                                                                        |
 
 Verifies `.github/renovate-tracked-deps.json` is up to date by running Renovate locally and comparing its output against the committed snapshot. Requires `renovate` in `[tools]`.
 
@@ -273,25 +275,34 @@ exclude_managers = ["github-actions", "github-runners"]
 | Patterns    | `*.xml`                            |
 
 <!-- linter-details-end -->
+<!-- markdownlint-enable MD013 -->
 <!-- editorconfig-checker-enable -->
 
 ## Scopes
 
 - `file` — invoked once per matched file
-- `files` — invoked once with all matched files as args; only changed files are passed
+- `files` — invoked once with all matched files as args; only changed files are
+  passed
 - `project` — invoked once with no file args; for checks with patterns set
-  (e.g. `cargo-clippy`), skipped entirely if no matching files changed, but runs on
-  the whole project when it does run. `golangci-lint` is the exception — it uses
+  (e.g. `cargo-clippy`), skipped entirely if no matching files changed, but
+  runs on the whole project when it does run. `golangci-lint` is the
+  exception — it uses
   `--new-from-rev` to scope analysis to changed code even within the project run.
 
-Checks tagged slow in the registry are skipped by `--fast-only`. Use
-`--fast-only` for local/pre-push feedback and the full set in CI. (No
-builtin is currently marked slow, but the mechanism is preserved.)
+Checks use one of three run policies:
 
-**`editorconfig-checker` defers to formatters**: `editorconfig-checker` runs on all files, but
+- `fast` — always runs, including in `--fast-only`
+- `slow` — skipped by `--fast-only`
+- `adaptive` — runs in `--fast-only` only when the changed files are relevant
+
+Use `--fast-only` for local/pre-push feedback and the full set in CI.
+
+**`editorconfig-checker` defers to formatters**: `editorconfig-checker` runs on
+all files, but
 automatically skips file types owned by an active line-length-enforcing
 formatter. When `cargo-fmt`, `ruff-format`, `biome-format`, or `prettier`
-are active, their file types are excluded from `editorconfig-checker` — those formatters
+are active, their file types are excluded from `editorconfig-checker` — those
+formatters
 already enforce line length and would conflict with `editorconfig-checker`'s
 `max_line_length` editorconfig check. If none of those formatters are
 installed, `editorconfig-checker` checks those files itself.

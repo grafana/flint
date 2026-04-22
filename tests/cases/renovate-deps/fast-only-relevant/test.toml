@@ -1,0 +1,14 @@
+[expected]
+args = "run --fast-only"
+exit = 0
+
+[expected.files]
+".renovate-ran" = """
+"""
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+touch .renovate-ran
+printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"npm":[{"packageFile":"package.json","deps":[{"depName":"express"},{"depName":"lodash"}]}]}}'
+'''

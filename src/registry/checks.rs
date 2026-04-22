@@ -264,6 +264,7 @@ fn check_lychee() -> Check {
 
 fn check_renovate_deps() -> Check {
     Check::special("renovate-deps", "renovate", SpecialKind::RenovateDeps)
+        .adaptive()
         .mise_tool("npm:renovate")
         .patterns(RENOVATE_CONFIG_PATTERNS)
         .desc("Verify Renovate dependency snapshot is up to date")

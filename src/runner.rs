@@ -583,7 +583,7 @@ fn shell_words(cmd: String) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::files::FileList;
-    use crate::registry::{Category, Check, CheckKind, Scope};
+    use crate::registry::{Category, Check, CheckKind, RunPolicy, Scope};
     use std::path::PathBuf;
 
     #[test]
@@ -652,6 +652,7 @@ mod tests {
             defers_to_formatters: false,
             activate_unconditionally: false,
             category: Category::Default,
+            run_policy: RunPolicy::Fast,
             toolchain: None,
             windows_java_jar: false,
             fix_behavior: crate::registry::FixBehavior::Definitive,

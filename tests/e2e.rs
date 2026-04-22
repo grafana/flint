@@ -150,6 +150,7 @@ fn cases() {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn fix_exits_nonzero_when_formatters_disagree_on_same_file() {
     let repo = git_repo();
@@ -206,15 +207,25 @@ node = "20"
 set -eu
 
 mode="$1"
-target="$2"
-base="$(basename "$target")"
+shift
 
-if [ "$base" = "README.md" ]; then
-  exit 0
-fi
+for target in "$@"; do
+  case "$target" in
+    -*)
+      continue
+      ;;
+  esac
 
-echo "prettier unexpectedly targeted: $target" >&2
-exit 1
+  base="$(basename "$target")"
+  if [ "$base" = "README.md" ]; then
+    continue
+  fi
+
+  echo "prettier unexpectedly targeted in $mode mode: $target" >&2
+  exit 1
+done
+
+exit 0
 "#,
     )
     .unwrap();

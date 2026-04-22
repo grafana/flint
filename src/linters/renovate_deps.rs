@@ -206,15 +206,37 @@ async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result
     combined.extend_from_slice(&out.stderr);
 
     if !out.status.success() {
-        let snippet = String::from_utf8_lossy(&combined);
+        let snippet = summarize_log_excerpt(&combined, 12);
         anyhow::bail!(
             "renovate exited with status {}: {}",
             out.status.code().unwrap_or(-1),
-            snippet.lines().take(20).collect::<Vec<_>>().join("\n")
+            snippet
         );
     }
 
     Ok(combined)
+}
+
+fn summarize_log_excerpt(log_bytes: &[u8], max_lines: usize) -> String {
+    let log = String::from_utf8_lossy(log_bytes);
+    let lines: Vec<&str> = log.lines().collect();
+
+    if lines.len() <= max_lines {
+        return lines.join("\n");
+    }
+
+    let head_count = max_lines / 2;
+    let tail_count = max_lines - head_count;
+    let mut excerpt = Vec::with_capacity(max_lines + 1);
+    excerpt.extend(lines.iter().take(head_count).copied());
+    excerpt.push("...");
+    excerpt.extend(
+        lines
+            .iter()
+            .skip(lines.len().saturating_sub(tail_count))
+            .copied(),
+    );
+    excerpt.join("\n")
 }
 
 fn resolve_renovate_config_path(project_root: &Path) -> anyhow::Result<PathBuf> {
@@ -488,6 +510,15 @@ mod tests {
         let new = dep_map(&[("a.json", &[("npm", &["y"])])]);
         let diff = unified_diff(&old, &new, "renovate-tracked-deps.json");
         assert!(diff.contains("renovate-tracked-deps.json"));
+    }
+
+    #[test]
+    fn summarize_log_excerpt_keeps_head_and_tail() {
+        let log = b"1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n";
+
+        let excerpt = summarize_log_excerpt(log, 6);
+
+        assert_eq!(excerpt, "1\n2\n3\n...\n8\n9\n10");
     }
 
     #[test]

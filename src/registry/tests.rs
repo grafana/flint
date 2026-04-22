@@ -58,6 +58,66 @@ fn version_ranges_must_not_be_mixed_with_unranged_entries() {
     }
 }
 
+/// Guardrail: two different fixer tools should not claim the same declared file
+/// pattern. Overlap between checks from the same underlying tool is still
+/// allowed for now (e.g. `biome` + `biome-format`, `ruff` + `ruff-format`)
+/// because those pairs are intentionally split into lint and format modes.
+#[test]
+fn competing_fixers_must_not_share_declared_patterns() {
+    const ALLOWED_OVERLAPS: &[(&str, &str)] = &[
+        // markdownlint enforces rules; prettier canonicalizes formatting.
+        ("markdownlint-cli2", "prettier"),
+        // clippy and rustfmt both fix Rust files, but serve distinct purposes.
+        ("cargo-clippy", "cargo-fmt"),
+    ];
+
+    let registry = builtin();
+    let fixers: Vec<&Check> = registry
+        .iter()
+        .filter(|c| c.has_fix() && !c.patterns.is_empty())
+        .collect();
+
+    let mut conflicts = vec![];
+    for (i, left) in fixers.iter().enumerate() {
+        for right in fixers.iter().skip(i + 1) {
+            if left.bin_name == right.bin_name {
+                continue;
+            }
+            let pair = if left.name < right.name {
+                (left.name, right.name)
+            } else {
+                (right.name, left.name)
+            };
+            if ALLOWED_OVERLAPS.contains(&pair) {
+                continue;
+            }
+
+            let overlap: Vec<&str> = left
+                .patterns
+                .iter()
+                .copied()
+                .filter(|p| right.patterns.contains(p))
+                .collect();
+            if !overlap.is_empty() {
+                conflicts.push(format!(
+                    "{} ({}) overlaps {} ({}) on {}",
+                    left.name,
+                    left.bin_name,
+                    right.name,
+                    right.bin_name,
+                    overlap.join(", ")
+                ));
+            }
+        }
+    }
+
+    assert!(
+        conflicts.is_empty(),
+        "competing fixer ownership detected:\n{}",
+        conflicts.join("\n")
+    );
+}
+
 /// Checks that every linter in the registry that uses an external binary
 /// actually has that binary on PATH. Covers all registry entries, not just
 /// those active in this repo — so tools like ktlint and hadolint are checked

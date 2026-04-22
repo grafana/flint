@@ -20,6 +20,42 @@ fn find_obsolete_key_detects_legacy_shfmt_backend() {
     );
 }
 
+#[test]
+fn find_obsolete_key_detects_legacy_biome_backend() {
+    let mut tools = HashMap::new();
+    tools.insert("npm:@biomejs/biome".to_string(), "2.4.12".to_string());
+    assert_eq!(
+        find_obsolete_key(&tools),
+        Some(("npm:@biomejs/biome", "biome"))
+    );
+}
+
+#[test]
+fn find_unsupported_key_detects_markdownlint_stack() {
+    let mut tools = HashMap::new();
+    tools.insert("npm:markdownlint-cli2".to_string(), "0.18.1".to_string());
+    assert_eq!(
+        find_unsupported_key(&tools),
+        Some((
+            "npm:markdownlint-cli2",
+            "replace with rumdl and remove markdownlint-era config",
+        ))
+    );
+}
+
+#[test]
+fn find_unsupported_key_detects_prettier_stack() {
+    let mut tools = HashMap::new();
+    tools.insert("npm:prettier".to_string(), "3.6.2".to_string());
+    assert_eq!(
+        find_unsupported_key(&tools),
+        Some((
+            "npm:prettier",
+            "replace with rumdl and yaml-lint, then remove prettier from the lint toolchain",
+        ))
+    );
+}
+
 /// If any entry for a bin_name declares a version_range, every entry for that
 /// bin_name must declare one. A mix of ranged and unranged entries for the same
 /// binary is ambiguous — it would be impossible to guarantee exactly one activates.

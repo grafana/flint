@@ -14,6 +14,21 @@ pub const OBSOLETE_KEYS: &[(&str, &str)] = &[
     // github:mvdan/sh is superseded by bare shfmt; mise resolves it via aqua:mvdan/sh,
     // and the aqua registry now ships Windows support for shfmt.
     ("github:mvdan/sh", "shfmt"),
+    // npm-installed biome is superseded by the standalone biome binary.
+    ("npm:@biomejs/biome", "biome"),
+];
+
+/// Mise tool keys that flint no longer supports and cannot auto-rewrite 1:1.
+/// These require a docs/config migration rather than a backend swap.
+pub const UNSUPPORTED_KEYS: &[(&str, &str)] = &[
+    (
+        "npm:markdownlint-cli2",
+        "replace with rumdl and remove markdownlint-era config",
+    ),
+    (
+        "npm:prettier",
+        "replace with rumdl and yaml-lint, then remove prettier from the lint toolchain",
+    ),
 ];
 
 /// Checks whether any obsolete tool keys are present in `mise_tools`.
@@ -22,6 +37,17 @@ pub fn find_obsolete_key(
     mise_tools: &HashMap<String, String>,
 ) -> Option<(&'static str, &'static str)> {
     OBSOLETE_KEYS
+        .iter()
+        .find(|(old, _)| mise_tools.contains_key(*old))
+        .copied()
+}
+
+/// Checks whether any unsupported legacy tool keys are present in `mise_tools`.
+/// Returns the first violation found as `(unsupported_key, migration_hint)`.
+pub fn find_unsupported_key(
+    mise_tools: &HashMap<String, String>,
+) -> Option<(&'static str, &'static str)> {
+    UNSUPPORTED_KEYS
         .iter()
         .find(|(old, _)| mise_tools.contains_key(*old))
         .copied()

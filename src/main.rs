@@ -212,6 +212,12 @@ async fn run(
         eprintln!("  Run `flint update` to apply the migration automatically.");
         std::process::exit(1);
     }
+    if let Some((old, hint)) = registry::find_unsupported_key(&mise_tools) {
+        eprintln!("flint: unsupported legacy lint tool in mise.toml: {old:?}");
+        eprintln!("  Migration required: {hint}.");
+        eprintln!("  Run `flint init` to upgrade the lint toolchain.");
+        std::process::exit(1);
+    }
     let active: Vec<&registry::Check> = {
         let mut out = vec![];
         for c in checks {

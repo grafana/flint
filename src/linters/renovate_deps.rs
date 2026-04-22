@@ -155,6 +155,7 @@ fn renovate_argv() -> anyhow::Result<Vec<String>> {
         return Ok(vec![
             "mise".to_string(),
             "exec".to_string(),
+            "node@24".to_string(),
             "npm:renovate".to_string(),
             "--".to_string(),
             "renovate".to_string(),
@@ -569,6 +570,7 @@ mod tests {
                 vec![
                     "mise",
                     "exec",
+                    "node@24",
                     "npm:renovate",
                     "--",
                     "renovate",

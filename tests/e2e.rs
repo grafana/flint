@@ -602,12 +602,12 @@ fn normalize_tool_versions(s: &str) -> String {
     // flint X.Y.Z (version command output)
     let re = Regex::new(r"flint \d+\.\d+\.\d+").unwrap();
     let s = re.replace_all(s, "flint <VERSION>").into_owned();
-    // Keep support for markdownlint-era snapshots until old fixtures disappear.
-    let re =
+    let old_markdownlint_banner =
         Regex::new(r"markdownlint-cli2 v\d+\.\d+\.\d+ \(markdownlint v\d+\.\d+\.\d+\)").unwrap();
-    let s = re
-        .replace_all(&s, "markdownlint-cli2 <VERSION>")
-        .into_owned();
+    assert!(
+        !old_markdownlint_banner.is_match(&s),
+        "found stale markdownlint-era snapshot output; update the fixture instead of normalizing it"
+    );
     let re = Regex::new(r"https://rust-lang\.github\.io/rust-clippy/rust-\d+\.\d+\.\d+/").unwrap();
     re.replace_all(
         &s,

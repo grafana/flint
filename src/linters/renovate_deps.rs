@@ -150,9 +150,9 @@ async fn run_inner(
     })
 }
 
-fn renovate_argv() -> Vec<String> {
+fn renovate_argv() -> anyhow::Result<Vec<String>> {
     if binary_on_path("mise") {
-        return vec![
+        return Ok(vec![
             "mise".to_string(),
             "exec".to_string(),
             "npm:renovate".to_string(),
@@ -161,19 +161,14 @@ fn renovate_argv() -> Vec<String> {
             "--platform=local".to_string(),
             "--require-config=ignored".to_string(),
             "--dry-run=extract".to_string(),
-        ];
+        ]);
     }
 
-    vec![
-        "renovate".to_string(),
-        "--platform=local".to_string(),
-        "--require-config=ignored".to_string(),
-        "--dry-run=extract".to_string(),
-    ]
+    anyhow::bail!("mise is required to run renovate-deps")
 }
 
-/// Runs Renovate in a mise-managed environment when available and returns the
-/// combined stdout+stderr log bytes.
+/// Runs Renovate in a mise-managed environment and returns the combined
+/// stdout+stderr log bytes.
 async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result<Vec<u8>> {
     // Forward env, setting Renovate-specific vars.
     let mut env: Vec<(String, String)> = std::env::vars().collect();
@@ -196,7 +191,7 @@ async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result
         env.push(("GITHUB_COM_TOKEN".into(), token));
     }
 
-    let out = super::spawn_command(&renovate_argv(), false)
+    let out = super::spawn_command(&renovate_argv()?, false)
         .current_dir(project_root)
         .envs(env)
         .stdin(Stdio::null())
@@ -534,12 +529,12 @@ mod tests {
     }
 
     #[test]
-    fn renovate_argv_uses_mise_exec_when_available() {
+    fn renovate_argv_requires_mise_and_uses_exec() {
         let argv = renovate_argv();
 
         if binary_on_path("mise") {
             assert_eq!(
-                argv,
+                argv.unwrap(),
                 vec![
                     "mise",
                     "exec",
@@ -553,13 +548,8 @@ mod tests {
             );
         } else {
             assert_eq!(
-                argv,
-                vec![
-                    "renovate",
-                    "--platform=local",
-                    "--require-config=ignored",
-                    "--dry-run=extract",
-                ]
+                argv.unwrap_err().to_string(),
+                "mise is required to run renovate-deps"
             );
         }
     }

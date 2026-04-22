@@ -15,9 +15,10 @@ use detection::{
 };
 use generation::{
     apply_changes, apply_env_and_tasks, detect_base_branch, ensure_flint_self_pin,
-    ensure_node_for_npm, flint_preset, generate_flint_toml, generate_lint_workflow,
-    generate_markdownlint_config, get_existing_config_dir, has_slow_selected, maybe_install_hook,
-    normalize_tools_section, patch_renovate_extends, prompt_config_dir, remove_v1_tasks,
+    ensure_node_for_npm, flint_preset, generate_biome_config, generate_flint_toml,
+    generate_lint_workflow, generate_markdownlint_config, get_existing_config_dir,
+    has_slow_selected, maybe_install_hook, normalize_tools_section, patch_renovate_extends,
+    prompt_config_dir, remove_v1_tasks,
 };
 use ui::{interactive_select_linters, select_categories_arrow};
 
@@ -249,6 +250,12 @@ Add and stage your source files before running init so the detection is accurate
             .zip(&g.check_selected)
             .any(|(c, &sel)| sel && c.name == "editorconfig-checker")
     });
+    let has_biome = groups.iter().any(|g| {
+        g.checks
+            .iter()
+            .zip(&g.check_selected)
+            .any(|(c, &sel)| sel && (c.name == "biome" || c.name == "biome-format"))
+    });
 
     // Prompt for the flint config dir (skipped if already set in mise.toml or --yes).
     let existing_config_dir = get_existing_config_dir(&current_content);
@@ -302,6 +309,11 @@ Add and stage your source files before running init so the detection is accurate
     } else {
         false
     };
+    let biome_generated = if has_biome {
+        generate_biome_config(project_root)?
+    } else {
+        false
+    };
 
     let renovate_patched = find_renovate_config(project_root)
         .map(|path| {
@@ -325,6 +337,7 @@ Add and stage your source files before running init so the detection is accurate
         && !toml_generated
         && !workflow_generated
         && !markdownlint_generated
+        && !biome_generated
         && !renovate_patched
     {
         println!("No changes to apply.");
@@ -665,6 +678,38 @@ rust = { version = "1.0", components = "clippy" }
         assert!(!tmp.path().join(".markdownlint.json").exists());
         let content = std::fs::read_to_string(tmp.path().join(".markdownlint.yml")).unwrap();
         assert!(content.contains("MD013: false"));
+    }
+
+    #[test]
+    fn generate_biome_config_writes_file() {
+        use generation::generate_biome_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let written = generate_biome_config(tmp.path()).unwrap();
+        assert!(written);
+        let content = std::fs::read_to_string(tmp.path().join("biome.json")).unwrap();
+        assert!(content.contains("\"indentStyle\": \"space\""));
+        assert!(content.contains("\"indentWidth\": 2"));
+    }
+
+    #[test]
+    fn generate_biome_config_skips_existing_json() {
+        use generation::generate_biome_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(tmp.path().join("biome.json"), "existing").unwrap();
+        let written = generate_biome_config(tmp.path()).unwrap();
+        assert!(!written);
+        let content = std::fs::read_to_string(tmp.path().join("biome.json")).unwrap();
+        assert_eq!(content, "existing");
+    }
+
+    #[test]
+    fn generate_biome_config_skips_existing_jsonc() {
+        use generation::generate_biome_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(tmp.path().join("biome.jsonc"), "existing").unwrap();
+        let written = generate_biome_config(tmp.path()).unwrap();
+        assert!(!written);
+        assert!(!tmp.path().join("biome.json").exists());
     }
 
     #[test]

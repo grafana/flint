@@ -47,7 +47,6 @@ fn check_prettier() -> Check {
         &["*.md", "*.yml", "*.yaml"],
     )
     .fix("prettier --write {FILES}")
-    .full_cmd("prettier --check {ROOT}", "prettier --write {ROOT}")
     .linter_config(".prettierrc", "--config")
     .formatter()
     .desc("Format Markdown and YAML files")

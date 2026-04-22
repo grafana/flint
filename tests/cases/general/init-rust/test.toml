@@ -11,6 +11,7 @@ Tip: flint init detects languages from tracked files (`git ls-files`). Add and s
   wrote <REPO>/.github/workflows/lint.yml
   removed <REPO>/.markdownlint.json (replaced by .markdownlint.yml)
   wrote <REPO>/.markdownlint.yml
+  wrote <REPO>/biome.json
 installed pre-commit hook (.git/hooks/pre-commit)
 Done. Run `mise install` to install the new tools.
 '''
@@ -28,6 +29,14 @@ Done. Run `mise install` to install the new tools.
 ".markdownlint.yml" = '''
 # Line length is enforced by editorconfig-checker via .editorconfig
 MD013: false
+'''
+"biome.json" = '''
+{
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2
+  }
+}
 '''
 "mise.toml" = '''
 [tools]

@@ -150,6 +150,157 @@ fn cases() {
     }
 }
 
+#[test]
+fn fix_exits_nonzero_when_formatters_disagree_on_same_file() {
+    let repo = git_repo();
+
+    std::fs::write(
+        repo.path().join("mise.toml"),
+        r#"[tools]
+node = "20"
+"npm:prettier" = "3.8.1"
+"npm:@biomejs/biome" = "2.4.12"
+"#,
+    )
+    .unwrap();
+    std::fs::write(repo.path().join("README.md"), "# Test\n").unwrap();
+    std::fs::write(
+        repo.path().join("biome.jsonc"),
+        r#"{
+  // Keep JSON formatting aligned with the repo's two-space style.
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+  },
+}
+"#,
+    )
+    .unwrap();
+
+    let out = Command::new("git")
+        .args(["add", "-A"])
+        .current_dir(repo.path())
+        .output()
+        .expect("failed to spawn git add");
+    assert!(
+        out.status.success(),
+        "git add failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let out = Command::new("git")
+        .args(["commit", "-q", "-m", "init"])
+        .current_dir(repo.path())
+        .output()
+        .expect("failed to spawn git commit");
+    assert!(
+        out.status.success(),
+        "git commit failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let fake_bin_dir = tempfile::tempdir().expect("fake_bin tempdir");
+    let prettier = fake_bin_dir.path().join("prettier");
+    std::fs::write(
+        &prettier,
+        r#"#!/bin/sh
+set -eu
+
+mode="$1"
+target="$2"
+base="$(basename "$target")"
+
+if [ "$base" = "README.md" ]; then
+  exit 0
+fi
+
+echo "prettier unexpectedly targeted: $target" >&2
+exit 1
+"#,
+    )
+    .unwrap();
+
+    let biome = fake_bin_dir.path().join("biome");
+    std::fs::write(
+        &biome,
+        r#"#!/bin/sh
+set -eu
+
+cmd="$1"
+shift
+
+if [ "$cmd" = "format" ] && [ "${1:-}" = "--write" ]; then
+  file="$2"
+  cat >"$file" <<'EOF'
+{
+  // Keep JSON formatting aligned with the repo's two-space style.
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2
+  }
+}
+EOF
+  exit 0
+fi
+
+if [ "$cmd" = "format" ]; then
+  file="$1"
+  if grep -q '"indentWidth": 2$' "$file" && grep -q '^  }$' "$file"; then
+    exit 0
+  fi
+  echo "formatting differs" >&2
+  exit 1
+fi
+
+echo "unsupported biome invocation: $cmd $*" >&2
+exit 1
+"#,
+    )
+    .unwrap();
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&prettier, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::set_permissions(&biome, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    let fake_path = format!(
+        "{}:{}",
+        fake_bin_dir.path().display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let fix_out = flint_with_env(
+        &["run", "--full", "--fix", "prettier", "biome-format"],
+        repo.path(),
+        &[("PATH", &fake_path)],
+    );
+    assert_eq!(fix_out.status.code(), Some(1));
+    let fix_stderr = String::from_utf8_lossy(&fix_out.stderr);
+    assert!(
+        fix_stderr.contains("flint: fixed: biome-format — commit before pushing"),
+        "unexpected fix stderr:\n{fix_stderr}"
+    );
+
+    let biome_jsonc = std::fs::read_to_string(repo.path().join("biome.jsonc")).unwrap();
+    assert!(
+        biome_jsonc.contains("\"indentWidth\": 2\n")
+            && !biome_jsonc.contains("\"indentWidth\": 2,\n"),
+        "expected biome-owned formatting after fix:\n{biome_jsonc}"
+    );
+
+    let check_out = flint_with_env(
+        &["run", "--full", "prettier"],
+        repo.path(),
+        &[("PATH", &fake_path)],
+    );
+    assert_eq!(
+        check_out.status.code(),
+        Some(0),
+        "prettier should ignore biome-owned JSONC in full mode:\n{}",
+        String::from_utf8_lossy(&check_out.stderr)
+    );
+}
+
 /// Recursively finds all directories containing a `test.toml` file.
 fn collect_cases(dir: &Path) -> Vec<PathBuf> {
     let mut cases = Vec::new();

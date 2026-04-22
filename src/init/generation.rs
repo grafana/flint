@@ -640,6 +640,35 @@ pub(super) fn generate_markdownlint_config(project_root: &Path) -> Result<bool> 
     Ok(true)
 }
 
+/// Generates `biome.json` in the project root when biome is being set up and no
+/// existing biome config is present.
+///
+/// Flint writes explicit space indentation to avoid Biome's default tab
+/// formatting surprising consumers during rollout.
+pub(super) fn generate_biome_config(project_root: &Path) -> Result<bool> {
+    const EXISTING_CONFIG_NAMES: &[&str] = &["biome.json", "biome.jsonc"];
+    if EXISTING_CONFIG_NAMES
+        .iter()
+        .map(|name| project_root.join(name))
+        .any(|path| path.exists())
+    {
+        return Ok(false);
+    }
+
+    let target = project_root.join("biome.json");
+    let content = concat!(
+        "{\n",
+        "  \"formatter\": {\n",
+        "    \"indentStyle\": \"space\",\n",
+        "    \"indentWidth\": 2\n",
+        "  }\n",
+        "}\n"
+    );
+    std::fs::write(&target, content)?;
+    println!("  wrote {}", target.display());
+    Ok(true)
+}
+
 /// Generates `.github/workflows/lint.yml` if it does not already exist.
 /// Returns `true` if the file was written.
 pub(super) fn generate_lint_workflow(

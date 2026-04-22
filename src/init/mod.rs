@@ -15,10 +15,10 @@ use detection::{
 };
 use generation::{
     apply_changes, apply_env_and_tasks, detect_base_branch, ensure_flint_self_pin,
-    ensure_node_for_npm, flint_preset, generate_biome_config, generate_flint_toml,
-    generate_lint_workflow, generate_rumdl_config, generate_yamllint_config,
-    get_existing_config_dir, has_slow_selected, maybe_install_hook, normalize_tools_section,
-    patch_renovate_extends, prompt_config_dir, remove_v1_tasks,
+    ensure_node_for_npm, exclude_markdown_from_editorconfig_checker, flint_preset,
+    generate_biome_config, generate_flint_toml, generate_lint_workflow, generate_rumdl_config,
+    generate_yamllint_config, get_existing_config_dir, has_slow_selected, maybe_install_hook,
+    normalize_tools_section, patch_renovate_extends, prompt_config_dir, remove_v1_tasks,
 };
 use ui::{interactive_select_linters, select_categories_arrow};
 
@@ -312,6 +312,14 @@ Add and stage your source files before running init so the detection is accurate
     } else {
         false
     };
+    let editorconfig_markdown_excluded = if has_rumdl {
+        exclude_markdown_from_editorconfig_checker(project_root, &config_dir_path)?
+    } else {
+        false
+    };
+    if editorconfig_markdown_excluded {
+        println!("  patched editorconfig-checker config — Markdown is now owned by rumdl");
+    }
     let yamllint_generated = if has_yaml_lint {
         generate_yamllint_config(project_root)?
     } else {
@@ -345,6 +353,7 @@ Add and stage your source files before running init so the detection is accurate
         && !toml_generated
         && !workflow_generated
         && !rumdl_generated
+        && !editorconfig_markdown_excluded
         && !yamllint_generated
         && !biome_generated
         && !renovate_patched
@@ -662,6 +671,7 @@ rust = { version = "1.0", components = "clippy" }
         let content = std::fs::read_to_string(tmp.path().join(".rumdl.toml")).unwrap();
         assert!(content.contains("line-length = 120"));
         assert!(content.contains("code-blocks = false"));
+        assert!(!content.contains("[global]"));
     }
 
     #[test]
@@ -685,6 +695,42 @@ rust = { version = "1.0", components = "clippy" }
         assert!(!tmp.path().join(".markdownlint.json").exists());
         let content = std::fs::read_to_string(tmp.path().join(".rumdl.toml")).unwrap();
         assert!(content.contains("[MD013]"));
+    }
+
+    #[test]
+    fn exclude_markdown_from_editorconfig_checker_updates_config_dir_file() {
+        use generation::exclude_markdown_from_editorconfig_checker;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(
+            config_dir.join(".editorconfig-checker.json"),
+            "{\n  \"Exclude\": [\".*\\\\.java$\"]\n}\n",
+        )
+        .unwrap();
+
+        let changed = exclude_markdown_from_editorconfig_checker(tmp.path(), &config_dir).unwrap();
+        assert!(changed);
+        let content =
+            std::fs::read_to_string(config_dir.join(".editorconfig-checker.json")).unwrap();
+        assert!(content.contains(".*\\\\.java$"));
+        assert!(content.contains(".*\\\\.md$"));
+    }
+
+    #[test]
+    fn exclude_markdown_from_editorconfig_checker_is_idempotent() {
+        use generation::exclude_markdown_from_editorconfig_checker;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(
+            config_dir.join(".editorconfig-checker.json"),
+            "{\n  \"Exclude\": [\".*\\\\.md$\"]\n}\n",
+        )
+        .unwrap();
+
+        let changed = exclude_markdown_from_editorconfig_checker(tmp.path(), &config_dir).unwrap();
+        assert!(!changed);
     }
 
     #[test]

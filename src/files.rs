@@ -171,5 +171,24 @@ fn filter_names(
         .filter(|name| !BUILTIN_EXCLUDES.contains(&name.as_str()))
         .filter(|name| !exclude.is_match(name))
         .map(|name| project_root.join(name))
+        .filter(|path| path.exists())
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn filter_names_skips_deleted_worktree_paths() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(tmp.path().join("present.md"), "ok\n").unwrap();
+        let names = ["missing.md".to_string(), "present.md".to_string()]
+            .into_iter()
+            .collect();
+
+        let files = filter_names(tmp.path(), &GlobSetBuilder::new().build().unwrap(), names);
+
+        assert_eq!(files, vec![tmp.path().join("present.md")]);
+    }
 }

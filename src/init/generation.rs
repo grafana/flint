@@ -627,8 +627,6 @@ pub(super) fn generate_rumdl_config(project_root: &Path) -> Result<bool> {
         }
     }
     let content = concat!(
-        "[global]\n",
-        "line-length = 120\n\n",
         "[MD013]\n",
         "enabled = true\n",
         "line-length = 120\n",
@@ -638,6 +636,64 @@ pub(super) fn generate_rumdl_config(project_root: &Path) -> Result<bool> {
     std::fs::write(&target, content)?;
     println!("  wrote {}", target.display());
     Ok(true)
+}
+
+/// Updates an existing editorconfig-checker config so Markdown is excluded when
+/// rumdl owns Markdown formatting and line-length enforcement.
+///
+/// Checks both the project root and `config_dir`, updating the first config
+/// file that exists. Returns `true` when a config was changed.
+pub(super) fn exclude_markdown_from_editorconfig_checker(
+    project_root: &Path,
+    config_dir: &Path,
+) -> Result<bool> {
+    const MARKDOWN_EXCLUDE: &str = ".*\\.md$";
+    let candidates = [
+        config_dir.join(".editorconfig-checker.json"),
+        project_root.join(".editorconfig-checker.json"),
+    ];
+
+    for path in candidates {
+        if !path.exists() {
+            continue;
+        }
+
+        let content = std::fs::read_to_string(&path)?;
+        let mut value: serde_json::Value = serde_json::from_str(&content)
+            .with_context(|| format!("failed to parse {}", path.display()))?;
+        let Some(obj) = value.as_object_mut() else {
+            anyhow::bail!("{} is not a JSON object", path.display());
+        };
+
+        let key = if obj.contains_key("Exclude") {
+            "Exclude"
+        } else if obj.contains_key("exclude") {
+            "exclude"
+        } else {
+            "Exclude"
+        };
+
+        let entry = obj
+            .entry(key.to_string())
+            .or_insert_with(|| serde_json::Value::Array(vec![]));
+        let Some(items) = entry.as_array_mut() else {
+            anyhow::bail!("{} field in {} is not an array", key, path.display());
+        };
+
+        if items
+            .iter()
+            .any(|v| v.as_str().is_some_and(|s| s == MARKDOWN_EXCLUDE))
+        {
+            return Ok(false);
+        }
+
+        items.push(serde_json::Value::String(MARKDOWN_EXCLUDE.to_string()));
+        let updated = serde_json::to_string_pretty(&value)? + "\n";
+        std::fs::write(&path, updated)?;
+        return Ok(true);
+    }
+
+    Ok(false)
 }
 
 /// Generates `.yamllint.yml` in the project root when yaml-lint is being set up.

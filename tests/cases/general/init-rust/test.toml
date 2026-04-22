@@ -27,9 +27,6 @@ Done. Run `mise install` to install the new tools.
 # exclude_paths = []
 '''
 ".rumdl.toml" = '''
-[global]
-line-length = 120
-
 [MD013]
 enabled = true
 line-length = 120

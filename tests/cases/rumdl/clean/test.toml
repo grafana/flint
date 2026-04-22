@@ -1,0 +1,9 @@
+[expected]
+args = "run --full rumdl"
+exit = 0
+
+[fake_bins]
+rumdl = '''
+#!/bin/sh
+exit 0
+'''

@@ -15,9 +15,7 @@ pub use types::{Category, Check, CheckKind, FixBehavior, RunPolicy, Scope, Speci
 /// `.toolchain()`.
 ///
 /// `flint init` uses this set to keep runtime keys above the `# Linters`
-/// header in `mise.toml`. `node` is deliberately excluded — it's pinned by
-/// `ensure_node_for_npm` only as a prereq for `npm:` backend linters, so it
-/// belongs in the linters group.
+/// header in `mise.toml`.
 pub fn toolchain_keys() -> std::collections::HashSet<&'static str> {
     builtin()
         .into_iter()

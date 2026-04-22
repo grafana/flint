@@ -152,15 +152,14 @@ fn cases() {
 
 #[cfg(unix)]
 #[test]
-fn fix_exits_nonzero_when_formatters_disagree_on_same_file() {
+fn markdown_tool_ignores_biome_owned_jsonc() {
     let repo = git_repo();
 
     std::fs::write(
         repo.path().join("mise.toml"),
         r#"[tools]
-node = "20"
-"npm:prettier" = "3.8.1"
-"npm:@biomejs/biome" = "2.4.12"
+rumdl = "0.1.78"
+biome = "2.4.12"
 "#,
     )
     .unwrap();
@@ -200,14 +199,19 @@ node = "20"
     );
 
     let fake_bin_dir = tempfile::tempdir().expect("fake_bin tempdir");
-    let prettier = fake_bin_dir.path().join("prettier");
+    let rumdl = fake_bin_dir.path().join("rumdl");
     std::fs::write(
-        &prettier,
+        &rumdl,
         r#"#!/bin/sh
 set -eu
 
-mode="$1"
+cmd="$1"
 shift
+
+if [ "$cmd" != "check" ]; then
+  echo "unsupported rumdl invocation: $cmd $*" >&2
+  exit 1
+fi
 
 for target in "$@"; do
   case "$target" in
@@ -221,7 +225,7 @@ for target in "$@"; do
     continue
   fi
 
-  echo "prettier unexpectedly targeted in $mode mode: $target" >&2
+  echo "rumdl unexpectedly targeted: $target" >&2
   exit 1
 done
 
@@ -271,7 +275,7 @@ exit 1
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&prettier, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::set_permissions(&rumdl, std::fs::Permissions::from_mode(0o755)).unwrap();
         std::fs::set_permissions(&biome, std::fs::Permissions::from_mode(0o755)).unwrap();
     }
 
@@ -281,7 +285,7 @@ exit 1
         std::env::var("PATH").unwrap_or_default()
     );
     let fix_out = flint_with_env(
-        &["run", "--full", "--fix", "prettier", "biome-format"],
+        &["run", "--full", "--fix", "rumdl", "biome-format"],
         repo.path(),
         &[("PATH", &fake_path)],
     );
@@ -300,14 +304,14 @@ exit 1
     );
 
     let check_out = flint_with_env(
-        &["run", "--full", "prettier"],
+        &["run", "--full", "rumdl"],
         repo.path(),
         &[("PATH", &fake_path)],
     );
     assert_eq!(
         check_out.status.code(),
         Some(0),
-        "prettier should ignore biome-owned JSONC in full mode:\n{}",
+        "rumdl should ignore biome-owned JSONC in full mode:\n{}",
         String::from_utf8_lossy(&check_out.stderr)
     );
 }
@@ -598,7 +602,7 @@ fn normalize_tool_versions(s: &str) -> String {
     // flint X.Y.Z (version command output)
     let re = Regex::new(r"flint \d+\.\d+\.\d+").unwrap();
     let s = re.replace_all(s, "flint <VERSION>").into_owned();
-    // markdownlint-cli2 vX.Y.Z (markdownlint vA.B.C)
+    // Keep support for markdownlint-era snapshots until old fixtures disappear.
     let re =
         Regex::new(r"markdownlint-cli2 v\d+\.\d+\.\d+ \(markdownlint v\d+\.\d+\.\d+\)").unwrap();
     let s = re

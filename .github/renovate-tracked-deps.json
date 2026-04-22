@@ -22,7 +22,9 @@
   "mise.toml": {
     "mise": [
       "actionlint",
+      "biome",
       "cargo:xmloxide",
+      "cargo:yaml-lint",
       "dotnet",
       "editorconfig-checker",
       "github:google/google-java-format",
@@ -32,13 +34,10 @@
       "golangci-lint",
       "hadolint",
       "lychee",
-      "node",
-      "npm:@biomejs/biome",
-      "npm:markdownlint-cli2",
-      "npm:prettier",
       "npm:renovate",
       "pipx:codespell",
       "pipx:ruff",
+      "rumdl",
       "rust",
       "shfmt"
     ]

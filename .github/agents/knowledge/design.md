@@ -8,21 +8,15 @@
 2. **`editorconfig-checker` deference**: `editorconfig-checker`
    (binary: `ec`) runs on all files but skips file types owned
    by active line-length-enforcing formatters (`cargo-fmt`,
-   `ruff-format`, `biome-format`, `prettier`). Implemented
+   `ruff-format`, `biome-format`, `rumdl`, `yaml-lint`). Implemented
    via `.defer_to_formatters()` on the `editorconfig-checker`
    entry. This avoids its `max_line_length` check conflicting
    with formatter output.
 
-3. **markdownlint + prettier on `*.md`**: Both checkers are
-   active when their tools are installed. They cover
-   different concerns (markdownlint: structural rules;
-   prettier: formatting). To avoid MD013 (line length)
-   conflicting with prettier's line wrapping, consuming
-   repos must disable MD013 in `.markdownlint.json`:
-
-   ```json
-   { "MD013": false }
-   ```
+3. **Rust-native docs/config stack**: Markdown is owned by
+   `rumdl`, YAML by `yaml-lint`, and JS/TS/JSON by `biome`.
+   This keeps ownership boundaries explicit and avoids the
+   old markdownlint/prettier overlap on `*.md`.
 
 4. **Fix mode runs serially**: `runner.rs` runs checks in
    parallel in check mode, but serially in fix mode to
@@ -43,6 +37,6 @@
    `BUILTIN_EXCLUDES` slice of paths that are always removed
    from the file list before any linter sees it. Currently
    contains `.github/renovate-tracked-deps.json` (a
-   generated file that should never be linted by prettier,
+   generated file that should never be linted by `rumdl`,
    ec, etc.). Add entries here — not in user-facing `exclude`
    docs — when a file is managed by flint itself.

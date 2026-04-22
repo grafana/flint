@@ -1,0 +1,17 @@
+[expected]
+args = "run --full rumdl"
+exit = 1
+stderr = '''
+[rumdl]
+README.md:3:26: trailing spaces
+
+flint: 1 check failed (rumdl)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''
+
+[fake_bins]
+rumdl = '''
+#!/bin/sh
+printf '%s\n' 'README.md:3:26: trailing spaces'
+exit 1
+'''

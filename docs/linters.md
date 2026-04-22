@@ -10,7 +10,6 @@ config injection for `biome` and `biome-format` is not yet implemented.
 <!-- markdownlint-disable MD013 -->
 <!-- linter-details-start -->
 <!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
-
 ## `actionlint`
 
 |             |                                                    |
@@ -177,28 +176,6 @@ config = ".github/config/lychee.toml"
 check_all_local = true
 ```
 
-## `markdownlint-cli2`
-
-|             |                                               |
-| ----------- | --------------------------------------------- |
-| Description | Lint Markdown files for style and consistency |
-| Fix         | yes                                           |
-| Binary      | `markdownlint-cli2`                           |
-| Scope       | [file](#scopes)                               |
-| Patterns    | `*.md`                                        |
-| Config      | `.markdownlint.jsonc`                         |
-
-## `prettier`
-
-|             |                                |
-| ----------- | ------------------------------ |
-| Description | Format Markdown and YAML files |
-| Fix         | yes                            |
-| Binary      | `prettier`                     |
-| Scope       | [files](#scopes)               |
-| Patterns    | `*.md *.yml *.yaml`            |
-| Config      | `.prettierrc`                  |
-
 ## `renovate-deps`
 
 |             |                                                                                                                            |
@@ -243,6 +220,17 @@ exclude_managers = ["github-actions", "github-runners"]
 | Patterns    | `*.py`             |
 | Config      | `ruff.toml`        |
 
+## `rumdl`
+
+|             |                                               |
+| ----------- | --------------------------------------------- |
+| Description | Lint Markdown files for style and consistency |
+| Fix         | yes                                           |
+| Binary      | `rumdl`                                       |
+| Scope       | [file](#scopes)                               |
+| Patterns    | `*.md`                                        |
+| Config      | `.rumdl.toml`                                 |
+
 ## `shellcheck`
 
 |             |                                        |
@@ -274,6 +262,17 @@ exclude_managers = ["github-actions", "github-runners"]
 | Scope       | [files](#scopes)                   |
 | Patterns    | `*.xml`                            |
 
+## `yaml-lint`
+
+|             |                                           |
+| ----------- | ----------------------------------------- |
+| Description | Lint YAML files for style and consistency |
+| Fix         | yes                                       |
+| Binary      | `yaml-lint`                               |
+| Scope       | [files](#scopes)                          |
+| Patterns    | `*.yml *.yaml`                            |
+| Config      | `.yamllint.yml`                           |
+
 <!-- linter-details-end -->
 <!-- markdownlint-enable MD013 -->
 <!-- editorconfig-checker-enable -->
@@ -300,7 +299,8 @@ Use `--fast-only` for local/pre-push feedback and the full set in CI.
 **`editorconfig-checker` defers to formatters**: `editorconfig-checker` runs on
 all files, but
 automatically skips file types owned by an active line-length-enforcing
-formatter. When `cargo-fmt`, `ruff-format`, `biome-format`, or `prettier`
+formatter. When `cargo-fmt`, `ruff-format`, `biome-format`, `rumdl`, or
+`yaml-lint`
 are active, their file types are excluded from `editorconfig-checker` — those
 formatters
 already enforce line length and would conflict with `editorconfig-checker`'s

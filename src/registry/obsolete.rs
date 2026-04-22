@@ -4,9 +4,6 @@ use std::collections::HashMap;
 /// during `flint init`. Each entry is `(old_key, replacement_key)` where
 /// `replacement_key` is the modern equivalent that the registry now uses.
 pub const OBSOLETE_KEYS: &[(&str, &str)] = &[
-    // markdownlint-cli was superseded by markdownlint-cli2 (actively maintained,
-    // faster, supports the same config files). flint only supports the cli2 variant.
-    ("npm:markdownlint-cli", "npm:markdownlint-cli2"),
     // ubi: was deprecated in mise; the github: backend is the modern replacement.
     // Repos that adopted flint before this change may still have ubi: keys.
     (

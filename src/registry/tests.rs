@@ -4,20 +4,9 @@ use std::path::Path;
 use super::*;
 
 #[test]
-fn find_obsolete_key_detects_superseded_keys() {
-    let mut tools = HashMap::new();
-    tools.insert("npm:markdownlint-cli".to_string(), "0.39.0".to_string());
-    let result = find_obsolete_key(&tools);
-    assert_eq!(
-        result,
-        Some(("npm:markdownlint-cli", "npm:markdownlint-cli2"))
-    );
-}
-
-#[test]
 fn find_obsolete_key_returns_none_for_clean_tools() {
     let mut tools = HashMap::new();
-    tools.insert("npm:markdownlint-cli2".to_string(), "0.17.2".to_string());
+    tools.insert("shfmt".to_string(), "3.13.1".to_string());
     assert_eq!(find_obsolete_key(&tools), None);
 }
 
@@ -115,7 +104,7 @@ fn readme_linter_table_in_sync() {
         return;
     }
 
-    // Normalize both sides: strip blank lines that prettier adds around
+    // Normalize both sides: strip blank lines that markdown formatters add around
     // headings, tables, and code blocks. This keeps the comparison stable
     // even when docs contain multi-paragraph content with blank lines.
     let actual_summary = extract_section(&readme, README_TABLE_START, README_TABLE_END);

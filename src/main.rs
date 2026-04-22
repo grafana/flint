@@ -8,7 +8,7 @@ mod runner;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
-use registry::{CheckKind, RunPolicy, Scope, SpecialKind};
+use registry::{CheckKind, FixBehavior, RunPolicy, Scope, SpecialKind};
 use runner::{CheckResult, RunOptions};
 use std::collections::HashMap;
 
@@ -260,44 +260,26 @@ async fn run(
     }
 
     if args.fix {
-        // Pre-check, fix what's fixable, report outcome.
         // Exits 0 if everything was already clean; 1 if anything was fixed (uncommitted)
         // or still needs review.
-        let check_results = runner::run(
-            &active,
-            &file_list,
-            RunOptions {
-                fix: false,
-                verbose: false,
-                short: true,
-                time: false,
-            },
-            project_root,
-            &cfg,
-            config_dir,
-        )
-        .await?;
+        let (single_pass_fixable, legacy_checks): (Vec<&registry::Check>, Vec<&registry::Check>) =
+            active
+                .iter()
+                .copied()
+                .partition(|c| supports_single_pass_fix(c));
 
-        let (fixable, reviewable): (Vec<CheckResult>, Vec<CheckResult>) = check_results
-            .into_iter()
-            .filter(|r| !r.ok)
-            .partition(|r| is_fixable(&r.name, &active));
-
+        let mut reviewable: Vec<CheckResult> = vec![];
         let mut fixed = vec![];
         let mut fix_failed = vec![];
         let mut post_fix_failed = vec![];
-        if !fixable.is_empty() {
-            let fixable_names: Vec<&str> = fixable.iter().map(|r| r.name.as_str()).collect();
-            let to_fix: Vec<&registry::Check> = active
-                .iter()
-                .filter(|c| fixable_names.contains(&c.name))
-                .copied()
-                .collect();
-            let fix_results = runner::run(
-                &to_fix,
+
+        if !legacy_checks.is_empty() {
+            let check_results = runner::run(
+                &legacy_checks,
+                &active,
                 &file_list,
                 RunOptions {
-                    fix: true,
+                    fix: false,
                     verbose: false,
                     short: true,
                     time: false,
@@ -307,29 +289,60 @@ async fn run(
                 config_dir,
             )
             .await?;
+
+            let (fixable, legacy_reviewable): (Vec<CheckResult>, Vec<CheckResult>) = check_results
+                .into_iter()
+                .filter(|r| !r.ok)
+                .partition(|r| is_fixable(&r.name, &legacy_checks));
+            reviewable.extend(legacy_reviewable);
+
             let mut to_verify = vec![];
-            for r in fix_results {
-                if r.ok {
-                    if let Some(check) = active.iter().find(|c| c.name == r.name) {
-                        if check.fix_behavior() == registry::FixBehavior::PartialNeedsVerify {
-                            to_verify.push(r.name);
-                        } else {
-                            fixed.push(r.name);
+            if !fixable.is_empty() {
+                let fixable_names: Vec<&str> = fixable.iter().map(|r| r.name.as_str()).collect();
+                let to_fix: Vec<&registry::Check> = legacy_checks
+                    .iter()
+                    .filter(|c| fixable_names.contains(&c.name))
+                    .copied()
+                    .collect();
+                let fix_results = runner::run(
+                    &to_fix,
+                    &active,
+                    &file_list,
+                    RunOptions {
+                        fix: true,
+                        verbose: false,
+                        short: true,
+                        time: false,
+                    },
+                    project_root,
+                    &cfg,
+                    config_dir,
+                )
+                .await?;
+                for r in fix_results {
+                    if r.ok {
+                        if let Some(check) = legacy_checks.iter().find(|c| c.name == r.name) {
+                            if check.fix_behavior() == registry::FixBehavior::PartialNeedsVerify {
+                                to_verify.push(r.name);
+                            } else {
+                                fixed.push(r.name);
+                            }
                         }
+                    } else {
+                        fix_failed.push(r.name);
                     }
-                } else {
-                    fix_failed.push(r.name);
                 }
             }
             if !to_verify.is_empty() {
                 let verify_names: Vec<&str> = to_verify.iter().map(String::as_str).collect();
-                let to_verify_checks: Vec<&registry::Check> = active
+                let to_verify_checks: Vec<&registry::Check> = legacy_checks
                     .iter()
                     .filter(|c| verify_names.contains(&c.name))
                     .copied()
                     .collect();
                 let verify_results = runner::run(
                     &to_verify_checks,
+                    &active,
                     &file_list,
                     RunOptions {
                         fix: false,
@@ -348,6 +361,33 @@ async fn run(
                     } else {
                         post_fix_failed.push(r);
                     }
+                }
+            }
+        }
+
+        if !single_pass_fixable.is_empty() {
+            let fix_results = runner::run(
+                &single_pass_fixable,
+                &active,
+                &file_list,
+                RunOptions {
+                    fix: true,
+                    verbose: false,
+                    short: true,
+                    time: false,
+                },
+                project_root,
+                &cfg,
+                config_dir,
+            )
+            .await?;
+            for r in fix_results {
+                if r.ok && r.changed {
+                    fixed.push(r.name);
+                } else if !r.ok {
+                    post_fix_failed.push(r);
+                } else {
+                    // Already clean: no summary line needed.
                 }
             }
         }
@@ -391,6 +431,7 @@ async fn run(
     }
 
     let results = runner::run(
+        &active,
         &active,
         &file_list,
         RunOptions {
@@ -483,6 +524,18 @@ fn run_policy_label(run_policy: RunPolicy) -> &'static str {
 
 fn is_fixable(name: &str, active: &[&registry::Check]) -> bool {
     active.iter().any(|c| c.name == name && c.has_fix())
+}
+
+fn supports_single_pass_fix(check: &registry::Check) -> bool {
+    check.has_fix()
+        && check.fix_behavior() == FixBehavior::Definitive
+        && matches!(
+            check.kind,
+            CheckKind::Template {
+                scope: Scope::File | Scope::Files,
+                ..
+            }
+        )
 }
 
 fn print_linters(

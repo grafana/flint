@@ -8,7 +8,7 @@ mod runner;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
-use registry::{CheckKind, Scope};
+use registry::{CheckKind, FixBehavior, RunPolicy, Scope, SpecialKind};
 use runner::{CheckResult, RunOptions};
 use std::collections::HashMap;
 
@@ -195,20 +195,48 @@ async fn run(
         registry.iter().collect()
     };
 
+    let file_list = files::changed(
+        project_root,
+        &cfg,
+        args.full,
+        args.new_from_rev.as_deref(),
+        args.to_ref.as_deref(),
+    )?;
+
     // Discover which checks are declared in the consuming repo's mise.toml, and apply
-    // --fast-only filter (skipped when linters are named explicitly).
-    // mise guarantees declared tools are on PATH, so no PATH check needed.
+    // --fast-only policy (skipped when linters are named explicitly, relevance-gated for
+    // adaptive checks). mise guarantees declared tools are on PATH, so no PATH check needed.
     let mise_tools = registry::read_mise_tools(project_root);
     if let Some((old, new)) = registry::find_obsolete_key(&mise_tools) {
         eprintln!("flint: obsolete tool key in mise.toml: {old:?} (replaced by {new:?})");
         eprintln!("  Run `flint update` to apply the migration automatically.");
         std::process::exit(1);
     }
+    if let Some((old, hint)) = registry::find_unsupported_key(&mise_tools) {
+        eprintln!("flint: unsupported legacy lint tool in mise.toml: {old:?}");
+        eprintln!("  Migration required: {hint}.");
+        eprintln!("  Run `flint init` to upgrade the lint toolchain.");
+        std::process::exit(1);
+    }
     let active: Vec<&registry::Check> = {
         let mut out = vec![];
         for c in checks {
             if registry::check_active(c, &mise_tools) {
-                if explicit || !args.fast_only || c.category != registry::Category::Slow {
+                let include = if explicit || !args.fast_only {
+                    true
+                } else {
+                    match c.run_policy {
+                        RunPolicy::Fast => true,
+                        RunPolicy::Slow => false,
+                        RunPolicy::Adaptive => match &c.kind {
+                            CheckKind::Special(SpecialKind::RenovateDeps) => {
+                                linters::renovate_deps::is_relevant(&file_list, project_root)
+                            }
+                            _ => true,
+                        },
+                    }
+                };
+                if include {
                     out.push(c);
                 }
             } else if explicit {
@@ -231,53 +259,27 @@ async fn run(
         }
     }
 
-    let file_list = files::changed(
-        project_root,
-        &cfg,
-        args.full,
-        args.new_from_rev.as_deref(),
-        args.to_ref.as_deref(),
-    )?;
-
     if args.fix {
-        // Pre-check, fix what's fixable, report outcome.
         // Exits 0 if everything was already clean; 1 if anything was fixed (uncommitted)
         // or still needs review.
-        let check_results = runner::run(
-            &active,
-            &file_list,
-            RunOptions {
-                fix: false,
-                verbose: false,
-                short: true,
-                time: false,
-            },
-            project_root,
-            &cfg,
-            config_dir,
-        )
-        .await?;
+        let (single_pass_fixable, legacy_checks): (Vec<&registry::Check>, Vec<&registry::Check>) =
+            active
+                .iter()
+                .copied()
+                .partition(|c| supports_single_pass_fix(c));
 
-        let (fixable, reviewable): (Vec<CheckResult>, Vec<CheckResult>) = check_results
-            .into_iter()
-            .filter(|r| !r.ok)
-            .partition(|r| is_fixable(&r.name, &active));
-
+        let mut reviewable: Vec<CheckResult> = vec![];
         let mut fixed = vec![];
         let mut fix_failed = vec![];
         let mut post_fix_failed = vec![];
-        if !fixable.is_empty() {
-            let fixable_names: Vec<&str> = fixable.iter().map(|r| r.name.as_str()).collect();
-            let to_fix: Vec<&registry::Check> = active
-                .iter()
-                .filter(|c| fixable_names.contains(&c.name))
-                .copied()
-                .collect();
-            let fix_results = runner::run(
-                &to_fix,
+
+        if !legacy_checks.is_empty() {
+            let check_results = runner::run(
+                &legacy_checks,
+                &active,
                 &file_list,
                 RunOptions {
-                    fix: true,
+                    fix: false,
                     verbose: false,
                     short: true,
                     time: false,
@@ -287,29 +289,60 @@ async fn run(
                 config_dir,
             )
             .await?;
+
+            let (fixable, legacy_reviewable): (Vec<CheckResult>, Vec<CheckResult>) = check_results
+                .into_iter()
+                .filter(|r| !r.ok)
+                .partition(|r| is_fixable(&r.name, &legacy_checks));
+            reviewable.extend(legacy_reviewable);
+
             let mut to_verify = vec![];
-            for r in fix_results {
-                if r.ok {
-                    if let Some(check) = active.iter().find(|c| c.name == r.name) {
-                        if check.fix_behavior() == registry::FixBehavior::PartialNeedsVerify {
-                            to_verify.push(r.name);
-                        } else {
-                            fixed.push(r.name);
+            if !fixable.is_empty() {
+                let fixable_names: Vec<&str> = fixable.iter().map(|r| r.name.as_str()).collect();
+                let to_fix: Vec<&registry::Check> = legacy_checks
+                    .iter()
+                    .filter(|c| fixable_names.contains(&c.name))
+                    .copied()
+                    .collect();
+                let fix_results = runner::run(
+                    &to_fix,
+                    &active,
+                    &file_list,
+                    RunOptions {
+                        fix: true,
+                        verbose: false,
+                        short: true,
+                        time: false,
+                    },
+                    project_root,
+                    &cfg,
+                    config_dir,
+                )
+                .await?;
+                for r in fix_results {
+                    if r.ok {
+                        if let Some(check) = legacy_checks.iter().find(|c| c.name == r.name) {
+                            if check.fix_behavior() == registry::FixBehavior::PartialNeedsVerify {
+                                to_verify.push(r.name);
+                            } else {
+                                fixed.push(r.name);
+                            }
                         }
+                    } else {
+                        fix_failed.push(r.name);
                     }
-                } else {
-                    fix_failed.push(r.name);
                 }
             }
             if !to_verify.is_empty() {
                 let verify_names: Vec<&str> = to_verify.iter().map(String::as_str).collect();
-                let to_verify_checks: Vec<&registry::Check> = active
+                let to_verify_checks: Vec<&registry::Check> = legacy_checks
                     .iter()
                     .filter(|c| verify_names.contains(&c.name))
                     .copied()
                     .collect();
                 let verify_results = runner::run(
                     &to_verify_checks,
+                    &active,
                     &file_list,
                     RunOptions {
                         fix: false,
@@ -328,6 +361,33 @@ async fn run(
                     } else {
                         post_fix_failed.push(r);
                     }
+                }
+            }
+        }
+
+        if !single_pass_fixable.is_empty() {
+            let fix_results = runner::run(
+                &single_pass_fixable,
+                &active,
+                &file_list,
+                RunOptions {
+                    fix: true,
+                    verbose: false,
+                    short: true,
+                    time: false,
+                },
+                project_root,
+                &cfg,
+                config_dir,
+            )
+            .await?;
+            for r in fix_results {
+                if r.ok && r.changed {
+                    fixed.push(r.name);
+                } else if !r.ok {
+                    post_fix_failed.push(r);
+                } else {
+                    // Already clean: no summary line needed.
                 }
             }
         }
@@ -371,6 +431,7 @@ async fn run(
     }
 
     let results = runner::run(
+        &active,
         &active,
         &file_list,
         RunOptions {
@@ -446,14 +507,35 @@ pub fn linter_json(check: &registry::Check) -> serde_json::Value {
         "binary": if check.uses_binary() { check.bin_name } else { "(built-in)" },
         "patterns": patterns,
         "fix": check.has_fix(),
-        "slow": check.category == registry::Category::Slow,
+        "run_policy": run_policy_label(check.run_policy),
+        "slow": check.run_policy == RunPolicy::Slow,
         "scope": scope,
         "config_file": config_file,
     })
 }
 
+fn run_policy_label(run_policy: RunPolicy) -> &'static str {
+    match run_policy {
+        RunPolicy::Fast => "fast",
+        RunPolicy::Slow => "slow",
+        RunPolicy::Adaptive => "adaptive",
+    }
+}
+
 fn is_fixable(name: &str, active: &[&registry::Check]) -> bool {
     active.iter().any(|c| c.name == name && c.has_fix())
+}
+
+fn supports_single_pass_fix(check: &registry::Check) -> bool {
+    check.has_fix()
+        && check.fix_behavior() == FixBehavior::Definitive
+        && matches!(
+            check.kind,
+            CheckKind::Template {
+                scope: Scope::File | Scope::Files,
+                ..
+            }
+        )
 }
 
 fn print_linters(
@@ -482,7 +564,7 @@ fn print_linters(
         .max(11);
 
     println!(
-        "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  {:<3}  {:<desc_w$}  PATTERNS",
+        "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {:<desc_w$}  PATTERNS",
         "NAME",
         "BINARY",
         "STATUS",
@@ -493,7 +575,7 @@ fn print_linters(
         bin_w = bin_w,
         desc_w = desc_w,
     );
-    println!("{}", "-".repeat(name_w + bin_w + desc_w + 42));
+    println!("{}", "-".repeat(name_w + bin_w + desc_w + 46));
 
     for check in registry {
         let status = if registry::check_active(check, mise_tools) {
@@ -511,16 +593,12 @@ fn print_linters(
         } else {
             "missing"
         };
-        let speed = if check.category == registry::Category::Slow {
-            "slow"
-        } else {
-            "fast"
-        };
+        let speed = run_policy_label(check.run_policy);
         let fix = if check.has_fix() { "yes" } else { "no" };
         let patterns_str = check.patterns.join(" ");
         if patterns_str.is_empty() {
             println!(
-                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  {:<3}  {:<desc_w$}",
+                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {:<desc_w$}",
                 check.name,
                 check.bin_name,
                 status,
@@ -533,7 +611,7 @@ fn print_linters(
             );
         } else {
             println!(
-                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<4}  {:<3}  {:<desc_w$}  {}",
+                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {:<desc_w$}  {}",
                 check.name,
                 check.bin_name,
                 status,

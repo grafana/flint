@@ -1,0 +1,8 @@
+{
+  "package.json": {
+    "npm": [
+      "express",
+      "lodash"
+    ]
+  }
+}

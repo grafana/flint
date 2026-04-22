@@ -2,16 +2,15 @@
 FLINT_CONFIG_DIR = ".github/config"
 
 [tools]
+biome = "2.4.12"
 lychee = "0.22.0"
-node = "24.15.0"
 "npm:renovate" = "43.129.0"
 "github:koalaman/shellcheck" = "v0.11.0"
 shfmt = "v3.13.1"
 actionlint = "1.7.10"
 editorconfig-checker = "v3.6.1"
-"npm:markdownlint-cli2" = "0.22.0"
-"npm:prettier" = "3.8.3"
-"npm:@biomejs/biome" = "2.4.12"
+"cargo:yaml-lint" = "0.1.0"
+"rumdl" = "0.1.78"
 "pipx:ruff" = "0.15.11"
 "pipx:codespell" = "2.4.2"
 rust = { version = "1.95.0", components = "clippy,rustfmt" }
@@ -24,6 +23,7 @@ dotnet = "10.0.201"
 "cargo:xmloxide" = "0.4.1"
 golangci-lint = "2.11.4"
 "github:google/google-java-format" = "1.35.0"
+node = "24.15.0"
 
 [tasks."setup:update-super-linter-versions"]
 description = "Generate super-linter version mapping from the super-linter repo"

@@ -39,7 +39,7 @@ Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`, `FLINT_FAST_ONL
 expressed as the exact command to run:
 
 ```text
-flint: 2 checks failed — flint run --fix prettier cargo-fmt | review: shellcheck
+flint: 2 checks failed — flint run --fix rumdl cargo-fmt | review: shellcheck
 ```
 
 **`--fix` output** — fixes what's fixable, then prints the full output of
@@ -61,7 +61,7 @@ Pass one or more linter names to run only those:
 
 ```bash
 flint run shellcheck shfmt        # run only shellcheck and shfmt
-flint run --fix prettier          # fix only prettier
+flint run --fix rumdl             # fix only Markdown issues
 ```
 
 ## `flint update`
@@ -71,7 +71,7 @@ tool keys with their modern equivalents, preserving the declared version. Run it
 `flint run` reports an obsolete key error:
 
 ```text
-flint: obsolete tool key in mise.toml: "npm:markdownlint-cli" (replaced by "npm:markdownlint-cli2")
+flint: obsolete tool key in mise.toml: "github:mvdan/sh" (replaced by "shfmt")
   Run `flint update` to apply the migration automatically.
 ```
 

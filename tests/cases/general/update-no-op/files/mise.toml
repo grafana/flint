@@ -1,4 +1,3 @@
 [tools]
-node = "24.14.1"
-"npm:markdownlint-cli2" = "0.17.2"
+rumdl = "0.1.78"
 shellcheck = "v0.11.0"

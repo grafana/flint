@@ -7,7 +7,7 @@ use crate::linters::renovate_deps::RENOVATE_CONFIG_PATTERNS;
 ///
 /// A check's `name` is the last path segment of its mise tool key (after `:` or `/`):
 /// - `editorconfig-checker` → name `editorconfig-checker` (not the binary `ec`)
-/// - `npm:markdownlint-cli2` → name `markdownlint-cli2`
+/// - `cargo:yaml-lint` → name `yaml-lint`
 /// - `github:pinterest/ktlint` → name `ktlint`
 ///
 /// Exception: when the mise tool key is a language toolchain shared across multiple
@@ -32,25 +32,22 @@ fn check_shfmt() -> Check {
         .style()
 }
 
-fn check_markdownlint_cli2() -> Check {
-    Check::file("markdownlint-cli2", "markdownlint-cli2 {FILE}", &["*.md"])
-        .fix("markdownlint-cli2 --fix {FILE}")
-        .linter_config(".markdownlint.jsonc", "--config")
+fn check_rumdl() -> Check {
+    Check::file("rumdl", "rumdl check {FILE}", &["*.md"])
+        .fix("rumdl check --fix {FILE}")
+        .linter_config(".rumdl.toml", "--config")
+        .formatter()
         .desc("Lint Markdown files for style and consistency")
-        .mise_tool("npm:markdownlint-cli2")
+        .mise_tool("rumdl")
 }
 
-fn check_prettier() -> Check {
-    Check::files(
-        "prettier",
-        "prettier --check {FILES}",
-        &["*.md", "*.yml", "*.yaml"],
-    )
-    .fix("prettier --write {FILES}")
-    .linter_config(".prettierrc", "--config")
-    .formatter()
-    .desc("Format Markdown and YAML files")
-    .mise_tool("npm:prettier")
+fn check_yaml_lint() -> Check {
+    Check::files("yaml-lint", "yaml-lint {FILES}", &["*.yml", "*.yaml"])
+        .fix("yaml-lint --fix {FILES}")
+        .linter_config(".yamllint.yml", "-c")
+        .formatter()
+        .desc("Lint YAML files for style and consistency")
+        .mise_tool("cargo:yaml-lint")
 }
 
 fn check_actionlint() -> Check {
@@ -140,7 +137,7 @@ fn check_biome() -> Check {
     )
     .fix("biome check --fix {FILE}")
     .desc("Lint JS/TS/JSON files")
-    .mise_tool("npm:@biomejs/biome")
+    .mise_tool("biome")
     .lang()
 }
 
@@ -154,7 +151,7 @@ fn check_biome_format() -> Check {
     .fix("biome format --write {FILE}")
     .formatter()
     .desc("Format JS/TS/JSON files")
-    .mise_tool("npm:@biomejs/biome")
+    .mise_tool("biome")
     .lang()
 }
 
@@ -264,6 +261,7 @@ fn check_lychee() -> Check {
 
 fn check_renovate_deps() -> Check {
     Check::special("renovate-deps", "renovate", SpecialKind::RenovateDeps)
+        .adaptive()
         .mise_tool("npm:renovate")
         .patterns(RENOVATE_CONFIG_PATTERNS)
         .desc("Verify Renovate dependency snapshot is up to date")
@@ -297,8 +295,8 @@ pub fn builtin() -> Vec<Check> {
     vec![
         check_shellcheck(),
         check_shfmt(),
-        check_markdownlint_cli2(),
-        check_prettier(),
+        check_rumdl(),
+        check_yaml_lint(),
         check_actionlint(),
         check_hadolint(),
         check_xmllint(),

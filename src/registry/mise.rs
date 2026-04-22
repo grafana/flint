@@ -8,8 +8,7 @@ use super::types::Check;
 ///
 /// Also registers normalized aliases for backend-prefixed tools so that checks
 /// can match by their bare package/binary name. For example:
-/// - `"npm:prettier"` → also registers `"prettier"`
-/// - `"npm:@biomejs/biome"` → also registers `"biome"` (last path component)
+/// - `"cargo:yaml-lint"` → also registers `"yaml-lint"`
 /// - `"github:google/google-java-format"` → also registers `"google-java-format"`
 ///
 /// The original key is always preserved; aliases only fill in missing entries.
@@ -38,7 +37,7 @@ pub fn read_mise_tools(project_root: &Path) -> HashMap<String, String> {
             }
         }
     }
-    // Add normalized aliases: strip the backend prefix (e.g. "npm:", "pipx:", "ubi:")
+    // Add normalized aliases: strip the backend prefix (e.g. "cargo:", "pipx:", "github:")
     // and take the last path component (e.g. "@biomejs/biome" → "biome").
     // Aliases never override an explicitly declared entry.
     let aliases: Vec<(String, String)> = tools
@@ -62,8 +61,8 @@ pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool
         return true;
     }
     let lookup_key = check.mise_tool_name.unwrap_or(check.bin_name);
-    // When mise_tool_name is set (e.g. "npm:markdownlint-cli2"), also accept
-    // the bare bin_name ("markdownlint-cli2") so repos using either form work.
+    // When mise_tool_name is set (e.g. "cargo:yaml-lint"), also accept
+    // the bare bin_name ("yaml-lint") so repos using either form work.
     let declared = mise_tools
         .get(lookup_key)
         .or_else(|| check.mise_tool_name.and(mise_tools.get(check.bin_name)));

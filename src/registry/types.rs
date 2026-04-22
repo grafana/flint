@@ -9,7 +9,7 @@ pub enum Scope {
     Project,
 }
 
-/// Which init profile (and `--fast-only` behaviour) a check belongs to.
+/// Which init profile a check belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Category {
     /// Primary programming language linter/formatter (Rust, Python, Go, …) — all init profiles.
@@ -19,8 +19,20 @@ pub enum Category {
     /// General fast tool (not language-specific) — `default` and `comprehensive` init profiles.
     #[default]
     Default,
-    /// Slow tool — `comprehensive` init profile only; skipped when `--fast-only` is passed.
+    /// Comprehensive-only tool (e.g. expensive or niche checks).
     Slow,
+}
+
+/// How a check participates in `--fast-only`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RunPolicy {
+    /// Always runs, including in `--fast-only`.
+    #[default]
+    Fast,
+    /// Skipped in `--fast-only` unless explicitly named.
+    Slow,
+    /// Runs in `--fast-only` only when the changed files are relevant to the check.
+    Adaptive,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -73,6 +85,7 @@ pub struct Check {
     /// dedicated formatter already owns.
     pub excludes_if_active: &'static [&'static str],
     pub category: Category,
+    pub run_policy: RunPolicy,
     /// When set, look for `(filename, flag)` in config_dir: if the file exists, inject
     /// `flag <abs-path>` into the command right after the binary name.
     pub linter_config: Option<(&'static str, &'static str)>,
@@ -187,6 +200,7 @@ impl Check {
             defers_to_formatters: false,
             activate_unconditionally: false,
             category: Category::Default,
+            run_policy: RunPolicy::Fast,
             toolchain: None,
             kind: CheckKind::Template {
                 check_cmd,
@@ -216,6 +230,7 @@ impl Check {
             defers_to_formatters: false,
             activate_unconditionally: false,
             category: Category::Default,
+            run_policy: RunPolicy::Fast,
             toolchain: None,
             windows_java_jar: false,
             fix_behavior: FixBehavior::Definitive,
@@ -288,9 +303,17 @@ impl Check {
         self
     }
 
-    /// Mark as slow — skipped when `--fast-only` is passed; `comprehensive` init profile only.
+    /// Mark as comprehensive-only in `flint init`, and skipped by `--fast-only`.
     pub fn slow(mut self) -> Self {
         self.category = Category::Slow;
+        self.run_policy = RunPolicy::Slow;
+        self
+    }
+
+    /// Mark as comprehensive-only in `flint init`, and relevance-gated in `--fast-only`.
+    pub fn adaptive(mut self) -> Self {
+        self.category = Category::Slow;
+        self.run_policy = RunPolicy::Adaptive;
         self
     }
 

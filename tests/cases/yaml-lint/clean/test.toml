@@ -1,0 +1,9 @@
+[expected]
+args = "run --full yaml-lint"
+exit = 0
+
+[fake_bins]
+yaml-lint = '''
+#!/bin/sh
+exit 0
+'''

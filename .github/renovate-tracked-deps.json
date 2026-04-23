@@ -43,7 +43,7 @@
       "shfmt"
     ]
   },
-  "src/init/generation.rs": {
+  "src/init/scaffold.rs": {
     "regex": [
       "Swatinem/rust-cache",
       "actions/checkout",

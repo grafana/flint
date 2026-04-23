@@ -6,21 +6,28 @@ use std::path::Path;
 
 use crate::registry::{Category, Check, builtin};
 
+mod config_files;
 mod detection;
 pub(crate) mod generation;
+mod scaffold;
 mod ui;
 
+use config_files::{
+    exclude_markdown_from_editorconfig_checker, generate_biome_config, generate_editorconfig,
+    generate_flint_toml, generate_rumdl_config, generate_yamllint_config,
+};
 use detection::{
     build_linter_groups, detect_obsolete_keys, detect_present_patterns, parse_tool_keys,
 };
 use generation::{
-    apply_changes, apply_env_and_tasks, detect_base_branch, ensure_flint_self_pin,
-    ensure_node_for_npm, exclude_markdown_from_editorconfig_checker, flint_preset,
-    generate_biome_config, generate_flint_toml, generate_lint_workflow, generate_rumdl_config,
-    generate_yamllint_config, get_existing_config_dir, has_slow_selected, maybe_install_hook,
-    normalize_tools_section, patch_renovate_extends, prompt_config_dir, remove_v1_tasks,
+    apply_changes, detect_base_branch, ensure_flint_self_pin, ensure_node_for_npm, flint_preset,
+    get_existing_config_dir, has_slow_selected, normalize_tools_section, patch_renovate_extends,
+    prompt_config_dir, remove_v1_tasks,
 };
+use scaffold::{apply_env_and_tasks, generate_lint_workflow, maybe_install_hook};
 use ui::{interactive_select_linters, select_categories_arrow};
+
+const DEFAULT_LINE_LENGTH: u16 = 120;
 
 /// Linter profile — shorthand for `--profile` CLI flag; maps to a category set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
@@ -154,13 +161,14 @@ Add and stage your source files before running init so the detection is accurate
     }
 
     // Step 1: determine which categories set the initial pre-selection.
+    let mut line_length = DEFAULT_LINE_LENGTH;
     let default_categories: HashSet<Category> = if let Some(profile) = profile_arg {
         profile_to_categories(profile)
     } else if yes {
         profile_to_categories(Profile::Default)
     } else {
         let mut cat_items = default_category_items();
-        if !select_categories_arrow(&mut cat_items)? {
+        if !select_categories_arrow(&mut cat_items, &mut line_length)? {
             println!("Aborted.");
             return Ok(());
         }
@@ -308,10 +316,11 @@ Add and stage your source files before running init so the detection is accurate
         || (current_tool_keys.contains("rust") && !final_remove.iter().any(|k| k == "rust"));
     let workflow_generated = generate_lint_workflow(project_root, &base_branch, has_rust)?;
     let rumdl_generated = if has_rumdl {
-        generate_rumdl_config(project_root)?
+        generate_rumdl_config(project_root, line_length)?
     } else {
         false
     };
+    let editorconfig_generated = generate_editorconfig(project_root, line_length)?;
     let editorconfig_markdown_excluded = if has_rumdl {
         exclude_markdown_from_editorconfig_checker(project_root, &config_dir_path)?
     } else {
@@ -321,7 +330,7 @@ Add and stage your source files before running init so the detection is accurate
         println!("  patched editorconfig-checker config — Markdown is now owned by rumdl");
     }
     let yamllint_generated = if has_yaml_lint {
-        generate_yamllint_config(project_root)?
+        generate_yamllint_config(project_root, line_length)?
     } else {
         false
     };
@@ -353,6 +362,7 @@ Add and stage your source files before running init so the detection is accurate
         && !toml_generated
         && !workflow_generated
         && !rumdl_generated
+        && !editorconfig_generated
         && !editorconfig_markdown_excluded
         && !yamllint_generated
         && !biome_generated
@@ -434,11 +444,12 @@ fn compute_desired_tools(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use config_files::generate_flint_toml;
     use detection::entry_components_differ;
     use generation::{
-        apply_changes, apply_env_and_tasks, generate_flint_toml, generate_lint_workflow,
-        get_existing_config_dir, has_slow_selected, normalize_tools_section,
+        apply_changes, get_existing_config_dir, has_slow_selected, normalize_tools_section,
     };
+    use scaffold::{apply_env_and_tasks, generate_lint_workflow};
 
     #[test]
     fn detect_obsolete_keys_finds_known_stale_key() {
@@ -664,9 +675,9 @@ rust = { version = "1.0", components = "clippy" }
 
     #[test]
     fn generate_rumdl_config_writes_file() {
-        use generation::generate_rumdl_config;
+        use config_files::generate_rumdl_config;
         let tmp = tempfile::TempDir::new().unwrap();
-        let written = generate_rumdl_config(tmp.path()).unwrap();
+        let written = generate_rumdl_config(tmp.path(), DEFAULT_LINE_LENGTH).unwrap();
         assert!(written);
         let content = std::fs::read_to_string(tmp.path().join(".rumdl.toml")).unwrap();
         assert!(content.contains("line-length = 120"));
@@ -676,10 +687,10 @@ rust = { version = "1.0", components = "clippy" }
 
     #[test]
     fn generate_rumdl_config_skips_when_target_exists() {
-        use generation::generate_rumdl_config;
+        use config_files::generate_rumdl_config;
         let tmp = tempfile::TempDir::new().unwrap();
         std::fs::write(tmp.path().join(".rumdl.toml"), "existing").unwrap();
-        let written = generate_rumdl_config(tmp.path()).unwrap();
+        let written = generate_rumdl_config(tmp.path(), DEFAULT_LINE_LENGTH).unwrap();
         assert!(!written);
         let content = std::fs::read_to_string(tmp.path().join(".rumdl.toml")).unwrap();
         assert_eq!(content, "existing");
@@ -687,10 +698,10 @@ rust = { version = "1.0", components = "clippy" }
 
     #[test]
     fn generate_rumdl_config_replaces_legacy_json() {
-        use generation::generate_rumdl_config;
+        use config_files::generate_rumdl_config;
         let tmp = tempfile::TempDir::new().unwrap();
         std::fs::write(tmp.path().join(".markdownlint.json"), r#"{"MD013":false}"#).unwrap();
-        let written = generate_rumdl_config(tmp.path()).unwrap();
+        let written = generate_rumdl_config(tmp.path(), DEFAULT_LINE_LENGTH).unwrap();
         assert!(written);
         assert!(!tmp.path().join(".markdownlint.json").exists());
         let content = std::fs::read_to_string(tmp.path().join(".rumdl.toml")).unwrap();
@@ -698,8 +709,51 @@ rust = { version = "1.0", components = "clippy" }
     }
 
     #[test]
+    fn generate_editorconfig_writes_file() {
+        use config_files::generate_editorconfig;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let written = generate_editorconfig(tmp.path(), DEFAULT_LINE_LENGTH).unwrap();
+        assert!(written);
+        let content = std::fs::read_to_string(tmp.path().join(".editorconfig")).unwrap();
+        assert!(content.contains("max_line_length = 120"));
+        assert!(content.contains("insert_final_newline = true"));
+    }
+
+    #[test]
+    fn generate_editorconfig_patches_existing_global_section() {
+        use config_files::generate_editorconfig;
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            tmp.path().join(".editorconfig"),
+            "root = true\n\n[*]\nindent_size = 2\n\n[*.rs]\nindent_size = 4\n",
+        )
+        .unwrap();
+        let written = generate_editorconfig(tmp.path(), DEFAULT_LINE_LENGTH).unwrap();
+        assert!(written);
+        let content = std::fs::read_to_string(tmp.path().join(".editorconfig")).unwrap();
+        assert!(content.contains("[*]\nindent_size = 2\nmax_line_length = 120\n"));
+        assert!(content.contains("[*.rs]\nindent_size = 4\n"));
+    }
+
+    #[test]
+    fn generate_editorconfig_skips_existing_line_length() {
+        use config_files::generate_editorconfig;
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            tmp.path().join(".editorconfig"),
+            "root = true\n\n[*]\nmax_line_length = 100\n",
+        )
+        .unwrap();
+        let written = generate_editorconfig(tmp.path(), DEFAULT_LINE_LENGTH).unwrap();
+        assert!(!written);
+        let content = std::fs::read_to_string(tmp.path().join(".editorconfig")).unwrap();
+        assert!(content.contains("max_line_length = 100"));
+        assert!(!content.contains("max_line_length = 120"));
+    }
+
+    #[test]
     fn exclude_markdown_from_editorconfig_checker_updates_config_dir_file() {
-        use generation::exclude_markdown_from_editorconfig_checker;
+        use config_files::exclude_markdown_from_editorconfig_checker;
         let tmp = tempfile::TempDir::new().unwrap();
         let config_dir = tmp.path().join(".github/config");
         std::fs::create_dir_all(&config_dir).unwrap();
@@ -719,7 +773,7 @@ rust = { version = "1.0", components = "clippy" }
 
     #[test]
     fn exclude_markdown_from_editorconfig_checker_is_idempotent() {
-        use generation::exclude_markdown_from_editorconfig_checker;
+        use config_files::exclude_markdown_from_editorconfig_checker;
         let tmp = tempfile::TempDir::new().unwrap();
         let config_dir = tmp.path().join(".github/config");
         std::fs::create_dir_all(&config_dir).unwrap();
@@ -735,9 +789,9 @@ rust = { version = "1.0", components = "clippy" }
 
     #[test]
     fn generate_yamllint_config_writes_file() {
-        use generation::generate_yamllint_config;
+        use config_files::generate_yamllint_config;
         let tmp = tempfile::TempDir::new().unwrap();
-        let written = generate_yamllint_config(tmp.path()).unwrap();
+        let written = generate_yamllint_config(tmp.path(), DEFAULT_LINE_LENGTH).unwrap();
         assert!(written);
         let content = std::fs::read_to_string(tmp.path().join(".yamllint.yml")).unwrap();
         assert!(content.contains("extends: relaxed"));
@@ -746,7 +800,7 @@ rust = { version = "1.0", components = "clippy" }
 
     #[test]
     fn generate_biome_config_writes_file() {
-        use generation::generate_biome_config;
+        use config_files::generate_biome_config;
         let tmp = tempfile::TempDir::new().unwrap();
         let written = generate_biome_config(tmp.path()).unwrap();
         assert!(written);
@@ -757,7 +811,7 @@ rust = { version = "1.0", components = "clippy" }
 
     #[test]
     fn generate_biome_config_skips_existing_json() {
-        use generation::generate_biome_config;
+        use config_files::generate_biome_config;
         let tmp = tempfile::TempDir::new().unwrap();
         std::fs::write(tmp.path().join("biome.json"), "existing").unwrap();
         let written = generate_biome_config(tmp.path()).unwrap();
@@ -768,7 +822,7 @@ rust = { version = "1.0", components = "clippy" }
 
     #[test]
     fn generate_biome_config_skips_existing_jsonc() {
-        use generation::generate_biome_config;
+        use config_files::generate_biome_config;
         let tmp = tempfile::TempDir::new().unwrap();
         std::fs::write(tmp.path().join("biome.jsonc"), "existing").unwrap();
         let written = generate_biome_config(tmp.path()).unwrap();

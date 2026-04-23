@@ -1,0 +1,293 @@
+use anyhow::{Context, Result};
+use std::io;
+use std::path::Path;
+
+/// Writes a skeleton `flint.toml` in `config_dir`. Creates the directory if needed.
+/// Returns `true` if the file was written, `false` if it already existed.
+///
+/// `exclude_managers`: when `Some`, populates `exclude_managers` in `[checks.renovate-deps]`
+/// with the given list (migrated from `RENOVATE_TRACKED_DEPS_EXCLUDE`). When `None` and
+/// `has_renovate` is true, writes a commented-out placeholder instead.
+pub(super) fn generate_flint_toml(
+    config_dir: &Path,
+    base_branch: &str,
+    has_renovate: bool,
+    exclude_managers: Option<&[String]>,
+) -> Result<bool> {
+    let toml_path = config_dir.join("flint.toml");
+    if toml_path.exists() {
+        return Ok(false);
+    }
+    std::fs::create_dir_all(config_dir)?;
+    let mut content = String::from("[settings]\n");
+    if base_branch != "main" {
+        content.push_str(&format!("base_branch = \"{base_branch}\"\n"));
+    }
+    content.push_str("# exclude = [\"CHANGELOG\\\\.md\"]\n");
+    if has_renovate {
+        content.push_str("\n[checks.renovate-deps]\n");
+        match exclude_managers {
+            Some(managers) if !managers.is_empty() => {
+                let list = managers
+                    .iter()
+                    .map(|m| format!("\"{m}\""))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                content.push_str(&format!("exclude_managers = [{list}]\n"));
+            }
+            _ => content.push_str("# exclude_managers = []\n"),
+        }
+    }
+    std::fs::write(&toml_path, &content)?;
+    println!("  wrote {}", toml_path.display());
+    Ok(true)
+}
+
+/// Generates `.rumdl.toml` in the project root when rumdl is being set up.
+/// Returns `true` if the file was written (or an older markdownlint variant was replaced).
+pub(super) fn generate_rumdl_config(project_root: &Path, line_length: u16) -> Result<bool> {
+    const LEGACY_CONFIG_NAMES: &[&str] = &[
+        ".markdownlint.json",
+        ".markdownlint.jsonc",
+        ".markdownlint.yaml",
+        ".markdownlint.yml",
+        ".markdownlint-cli2.jsonc",
+        ".markdownlint-cli2.yaml",
+        ".markdownlint-cli2.yml",
+        ".markdownlint-cli2.cjs",
+        ".markdownlint-cli2.mjs",
+    ];
+    let target = project_root.join(".rumdl.toml");
+    if target.exists() {
+        return Ok(false);
+    }
+    for name in LEGACY_CONFIG_NAMES {
+        let legacy = project_root.join(name);
+        if legacy.exists() {
+            std::fs::remove_file(&legacy)?;
+            println!("  removed {} (replaced by .rumdl.toml)", legacy.display());
+        }
+    }
+    let content = format!(
+        "[MD013]\n\
+         enabled = true\n\
+         line-length = {line_length}\n\
+         code-blocks = false\n\
+         tables = false\n",
+    );
+    std::fs::write(&target, content)?;
+    println!("  wrote {}", target.display());
+    Ok(true)
+}
+
+/// Generates or updates `.editorconfig` in the project root.
+///
+/// Existing explicit `max_line_length` settings are left untouched. When a
+/// root `[*]` section exists without a line-length setting, flint adds one
+/// there; otherwise it appends a minimal `[*]` section.
+pub(super) fn generate_editorconfig(project_root: &Path, line_length: u16) -> Result<bool> {
+    let target = project_root.join(".editorconfig");
+    let content = match std::fs::read_to_string(&target) {
+        Ok(content) => content,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            let content = format!(
+                "root = true\n\
+                 \n\
+                 [*]\n\
+                 charset = utf-8\n\
+                 end_of_line = lf\n\
+                 indent_style = space\n\
+                 indent_size = 2\n\
+                 insert_final_newline = true\n\
+                 trim_trailing_whitespace = true\n\
+                 max_line_length = {line_length}\n",
+            );
+            std::fs::write(&target, content)?;
+            println!("  wrote {}", target.display());
+            return Ok(true);
+        }
+        Err(e) => return Err(e).with_context(|| format!("failed to read {}", target.display())),
+    };
+
+    if editorconfig_has_global_line_length(&content) {
+        return Ok(false);
+    }
+
+    let updated = add_editorconfig_global_line_length(&content, line_length);
+    if updated == content {
+        return Ok(false);
+    }
+    std::fs::write(&target, updated)?;
+    println!(
+        "  patched {} — set max_line_length = {line_length}",
+        target.display()
+    );
+    Ok(true)
+}
+
+fn editorconfig_has_global_line_length(content: &str) -> bool {
+    let mut in_global = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_global = trimmed == "[*]";
+            continue;
+        }
+        if in_global && trimmed.starts_with("max_line_length") {
+            return true;
+        }
+    }
+    false
+}
+
+fn add_editorconfig_global_line_length(content: &str, line_length: u16) -> String {
+    let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
+    let had_trailing_newline = content.ends_with('\n');
+    let Some(section_start) = lines.iter().position(|line| line.trim() == "[*]") else {
+        let mut updated = content.to_string();
+        if !updated.ends_with('\n') {
+            updated.push('\n');
+        }
+        if !updated.ends_with("\n\n") {
+            updated.push('\n');
+        }
+        updated.push_str(&format!("[*]\nmax_line_length = {line_length}\n"));
+        return updated;
+    };
+
+    let section_end = lines
+        .iter()
+        .enumerate()
+        .skip(section_start + 1)
+        .find_map(|(idx, line)| {
+            let trimmed = line.trim();
+            (trimmed.starts_with('[') && trimmed.ends_with(']')).then_some(idx)
+        })
+        .unwrap_or(lines.len());
+    let insert_at = lines
+        .iter()
+        .enumerate()
+        .take(section_end)
+        .skip(section_start + 1)
+        .find_map(|(idx, line)| (line.trim_start().starts_with("indent_size")).then_some(idx + 1))
+        .unwrap_or(section_end);
+
+    lines.insert(insert_at, format!("max_line_length = {line_length}"));
+    let mut updated = lines.join("\n");
+    if had_trailing_newline {
+        updated.push('\n');
+    }
+    updated
+}
+
+/// Updates an existing editorconfig-checker config so Markdown is excluded when
+/// rumdl owns Markdown formatting and line-length enforcement.
+///
+/// Checks both the project root and `config_dir`, updating the first config
+/// file that exists. Returns `true` when a config was changed.
+pub(super) fn exclude_markdown_from_editorconfig_checker(
+    project_root: &Path,
+    config_dir: &Path,
+) -> Result<bool> {
+    const MARKDOWN_EXCLUDE: &str = ".*\\.md$";
+    let candidates = [
+        config_dir.join(".editorconfig-checker.json"),
+        project_root.join(".editorconfig-checker.json"),
+    ];
+
+    for path in candidates {
+        if !path.exists() {
+            continue;
+        }
+
+        let content = std::fs::read_to_string(&path)?;
+        let mut value: serde_json::Value = serde_json::from_str(&content)
+            .with_context(|| format!("failed to parse {}", path.display()))?;
+        let Some(obj) = value.as_object_mut() else {
+            anyhow::bail!("{} is not a JSON object", path.display());
+        };
+
+        let key = if obj.contains_key("Exclude") {
+            "Exclude"
+        } else if obj.contains_key("exclude") {
+            "exclude"
+        } else {
+            "Exclude"
+        };
+
+        let entry = obj
+            .entry(key.to_string())
+            .or_insert_with(|| serde_json::Value::Array(vec![]));
+        let Some(items) = entry.as_array_mut() else {
+            anyhow::bail!("{} field in {} is not an array", key, path.display());
+        };
+
+        if items
+            .iter()
+            .any(|v| v.as_str().is_some_and(|s| s == MARKDOWN_EXCLUDE))
+        {
+            return Ok(false);
+        }
+
+        items.push(serde_json::Value::String(MARKDOWN_EXCLUDE.to_string()));
+        let updated = serde_json::to_string_pretty(&value)? + "\n";
+        std::fs::write(&path, updated)?;
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
+/// Generates `.yamllint.yml` in the project root when yaml-lint is being set up.
+pub(super) fn generate_yamllint_config(project_root: &Path, line_length: u16) -> Result<bool> {
+    let target = project_root.join(".yamllint.yml");
+    if target.exists() {
+        return Ok(false);
+    }
+    let content = [
+        "extends: relaxed",
+        "",
+        "rules:",
+        "  document-start: disable",
+        "  line-length:",
+        &format!("    max: {line_length}"),
+        "  indentation:",
+        "    spaces: 2",
+        "",
+    ]
+    .join("\n");
+    std::fs::write(&target, content)?;
+    println!("  wrote {}", target.display());
+    Ok(true)
+}
+
+/// Generates `biome.json` in the project root when biome is being set up and no
+/// existing biome config is present.
+///
+/// Flint writes explicit space indentation to avoid Biome's default tab
+/// formatting surprising consumers during rollout.
+pub(super) fn generate_biome_config(project_root: &Path) -> Result<bool> {
+    const EXISTING_CONFIG_NAMES: &[&str] = &["biome.json", "biome.jsonc"];
+    if EXISTING_CONFIG_NAMES
+        .iter()
+        .map(|name| project_root.join(name))
+        .any(|path| path.exists())
+    {
+        return Ok(false);
+    }
+
+    let target = project_root.join("biome.json");
+    let content = [
+        "{",
+        "  \"formatter\": {",
+        "    \"indentStyle\": \"space\",",
+        "    \"indentWidth\": 2",
+        "  }",
+        "}",
+        "",
+    ]
+    .join("\n");
+    std::fs::write(&target, content)?;
+    println!("  wrote {}", target.display());
+    Ok(true)
+}

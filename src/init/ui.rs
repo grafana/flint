@@ -12,19 +12,35 @@ use super::{CategoryItem, LinterGroup};
 
 fn run_arrow_selector<T>(
     items: &mut [T],
-    print_fn: fn(&mut dyn Write, &[T], usize) -> Result<usize>,
+    line_length: &mut u16,
+    print_fn: fn(&mut dyn Write, &[T], usize, u16) -> Result<usize>,
     toggle_fn: fn(&mut T),
 ) -> Result<bool> {
+    const LINE_LENGTHS: &[u16] = &[80, 100, 120, 140];
+
+    fn adjust_line_length(line_length: &mut u16, delta: isize) {
+        let current = LINE_LENGTHS
+            .iter()
+            .position(|len| len == line_length)
+            .unwrap_or_else(|| LINE_LENGTHS.iter().position(|len| *len == 120).unwrap());
+        let next = current
+            .saturating_add_signed(delta)
+            .min(LINE_LENGTHS.len() - 1);
+        *line_length = LINE_LENGTHS[next];
+    }
+
     let mut cursor = 0usize;
     terminal::enable_raw_mode()?;
     let result = (|| -> Result<bool> {
         let mut stdout = io::stdout();
-        let mut n_lines = print_fn(&mut stdout, items, cursor)?;
+        let mut n_lines = print_fn(&mut stdout, items, cursor, *line_length)?;
         loop {
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Up if cursor > 0 => cursor -= 1,
                     KeyCode::Down if cursor + 1 < items.len() => cursor += 1,
+                    KeyCode::Left => adjust_line_length(line_length, -1),
+                    KeyCode::Right => adjust_line_length(line_length, 1),
                     KeyCode::Char(' ') => toggle_fn(&mut items[cursor]),
                     KeyCode::Enter => {
                         execute!(
@@ -57,7 +73,7 @@ fn run_arrow_selector<T>(
                     cursor::MoveUp(n_lines as u16),
                     terminal::Clear(ClearType::FromCursorDown)
                 )?;
-                n_lines = print_fn(&mut stdout, items, cursor)?;
+                n_lines = print_fn(&mut stdout, items, cursor, *line_length)?;
             }
         }
     })();
@@ -68,8 +84,11 @@ fn run_arrow_selector<T>(
 
 // --- Step 1: category selection ---
 
-pub(super) fn select_categories_arrow(items: &mut [CategoryItem]) -> Result<bool> {
-    run_arrow_selector(items, print_cat_selector, |item| {
+pub(super) fn select_categories_arrow(
+    items: &mut [CategoryItem],
+    line_length: &mut u16,
+) -> Result<bool> {
+    run_arrow_selector(items, line_length, print_cat_selector, |item| {
         item.selected = !item.selected
     })
 }
@@ -78,6 +97,7 @@ fn print_cat_selector(
     stdout: &mut dyn Write,
     items: &[CategoryItem],
     cursor: usize,
+    line_length: u16,
 ) -> Result<usize> {
     let mut lines = 0usize;
     write!(stdout, "Select categories:\r\n\r\n")?;
@@ -88,11 +108,12 @@ fn print_cat_selector(
         write!(stdout, "  {}  [{}]  {}\r\n", arrow, sel, item.label)?;
         lines += 1;
     }
+    write!(stdout, "\r\n  line length: {line_length}   ←→ adjust\r\n")?;
     write!(
         stdout,
-        "\r\n  ↑↓ navigate   space toggle   enter continue   q abort\r\n"
+        "  ↑↓ navigate   space toggle   enter continue   q abort\r\n"
     )?;
-    lines += 2;
+    lines += 3;
     stdout.flush()?;
     Ok(lines)
 }

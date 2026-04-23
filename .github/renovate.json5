@@ -50,8 +50,8 @@
     },
     {
       customType: "regex",
-      description: "Update GitHub Action SHA pins embedded in the generated workflow template (src/init/generation.rs)",
-      managerFilePatterns: ["/^src/init/generation\\.rs$/"],
+      description: "Update GitHub Action SHA pins embedded in the generated workflow template (src/init/scaffold.rs)",
+      managerFilePatterns: ["/^src/init/scaffold\\.rs$/"],
       matchStrings: ["uses: (?<depName>[^@\\\\]+)@(?<currentDigest>[a-f0-9]{40})\\s*#\\s*(?<currentValue>v[^\\s'\"\\\\]+)"],
       datasourceTemplate: "github-tags",
     },
@@ -68,8 +68,8 @@
     },
     {
       customType: "regex",
-      description: "Update mise version embedded in the generated workflow template (src/init/generation.rs)",
-      managerFilePatterns: ["/^src/init/generation\\.rs$/"],
+      description: "Update mise version embedded in the generated workflow template (src/init/scaffold.rs)",
+      managerFilePatterns: ["/^src/init/scaffold\\.rs$/"],
       datasourceTemplate: "github-release-attachments",
       packageNameTemplate: "jdx/mise",
       depNameTemplate: "mise",

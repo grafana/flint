@@ -23,8 +23,7 @@ Done. Run `mise install` to install the new tools.
 [expected.files]
 ".github/config/flint.toml" = '''
 [settings]
-# exclude = "CHANGELOG\\.md"
-# exclude_paths = []
+# exclude = ["CHANGELOG\\.md"]
 '''
 ".rumdl.toml" = '''
 [MD013]

@@ -785,7 +785,6 @@ rust = { version = "1.0", components = "clippy" }
         let content = std::fs::read_to_string(dir.join("flint.toml")).unwrap();
         assert!(content.contains("[settings]"));
         assert!(content.contains("# exclude ="));
-        assert!(content.contains("# exclude_paths ="));
         assert!(!content.contains("base_branch")); // "main" is the default, omitted
     }
 

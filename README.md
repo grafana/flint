@@ -42,8 +42,9 @@ Add `flint` to your repo's `mise.toml`:
 Bootstrap a repo with `flint init` (scaffolds config). Install a
 pre-commit hook with `flint hook install`.
 This is appropriate even if the repo already has an existing `mise.toml`;
-`flint init` is not just for greenfield repos. If `init` adds tools you do not
-want, trim the generated tool list afterward.
+`flint init` is not just for greenfield repos. You can choose which linters to
+enable during the prompt, or trim the generated tool list afterward if you run
+`flint init --yes`.
 
 ### mise.toml setup
 

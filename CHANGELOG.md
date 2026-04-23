@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.20.4](https://github.com/grafana/flint/compare/v0.20.3...v0.20.4) - 2026-04-23
+
+### Added
+
+- group linter renovate updates ([#209](https://github.com/grafana/flint/pull/209))
+
+### Fixed
+
+- expand baseline guards for config and flint changes ([#215](https://github.com/grafana/flint/pull/215))
+- remove stale exclude_paths init placeholder ([#211](https://github.com/grafana/flint/pull/211))
+- baseline lint coverage changes ([#214](https://github.com/grafana/flint/pull/214))
+- align biome init and formatter ownership ([#205](https://github.com/grafana/flint/pull/205))
+
+### Other
+
+- *(deps)* update dependency npm:renovate to v43.133.0 ([#216](https://github.com/grafana/flint/pull/216))
+- *(deps)* update dependency npm:renovate to v43.132.2 ([#212](https://github.com/grafana/flint/pull/212))
+- *(deps)* update taiki-e/install-action digest to 5f57d6c ([#204](https://github.com/grafana/flint/pull/204))
+- clarify that flint init works with existing mise.toml ([#208](https://github.com/grafana/flint/pull/208))
+- guard against overlapping fixer ownership ([#206](https://github.com/grafana/flint/pull/206))
+
 ## [0.20.3](https://github.com/grafana/flint/compare/v0.20.2...v0.20.3) - 2026-04-21
 
 ### Added

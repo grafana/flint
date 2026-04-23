@@ -22,7 +22,7 @@ Done. Run `mise install` to install the new tools.
 [expected.files]
 ".github/config/flint.toml" = '''
 [settings]
-# exclude = "CHANGELOG\\.md"
+# exclude = ["CHANGELOG\\.md"]
 '''
 ".markdownlint.yml" = '''
 # Line length is enforced by editorconfig-checker via .editorconfig

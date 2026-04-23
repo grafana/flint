@@ -580,7 +580,7 @@ pub(super) fn generate_flint_toml(
     if base_branch != "main" {
         content.push_str(&format!("base_branch = \"{base_branch}\"\n"));
     }
-    content.push_str("# exclude = \"CHANGELOG\\\\.md\"\n");
+    content.push_str("# exclude = [\"CHANGELOG\\\\.md\"]\n");
     if has_renovate {
         content.push_str("\n[checks.renovate-deps]\n");
         match exclude_managers {

@@ -1,0 +1,19 @@
+[expected]
+args = "run shellcheck"
+exit = 1
+stderr = '''
+[shellcheck]
+
+In <REPO>/bad.sh line 2:
+echo $1
+     ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+
+Did you mean:
+echo "$1"
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2086 -- Double quote to prevent globbing ...
+
+flint: 1 check failed (shellcheck)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''

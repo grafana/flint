@@ -1,0 +1,7 @@
+[expected]
+args = "run shellcheck"
+exit = 1
+stderr = '''
+flint: unsupported shellcheck config file found: shellcheckrc
+  Flint only supports FLINT_CONFIG_DIR/.shellcheckrc for shellcheck. Move the config to the supported location or remove the alternate file.
+'''

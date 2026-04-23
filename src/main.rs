@@ -251,6 +251,20 @@ async fn run(
         out
     };
 
+    if let Some((check, config)) = active.iter().find_map(|check| {
+        unsupported_config(check, project_root, config_dir).map(|config| (*check, config))
+    }) {
+        let canonical = check
+            .linter_config
+            .map(|(file, _)| format!("FLINT_CONFIG_DIR/{file}"))
+            .unwrap_or_else(|| "the flint-managed config".to_string());
+        eprintln!(
+            "flint: unsupported {name} config file found: {config}\n  Flint only supports {canonical} for {name}. Move the config to the supported location or remove the alternate file.",
+            name = check.name
+        );
+        std::process::exit(1);
+    }
+
     if args.verbose {
         let names: Vec<&str> = active.iter().map(|c| c.name).collect();
         if names.is_empty() {
@@ -566,6 +580,10 @@ fn baseline_check_names(
 
     let changed = changed_rel_paths(file_list, project_root);
     let previous_tools = registry::read_mise_tools_at_ref(project_root, merge_base);
+    if registry::flint_version_changed(&previous_tools, current_tools) {
+        return active.iter().map(|check| check.name.to_string()).collect();
+    }
+
     let flint_config = config_rel_path(project_root, config_dir, "flint.toml");
     let flint_config_changed = changed.contains(&flint_config);
     let flint_toml =
@@ -581,12 +599,24 @@ fn baseline_check_names(
                         || (matches!(check.kind, CheckKind::Special(_))
                             && change.check_changed(check.name))
                 })
-                || check.linter_config.is_some_and(|(file, _)| {
-                    changed.contains(&config_rel_path(project_root, config_dir, file))
+                || check.baseline_configs.iter().any(|config| {
+                    changed.contains(&config_file_rel_path(project_root, config_dir, config))
                 })
         })
         .map(|check| check.name.to_string())
         .collect()
+}
+
+fn unsupported_config(
+    check: &registry::Check,
+    project_root: &Path,
+    config_dir: &Path,
+) -> Option<String> {
+    check
+        .unsupported_configs
+        .iter()
+        .find(|config| config_present(project_root, config_dir, config))
+        .map(|config| config_file_rel_path(project_root, config_dir, config))
 }
 
 struct FlintTomlChange {
@@ -621,6 +651,30 @@ fn read_toml_file(path: &Path) -> toml::Value {
         .ok()
         .and_then(|content| toml::from_str(&content).ok())
         .unwrap_or(toml::Value::Table(Default::default()))
+}
+
+fn config_present(project_root: &Path, config_dir: &Path, config: &registry::ConfigFile) -> bool {
+    let path = config_file_abs_path(project_root, config_dir, config);
+    match config.presence {
+        registry::ConfigMatch::Exists => path.exists(),
+        registry::ConfigMatch::TomlSection(section) => {
+            toml_section(&read_toml_file(&path), section).is_some()
+        }
+        registry::ConfigMatch::IniSection(section) => ini_section_exists(&path, section),
+    }
+}
+
+fn ini_section_exists(path: &Path, section: &str) -> bool {
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return false;
+    };
+    content.lines().any(|line| {
+        let trimmed = line.trim();
+        trimmed
+            .strip_prefix('[')
+            .and_then(|rest| rest.strip_suffix(']'))
+            .is_some_and(|name| name.trim() == section)
+    })
 }
 
 fn read_toml_at_ref(project_root: &Path, git_ref: &str, rel_path: &str) -> toml::Value {
@@ -666,6 +720,34 @@ fn config_rel_path(project_root: &Path, config_dir: &Path, file: &str) -> String
     path.strip_prefix(project_root)
         .map(normalize_path)
         .unwrap_or_else(|_| normalize_path(&PathBuf::from(file)))
+}
+
+fn config_file_abs_path(
+    project_root: &Path,
+    config_dir: &Path,
+    config: &registry::ConfigFile,
+) -> PathBuf {
+    match config.base {
+        registry::ConfigBase::ProjectRoot => project_root.join(config.path),
+        registry::ConfigBase::ConfigDir => {
+            if config_dir.is_absolute() {
+                config_dir.join(config.path)
+            } else {
+                project_root.join(config_dir).join(config.path)
+            }
+        }
+    }
+}
+
+fn config_file_rel_path(
+    project_root: &Path,
+    config_dir: &Path,
+    config: &registry::ConfigFile,
+) -> String {
+    let path = config_file_abs_path(project_root, config_dir, config);
+    path.strip_prefix(project_root)
+        .map(normalize_path)
+        .unwrap_or_else(|_| normalize_path(&PathBuf::from(config.path)))
 }
 
 fn normalize_path(path: &Path) -> String {

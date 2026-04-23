@@ -723,6 +723,8 @@ mod tests {
             patterns,
             excludes_if_active: &[],
             linter_config: None,
+            baseline_configs: &[],
+            unsupported_configs: &[],
             is_formatter: false,
             defers_to_formatters: false,
             activate_unconditionally: false,

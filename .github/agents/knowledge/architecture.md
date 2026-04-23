@@ -48,7 +48,11 @@ A check is expanded to all matching files when:
 - it was not active at the merge base, meaning its tool was newly added to
   `mise.toml`
 - its resolved tool version changed in `mise.toml`
+- the pinned `github:grafana/flint` version changed in `mise.toml`; this expands
+  every active check because the runner/orchestrator changed
 - its registered `.linter_config(...)` file changed under `FLINT_CONFIG_DIR`
+- another supported baseline config changed, such as `.editorconfig` for
+  `editorconfig-checker`
 - `flint.toml` changed under `[settings]`
 - `flint.toml` changed the check-specific section for a special check
 
@@ -57,3 +61,8 @@ Explicit `--full` bypasses this selection because every check is already using
 the all-files list. Config-change triggers use the raw git change list before
 `settings.exclude` is applied, so excluded config paths still expand the affected
 check.
+
+For linters where flint passes a config file explicitly, the registered
+flint-managed file is authoritative. Known alternate upstream config files are
+hard failures for active checks, including section-based configs like
+`pyproject.toml` only when the relevant tool section exists.

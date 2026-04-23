@@ -1,5 +1,68 @@
-use super::types::{Check, SpecialKind};
+use super::types::{Check, ConfigFile, SpecialKind};
 use crate::linters::renovate_deps::RENOVATE_CONFIG_PATTERNS;
+
+const TOOL_RUMDL: &[&str] = &["tool", "rumdl"];
+const TOOL_CODESPELL: &[&str] = &["tool", "codespell"];
+const TOOL_RUFF: &[&str] = &["tool", "ruff"];
+
+const SHELLCHECK_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".shellcheckrc")];
+const SHELLCHECK_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
+    ConfigFile::config_dir("shellcheckrc"),
+    ConfigFile::project("shellcheckrc"),
+];
+const RUMDL_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".rumdl.toml")];
+const RUMDL_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
+    ConfigFile::config_dir("rumdl.toml"),
+    ConfigFile::project("rumdl.toml"),
+    ConfigFile::project(".config/rumdl.toml"),
+    ConfigFile::project_toml_section("pyproject.toml", TOOL_RUMDL),
+];
+const YAMLLINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".yamllint.yml")];
+const YAMLLINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
+    ConfigFile::config_dir(".yamllint"),
+    ConfigFile::config_dir(".yamllint.yaml"),
+    ConfigFile::project(".yamllint"),
+    ConfigFile::project(".yamllint.yaml"),
+];
+const ACTIONLINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir("actionlint.yml")];
+const ACTIONLINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
+    ConfigFile::config_dir("actionlint.yaml"),
+    ConfigFile::project(".github/actionlint.yaml"),
+    ConfigFile::project(".github/actionlint.yml"),
+];
+const HADOLINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".hadolint.yaml")];
+const HADOLINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
+    ConfigFile::config_dir(".hadolint.yml"),
+    ConfigFile::project(".hadolint.yml"),
+];
+const CODESPELL_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".codespellrc")];
+const CODESPELL_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
+    ConfigFile::project_ini_section("setup.cfg", "codespell"),
+    ConfigFile::project_toml_section("pyproject.toml", TOOL_CODESPELL),
+];
+const EDITORCONFIG_CHECKER_BASELINE_CONFIGS: &[ConfigFile] = &[
+    ConfigFile::config_dir(".editorconfig-checker.json"),
+    ConfigFile::project(".editorconfig"),
+];
+const EDITORCONFIG_CHECKER_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
+    ConfigFile::config_dir(".ecrc"),
+    ConfigFile::project(".ecrc"),
+];
+const GOLANGCI_LINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".golangci.yml")];
+const GOLANGCI_LINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
+    ConfigFile::config_dir(".golangci.yaml"),
+    ConfigFile::config_dir(".golangci.toml"),
+    ConfigFile::config_dir(".golangci.json"),
+    ConfigFile::project(".golangci.yaml"),
+    ConfigFile::project(".golangci.toml"),
+    ConfigFile::project(".golangci.json"),
+];
+const RUFF_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir("ruff.toml")];
+const RUFF_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
+    ConfigFile::config_dir(".ruff.toml"),
+    ConfigFile::project(".ruff.toml"),
+    ConfigFile::project_toml_section("pyproject.toml", TOOL_RUFF),
+];
 
 /// Built-in linter registry.
 ///
@@ -20,6 +83,8 @@ fn check_shellcheck() -> Check {
         &["*.sh", "*.bash", "*.bats"],
     )
     .linter_config(".shellcheckrc", "--rcfile")
+    .baseline_configs(SHELLCHECK_BASELINE_CONFIGS)
+    .unsupported_configs(SHELLCHECK_UNSUPPORTED_CONFIGS)
     .desc("Lint shell scripts for common mistakes")
     .style()
 }
@@ -36,6 +101,8 @@ fn check_rumdl() -> Check {
     Check::file("rumdl", "rumdl check {FILE}", &["*.md"])
         .fix("rumdl check --fix {FILE}")
         .linter_config(".rumdl.toml", "--config")
+        .baseline_configs(RUMDL_BASELINE_CONFIGS)
+        .unsupported_configs(RUMDL_UNSUPPORTED_CONFIGS)
         .formatter()
         .desc("Lint Markdown files for style and consistency")
         .mise_tool("rumdl")
@@ -45,6 +112,8 @@ fn check_yaml_lint() -> Check {
     Check::files("yaml-lint", "yaml-lint {FILES}", &["*.yml", "*.yaml"])
         .fix("yaml-lint --fix {FILES}")
         .linter_config(".yamllint.yml", "-c")
+        .baseline_configs(YAMLLINT_BASELINE_CONFIGS)
+        .unsupported_configs(YAMLLINT_UNSUPPORTED_CONFIGS)
         .formatter()
         .desc("Lint YAML files for style and consistency")
         .mise_tool("cargo:yaml-lint")
@@ -57,6 +126,8 @@ fn check_actionlint() -> Check {
         &[".github/workflows/*.yml", ".github/workflows/*.yaml"],
     )
     .linter_config("actionlint.yml", "-config-file")
+    .baseline_configs(ACTIONLINT_BASELINE_CONFIGS)
+    .unsupported_configs(ACTIONLINT_UNSUPPORTED_CONFIGS)
     .desc("Lint GitHub Actions workflow files")
     .style()
 }
@@ -68,6 +139,8 @@ fn check_hadolint() -> Check {
         &["Dockerfile", "Dockerfile.*", "*.dockerfile"],
     )
     .linter_config(".hadolint.yaml", "--config")
+    .baseline_configs(HADOLINT_BASELINE_CONFIGS)
+    .unsupported_configs(HADOLINT_UNSUPPORTED_CONFIGS)
     .desc("Lint Dockerfiles")
     .style()
 }
@@ -82,6 +155,8 @@ fn check_codespell() -> Check {
     Check::files("codespell", "codespell {FILES}", &["*"])
         .fix("codespell --write-changes {FILES}")
         .linter_config(".codespellrc", "--config")
+        .baseline_configs(CODESPELL_BASELINE_CONFIGS)
+        .unsupported_configs(CODESPELL_UNSUPPORTED_CONFIGS)
         .desc("Check for common spelling mistakes")
         .mise_tool("pipx:codespell")
 }
@@ -95,6 +170,8 @@ fn check_editorconfig_checker() -> Check {
         .mise_tool("editorconfig-checker")
         .defer_to_formatters()
         .linter_config(".editorconfig-checker.json", "-config")
+        .baseline_configs(EDITORCONFIG_CHECKER_BASELINE_CONFIGS)
+        .unsupported_configs(EDITORCONFIG_CHECKER_UNSUPPORTED_CONFIGS)
         .desc("Check files comply with EditorConfig settings")
 }
 
@@ -105,6 +182,8 @@ fn check_golangci_lint() -> Check {
         &["*.go"],
     )
     .linter_config(".golangci.yml", "--config")
+    .baseline_configs(GOLANGCI_LINT_BASELINE_CONFIGS)
+    .unsupported_configs(GOLANGCI_LINT_UNSUPPORTED_CONFIGS)
     .desc("Lint Go code; uses --new-from-rev to scope analysis to changed code")
     .lang()
 }
@@ -113,6 +192,8 @@ fn check_ruff() -> Check {
     Check::file("ruff", "ruff check {FILE}", &["*.py"])
         .fix("ruff check --fix {FILE}")
         .linter_config("ruff.toml", "--config")
+        .baseline_configs(RUFF_BASELINE_CONFIGS)
+        .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
         .desc("Lint Python code")
         .mise_tool("pipx:ruff")
         .lang()
@@ -123,6 +204,8 @@ fn check_ruff_format() -> Check {
         .bin("ruff")
         .fix("ruff format {FILE}")
         .linter_config("ruff.toml", "--config")
+        .baseline_configs(RUFF_BASELINE_CONFIGS)
+        .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
         .formatter()
         .desc("Format Python code")
         .mise_tool("pipx:ruff")

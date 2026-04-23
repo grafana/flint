@@ -100,6 +100,15 @@ pub fn tool_version_changed(
     previous.is_some() && current.is_some() && previous != current
 }
 
+pub fn flint_version_changed(
+    previous_tools: &HashMap<String, String>,
+    current_tools: &HashMap<String, String>,
+) -> bool {
+    let previous = previous_tools.get("github:grafana/flint");
+    let current = current_tools.get("github:grafana/flint");
+    previous.is_some() && current.is_some() && previous != current
+}
+
 fn declared_tool_version<'a>(
     check: &Check,
     mise_tools: &'a HashMap<String, String>,

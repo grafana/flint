@@ -82,9 +82,10 @@ pub(super) fn generate_rumdl_config(project_root: &Path, line_length: u16) -> Re
 
 /// Generates or updates `.editorconfig` in the project root.
 ///
-/// Existing explicit `max_line_length` settings are left untouched. When a
-/// root `[*]` section exists without a line-length setting, flint adds one
-/// there; otherwise it appends a minimal `[*]` section.
+/// Existing explicit global `[*]` `max_line_length` settings are left
+/// untouched. When a root `[*]` section exists without a line-length
+/// setting, flint adds one there; otherwise it appends a minimal `[*]`
+/// section.
 pub(super) fn generate_editorconfig(project_root: &Path, line_length: u16) -> Result<bool> {
     let target = project_root.join(".editorconfig");
     let content = match std::fs::read_to_string(&target) {

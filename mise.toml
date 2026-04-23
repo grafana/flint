@@ -4,7 +4,7 @@ FLINT_CONFIG_DIR = ".github/config"
 [tools]
 biome = "2.4.12"
 lychee = "0.22.0"
-"npm:renovate" = "43.129.0"
+"npm:renovate" = "43.132.2"
 "github:koalaman/shellcheck" = "v0.11.0"
 shfmt = "v3.13.1"
 actionlint = "1.7.10"

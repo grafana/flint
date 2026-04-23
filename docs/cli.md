@@ -47,6 +47,7 @@ leaving unrelated checks scoped to changed files.
 A check runs against all matching files when:
 
 - the check is newly active because its tool was added to `mise.toml`
+- the check's tool version changed in `mise.toml`
 - the check's flint-managed config file changed, such as `.shellcheckrc` or
   `.yamllint.yml` in `FLINT_CONFIG_DIR`
 - `flint.toml` changed under `[settings]`
@@ -55,7 +56,9 @@ A check runs against all matching files when:
 
 `--full` is still the explicit whole-repo mode. The automatic baseline behavior
 only applies in changed-file mode, and only to checks whose lint coverage may
-have changed.
+have changed. Config-file triggers are detected from the raw git change list, so
+they still apply when the config path itself is excluded from ordinary lint file
+selection.
 
 **`--short` output** — failed checks partitioned by fixability, fixable ones
 expressed as the exact command to run:

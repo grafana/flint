@@ -36,9 +36,28 @@
   ],
   "packageRules": [
     {
-      "matchPackageNames": ["renovate"],
-      "description": "Only update renovate once a week",
-      "schedule": ["before 6am on Monday"]
+      "matchPackageNames": [
+        "actionlint",
+        "cargo:xmloxide",
+        "editorconfig-checker",
+        "github:google/google-java-format",
+        "github:koalaman/shellcheck",
+        "github:pinterest/ktlint",
+        "golangci-lint",
+        "hadolint",
+        "lychee",
+        "npm:@biomejs/biome",
+        "npm:markdownlint-cli2",
+        "npm:prettier",
+        "npm:renovate",
+        "pipx:codespell",
+        "pipx:ruff",
+        "shellcheck",
+        "shfmt"
+      ],
+      "groupName": "linters",
+      "description": "Only update flint-managed linters once a week",
+      "schedule": ["before 4am on Monday"]
     },
     {
       "matchPackageNames": ["jdx/mise"],

@@ -47,10 +47,13 @@ A check is expanded to all matching files when:
 
 - it was not active at the merge base, meaning its tool was newly added to
   `mise.toml`
+- its resolved tool version changed in `mise.toml`
 - its registered `.linter_config(...)` file changed under `FLINT_CONFIG_DIR`
 - `flint.toml` changed under `[settings]`
 - `flint.toml` changed the check-specific section for a special check
 
 This is per-check. Unaffected checks still receive the normal changed-file list.
 Explicit `--full` bypasses this selection because every check is already using
-the all-files list.
+the all-files list. Config-change triggers use the raw git change list before
+`settings.exclude` is applied, so excluded config paths still expand the affected
+check.

@@ -89,6 +89,12 @@ pub struct Check {
     /// When set, look for `(filename, flag)` in config_dir: if the file exists, inject
     /// `flag <abs-path>` into the command right after the binary name.
     pub linter_config: Option<(&'static str, &'static str)>,
+    /// Config-like files that affect this check's results and should trigger
+    /// a one-time all-files baseline run when changed.
+    pub baseline_configs: &'static [ConfigFile],
+    /// Known upstream config locations that flint does not support for this
+    /// check. Their presence is a hard failure to avoid silent config drift.
+    pub unsupported_configs: &'static [ConfigFile],
     /// This check is a formatter — it owns certain file types for formatting purposes.
     pub is_formatter: bool,
     /// Skip files owned by active formatters (used by ec to avoid double-checking).
@@ -196,6 +202,8 @@ impl Check {
             patterns,
             excludes_if_active: &[],
             linter_config: None,
+            baseline_configs: &[],
+            unsupported_configs: &[],
             is_formatter: false,
             defers_to_formatters: false,
             activate_unconditionally: false,
@@ -226,6 +234,8 @@ impl Check {
             patterns: &[],
             excludes_if_active: &[],
             linter_config: None,
+            baseline_configs: &[],
+            unsupported_configs: &[],
             is_formatter: false,
             defers_to_formatters: false,
             activate_unconditionally: false,
@@ -390,5 +400,72 @@ impl Check {
     pub fn linter_config(mut self, file: &'static str, flag: &'static str) -> Self {
         self.linter_config = Some((file, flag));
         self
+    }
+
+    pub fn baseline_configs(mut self, files: &'static [ConfigFile]) -> Self {
+        self.baseline_configs = files;
+        self
+    }
+
+    pub fn unsupported_configs(mut self, files: &'static [ConfigFile]) -> Self {
+        self.unsupported_configs = files;
+        self
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ConfigBase {
+    ProjectRoot,
+    ConfigDir,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ConfigMatch {
+    Exists,
+    TomlSection(&'static [&'static str]),
+    IniSection(&'static str),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ConfigFile {
+    pub base: ConfigBase,
+    pub path: &'static str,
+    pub presence: ConfigMatch,
+}
+
+impl ConfigFile {
+    pub const fn project(path: &'static str) -> Self {
+        Self {
+            base: ConfigBase::ProjectRoot,
+            path,
+            presence: ConfigMatch::Exists,
+        }
+    }
+
+    pub const fn config_dir(path: &'static str) -> Self {
+        Self {
+            base: ConfigBase::ConfigDir,
+            path,
+            presence: ConfigMatch::Exists,
+        }
+    }
+
+    pub const fn project_toml_section(
+        path: &'static str,
+        section: &'static [&'static str],
+    ) -> Self {
+        Self {
+            base: ConfigBase::ProjectRoot,
+            path,
+            presence: ConfigMatch::TomlSection(section),
+        }
+    }
+
+    pub const fn project_ini_section(path: &'static str, section: &'static str) -> Self {
+        Self {
+            base: ConfigBase::ProjectRoot,
+            path,
+            presence: ConfigMatch::IniSection(section),
+        }
     }
 }

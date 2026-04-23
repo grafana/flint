@@ -66,6 +66,13 @@ Check::file("rumdl", "rumdl check {FILE}", &["*.md"])
 Look up the tool's `--help` or man page for the config flag name and expected
 argument type before adding `.linter_config`.
 
+When a tool supports other config filenames, register them with
+`.unsupported_configs(...)` so flint fails loudly instead of letting the tool
+auto-discover a config that flint does not baseline or inject. Use
+`.baseline_configs(...)` for config-like files that should force an all-files
+run when changed, even if they are not passed via `.linter_config(...)`; for
+example, `editorconfig-checker` treats `.editorconfig` as a baseline config.
+
 For checks that need custom logic (not a simple command template), add a module
 under `src/linters/` and use `CheckKind::Special`.
 

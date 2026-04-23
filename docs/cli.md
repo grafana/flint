@@ -50,6 +50,8 @@ A check runs against all matching files when:
 - the check's tool version changed in `mise.toml`
 - the check's flint-managed config file changed, such as `.shellcheckrc` or
   `.yamllint.yml` in `FLINT_CONFIG_DIR`
+- another supported baseline config for the check changed, such as
+  `.editorconfig` for `editorconfig-checker`
 - `flint.toml` changed under `[settings]`
 - `flint.toml` changed the check-specific config for a special check, such as
   `[checks.links]` or `[checks.renovate-deps]`
@@ -59,6 +61,12 @@ only applies in changed-file mode, and only to checks whose lint coverage may
 have changed. Config-file triggers are detected from the raw git change list, so
 they still apply when the config path itself is excluded from ordinary lint file
 selection.
+
+Flint intentionally supports one canonical config filename per linter when it
+passes config paths explicitly. If an active linter has a known alternate
+upstream config file, Flint fails before running the linter instead of silently
+ignoring or partially auto-discovering that config. Move the config to the
+Flint-managed filename under `FLINT_CONFIG_DIR`, or remove the alternate file.
 
 **`--short` output** — failed checks partitioned by fixability, fixable ones
 expressed as the exact command to run:

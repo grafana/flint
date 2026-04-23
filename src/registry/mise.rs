@@ -8,8 +8,7 @@ use super::types::Check;
 ///
 /// Also registers normalized aliases for backend-prefixed tools so that checks
 /// can match by their bare package/binary name. For example:
-/// - `"npm:prettier"` → also registers `"prettier"`
-/// - `"npm:@biomejs/biome"` → also registers `"biome"` (last path component)
+/// - `"cargo:yaml-lint"` → also registers `"yaml-lint"`
 /// - `"github:google/google-java-format"` → also registers `"google-java-format"`
 ///
 /// The original key is always preserved; aliases only fill in missing entries.
@@ -19,7 +18,25 @@ pub fn read_mise_tools(project_root: &Path) -> HashMap<String, String> {
         Ok(c) => c,
         Err(_) => return HashMap::new(),
     };
-    let value: toml::Value = match toml::from_str(&content) {
+    read_mise_tools_from_str(&content)
+}
+
+pub fn read_mise_tools_at_ref(project_root: &Path, git_ref: &str) -> HashMap<String, String> {
+    let spec = format!("{git_ref}:mise.toml");
+    let out = match std::process::Command::new("git")
+        .args(["show", &spec])
+        .current_dir(project_root)
+        .output()
+    {
+        Ok(out) if out.status.success() => out,
+        _ => return HashMap::new(),
+    };
+    let content = String::from_utf8_lossy(&out.stdout);
+    read_mise_tools_from_str(&content)
+}
+
+fn read_mise_tools_from_str(content: &str) -> HashMap<String, String> {
+    let value: toml::Value = match toml::from_str(content) {
         Ok(v) => v,
         Err(_) => return HashMap::new(),
     };
@@ -38,7 +55,7 @@ pub fn read_mise_tools(project_root: &Path) -> HashMap<String, String> {
             }
         }
     }
-    // Add normalized aliases: strip the backend prefix (e.g. "npm:", "pipx:", "ubi:")
+    // Add normalized aliases: strip the backend prefix (e.g. "cargo:", "pipx:", "github:")
     // and take the last path component (e.g. "@biomejs/biome" → "biome").
     // Aliases never override an explicitly declared entry.
     let aliases: Vec<(String, String)> = tools
@@ -61,13 +78,7 @@ pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool
     if check.activate_unconditionally {
         return true;
     }
-    let lookup_key = check.mise_tool_name.unwrap_or(check.bin_name);
-    // When mise_tool_name is set (e.g. "npm:markdownlint-cli2"), also accept
-    // the bare bin_name ("markdownlint-cli2") so repos using either form work.
-    let declared = mise_tools
-        .get(lookup_key)
-        .or_else(|| check.mise_tool_name.and(mise_tools.get(check.bin_name)));
-    let Some(declared) = declared else {
+    let Some(declared) = declared_tool_version(check, mise_tools) else {
         return false;
     };
     let Some(range_str) = check.version_range else {
@@ -77,6 +88,32 @@ pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool
         return false;
     };
     coerce_version(declared).is_some_and(|v| req.matches(&v))
+}
+
+pub fn tool_version_changed(
+    check: &Check,
+    previous_tools: &HashMap<String, String>,
+    current_tools: &HashMap<String, String>,
+) -> bool {
+    let previous = declared_tool_version(check, previous_tools);
+    let current = declared_tool_version(check, current_tools);
+    previous.is_some() && current.is_some() && previous != current
+}
+
+fn declared_tool_version<'a>(
+    check: &Check,
+    mise_tools: &'a HashMap<String, String>,
+) -> Option<&'a str> {
+    if check.activate_unconditionally {
+        return None;
+    }
+    let lookup_key = check.mise_tool_name.unwrap_or(check.bin_name);
+    // When mise_tool_name is set (e.g. "cargo:yaml-lint"), also accept
+    // the bare bin_name ("yaml-lint") so repos using either form work.
+    mise_tools
+        .get(lookup_key)
+        .or_else(|| check.mise_tool_name.and(mise_tools.get(check.bin_name)))
+        .map(String::as_str)
 }
 
 /// Parses a version string, padding with `.0` components if needed to satisfy

@@ -4,13 +4,14 @@ exit = 0
 stdout = '''
 Tip: flint init detects languages from tracked files (`git ls-files`). Add and stage your source files before running init so the detection is accurate.
 
-  added node (LTS) — required by npm: backend tools
   pinned flint itself — reproducible lint runs across contributors
   normalized [tools] in <REPO>/mise.toml
   wrote <REPO>/.github/config/flint.toml
   wrote <REPO>/.github/workflows/lint.yml
-  removed <REPO>/.markdownlint.json (replaced by .markdownlint.yml)
-  wrote <REPO>/.markdownlint.yml
+  removed <REPO>/.markdownlint.json (replaced by .rumdl.toml)
+  wrote <REPO>/.rumdl.toml
+  wrote <REPO>/.yamllint.yml
+  wrote <REPO>/biome.json
 installed pre-commit hook (.git/hooks/pre-commit)
 Done. Run `mise install` to install the new tools.
 '''
@@ -24,9 +25,30 @@ Done. Run `mise install` to install the new tools.
 [settings]
 # exclude = ["CHANGELOG\\.md"]
 '''
-".markdownlint.yml" = '''
-# Line length is enforced by editorconfig-checker via .editorconfig
-MD013: false
+".rumdl.toml" = '''
+[MD013]
+enabled = true
+line-length = 120
+code-blocks = false
+tables = false
+'''
+".yamllint.yml" = '''
+extends: relaxed
+
+rules:
+  document-start: disable
+  line-length:
+    max: 120
+  indentation:
+    spaces: 2
+'''
+"biome.json" = '''
+{
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2
+  }
+}
 '''
 "mise.toml" = '''
 [tools]
@@ -34,14 +56,13 @@ rust = { version = "1.0.0", components = "clippy,rustfmt" }
 
 # Linters
 actionlint = "1.0.0"
+biome = "1.0.0"
+"cargo:yaml-lint" = "1.0.0"
 editorconfig-checker = "1.0.0"
 "github:grafana/flint" = "1.0.0"
 lychee = "1.0.0"
-node = "1.0.0"
-"npm:@biomejs/biome" = "1.0.0"
-"npm:markdownlint-cli2" = "1.0.0"
-"npm:prettier" = "1.0.0"
 "pipx:codespell" = "1.0.0"
+rumdl = "1.0.0"
 
 [env]
 FLINT_CONFIG_DIR = ".github/config"

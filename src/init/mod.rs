@@ -15,8 +15,9 @@ use detection::{
 };
 use generation::{
     apply_changes, apply_env_and_tasks, detect_base_branch, ensure_flint_self_pin,
-    ensure_node_for_npm, flint_preset, generate_flint_toml, generate_lint_workflow,
-    generate_markdownlint_config, get_existing_config_dir, has_slow_selected, maybe_install_hook,
+    ensure_node_for_npm, exclude_markdown_from_editorconfig_checker, flint_preset,
+    generate_biome_config, generate_flint_toml, generate_lint_workflow, generate_rumdl_config,
+    generate_yamllint_config, get_existing_config_dir, has_slow_selected, maybe_install_hook,
     normalize_tools_section, patch_renovate_extends, prompt_config_dir, remove_v1_tasks,
 };
 use ui::{interactive_select_linters, select_categories_arrow};
@@ -26,7 +27,7 @@ use ui::{interactive_select_linters, select_categories_arrow};
 pub enum Profile {
     /// Primary language linters only (ruff, cargo-clippy, golangci-lint, …).
     Lang,
-    /// Lang + supplementary checks + fast general tools (shellcheck, prettier, codespell, …).
+    /// Lang + supplementary checks + fast general tools (shellcheck, rumdl, codespell, …).
     Default,
     /// Default + slow linters (renovate-deps).
     Comprehensive,
@@ -140,13 +141,16 @@ Add and stage your source files before running init so the detection is accurate
     let registry = builtin();
     let mut present_patterns = detect_present_patterns(project_root, &registry)?;
 
-    // If init will generate `.github/workflows/lint.yml`, treat the workflow
-    // patterns as present so actionlint gets selected in the same run.
-    // Without this, init would be non-idempotent: the second run would see the
-    // newly-generated workflow and add actionlint then.
+    // If init will generate `.github/workflows/lint.yml`, treat both the workflow-
+    // specific patterns and generic YAML patterns as present so actionlint and
+    // yaml-lint get selected in the same run. Without this, init would be
+    // non-idempotent: the second run would see the newly-generated workflow and
+    // add extra linters then.
     if !project_root.join(".github/workflows/lint.yml").exists() {
         present_patterns.insert(".github/workflows/*.yml".to_string());
         present_patterns.insert(".github/workflows/*.yaml".to_string());
+        present_patterns.insert("*.yml".to_string());
+        present_patterns.insert("*.yaml".to_string());
     }
 
     // Step 1: determine which categories set the initial pre-selection.
@@ -193,7 +197,7 @@ Add and stage your source files before running init so the detection is accurate
         return Ok(());
     }
 
-    // Detect obsolete tool keys (e.g. npm:markdownlint-cli → npm:markdownlint-cli2).
+    // Detect obsolete tool keys (e.g. github:mvdan/sh → shfmt).
     // These are removed regardless of the interactive selection — keeping them serves no purpose.
     let obsolete = detect_obsolete_keys(&current_tool_keys);
     for (old_key, replacement) in &obsolete {
@@ -237,17 +241,23 @@ Add and stage your source files before running init so the detection is accurate
             .zip(&g.check_selected)
             .any(|(c, &sel)| sel && c.name == "renovate-deps")
     });
-    let has_markdownlint = groups.iter().any(|g| {
+    let has_rumdl = groups.iter().any(|g| {
         g.checks
             .iter()
             .zip(&g.check_selected)
-            .any(|(c, &sel)| sel && c.name == "markdownlint-cli2")
+            .any(|(c, &sel)| sel && c.name == "rumdl")
     });
-    let has_editorconfig_checker = groups.iter().any(|g| {
+    let has_yaml_lint = groups.iter().any(|g| {
         g.checks
             .iter()
             .zip(&g.check_selected)
-            .any(|(c, &sel)| sel && c.name == "editorconfig-checker")
+            .any(|(c, &sel)| sel && c.name == "yaml-lint")
+    });
+    let has_biome = groups.iter().any(|g| {
+        g.checks
+            .iter()
+            .zip(&g.check_selected)
+            .any(|(c, &sel)| sel && (c.name == "biome" || c.name == "biome-format"))
     });
 
     // Prompt for the flint config dir (skipped if already set in mise.toml or --yes).
@@ -297,8 +307,26 @@ Add and stage your source files before running init so the detection is accurate
     let has_rust = final_add.iter().any(|(k, _)| k == "rust")
         || (current_tool_keys.contains("rust") && !final_remove.iter().any(|k| k == "rust"));
     let workflow_generated = generate_lint_workflow(project_root, &base_branch, has_rust)?;
-    let markdownlint_generated = if has_markdownlint && has_editorconfig_checker {
-        generate_markdownlint_config(project_root)?
+    let rumdl_generated = if has_rumdl {
+        generate_rumdl_config(project_root)?
+    } else {
+        false
+    };
+    let editorconfig_markdown_excluded = if has_rumdl {
+        exclude_markdown_from_editorconfig_checker(project_root, &config_dir_path)?
+    } else {
+        false
+    };
+    if editorconfig_markdown_excluded {
+        println!("  patched editorconfig-checker config — Markdown is now owned by rumdl");
+    }
+    let yamllint_generated = if has_yaml_lint {
+        generate_yamllint_config(project_root)?
+    } else {
+        false
+    };
+    let biome_generated = if has_biome {
+        generate_biome_config(project_root)?
     } else {
         false
     };
@@ -324,7 +352,10 @@ Add and stage your source files before running init so the detection is accurate
         && !meta_changed
         && !toml_generated
         && !workflow_generated
-        && !markdownlint_generated
+        && !rumdl_generated
+        && !editorconfig_markdown_excluded
+        && !yamllint_generated
+        && !biome_generated
         && !renovate_patched
     {
         println!("No changes to apply.");
@@ -413,19 +444,19 @@ mod tests {
     fn detect_obsolete_keys_finds_known_stale_key() {
         use detection::detect_obsolete_keys;
         let mut keys = HashSet::new();
-        keys.insert("npm:markdownlint-cli".to_string());
+        keys.insert("github:mvdan/sh".to_string());
         keys.insert("shellcheck".to_string());
         let found = detect_obsolete_keys(&keys);
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].0, "npm:markdownlint-cli");
-        assert_eq!(found[0].1, "npm:markdownlint-cli2");
+        assert_eq!(found[0].0, "github:mvdan/sh");
+        assert_eq!(found[0].1, "shfmt");
     }
 
     #[test]
     fn detect_obsolete_keys_ignores_current_keys() {
         use detection::detect_obsolete_keys;
         let mut keys = HashSet::new();
-        keys.insert("npm:markdownlint-cli2".to_string());
+        keys.insert("rumdl".to_string());
         keys.insert("shellcheck".to_string());
         let found = detect_obsolete_keys(&keys);
         assert!(found.is_empty());
@@ -474,9 +505,8 @@ mod tests {
     fn normalize_tools_section_sorts_and_inserts_linters_header() {
         let content = r#"[tools]
 lychee = "0.22.0"
-node = "24.0.0"
 actionlint = "1.7.0"
-"npm:prettier" = "3.8.0"
+rumdl = "0.1.0"
 rust = { version = "1.95.0", components = "clippy,rustfmt" }
 "#;
         let tmp = tempfile::NamedTempFile::new().unwrap();
@@ -485,18 +515,17 @@ rust = { version = "1.95.0", components = "clippy,rustfmt" }
         assert!(changed);
         let result = std::fs::read_to_string(tmp.path()).unwrap();
         let header_pos = result.find("# Linters").expect("header present");
-        let node_pos = result.find("node =").expect("node present");
+        let biome_pos = result.find("biome =").unwrap_or(usize::MAX);
         let rust_pos = result.find("rust =").expect("rust present");
         let actionlint_pos = result.find("actionlint =").expect("actionlint present");
         let lychee_pos = result.find("lychee =").expect("lychee present");
-        let prettier_pos = result.find("\"npm:prettier\"").expect("prettier present");
-        // rust is the only true toolchain here; node lives with linters because
-        // it's only pinned as a prereq for npm:* backend tools.
+        let rumdl_pos = result.find("rumdl =").expect("rumdl present");
         assert!(rust_pos < header_pos, "toolchains above header");
-        assert!(node_pos > header_pos, "node below header (linter prereq)");
         assert!(actionlint_pos > header_pos, "linters below header");
         assert!(
-            actionlint_pos < lychee_pos && lychee_pos < node_pos && node_pos < prettier_pos,
+            actionlint_pos < lychee_pos
+                && lychee_pos < rumdl_pos
+                && (biome_pos == usize::MAX || rumdl_pos < biome_pos),
             "linters sorted alphabetically"
         );
 
@@ -532,12 +561,12 @@ rust = { version = "1.95.0", components = "clippy,rustfmt" }
         let content = r#"
 [tools]
 shellcheck = "v0.11.0"
-"npm:prettier" = "3.8.1"
+rumdl = "0.1.0"
 rust = { version = "1.0", components = "clippy" }
 "#;
         let keys = parse_tool_keys(content);
         assert!(keys.contains("shellcheck"));
-        assert!(keys.contains("npm:prettier"));
+        assert!(keys.contains("rumdl"));
         assert!(keys.contains("rust"));
         assert!(!keys.contains("nonexistent"));
     }
@@ -634,37 +663,117 @@ rust = { version = "1.0", components = "clippy" }
     }
 
     #[test]
-    fn generate_markdownlint_config_writes_file() {
-        use generation::generate_markdownlint_config;
+    fn generate_rumdl_config_writes_file() {
+        use generation::generate_rumdl_config;
         let tmp = tempfile::TempDir::new().unwrap();
-        let written = generate_markdownlint_config(tmp.path()).unwrap();
+        let written = generate_rumdl_config(tmp.path()).unwrap();
         assert!(written);
-        let content = std::fs::read_to_string(tmp.path().join(".markdownlint.yml")).unwrap();
-        assert!(content.contains("MD013: false"));
-        assert!(content.contains("editorconfig-checker"));
+        let content = std::fs::read_to_string(tmp.path().join(".rumdl.toml")).unwrap();
+        assert!(content.contains("line-length = 120"));
+        assert!(content.contains("code-blocks = false"));
+        assert!(!content.contains("[global]"));
     }
 
     #[test]
-    fn generate_markdownlint_config_skips_when_target_exists() {
-        use generation::generate_markdownlint_config;
+    fn generate_rumdl_config_skips_when_target_exists() {
+        use generation::generate_rumdl_config;
         let tmp = tempfile::TempDir::new().unwrap();
-        std::fs::write(tmp.path().join(".markdownlint.yml"), "existing").unwrap();
-        let written = generate_markdownlint_config(tmp.path()).unwrap();
+        std::fs::write(tmp.path().join(".rumdl.toml"), "existing").unwrap();
+        let written = generate_rumdl_config(tmp.path()).unwrap();
         assert!(!written);
-        let content = std::fs::read_to_string(tmp.path().join(".markdownlint.yml")).unwrap();
+        let content = std::fs::read_to_string(tmp.path().join(".rumdl.toml")).unwrap();
         assert_eq!(content, "existing");
     }
 
     #[test]
-    fn generate_markdownlint_config_replaces_legacy_json() {
-        use generation::generate_markdownlint_config;
+    fn generate_rumdl_config_replaces_legacy_json() {
+        use generation::generate_rumdl_config;
         let tmp = tempfile::TempDir::new().unwrap();
         std::fs::write(tmp.path().join(".markdownlint.json"), r#"{"MD013":false}"#).unwrap();
-        let written = generate_markdownlint_config(tmp.path()).unwrap();
+        let written = generate_rumdl_config(tmp.path()).unwrap();
         assert!(written);
         assert!(!tmp.path().join(".markdownlint.json").exists());
-        let content = std::fs::read_to_string(tmp.path().join(".markdownlint.yml")).unwrap();
-        assert!(content.contains("MD013: false"));
+        let content = std::fs::read_to_string(tmp.path().join(".rumdl.toml")).unwrap();
+        assert!(content.contains("[MD013]"));
+    }
+
+    #[test]
+    fn exclude_markdown_from_editorconfig_checker_updates_config_dir_file() {
+        use generation::exclude_markdown_from_editorconfig_checker;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(
+            config_dir.join(".editorconfig-checker.json"),
+            "{\n  \"Exclude\": [\".*\\\\.java$\"]\n}\n",
+        )
+        .unwrap();
+
+        let changed = exclude_markdown_from_editorconfig_checker(tmp.path(), &config_dir).unwrap();
+        assert!(changed);
+        let content =
+            std::fs::read_to_string(config_dir.join(".editorconfig-checker.json")).unwrap();
+        assert!(content.contains(".*\\\\.java$"));
+        assert!(content.contains(".*\\\\.md$"));
+    }
+
+    #[test]
+    fn exclude_markdown_from_editorconfig_checker_is_idempotent() {
+        use generation::exclude_markdown_from_editorconfig_checker;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(
+            config_dir.join(".editorconfig-checker.json"),
+            "{\n  \"Exclude\": [\".*\\\\.md$\"]\n}\n",
+        )
+        .unwrap();
+
+        let changed = exclude_markdown_from_editorconfig_checker(tmp.path(), &config_dir).unwrap();
+        assert!(!changed);
+    }
+
+    #[test]
+    fn generate_yamllint_config_writes_file() {
+        use generation::generate_yamllint_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let written = generate_yamllint_config(tmp.path()).unwrap();
+        assert!(written);
+        let content = std::fs::read_to_string(tmp.path().join(".yamllint.yml")).unwrap();
+        assert!(content.contains("extends: relaxed"));
+        assert!(content.contains("document-start: disable"));
+    }
+
+    #[test]
+    fn generate_biome_config_writes_file() {
+        use generation::generate_biome_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let written = generate_biome_config(tmp.path()).unwrap();
+        assert!(written);
+        let content = std::fs::read_to_string(tmp.path().join("biome.json")).unwrap();
+        assert!(content.contains("\"indentStyle\": \"space\""));
+        assert!(content.contains("\"indentWidth\": 2"));
+    }
+
+    #[test]
+    fn generate_biome_config_skips_existing_json() {
+        use generation::generate_biome_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(tmp.path().join("biome.json"), "existing").unwrap();
+        let written = generate_biome_config(tmp.path()).unwrap();
+        assert!(!written);
+        let content = std::fs::read_to_string(tmp.path().join("biome.json")).unwrap();
+        assert_eq!(content, "existing");
+    }
+
+    #[test]
+    fn generate_biome_config_skips_existing_jsonc() {
+        use generation::generate_biome_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(tmp.path().join("biome.jsonc"), "existing").unwrap();
+        let written = generate_biome_config(tmp.path()).unwrap();
+        assert!(!written);
+        assert!(!tmp.path().join("biome.json").exists());
     }
 
     #[test]

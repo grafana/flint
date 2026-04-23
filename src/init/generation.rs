@@ -600,25 +600,21 @@ pub(super) fn generate_flint_toml(
     Ok(true)
 }
 
-/// Generates `.markdownlint.yml` in the project root when markdownlint-cli2 is
-/// being set up alongside editorconfig-checker.
-/// Returns `true` if the file was written (or an older variant was replaced).
-///
-/// Target format is `.markdownlint.yml` for uniformity across consumer repos.
-/// Older variants (`.markdownlint.{json,jsonc,yaml}`,
-/// `.markdownlint-cli2.{jsonc,yaml,yml,cjs,mjs}`) are replaced.
-pub(super) fn generate_markdownlint_config(project_root: &Path) -> Result<bool> {
+/// Generates `.rumdl.toml` in the project root when rumdl is being set up.
+/// Returns `true` if the file was written (or an older markdownlint variant was replaced).
+pub(super) fn generate_rumdl_config(project_root: &Path) -> Result<bool> {
     const LEGACY_CONFIG_NAMES: &[&str] = &[
         ".markdownlint.json",
         ".markdownlint.jsonc",
         ".markdownlint.yaml",
+        ".markdownlint.yml",
         ".markdownlint-cli2.jsonc",
         ".markdownlint-cli2.yaml",
         ".markdownlint-cli2.yml",
         ".markdownlint-cli2.cjs",
         ".markdownlint-cli2.mjs",
     ];
-    let target = project_root.join(".markdownlint.yml");
+    let target = project_root.join(".rumdl.toml");
     if target.exists() {
         return Ok(false);
     }
@@ -626,14 +622,126 @@ pub(super) fn generate_markdownlint_config(project_root: &Path) -> Result<bool> 
         let legacy = project_root.join(name);
         if legacy.exists() {
             std::fs::remove_file(&legacy)?;
-            println!(
-                "  removed {} (replaced by .markdownlint.yml)",
-                legacy.display()
-            );
+            println!("  removed {} (replaced by .rumdl.toml)", legacy.display());
         }
     }
-    let content =
-        "# Line length is enforced by editorconfig-checker via .editorconfig\nMD013: false\n";
+    let content = concat!(
+        "[MD013]\n",
+        "enabled = true\n",
+        "line-length = 120\n",
+        "code-blocks = false\n",
+        "tables = false\n",
+    );
+    std::fs::write(&target, content)?;
+    println!("  wrote {}", target.display());
+    Ok(true)
+}
+
+/// Updates an existing editorconfig-checker config so Markdown is excluded when
+/// rumdl owns Markdown formatting and line-length enforcement.
+///
+/// Checks both the project root and `config_dir`, updating the first config
+/// file that exists. Returns `true` when a config was changed.
+pub(super) fn exclude_markdown_from_editorconfig_checker(
+    project_root: &Path,
+    config_dir: &Path,
+) -> Result<bool> {
+    const MARKDOWN_EXCLUDE: &str = ".*\\.md$";
+    let candidates = [
+        config_dir.join(".editorconfig-checker.json"),
+        project_root.join(".editorconfig-checker.json"),
+    ];
+
+    for path in candidates {
+        if !path.exists() {
+            continue;
+        }
+
+        let content = std::fs::read_to_string(&path)?;
+        let mut value: serde_json::Value = serde_json::from_str(&content)
+            .with_context(|| format!("failed to parse {}", path.display()))?;
+        let Some(obj) = value.as_object_mut() else {
+            anyhow::bail!("{} is not a JSON object", path.display());
+        };
+
+        let key = if obj.contains_key("Exclude") {
+            "Exclude"
+        } else if obj.contains_key("exclude") {
+            "exclude"
+        } else {
+            "Exclude"
+        };
+
+        let entry = obj
+            .entry(key.to_string())
+            .or_insert_with(|| serde_json::Value::Array(vec![]));
+        let Some(items) = entry.as_array_mut() else {
+            anyhow::bail!("{} field in {} is not an array", key, path.display());
+        };
+
+        if items
+            .iter()
+            .any(|v| v.as_str().is_some_and(|s| s == MARKDOWN_EXCLUDE))
+        {
+            return Ok(false);
+        }
+
+        items.push(serde_json::Value::String(MARKDOWN_EXCLUDE.to_string()));
+        let updated = serde_json::to_string_pretty(&value)? + "\n";
+        std::fs::write(&path, updated)?;
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
+/// Generates `.yamllint.yml` in the project root when yaml-lint is being set up.
+pub(super) fn generate_yamllint_config(project_root: &Path) -> Result<bool> {
+    let target = project_root.join(".yamllint.yml");
+    if target.exists() {
+        return Ok(false);
+    }
+    let content = concat!(
+        "extends: relaxed\n",
+        "\n",
+        "rules:\n",
+        "  document-start: disable\n",
+        "  line-length:\n",
+        "    max: 120\n",
+        "  indentation:\n",
+        "    spaces: 2\n",
+    );
+    std::fs::write(&target, content)?;
+    println!("  wrote {}", target.display());
+    Ok(true)
+}
+
+/// Generates `biome.json` in the project root when biome is being set up and no
+/// existing biome config is present.
+///
+/// Flint writes explicit space indentation to avoid Biome's default tab
+/// formatting surprising consumers during rollout.
+pub(super) fn generate_biome_config(project_root: &Path) -> Result<bool> {
+    const EXISTING_CONFIG_NAMES: &[&str] = &["biome.json", "biome.jsonc"];
+    if EXISTING_CONFIG_NAMES
+        .iter()
+        .map(|name| project_root.join(name))
+        .any(|path| path.exists())
+    {
+        return Ok(false);
+    }
+
+    let target = project_root.join("biome.json");
+    let content = [
+        "{",
+        "  \"formatter\": {",
+        "    \"indentStyle\": \"space\",",
+        "    \"indentWidth\": 2",
+        "  }",
+        "}",
+        "",
+    ]
+    .join("\n");
     std::fs::write(&target, content)?;
     println!("  wrote {}", target.display());
     Ok(true)
@@ -849,7 +957,7 @@ mod node_prereq_tests {
 
     #[test]
     fn needs_node_when_npm_key_without_node() {
-        let content = "[tools]\n\"npm:prettier\" = \"3.8.1\"\n";
+        let content = "[tools]\n\"npm:renovate\" = \"43.129.0\"\n";
         assert!(needs_node_for_npm(content));
     }
 
@@ -861,7 +969,7 @@ mod node_prereq_tests {
 
     #[test]
     fn no_node_needed_when_node_already_declared() {
-        let content = "[tools]\nnode = \"20\"\n\"npm:prettier\" = \"3.8.1\"\n";
+        let content = "[tools]\nnode = \"20\"\n\"npm:renovate\" = \"43.129.0\"\n";
         assert!(!needs_node_for_npm(content));
     }
 
@@ -875,7 +983,7 @@ mod node_prereq_tests {
     fn noop_when_node_already_present() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mise.toml");
-        let original = "[tools]\nnode = \"20\"\n\"npm:prettier\" = \"3.8.1\"\n";
+        let original = "[tools]\nnode = \"20\"\n\"npm:renovate\" = \"43.129.0\"\n";
         std::fs::write(&path, original).unwrap();
         let added = ensure_node_for_npm(dir.path()).unwrap();
         assert!(!added);
@@ -902,41 +1010,27 @@ mod replace_obsolete_tests {
     fn replaces_old_key_preserving_version() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mise.toml");
-        std::fs::write(&path, "[tools]\n\"npm:markdownlint-cli\" = \"0.39.0\"\n").unwrap();
-        let replaced = replace_obsolete_keys(
-            dir.path(),
-            &[("npm:markdownlint-cli", "npm:markdownlint-cli2")],
-        )
-        .unwrap();
+        std::fs::write(&path, "[tools]\n\"github:mvdan/sh\" = \"v3.13.1\"\n").unwrap();
+        let replaced = replace_obsolete_keys(dir.path(), &[("github:mvdan/sh", "shfmt")]).unwrap();
         assert_eq!(
             replaced,
-            vec![(
-                "npm:markdownlint-cli".to_string(),
-                "npm:markdownlint-cli2".to_string()
-            )]
+            vec![("github:mvdan/sh".to_string(), "shfmt".to_string())]
         );
         let result = std::fs::read_to_string(&path).unwrap();
+        assert!(result.contains("shfmt"), "new key written: {result}");
         assert!(
-            result.contains("npm:markdownlint-cli2"),
-            "new key written: {result}"
-        );
-        assert!(
-            !result.contains("\"npm:markdownlint-cli\""),
+            !result.contains("\"github:mvdan/sh\""),
             "old key removed: {result}"
         );
-        assert!(result.contains("0.39.0"), "version preserved: {result}");
+        assert!(result.contains("v3.13.1"), "version preserved: {result}");
     }
 
     #[test]
     fn noop_when_no_obsolete_keys() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mise.toml");
-        std::fs::write(&path, "[tools]\n\"npm:markdownlint-cli2\" = \"0.17.2\"\n").unwrap();
-        let replaced = replace_obsolete_keys(
-            dir.path(),
-            &[("npm:markdownlint-cli", "npm:markdownlint-cli2")],
-        )
-        .unwrap();
+        std::fs::write(&path, "[tools]\nshfmt = \"v3.13.1\"\n").unwrap();
+        let replaced = replace_obsolete_keys(dir.path(), &[("github:mvdan/sh", "shfmt")]).unwrap();
         assert!(replaced.is_empty());
     }
 }

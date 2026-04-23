@@ -5,19 +5,17 @@ mod resolve;
 mod types;
 
 pub use checks::builtin;
-pub use mise::{check_active, read_mise_tools};
-pub use obsolete::{OBSOLETE_KEYS, find_obsolete_key};
+pub use mise::{check_active, read_mise_tools, read_mise_tools_at_ref, tool_version_changed};
+pub use obsolete::{OBSOLETE_KEYS, find_obsolete_key, find_unsupported_key};
 pub use resolve::binary_on_path;
-pub use types::{Category, Check, CheckKind, FixBehavior, Scope, SpecialKind};
+pub use types::{Category, Check, CheckKind, FixBehavior, RunPolicy, Scope, SpecialKind};
 
 /// Returns the set of `mise.toml` tool keys that name language runtimes/SDKs
 /// (e.g. `rust`, `go`, `dotnet`). Derived from registry checks marked
 /// `.toolchain()`.
 ///
 /// `flint init` uses this set to keep runtime keys above the `# Linters`
-/// header in `mise.toml`. `node` is deliberately excluded — it's pinned by
-/// `ensure_node_for_npm` only as a prereq for `npm:` backend linters, so it
-/// belongs in the linters group.
+/// header in `mise.toml`.
 pub fn toolchain_keys() -> std::collections::HashSet<&'static str> {
     builtin()
         .into_iter()

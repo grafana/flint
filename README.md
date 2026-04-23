@@ -64,8 +64,9 @@ Add the linting tools your project needs alongside the `flint` binary itself:
 shellcheck              = "v0.11.0"
 "github:mvdan/sh"       = "v3.13.1"  # activates shfmt
 actionlint              = "1.7.10"
-"npm:markdownlint-cli2" = "0.47.0"
-"npm:prettier"          = "3.5.0"
+rumdl                   = "0.1.78"
+"cargo:yaml-lint"       = "0.1.0"
+biome                   = "2.4.12"
 rust                    = "1.87.0"    # activates cargo-fmt + cargo-clippy
 go                      = "1.24.0"    # activates gofmt
 lychee                  = "0.18.0"    # activates links check
@@ -180,14 +181,14 @@ Click a name in the table below for details. See the
 | [`ktlint`](docs/linters.md#ktlint)                             | Lint and format Kotlin code                                         | yes |
 | [`license-header`](docs/linters.md#license-header)             | Check source files have the required license header                 | —   |
 | [`lychee`](docs/linters.md#lychee)                             | Check for broken links                                              | —   |
-| [`markdownlint-cli2`](docs/linters.md#markdownlint-cli2)       | Lint Markdown files for style and consistency                       | yes |
-| [`prettier`](docs/linters.md#prettier)                         | Format Markdown and YAML files                                      | yes |
 | [`renovate-deps`](docs/linters.md#renovate-deps)               | Verify Renovate dependency snapshot is up to date                   | yes |
 | [`ruff`](docs/linters.md#ruff)                                 | Lint Python code                                                    | yes |
 | [`ruff-format`](docs/linters.md#ruff-format)                   | Format Python code                                                  | yes |
+| [`rumdl`](docs/linters.md#rumdl)                               | Lint Markdown files for style and consistency                       | yes |
 | [`shellcheck`](docs/linters.md#shellcheck)                     | Lint shell scripts for common mistakes                              | —   |
 | [`shfmt`](docs/linters.md#shfmt)                               | Format shell scripts                                                | yes |
 | [`xmllint`](docs/linters.md#xmllint)                           | Validate XML files are well-formed                                  | —   |
+| [`yaml-lint`](docs/linters.md#yaml-lint)                       | Lint YAML files for style and consistency                           | yes |
 
 <!-- registry-table-end -->
 <!-- editorconfig-checker-enable -->

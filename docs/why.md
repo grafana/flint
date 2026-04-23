@@ -72,4 +72,4 @@ use everywhere" promise of mise. Container startup also adds latency to every ru
 
 5. **Autofix where possible** — `--fix` checks first, fixes what's fixable,
    reports what needs review. Fix mode runs serially to avoid concurrent writes.
-   Pass specific linter names to limit which fixers run (`flint run --fix prettier shfmt`).
+   Pass specific linter names to limit which fixers run (`flint run --fix rumdl shfmt`).

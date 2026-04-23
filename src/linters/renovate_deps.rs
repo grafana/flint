@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 use crate::config::RenovateDepsConfig;
+use crate::files::FileList;
 use crate::linters::LinterOutput;
 
 const COMMITTED_FILE: &str = "renovate-tracked-deps.json";
@@ -27,6 +28,57 @@ pub async fn run(cfg: &RenovateDepsConfig, fix: bool, project_root: &Path) -> Li
         Ok(out) => out,
         Err(e) => LinterOutput::err(format!("flint: renovate-deps: {e}\n")),
     }
+}
+
+pub(crate) fn is_relevant(file_list: &FileList, project_root: &Path) -> bool {
+    if file_list.full {
+        return true;
+    }
+
+    let changed: HashSet<String> = file_list
+        .files
+        .iter()
+        .filter_map(|path| {
+            path.strip_prefix(project_root)
+                .ok()
+                .map(|rel| rel.to_string_lossy().into_owned())
+        })
+        .collect();
+
+    if changed.is_empty() {
+        return false;
+    }
+
+    if changed
+        .iter()
+        .any(|path| RENOVATE_CONFIG_PATTERNS.contains(&path.as_str()))
+    {
+        return true;
+    }
+
+    let committed_path = COMMITTED_PATHS
+        .iter()
+        .map(|path| project_root.join(path))
+        .find(|path| path.exists());
+
+    let Some(committed_path) = committed_path else {
+        return false;
+    };
+
+    let committed_rel = display_path(project_root, &committed_path);
+    if changed.contains(&committed_rel) {
+        return true;
+    }
+
+    let committed: DepMap = match std::fs::read_to_string(&committed_path)
+        .ok()
+        .and_then(|contents| serde_json::from_str(&contents).ok())
+    {
+        Some(committed) => committed,
+        None => return true,
+    };
+
+    committed.keys().any(|path| changed.contains(path))
 }
 
 async fn run_inner(
@@ -463,5 +515,103 @@ mod tests {
             committed_path_for_config(Path::new(".github/renovate.json5")),
             PathBuf::from(".github/renovate-tracked-deps.json")
         );
+    }
+
+    fn file_list(paths: &[&str], full: bool) -> FileList {
+        FileList {
+            files: paths.iter().map(PathBuf::from).collect(),
+            changed_paths: paths.iter().map(|path| path.to_string()).collect(),
+            merge_base: Some("base".to_string()),
+            full,
+        }
+    }
+
+    #[test]
+    fn relevant_when_full_mode() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(is_relevant(&file_list(&[], true), dir.path()));
+    }
+
+    #[test]
+    fn relevant_when_renovate_config_changed() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(is_relevant(
+            &file_list(
+                &[dir.path().join(".github/renovate.json5").to_str().unwrap()],
+                false
+            ),
+            dir.path()
+        ));
+    }
+
+    #[test]
+    fn relevant_when_snapshot_changed() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join(".github")).unwrap();
+        std::fs::write(
+            dir.path().join(".github/renovate-tracked-deps.json"),
+            "{}\n",
+        )
+        .unwrap();
+
+        assert!(is_relevant(
+            &file_list(
+                &[dir
+                    .path()
+                    .join(".github/renovate-tracked-deps.json")
+                    .to_str()
+                    .unwrap()],
+                false
+            ),
+            dir.path()
+        ));
+    }
+
+    #[test]
+    fn relevant_when_tracked_manifest_changed() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join(".github")).unwrap();
+        write_snapshot(
+            &dir.path().join(".github/renovate-tracked-deps.json"),
+            &dep_map(&[("package.json", &[("npm", &["express"])])]),
+        )
+        .unwrap();
+
+        assert!(is_relevant(
+            &file_list(&[dir.path().join("package.json").to_str().unwrap()], false),
+            dir.path()
+        ));
+    }
+
+    #[test]
+    fn not_relevant_for_untracked_change() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join(".github")).unwrap();
+        write_snapshot(
+            &dir.path().join(".github/renovate-tracked-deps.json"),
+            &dep_map(&[("package.json", &[("npm", &["express"])])]),
+        )
+        .unwrap();
+
+        assert!(!is_relevant(
+            &file_list(&[dir.path().join("README.md").to_str().unwrap()], false),
+            dir.path()
+        ));
+    }
+
+    #[test]
+    fn relevant_when_snapshot_is_unparseable() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join(".github")).unwrap();
+        std::fs::write(
+            dir.path().join(".github/renovate-tracked-deps.json"),
+            "{not json}\n",
+        )
+        .unwrap();
+
+        assert!(is_relevant(
+            &file_list(&[dir.path().join("README.md").to_str().unwrap()], false),
+            dir.path()
+        ));
     }
 }

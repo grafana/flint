@@ -18,7 +18,25 @@ pub fn read_mise_tools(project_root: &Path) -> HashMap<String, String> {
         Ok(c) => c,
         Err(_) => return HashMap::new(),
     };
-    let value: toml::Value = match toml::from_str(&content) {
+    read_mise_tools_from_str(&content)
+}
+
+pub fn read_mise_tools_at_ref(project_root: &Path, git_ref: &str) -> HashMap<String, String> {
+    let spec = format!("{git_ref}:mise.toml");
+    let out = match std::process::Command::new("git")
+        .args(["show", &spec])
+        .current_dir(project_root)
+        .output()
+    {
+        Ok(out) if out.status.success() => out,
+        _ => return HashMap::new(),
+    };
+    let content = String::from_utf8_lossy(&out.stdout);
+    read_mise_tools_from_str(&content)
+}
+
+fn read_mise_tools_from_str(content: &str) -> HashMap<String, String> {
+    let value: toml::Value = match toml::from_str(content) {
         Ok(v) => v,
         Err(_) => return HashMap::new(),
     };

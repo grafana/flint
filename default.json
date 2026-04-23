@@ -38,6 +38,8 @@
     {
       "matchPackageNames": [
         "actionlint",
+        "biome",
+        "cargo:yaml-lint",
         "cargo:xmloxide",
         "editorconfig-checker",
         "github:google/google-java-format",
@@ -46,12 +48,10 @@
         "golangci-lint",
         "hadolint",
         "lychee",
-        "npm:@biomejs/biome",
-        "npm:markdownlint-cli2",
-        "npm:prettier",
         "npm:renovate",
         "pipx:codespell",
         "pipx:ruff",
+        "rumdl",
         "shellcheck",
         "shfmt"
       ],

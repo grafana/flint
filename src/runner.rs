@@ -10,6 +10,7 @@ use crate::files::FileList;
 use crate::linters::{LinterOutput, license_header, lychee, renovate_deps};
 use crate::registry::{Check, CheckKind, Scope, SpecialKind};
 
+#[derive(Clone, Copy)]
 pub struct RunOptions {
     pub fix: bool,
     pub verbose: bool,

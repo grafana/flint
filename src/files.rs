@@ -29,7 +29,7 @@ pub fn changed(
     let exclude = build_exclude_set(cfg);
 
     if full {
-        return all_files(project_root, &exclude);
+        return all(project_root, cfg);
     }
 
     let merge_base = resolve_merge_base(project_root, cfg, from_ref)?;
@@ -39,7 +39,7 @@ pub fn changed(
         collect_changed_files(project_root, &exclude, base, to)?
     } else {
         // No merge base (shallow clone etc.) — fall back to all files.
-        return all_files(project_root, &exclude);
+        return all(project_root, cfg);
     };
 
     Ok(FileList {
@@ -111,6 +111,11 @@ fn collect_changed_files(
     }
 
     Ok(filter_names(project_root, exclude, names))
+}
+
+pub fn all(project_root: &Path, cfg: &Config) -> Result<FileList> {
+    let exclude = build_exclude_set(cfg);
+    all_files(project_root, &exclude)
 }
 
 fn all_files(project_root: &Path, exclude: &GlobSet) -> Result<FileList> {

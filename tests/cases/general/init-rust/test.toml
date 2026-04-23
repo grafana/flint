@@ -10,6 +10,7 @@ Tip: flint init detects languages from tracked files (`git ls-files`). Add and s
   wrote <REPO>/.github/workflows/lint.yml
   removed <REPO>/.markdownlint.json (replaced by .rumdl.toml)
   wrote <REPO>/.rumdl.toml
+  patched <REPO>/.editorconfig — set max_line_length = 120
   wrote <REPO>/.yamllint.yml
   wrote <REPO>/biome.json
 installed pre-commit hook (.git/hooks/pre-commit)
@@ -31,6 +32,17 @@ enabled = true
 line-length = 120
 code-blocks = false
 tables = false
+'''
+".editorconfig" = '''
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+indent_style = space
+indent_size = 2
+max_line_length = 120
 '''
 ".yamllint.yml" = '''
 extends: relaxed

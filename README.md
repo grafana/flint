@@ -124,7 +124,7 @@ Optional. Place in the repo root (or in `FLINT_CONFIG_DIR` — see below). All s
 
 ```toml
 [settings]
-base_branch = "main"                            # branch to diff against
+# base_branch = "dev"                           # branch to diff against; defaults to "main"
 exclude = ["CHANGELOG.md", "vendor/**"]         # glob patterns — exclude matching files
 
 [checks.links]

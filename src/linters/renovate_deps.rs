@@ -520,6 +520,7 @@ mod tests {
     fn file_list(paths: &[&str], full: bool) -> FileList {
         FileList {
             files: paths.iter().map(PathBuf::from).collect(),
+            changed_paths: paths.iter().map(|path| path.to_string()).collect(),
             merge_base: Some("base".to_string()),
             full,
         }

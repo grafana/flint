@@ -78,13 +78,7 @@ pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool
     if check.activate_unconditionally {
         return true;
     }
-    let lookup_key = check.mise_tool_name.unwrap_or(check.bin_name);
-    // When mise_tool_name is set (e.g. "cargo:yaml-lint"), also accept
-    // the bare bin_name ("yaml-lint") so repos using either form work.
-    let declared = mise_tools
-        .get(lookup_key)
-        .or_else(|| check.mise_tool_name.and(mise_tools.get(check.bin_name)));
-    let Some(declared) = declared else {
+    let Some(declared) = declared_tool_version(check, mise_tools) else {
         return false;
     };
     let Some(range_str) = check.version_range else {
@@ -94,6 +88,32 @@ pub fn check_active(check: &Check, mise_tools: &HashMap<String, String>) -> bool
         return false;
     };
     coerce_version(declared).is_some_and(|v| req.matches(&v))
+}
+
+pub fn tool_version_changed(
+    check: &Check,
+    previous_tools: &HashMap<String, String>,
+    current_tools: &HashMap<String, String>,
+) -> bool {
+    let previous = declared_tool_version(check, previous_tools);
+    let current = declared_tool_version(check, current_tools);
+    previous.is_some() && current.is_some() && previous != current
+}
+
+fn declared_tool_version<'a>(
+    check: &Check,
+    mise_tools: &'a HashMap<String, String>,
+) -> Option<&'a str> {
+    if check.activate_unconditionally {
+        return None;
+    }
+    let lookup_key = check.mise_tool_name.unwrap_or(check.bin_name);
+    // When mise_tool_name is set (e.g. "cargo:yaml-lint"), also accept
+    // the bare bin_name ("yaml-lint") so repos using either form work.
+    mise_tools
+        .get(lookup_key)
+        .or_else(|| check.mise_tool_name.and(mise_tools.get(check.bin_name)))
+        .map(String::as_str)
 }
 
 /// Parses a version string, padding with `.0` components if needed to satisfy

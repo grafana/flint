@@ -260,7 +260,8 @@ async fn run(
         }
     }
 
-    let baseline_names = baseline_check_names(&active, &file_list, project_root, config_dir);
+    let baseline_names =
+        baseline_check_names(&active, &file_list, project_root, config_dir, &mise_tools);
     let baseline_file_list = if baseline_names.is_empty() {
         None
     } else {
@@ -554,6 +555,7 @@ fn baseline_check_names(
     file_list: &files::FileList,
     project_root: &Path,
     config_dir: &Path,
+    current_tools: &HashMap<String, String>,
 ) -> HashSet<String> {
     if file_list.full {
         return HashSet::new();
@@ -573,6 +575,7 @@ fn baseline_check_names(
         .iter()
         .filter(|check| {
             !registry::check_active(check, &previous_tools)
+                || registry::tool_version_changed(check, &previous_tools, current_tools)
                 || flint_toml.as_ref().is_some_and(|change| {
                     change.settings_changed
                         || (matches!(check.kind, CheckKind::Special(_))
@@ -642,6 +645,10 @@ fn toml_section<'a>(value: &'a toml::Value, path: &[&str]) -> Option<&'a toml::V
 }
 
 fn changed_rel_paths(file_list: &files::FileList, project_root: &Path) -> HashSet<String> {
+    if !file_list.changed_paths.is_empty() {
+        return file_list.changed_paths.iter().cloned().collect();
+    }
+
     file_list
         .files
         .iter()

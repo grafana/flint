@@ -80,10 +80,6 @@ Then wire up lint tasks:
 description = "Run all lints"
 run = "flint run"
 
-[tasks."lint:pre-commit"]
-description = "Fast auto-fix lint pass — for pre-push hooks and agentic pipelines"
-run = "flint run --fix --fast-only"
-
 [tasks."lint:fix"]
 description = "Auto-fix lint issues"
 run = "flint run --fix"

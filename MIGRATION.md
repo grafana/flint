@@ -20,13 +20,12 @@ After installing flint (`mise install`), run `flint init`. It automatically:
 - removes `RENOVATE_TRACKED_DEPS_EXCLUDE` from `[env]` and migrates the manager list to `flint.toml` (when a v1 renovate-deps task is present)
 - replaces `npm:markdownlint-cli` with `npm:markdownlint-cli2` in `[tools]`
 - adds the missing linters to `[tools]` based on your tracked files
-- adds `[env] FLINT_CONFIG_DIR` and standard `lint*` / `setup:pre-commit-hook` tasks
+- adds `[env] FLINT_CONFIG_DIR` and standard `lint` / `lint:fix` tasks
 - writes a `flint.toml` skeleton in your chosen config dir
 - generates `.github/workflows/lint.yml`
 - patches `renovate.json5` to add the flint preset
 
-Then run `mise install` to install the new tools and
-`mise run setup:pre-commit-hook` to install the git hook.
+Then run `mise install` to install the new tools.
 
 Finally, run `flint run --fix renovate-deps` to regenerate
 `renovate-tracked-deps.json` with all the new tools included.

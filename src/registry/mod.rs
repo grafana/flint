@@ -16,18 +16,26 @@ pub use types::{
     SpecialKind,
 };
 
-/// Returns the set of `mise.toml` tool keys that name language runtimes/SDKs
-/// (e.g. `rust`, `go`, `dotnet`). Derived from registry checks marked
-/// `.toolchain()`.
+/// Returns the set of `mise.toml` tool keys that belong under the `# Linters`
+/// header. Runtime, SDK, and unrelated project tools stay above the header.
 ///
-/// `flint init` uses this set to keep runtime keys above the `# Linters`
-/// header in `mise.toml`.
-pub fn toolchain_keys() -> std::collections::HashSet<&'static str> {
-    builtin()
+/// Includes unsupported legacy lint tools so existing configs still group
+/// lint-related entries together before `flint init` removes or replaces them.
+pub fn linter_keys() -> std::collections::HashSet<&'static str> {
+    let mut keys: std::collections::HashSet<&'static str> = std::collections::HashSet::new();
+    for check in builtin()
         .into_iter()
-        .filter(|c| c.is_toolchain())
-        .filter_map(|c| c.mise_tool_name)
-        .collect()
+        .filter(|c| c.uses_binary() && !c.is_toolchain() && !c.activate_unconditionally)
+    {
+        keys.insert(check.bin_name);
+        if let Some(tool) = check.mise_tool_name {
+            keys.insert(tool);
+        }
+    }
+    keys.extend(OBSOLETE_KEYS.iter().map(|(old, _)| *old));
+    keys.extend(obsolete::UNSUPPORTED_KEYS.iter().map(|(old, _)| *old));
+    keys.insert("github:grafana/flint");
+    keys
 }
 
 #[cfg(test)]

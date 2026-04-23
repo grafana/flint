@@ -48,6 +48,8 @@ A check runs against all matching files when:
 
 - the check is newly active because its tool was added to `mise.toml`
 - the check's tool version changed in `mise.toml`
+- the pinned `github:grafana/flint` version changed in `mise.toml`, which
+  expands all active checks
 - the check's flint-managed config file changed, such as `.shellcheckrc` or
   `.yamllint.yml` in `FLINT_CONFIG_DIR`
 - another supported baseline config for the check changed, such as

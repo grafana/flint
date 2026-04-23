@@ -580,6 +580,10 @@ fn baseline_check_names(
 
     let changed = changed_rel_paths(file_list, project_root);
     let previous_tools = registry::read_mise_tools_at_ref(project_root, merge_base);
+    if registry::flint_version_changed(&previous_tools, current_tools) {
+        return active.iter().map(|check| check.name.to_string()).collect();
+    }
+
     let flint_config = config_rel_path(project_root, config_dir, "flint.toml");
     let flint_config_changed = changed.contains(&flint_config);
     let flint_toml =

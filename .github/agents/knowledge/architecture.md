@@ -48,6 +48,8 @@ A check is expanded to all matching files when:
 - it was not active at the merge base, meaning its tool was newly added to
   `mise.toml`
 - its resolved tool version changed in `mise.toml`
+- the pinned `github:grafana/flint` version changed in `mise.toml`; this expands
+  every active check because the runner/orchestrator changed
 - its registered `.linter_config(...)` file changed under `FLINT_CONFIG_DIR`
 - another supported baseline config changed, such as `.editorconfig` for
   `editorconfig-checker`

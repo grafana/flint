@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 
 use super::*;
@@ -140,6 +140,60 @@ fn all_registry_binaries_found() {
         not_found.is_empty(),
         "registry linters missing binary on PATH: {}",
         not_found.join(", ")
+    );
+}
+
+#[test]
+fn default_renovate_preset_covers_all_linter_tools_weekly() {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let default_json_path = manifest_dir.join("default.json");
+    let default_json =
+        std::fs::read_to_string(&default_json_path).expect("default.json must be readable");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&default_json).expect("default.json must be valid JSON");
+
+    let package_rules = parsed["packageRules"]
+        .as_array()
+        .expect("default.json packageRules must be an array");
+    let linters_rule = package_rules
+        .iter()
+        .find(|rule| rule["groupName"].as_str() == Some("linters"))
+        .expect("default.json must define a packageRules entry with groupName 'linters'");
+
+    let actual: BTreeSet<&str> = linters_rule["matchPackageNames"]
+        .as_array()
+        .expect("linters package rule must declare matchPackageNames")
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .expect("linters package names must be strings")
+        })
+        .collect();
+
+    let mut expected: BTreeSet<&str> = builtin()
+        .into_iter()
+        .filter(|check| check.uses_binary())
+        .filter(|check| !check.is_toolchain())
+        .filter_map(|check| check.mise_tool_name.or(Some(check.bin_name)))
+        .collect();
+    // Backward-compatible alias still used in this repo's own mise.toml.
+    expected.insert("github:koalaman/shellcheck");
+
+    assert_eq!(
+        linters_rule["schedule"].as_array(),
+        Some(&vec![serde_json::Value::String(
+            "before 4am on Monday".to_string()
+        )]),
+        "linters package rule must remain on the weekly Monday schedule"
+    );
+    assert!(
+        !actual.contains("node"),
+        "node is a runtime prerequisite, not a linter, and must not be in the weekly linters rule"
+    );
+    assert_eq!(
+        actual, expected,
+        "default.json weekly linters rule is out of sync with the linter registry"
     );
 }
 

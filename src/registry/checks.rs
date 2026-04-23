@@ -16,7 +16,7 @@ use crate::linters::renovate_deps::RENOVATE_CONFIG_PATTERNS;
 fn check_shellcheck() -> Check {
     Check::file(
         "shellcheck",
-        "shellcheck {FILE}",
+        "shellcheck -x -P SCRIPTDIR {FILE}",
         &["*.sh", "*.bash", "*.bats"],
     )
     .linter_config(".shellcheckrc", "--rcfile")

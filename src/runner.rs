@@ -10,6 +10,7 @@ use crate::files::FileList;
 use crate::linters::{LinterOutput, license_header, lychee, renovate_deps};
 use crate::registry::{Check, CheckKind, Scope, SpecialKind};
 
+#[derive(Clone, Copy)]
 pub struct RunOptions {
     pub fix: bool,
     pub verbose: bool,
@@ -748,6 +749,7 @@ mod tests {
                 .iter()
                 .map(|s| PathBuf::from(format!("/repo/{s}")))
                 .collect(),
+            changed_paths: paths.iter().map(|path| path.to_string()).collect(),
             merge_base: Some("abc123".to_string()),
             full: false,
         }

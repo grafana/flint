@@ -12,6 +12,8 @@ const BUILTIN_EXCLUDES: &[&str] = COMMITTED_PATHS;
 #[derive(Clone)]
 pub struct FileList {
     pub files: Vec<PathBuf>,
+    /// Changed paths from git before user excludes are applied.
+    pub changed_paths: Vec<String>,
     /// The merge base ref, used by project-scoped checks (e.g. golangci-lint).
     pub merge_base: Option<String>,
     /// True when the file list contains all project files (explicit --full or no merge base).
@@ -29,21 +31,26 @@ pub fn changed(
     let exclude = build_exclude_set(cfg);
 
     if full {
-        return all_files(project_root, &exclude);
+        return all(project_root, cfg);
     }
 
     let merge_base = resolve_merge_base(project_root, cfg, from_ref)?;
 
-    let files = if let Some(ref base) = merge_base {
+    let (files, changed_paths) = if let Some(ref base) = merge_base {
         let to = to_ref.unwrap_or("HEAD");
-        collect_changed_files(project_root, &exclude, base, to)?
+        let names = collect_changed_names(project_root, base, to)?;
+        (
+            filter_names(project_root, &exclude, names.clone()),
+            names.into_iter().collect(),
+        )
     } else {
         // No merge base (shallow clone etc.) — fall back to all files.
-        return all_files(project_root, &exclude);
+        return all(project_root, cfg);
     };
 
     Ok(FileList {
         files,
+        changed_paths,
         merge_base,
         full: false,
     })
@@ -88,12 +95,11 @@ fn resolve_merge_base(
     Ok(None)
 }
 
-fn collect_changed_files(
+fn collect_changed_names(
     project_root: &Path,
-    exclude: &GlobSet,
     base: &str,
     to: &str,
-) -> Result<Vec<PathBuf>> {
+) -> Result<std::collections::BTreeSet<String>> {
     let range = format!("{base}...{to}");
     let mut names: std::collections::BTreeSet<String> = Default::default();
 
@@ -110,7 +116,12 @@ fn collect_changed_files(
         names.insert(line);
     }
 
-    Ok(filter_names(project_root, exclude, names))
+    Ok(names)
+}
+
+pub fn all(project_root: &Path, cfg: &Config) -> Result<FileList> {
+    let exclude = build_exclude_set(cfg);
+    all_files(project_root, &exclude)
 }
 
 fn all_files(project_root: &Path, exclude: &GlobSet) -> Result<FileList> {
@@ -132,6 +143,7 @@ fn all_files(project_root: &Path, exclude: &GlobSet) -> Result<FileList> {
 
     Ok(FileList {
         files: filter_names(project_root, exclude, names),
+        changed_paths: vec![],
         merge_base: None,
         full: true,
     })

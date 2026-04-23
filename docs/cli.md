@@ -35,6 +35,31 @@ Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`, `FLINT_FAST_ONL
 | Pre-push hook (CC / agentic) | `flint run --fix --fast-only`          | Fixes what it can silently, surfaces only what needs human review |
 | CI                           | `flint run`                            | Full output for humans reading CI logs                            |
 
+## Changed-file and baseline runs
+
+By default, `flint run` checks only files changed relative to the merge base.
+Use `--full` to check every matching file explicitly.
+
+Some changed-file runs intentionally expand one or more affected checks to all
+matching files. This establishes a baseline when lint coverage changes, while
+leaving unrelated checks scoped to changed files.
+
+A check runs against all matching files when:
+
+- the check is newly active because its tool was added to `mise.toml`
+- the check's tool version changed in `mise.toml`
+- the check's flint-managed config file changed, such as `.shellcheckrc` or
+  `.yamllint.yml` in `FLINT_CONFIG_DIR`
+- `flint.toml` changed under `[settings]`
+- `flint.toml` changed the check-specific config for a special check, such as
+  `[checks.links]` or `[checks.renovate-deps]`
+
+`--full` is still the explicit whole-repo mode. The automatic baseline behavior
+only applies in changed-file mode, and only to checks whose lint coverage may
+have changed. Config-file triggers are detected from the raw git change list, so
+they still apply when the config path itself is excluded from ordinary lint file
+selection.
+
 **`--short` output** — failed checks partitioned by fixability, fixable ones
 expressed as the exact command to run:
 

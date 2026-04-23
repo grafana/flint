@@ -8,8 +8,6 @@ use crossterm::{
     terminal::{self, ClearType},
 };
 
-use crate::registry::Category;
-
 use super::{CategoryItem, LinterGroup};
 
 fn run_arrow_selector<T>(
@@ -218,15 +216,15 @@ fn print_linter_table(
                 "[ ]"
             };
             let cursor_mark = if flat_idx == cursor { ">" } else { " " };
-            let speed = if check.category == Category::Slow {
-                "slow"
-            } else {
-                "fast"
+            let speed = match check.run_policy {
+                crate::registry::RunPolicy::Fast => "fast",
+                crate::registry::RunPolicy::Slow => "slow",
+                crate::registry::RunPolicy::Adaptive => "adaptive",
             };
             let patterns = check.patterns.join(" ");
             write!(
                 stdout,
-                "  {}  {}  {:<name_w$}  {:<bin_w$}  {:<4}  {:<30}  {}\r\n",
+                "  {}  {}  {:<name_w$}  {:<bin_w$}  {:<8}  {:<30}  {}\r\n",
                 cursor_mark,
                 sel_mark,
                 check.name,

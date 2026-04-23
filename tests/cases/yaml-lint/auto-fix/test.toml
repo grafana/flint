@@ -1,0 +1,42 @@
+[expected]
+args = "run --full --fix yaml-lint"
+exit = 1
+stderr = '''
+flint: fixed: yaml-lint — commit before pushing
+'''
+
+[expected.files]
+"config.yml" = """
+name: "test"
+value: 42
+items: ["a", "b"]
+"""
+
+[fake_bins]
+yaml-lint = '''
+#!/bin/sh
+set -eu
+file=""
+fix=0
+for arg in "$@"; do
+  case "$arg" in
+    --fix) fix=1 ;;
+    -*) ;;
+    *) file="$arg" ;;
+  esac
+done
+[ -n "$file" ] || exit 1
+if grep -q 'value:     42' "$file"; then
+  if [ "$fix" -eq 1 ]; then
+    cat >"$file" <<'EOF'
+name: "test"
+value: 42
+items: ["a", "b"]
+EOF
+    exit 0
+  fi
+  printf '%s\n' 'config.yml:2: bad spacing'
+  exit 1
+fi
+exit 0
+'''

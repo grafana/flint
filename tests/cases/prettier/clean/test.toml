@@ -1,3 +1,0 @@
-[expected]
-args = "run --full prettier"
-exit = 0

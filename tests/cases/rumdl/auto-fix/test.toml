@@ -1,0 +1,55 @@
+[expected]
+args = "run --full --fix rumdl"
+exit = 1
+stderr = '''
+flint: fixed: rumdl — commit before pushing
+'''
+
+[expected.files]
+"README.md" = """
+# Title
+
+Text with trailing spaces
+
+## Section
+"""
+
+[fake_bins]
+rumdl = '''
+#!/bin/sh
+set -eu
+file=""
+fix=0
+count_file=".rumdl-invocations"
+for arg in "$@"; do
+  case "$arg" in
+    --fix) fix=1 ;;
+    -*) ;;
+    *) file="$arg" ;;
+  esac
+done
+[ -n "$file" ] || exit 1
+count=0
+[ -f "$count_file" ] && count=$(cat "$count_file")
+count=$((count + 1))
+printf '%s' "$count" > "$count_file"
+if [ "$count" -gt 1 ]; then
+  printf '%s\n' 'rumdl invoked more than once in --fix flow' >&2
+  exit 99
+fi
+if [ "$fix" -ne 1 ]; then
+  printf '%s\n' 'unexpected rumdl pre-check invocation' >&2
+  exit 98
+fi
+if grep -q 'spaces   $' "$file"; then
+  cat >"$file" <<'EOF'
+# Title
+
+Text with trailing spaces
+
+## Section
+EOF
+  exit 0
+fi
+exit 0
+'''

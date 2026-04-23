@@ -1,4 +1,3 @@
 [tools]
-node = "24.14.1"
-"npm:markdownlint-cli" = "0.39.0"
+"github:mvdan/sh" = "v3.13.1"
 shellcheck = "v0.11.0"

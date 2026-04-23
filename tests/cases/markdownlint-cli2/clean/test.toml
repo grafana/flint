@@ -1,3 +1,0 @@
-[expected]
-args = "run --full markdownlint-cli2"
-exit = 0

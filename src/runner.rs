@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
@@ -19,6 +20,7 @@ pub struct RunOptions {
 pub struct CheckResult {
     pub name: String,
     pub ok: bool,
+    pub changed: bool,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
     pub duration: Duration,
@@ -30,6 +32,7 @@ enum PreparedCheck {
     Invocations {
         name: String,
         argv_list: Vec<Vec<String>>,
+        tracked_files: Vec<PathBuf>,
         windows_java_jar: bool,
     },
     Links {
@@ -62,26 +65,43 @@ impl PreparedCheck {
     async fn execute(self, fix: bool, project_root: &Path) -> CheckResult {
         let name = self.name().to_string();
         let start = Instant::now();
-        let out: LinterOutput = match self {
+        let (out, changed): (LinterOutput, bool) = match self {
             Self::Invocations {
                 argv_list,
+                tracked_files,
                 windows_java_jar,
                 ..
-            } => run_invocations(&name, &argv_list, windows_java_jar, project_root).await,
+            } => {
+                let before = if fix && !tracked_files.is_empty() {
+                    Some(fingerprint_files(&tracked_files))
+                } else {
+                    None
+                };
+                let out = run_invocations(&name, &argv_list, windows_java_jar, project_root).await;
+                let changed =
+                    before.is_some_and(|before| before != fingerprint_files(&tracked_files));
+                (out, changed)
+            }
             Self::Links {
                 cfg,
                 file_list,
                 config_dir,
                 ..
-            } => lychee::run(&cfg, &file_list, project_root, &config_dir).await,
-            Self::RenovateDeps { cfg, .. } => renovate_deps::run(&cfg, fix, project_root).await,
+            } => (
+                lychee::run(&cfg, &file_list, project_root, &config_dir).await,
+                false,
+            ),
+            Self::RenovateDeps { cfg, .. } => {
+                (renovate_deps::run(&cfg, fix, project_root).await, false)
+            }
             Self::LicenseHeader { cfg, files, .. } => {
-                license_header::run(&cfg, project_root, &files).await
+                (license_header::run(&cfg, project_root, &files).await, false)
             }
         };
         CheckResult {
             name,
             ok: out.ok,
+            changed,
             stdout: out.stdout,
             stderr: out.stderr,
             duration: start.elapsed(),
@@ -91,6 +111,7 @@ impl PreparedCheck {
 
 pub async fn run(
     checks: &[&Check],
+    active_checks: &[&Check],
     file_list: &FileList,
     opts: RunOptions,
     project_root: &Path,
@@ -105,7 +126,17 @@ pub async fn run(
     } = opts;
     let prepared: Vec<PreparedCheck> = checks
         .iter()
-        .filter_map(|&check| prepare(check, file_list, fix, project_root, checks, cfg, config_dir))
+        .filter_map(|&check| {
+            prepare(
+                check,
+                file_list,
+                fix,
+                project_root,
+                active_checks,
+                cfg,
+                config_dir,
+            )
+        })
         .collect();
 
     if fix {
@@ -162,6 +193,7 @@ fn prepare(
     let name = check.name.to_string();
     match &check.kind {
         CheckKind::Template { .. } => {
+            let tracked_files = tracked_files(check, file_list, project_root, active_checks);
             let argv_list = build_invocations(
                 check,
                 file_list,
@@ -176,6 +208,7 @@ fn prepare(
             Some(PreparedCheck::Invocations {
                 name,
                 argv_list,
+                tracked_files,
                 windows_java_jar: check.windows_java_jar,
             })
         }
@@ -214,6 +247,36 @@ fn prepare(
             })
         }
     }
+}
+
+fn tracked_files(
+    check: &Check,
+    file_list: &FileList,
+    project_root: &Path,
+    active_checks: &[&Check],
+) -> Vec<PathBuf> {
+    let CheckKind::Template { scope, .. } = &check.kind else {
+        return vec![];
+    };
+    if !matches!(scope, Scope::File | Scope::Files) {
+        return vec![];
+    }
+
+    let mut excludes: Vec<&str> = active_checks
+        .iter()
+        .filter(|c| check.excludes_if_active.contains(&c.name))
+        .flat_map(|c| c.patterns.iter().copied())
+        .collect();
+    if check.defers_to_formatters {
+        for active in active_checks.iter().filter(|c| c.is_formatter) {
+            excludes.extend(active.patterns.iter().copied());
+        }
+    }
+
+    match_files(&file_list.files, check.patterns, &excludes, project_root)
+        .into_iter()
+        .cloned()
+        .collect()
 }
 
 /// Returns the list of argv vectors to execute for a check.
@@ -429,6 +492,17 @@ Install it with: `rustup component add {component}`\n"
     stderr.extend_from_slice(note.as_bytes());
 }
 
+fn fingerprint_files(files: &[PathBuf]) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    for path in files {
+        path.hash(&mut hasher);
+        if let Ok(bytes) = std::fs::read(path) {
+            bytes.hash(&mut hasher);
+        }
+    }
+    hasher.finish()
+}
+
 fn missing_rust_component(name: &str, stderr: &[u8]) -> Option<&'static str> {
     let stderr = String::from_utf8_lossy(stderr);
     match name {
@@ -583,7 +657,7 @@ fn shell_words(cmd: String) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::files::FileList;
-    use crate::registry::{Category, Check, CheckKind, Scope};
+    use crate::registry::{Category, Check, CheckKind, RunPolicy, Scope};
     use std::path::PathBuf;
 
     #[test]
@@ -652,6 +726,7 @@ mod tests {
             defers_to_formatters: false,
             activate_unconditionally: false,
             category: Category::Default,
+            run_policy: RunPolicy::Fast,
             toolchain: None,
             windows_java_jar: false,
             fix_behavior: crate::registry::FixBehavior::Definitive,

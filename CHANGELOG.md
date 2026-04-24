@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.20.5](https://github.com/grafana/flint/compare/v0.20.4...v0.20.5) - 2026-04-24
+
+### Added
+
+- add taplo formatter check ([#224](https://github.com/grafana/flint/pull/224))
+- *(init)* configure line length during init ([#218](https://github.com/grafana/flint/pull/218))
+
+### Fixed
+
+- switch yaml-lint to ryl ([#226](https://github.com/grafana/flint/pull/226))
+- *(ruff)* install via github releases ([#227](https://github.com/grafana/flint/pull/227))
+- resolve init rollout regressions ([#220](https://github.com/grafana/flint/pull/220))
+
+### Other
+
+- *(deps)* update taiki-e/install-action digest to 787505c ([#219](https://github.com/grafana/flint/pull/219))
+- *(deps)* update dependency grafana/flint to v0.20.3 ([#225](https://github.com/grafana/flint/pull/225))
+
 ## [0.20.4](https://github.com/grafana/flint/compare/v0.20.3...v0.20.4) - 2026-04-23
 
 ### Added

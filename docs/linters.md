@@ -252,6 +252,22 @@ exclude_managers = ["github-actions", "github-runners"]
 | Scope       | [file](#scopes)      |
 | Patterns    | `*.sh *.bash`        |
 
+## `taplo`
+
+|             |                   |
+| ----------- | ----------------- |
+| Description | Format TOML files |
+| Fix         | yes               |
+| Binary      | `taplo`           |
+| Scope       | [file](#scopes)   |
+| Patterns    | `*.toml`          |
+
+Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).
+
+This check intentionally stays basic: it uses `taplo fmt --check` for verification and `taplo fmt` for `--fix`. That keeps behavior aligned with flint's existing formatter-style checks.
+
+Current caveat: Taplo's published docs currently advertise TOML 1.0.0 support, so treat this check as TOML 1.0-oriented for now.
+
 ## `xmllint`
 
 |             |                                    |

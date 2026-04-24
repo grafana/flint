@@ -35,6 +35,8 @@ enum PreparedCheck {
         argv_list: Vec<Vec<String>>,
         tracked_files: Vec<PathBuf>,
         windows_java_jar: bool,
+        env: &'static [(&'static str, &'static str)],
+        stderr_filter_prefixes: &'static [&'static str],
     },
     Links {
         name: String,
@@ -63,7 +65,7 @@ impl PreparedCheck {
         }
     }
 
-    async fn execute(self, fix: bool, project_root: &Path) -> CheckResult {
+    async fn execute(self, fix: bool, verbose: bool, project_root: &Path) -> CheckResult {
         let name = self.name().to_string();
         let start = Instant::now();
         let (out, changed): (LinterOutput, bool) = match self {
@@ -71,6 +73,8 @@ impl PreparedCheck {
                 argv_list,
                 tracked_files,
                 windows_java_jar,
+                env,
+                stderr_filter_prefixes,
                 ..
             } => {
                 let before = if fix && !tracked_files.is_empty() {
@@ -78,7 +82,15 @@ impl PreparedCheck {
                 } else {
                     None
                 };
-                let out = run_invocations(&name, &argv_list, windows_java_jar, project_root).await;
+                let out = run_invocations(
+                    &name,
+                    &argv_list,
+                    windows_java_jar,
+                    if verbose { &[] } else { env },
+                    if verbose { &[] } else { stderr_filter_prefixes },
+                    project_root,
+                )
+                .await;
                 let changed =
                     before.is_some_and(|before| before != fingerprint_files(&tracked_files));
                 (out, changed)
@@ -143,7 +155,7 @@ pub async fn run(
     if fix {
         let mut results = vec![];
         for task in prepared {
-            let r = task.execute(fix, project_root).await;
+            let r = task.execute(fix, verbose, project_root).await;
             if !short && (verbose || !r.ok) {
                 eprintln!("[{}]{}", r.name, format_duration_suffix(time, r.duration));
                 flush_output(&r.stdout, &r.stderr);
@@ -156,7 +168,7 @@ pub async fn run(
     let mut set: JoinSet<CheckResult> = JoinSet::new();
     for task in prepared {
         let root = project_root.to_path_buf();
-        set.spawn(async move { task.execute(false, &root).await });
+        set.spawn(async move { task.execute(false, verbose, &root).await });
     }
 
     // Collect all results before printing to avoid interleaved output.
@@ -211,6 +223,8 @@ fn prepare(
                 argv_list,
                 tracked_files,
                 windows_java_jar: check.windows_java_jar,
+                env: check.env,
+                stderr_filter_prefixes: check.stderr_filter_prefixes,
             })
         }
         CheckKind::Special(SpecialKind::Links) => Some(PreparedCheck::Links {
@@ -441,6 +455,8 @@ async fn run_invocations(
     name: &str,
     invocations: &[Vec<String>],
     windows_java_jar: bool,
+    env: &[(&str, &str)],
+    stderr_filter_prefixes: &[&str],
     root: &Path,
 ) -> LinterOutput {
     let mut all_ok = true;
@@ -451,15 +467,27 @@ async fn run_invocations(
         if argv.is_empty() {
             continue;
         }
-        let result = crate::linters::spawn_command(argv, windows_java_jar)
-            .current_dir(root)
+        let mut cmd = crate::linters::spawn_command(argv, windows_java_jar);
+        cmd.current_dir(root)
             .stdin(Stdio::null())
-            .output()
-            .await;
+            .envs(env.iter().copied());
+        let result = cmd.output().await;
         match result {
             Ok(out) => {
-                combined_stdout.extend_from_slice(&out.stdout);
-                combined_stderr.extend_from_slice(&out.stderr);
+                if name == "taplo" && !stderr_filter_prefixes.is_empty() && !out.status.success() {
+                    let (stdout, stderr) =
+                        normalize_taplo_nonverbose_output(argv, &out.stdout, &out.stderr);
+                    combined_stdout.extend_from_slice(&stdout);
+                    combined_stderr.extend_from_slice(&stderr);
+                } else {
+                    combined_stdout.extend_from_slice(&out.stdout);
+                    if stderr_filter_prefixes.is_empty() {
+                        combined_stderr.extend_from_slice(&out.stderr);
+                    } else {
+                        let filtered = filter_stderr_lines(&out.stderr, stderr_filter_prefixes);
+                        combined_stderr.extend_from_slice(&filtered);
+                    }
+                }
                 if !out.status.success() {
                     all_ok = false;
                 }
@@ -479,6 +507,71 @@ async fn run_invocations(
         stdout: combined_stdout,
         stderr: combined_stderr,
     }
+}
+
+fn filter_stderr_lines(stderr: &[u8], prefixes: &[&str]) -> Vec<u8> {
+    let text = String::from_utf8_lossy(stderr);
+    let mut out = String::new();
+    for line in text.split_inclusive('\n') {
+        let trimmed = line.trim_end_matches('\n');
+        if prefixes.iter().any(|prefix| trimmed.starts_with(prefix)) {
+            continue;
+        }
+        out.push_str(line);
+    }
+    if !text.is_empty() && !text.ends_with('\n') {
+        let tail = text
+            .rsplit_once('\n')
+            .map(|(_, tail)| tail)
+            .unwrap_or(&text);
+        if !prefixes.iter().any(|prefix| tail.starts_with(prefix)) && !out.ends_with(tail) {
+            out.push_str(tail);
+        }
+    }
+    out.into_bytes()
+}
+
+fn normalize_taplo_nonverbose_output(
+    argv: &[String],
+    stdout: &[u8],
+    stderr: &[u8],
+) -> (Vec<u8>, Vec<u8>) {
+    let raw = format!(
+        "{}{}",
+        String::from_utf8_lossy(stdout),
+        String::from_utf8_lossy(stderr)
+    );
+    let mut error_lines: Vec<String> = raw
+        .lines()
+        .filter(|line| line.starts_with("ERROR"))
+        .map(ToOwned::to_owned)
+        .collect();
+
+    if error_lines.is_empty()
+        && let Some(target) = argv.last()
+    {
+        error_lines.push(format!(
+            "ERROR taplo:format_files: the file is not properly formatted path=\"{target}\""
+        ));
+    }
+
+    if !error_lines.is_empty()
+        && !error_lines.iter().any(|line| {
+            line == "ERROR operation failed error=some files were not properly formatted"
+        })
+    {
+        error_lines.push(
+            "ERROR operation failed error=some files were not properly formatted".to_string(),
+        );
+    }
+
+    let stderr = if error_lines.is_empty() {
+        Vec::new()
+    } else {
+        format!("{}\n", error_lines.join("\n")).into_bytes()
+    };
+
+    (Vec::new(), stderr)
 }
 
 fn maybe_append_rust_component_note(name: &str, stderr: &mut Vec<u8>) {
@@ -723,6 +816,8 @@ mod tests {
             patterns,
             excludes_if_active: &[],
             linter_config: None,
+            env: &[],
+            stderr_filter_prefixes: &[],
             baseline_configs: &[],
             unsupported_configs: &[],
             is_formatter: false,
@@ -825,5 +920,19 @@ mod tests {
         let msg = String::from_utf8(stderr).unwrap();
         assert!(msg.contains("NOTE: `cargo-fmt` needs the Rust `rustfmt` component"));
         assert!(msg.contains("rustup component add rustfmt"));
+    }
+
+    #[test]
+    fn filters_matching_stderr_prefixes() {
+        let stderr = b" INFO taplo: noisy\nERROR useful\n";
+        let filtered = filter_stderr_lines(stderr, &[" INFO taplo:"]);
+        assert_eq!(String::from_utf8(filtered).unwrap(), "ERROR useful\n");
+    }
+
+    #[test]
+    fn preserves_non_matching_stderr_lines() {
+        let stderr = b"ERROR useful\n";
+        let filtered = filter_stderr_lines(stderr, &[" INFO taplo:"]);
+        assert_eq!(String::from_utf8(filtered).unwrap(), "ERROR useful\n");
     }
 }

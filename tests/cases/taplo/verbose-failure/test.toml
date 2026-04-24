@@ -1,0 +1,10 @@
+[expected]
+args = "run --full --verbose taplo"
+exit = 1
+stderr_contains = [
+  'flint: active linters: taplo',
+  '[taplo]',
+  'INFO taplo:format_files:collect_files: found files total=1 excluded=0 files=["<REPO>/data.toml"] cwd="<REPO>"',
+  'INFO taplo:format_files:collect_files: found files total=1 excluded=0 files=["<REPO>/mise.toml"] cwd="<REPO>"',
+  'flint: 1 check failed (taplo)',
+]

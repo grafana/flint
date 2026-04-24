@@ -183,6 +183,7 @@ Click a name in the table below for details. See the
 | [`rumdl`](docs/linters.md#rumdl)                               | Lint Markdown files for style and consistency                       | yes |
 | [`shellcheck`](docs/linters.md#shellcheck)                     | Lint shell scripts for common mistakes                              | —   |
 | [`shfmt`](docs/linters.md#shfmt)                               | Format shell scripts                                                | yes |
+| [`taplo`](docs/linters.md#taplo)                               | Format TOML files                                                   | yes |
 | [`xmllint`](docs/linters.md#xmllint)                           | Validate XML files are well-formed                                  | —   |
 | [`yaml-lint`](docs/linters.md#yaml-lint)                       | Lint YAML files for style and consistency                           | yes |
 

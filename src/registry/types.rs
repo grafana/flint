@@ -89,6 +89,13 @@ pub struct Check {
     /// When set, look for `(filename, flag)` in config_dir: if the file exists, inject
     /// `flag <abs-path>` into the command right after the binary name.
     pub linter_config: Option<(&'static str, &'static str)>,
+    /// Environment variable overrides to apply only in non-verbose runs when
+    /// invoking this check's external process. These are intentionally not set
+    /// under `--verbose`, so checks must not rely on them always being present.
+    pub env: &'static [(&'static str, &'static str)],
+    /// Line prefixes to drop from stderr in non-verbose mode. This is only for
+    /// low-value log noise; actionable diagnostics must remain visible.
+    pub stderr_filter_prefixes: &'static [&'static str],
     /// Config-like files that affect this check's results and should trigger
     /// a one-time all-files baseline run when changed.
     pub baseline_configs: &'static [ConfigFile],
@@ -202,6 +209,8 @@ impl Check {
             patterns,
             excludes_if_active: &[],
             linter_config: None,
+            env: &[],
+            stderr_filter_prefixes: &[],
             baseline_configs: &[],
             unsupported_configs: &[],
             is_formatter: false,
@@ -234,6 +243,8 @@ impl Check {
             patterns: &[],
             excludes_if_active: &[],
             linter_config: None,
+            env: &[],
+            stderr_filter_prefixes: &[],
             baseline_configs: &[],
             unsupported_configs: &[],
             is_formatter: false,
@@ -399,6 +410,17 @@ impl Check {
     /// right after the binary name. Has no effect when the file is absent.
     pub fn linter_config(mut self, file: &'static str, flag: &'static str) -> Self {
         self.linter_config = Some((file, flag));
+        self
+    }
+
+    /// Set fixed environment variables when spawning this check's process.
+    pub fn env(mut self, env: &'static [(&'static str, &'static str)]) -> Self {
+        self.env = env;
+        self
+    }
+
+    pub fn stderr_filter_prefixes(mut self, prefixes: &'static [&'static str]) -> Self {
+        self.stderr_filter_prefixes = prefixes;
         self
     }
 

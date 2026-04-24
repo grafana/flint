@@ -108,9 +108,9 @@ pub struct Check {
     /// Line prefixes to drop from stderr in non-verbose mode. This is only for
     /// low-value log noise; actionable diagnostics must remain visible.
     pub stderr_filter_prefixes: &'static [&'static str],
-    /// Config-like files that affect this check's results and should trigger
+    /// Config-like file that affects this check's results and should trigger
     /// a one-time all-files baseline run when changed.
-    pub baseline_configs: &'static [ConfigFile],
+    pub baseline_config: Option<ConfigFile>,
     /// Known upstream config locations that flint does not support for this
     /// check. Their presence is a hard failure to avoid silent config drift.
     pub unsupported_configs: &'static [ConfigFile],
@@ -223,7 +223,7 @@ impl Check {
             linter_config: None,
             env: &[],
             stderr_filter_prefixes: &[],
-            baseline_configs: &[],
+            baseline_config: None,
             unsupported_configs: &[],
             is_formatter: false,
             defers_to_formatters: false,
@@ -257,7 +257,7 @@ impl Check {
             linter_config: None,
             env: &[],
             stderr_filter_prefixes: &[],
-            baseline_configs: &[],
+            baseline_config: None,
             unsupported_configs: &[],
             is_formatter: false,
             defers_to_formatters: false,
@@ -448,8 +448,8 @@ impl Check {
         self
     }
 
-    pub fn baseline_configs(mut self, files: &'static [ConfigFile]) -> Self {
-        self.baseline_configs = files;
+    pub fn baseline_config(mut self, file: ConfigFile) -> Self {
+        self.baseline_config = Some(file);
         self
     }
 

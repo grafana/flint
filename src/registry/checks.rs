@@ -51,26 +51,14 @@ const GOLANGCI_LINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::project(".golangci.toml"),
     ConfigFile::project(".golangci.json"),
 ];
-const SHELLCHECK_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".shellcheckrc")];
-const RUMDL_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".rumdl.toml")];
-const YAMLLINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".yamllint.yml")];
-const TAPLO_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".taplo.toml")];
-const ACTIONLINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir("actionlint.yml")];
-const HADOLINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".hadolint.yaml")];
-const CODESPELL_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".codespellrc")];
-const EDITORCONFIG_CHECKER_BASELINE_CONFIGS: &[ConfigFile] = &[
-    ConfigFile::config_dir(".editorconfig-checker.json"),
-    ConfigFile::project(".editorconfig"),
-];
-const GOLANGCI_LINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".golangci.yml")];
-const BIOME_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::project("biome.jsonc")];
+const BIOME_BASELINE_CONFIG: ConfigFile = ConfigFile::project("biome.jsonc");
 const BIOME_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[ConfigFile::project("biome.json")];
-const RUSTFMT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir("rustfmt.toml")];
+const RUSTFMT_BASELINE_CONFIG: ConfigFile = ConfigFile::config_dir("rustfmt.toml");
 const RUSTFMT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::project("rustfmt.toml"),
     ConfigFile::project(".rustfmt.toml"),
 ];
-const RUFF_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir("ruff.toml")];
+const RUFF_BASELINE_CONFIG: ConfigFile = ConfigFile::config_dir("ruff.toml");
 const RUFF_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir(".ruff.toml"),
     ConfigFile::project(".ruff.toml"),
@@ -98,7 +86,7 @@ fn check_shellcheck() -> Check {
         &["*.sh", "*.bash", "*.bats"],
     )
     .linter_config(".shellcheckrc", "--rcfile")
-    .baseline_configs(SHELLCHECK_BASELINE_CONFIGS)
+    .baseline_config(ConfigFile::config_dir(".shellcheckrc"))
     .unsupported_configs(SHELLCHECK_UNSUPPORTED_CONFIGS)
     .desc("Lint shell scripts for common mistakes")
     .style()
@@ -116,7 +104,7 @@ fn check_rumdl() -> Check {
     Check::file("rumdl", "rumdl check {FILE}", &["*.md"])
         .fix("rumdl check --fix {FILE}")
         .linter_config(".rumdl.toml", "--config")
-        .baseline_configs(RUMDL_BASELINE_CONFIGS)
+        .baseline_config(ConfigFile::config_dir(".rumdl.toml"))
         .unsupported_configs(RUMDL_UNSUPPORTED_CONFIGS)
         .formatter()
         .desc("Lint Markdown files for style and consistency")
@@ -128,7 +116,7 @@ fn check_yaml_lint() -> Check {
         .bin("ryl")
         .fix("ryl --fix {FILES}")
         .linter_config(".yamllint.yml", "-c")
-        .baseline_configs(YAMLLINT_BASELINE_CONFIGS)
+        .baseline_config(ConfigFile::config_dir(".yamllint.yml"))
         .unsupported_configs(YAMLLINT_UNSUPPORTED_CONFIGS)
         .formatter()
         .desc("Lint YAML files for style and consistency")
@@ -139,7 +127,7 @@ fn check_taplo() -> Check {
     Check::file("taplo", "taplo fmt --check {FILE}", &["*.toml"])
         .fix("taplo fmt {FILE}")
         .linter_config(".taplo.toml", "--config")
-        .baseline_configs(TAPLO_BASELINE_CONFIGS)
+        .baseline_config(ConfigFile::config_dir(".taplo.toml"))
         .unsupported_configs(TAPLO_UNSUPPORTED_CONFIGS)
         .mise_tool("github:tamasfe/taplo")
         .stderr_filter_prefixes(&[" INFO taplo:"])
@@ -165,7 +153,7 @@ fn check_actionlint() -> Check {
         &[".github/workflows/*.yml", ".github/workflows/*.yaml"],
     )
     .linter_config("actionlint.yml", "-config-file")
-    .baseline_configs(ACTIONLINT_BASELINE_CONFIGS)
+    .baseline_config(ConfigFile::config_dir("actionlint.yml"))
     .unsupported_configs(ACTIONLINT_UNSUPPORTED_CONFIGS)
     .desc("Lint GitHub Actions workflow files")
     .style()
@@ -178,7 +166,7 @@ fn check_hadolint() -> Check {
         &["Dockerfile", "Dockerfile.*", "*.dockerfile"],
     )
     .linter_config(".hadolint.yaml", "--config")
-    .baseline_configs(HADOLINT_BASELINE_CONFIGS)
+    .baseline_config(ConfigFile::config_dir(".hadolint.yaml"))
     .unsupported_configs(HADOLINT_UNSUPPORTED_CONFIGS)
     .desc("Lint Dockerfiles")
     .style()
@@ -194,7 +182,7 @@ fn check_codespell() -> Check {
     Check::files("codespell", "codespell {FILES}", &["*"])
         .fix("codespell --write-changes {FILES}")
         .linter_config(".codespellrc", "--config")
-        .baseline_configs(CODESPELL_BASELINE_CONFIGS)
+        .baseline_config(ConfigFile::config_dir(".codespellrc"))
         .unsupported_configs(CODESPELL_UNSUPPORTED_CONFIGS)
         .desc("Check for common spelling mistakes")
         .mise_tool("pipx:codespell")
@@ -209,7 +197,7 @@ fn check_editorconfig_checker() -> Check {
         .mise_tool("editorconfig-checker")
         .defer_to_formatters()
         .linter_config(".editorconfig-checker.json", "-config")
-        .baseline_configs(EDITORCONFIG_CHECKER_BASELINE_CONFIGS)
+        .baseline_config(ConfigFile::config_dir(".editorconfig-checker.json"))
         .unsupported_configs(EDITORCONFIG_CHECKER_UNSUPPORTED_CONFIGS)
         .desc("Check files comply with EditorConfig settings")
 }
@@ -221,7 +209,7 @@ fn check_golangci_lint() -> Check {
         &["*.go"],
     )
     .linter_config(".golangci.yml", "--config")
-    .baseline_configs(GOLANGCI_LINT_BASELINE_CONFIGS)
+    .baseline_config(ConfigFile::config_dir(".golangci.yml"))
     .unsupported_configs(GOLANGCI_LINT_UNSUPPORTED_CONFIGS)
     .desc("Lint Go code; uses --new-from-rev to scope analysis to changed code")
     .lang()
@@ -231,7 +219,7 @@ fn check_ruff() -> Check {
     Check::file("ruff", "ruff check {FILE}", &["*.py"])
         .fix("ruff check --fix {FILE}")
         .linter_config("ruff.toml", "--config")
-        .baseline_configs(RUFF_BASELINE_CONFIGS)
+        .baseline_config(RUFF_BASELINE_CONFIG)
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
         .desc("Lint Python code")
         .mise_tool("github:astral-sh/ruff")
@@ -243,7 +231,7 @@ fn check_ruff_format() -> Check {
         .bin("ruff")
         .fix("ruff format {FILE}")
         .linter_config("ruff.toml", "--config")
-        .baseline_configs(RUFF_BASELINE_CONFIGS)
+        .baseline_config(RUFF_BASELINE_CONFIG)
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
         .formatter()
         .desc("Format Python code")
@@ -258,7 +246,7 @@ fn check_biome() -> Check {
         &["*.json", "*.jsonc", "*.js", "*.ts", "*.jsx", "*.tsx"],
     )
     .fix("biome check --fix {FILE}")
-    .baseline_configs(BIOME_BASELINE_CONFIGS)
+    .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
     .desc("Lint JS/TS/JSON files")
     .mise_tool("biome")
@@ -273,7 +261,7 @@ fn check_biome_format() -> Check {
     )
     .bin("biome")
     .fix("biome format --write {FILE}")
-    .baseline_configs(BIOME_BASELINE_CONFIGS)
+    .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
     .formatter()
     .desc("Format JS/TS/JSON files")
@@ -299,7 +287,7 @@ fn check_cargo_fmt() -> Check {
     Check::project("cargo-fmt", "cargo fmt -- {CONFIG_ARGS} --check", &["*.rs"])
         .fix("cargo fmt -- {CONFIG_ARGS}")
         .linter_config("rustfmt.toml", "--config-path")
-        .baseline_configs(RUSTFMT_BASELINE_CONFIGS)
+        .baseline_config(RUSTFMT_BASELINE_CONFIG)
         .unsupported_configs(RUSTFMT_UNSUPPORTED_CONFIGS)
         .bin("rustfmt")
         .mise_tool("rust")

@@ -259,15 +259,10 @@ async fn run(
             .as_ref()
             .map(canonical_config_path)
             .or_else(|| {
-                if check.baseline_configs.len() == 1 {
-                    Some(config_file_rel_path(
-                        project_root,
-                        config_dir,
-                        &check.baseline_configs[0],
-                    ))
-                } else {
-                    None
-                }
+                check
+                    .baseline_config
+                    .as_ref()
+                    .map(|config| config_file_rel_path(project_root, config_dir, config))
             })
             .unwrap_or_else(|| "the flint-managed config".to_string());
         eprintln!(
@@ -611,9 +606,15 @@ fn baseline_check_names(
                         || (matches!(check.kind, CheckKind::Special(_))
                             && change.check_changed(check.name))
                 })
-                || check.baseline_configs.iter().any(|config| {
+                || check.baseline_config.as_ref().is_some_and(|config| {
                     changed.contains(&config_file_rel_path(project_root, config_dir, config))
                 })
+                || (check.name == "editorconfig-checker"
+                    && changed.contains(&config_file_rel_path(
+                        project_root,
+                        config_dir,
+                        &registry::ConfigFile::project(".editorconfig"),
+                    )))
         })
         .map(|check| check.name.to_string())
         .collect()

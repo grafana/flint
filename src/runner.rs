@@ -887,7 +887,7 @@ mod tests {
             linter_config: None,
             env: &[],
             stderr_filter_prefixes: &[],
-            baseline_configs: &[],
+            baseline_config: None,
             unsupported_configs: &[],
             is_formatter: false,
             defers_to_formatters: false,

@@ -24,7 +24,7 @@
       "actionlint",
       "biome",
       "cargo:xmloxide",
-      "cargo:yaml-lint",
+      "github:hiromaily/yaml-lint-rs",
       "dotnet",
       "editorconfig-checker",
       "github:google/google-java-format",

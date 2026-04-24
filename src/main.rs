@@ -258,6 +258,17 @@ async fn run(
             .linter_config
             .as_ref()
             .map(canonical_config_path)
+            .or_else(|| {
+                if check.baseline_configs.len() == 1 {
+                    Some(config_file_rel_path(
+                        project_root,
+                        config_dir,
+                        &check.baseline_configs[0],
+                    ))
+                } else {
+                    None
+                }
+            })
             .unwrap_or_else(|| "the flint-managed config".to_string());
         eprintln!(
             "flint: unsupported {name} config file found: {config}\n  Flint only supports {canonical} for {name}. Move the config to the supported location or remove the alternate file.",

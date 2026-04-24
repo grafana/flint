@@ -5,56 +5,44 @@ const TOOL_RUMDL: &[&str] = &["tool", "rumdl"];
 const TOOL_CODESPELL: &[&str] = &["tool", "codespell"];
 const TOOL_RUFF: &[&str] = &["tool", "ruff"];
 
-const SHELLCHECK_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".shellcheckrc")];
 const SHELLCHECK_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir("shellcheckrc"),
     ConfigFile::project("shellcheckrc"),
 ];
-const RUMDL_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".rumdl.toml")];
 const RUMDL_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir("rumdl.toml"),
     ConfigFile::project("rumdl.toml"),
     ConfigFile::project(".config/rumdl.toml"),
     ConfigFile::project_toml_section("pyproject.toml", TOOL_RUMDL),
 ];
-const YAMLLINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".yamllint.yml")];
 const YAMLLINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir(".yamllint"),
     ConfigFile::config_dir(".yamllint.yaml"),
     ConfigFile::project(".yamllint"),
     ConfigFile::project(".yamllint.yaml"),
 ];
-const TAPLO_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".taplo.toml")];
 const TAPLO_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir("taplo.toml"),
     ConfigFile::project(".taplo.toml"),
     ConfigFile::project("taplo.toml"),
 ];
-const ACTIONLINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir("actionlint.yml")];
 const ACTIONLINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir("actionlint.yaml"),
     ConfigFile::project(".github/actionlint.yaml"),
     ConfigFile::project(".github/actionlint.yml"),
 ];
-const HADOLINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".hadolint.yaml")];
 const HADOLINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir(".hadolint.yml"),
     ConfigFile::project(".hadolint.yml"),
 ];
-const CODESPELL_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".codespellrc")];
 const CODESPELL_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::project_ini_section("setup.cfg", "codespell"),
     ConfigFile::project_toml_section("pyproject.toml", TOOL_CODESPELL),
-];
-const EDITORCONFIG_CHECKER_BASELINE_CONFIGS: &[ConfigFile] = &[
-    ConfigFile::config_dir(".editorconfig-checker.json"),
-    ConfigFile::project(".editorconfig"),
 ];
 const EDITORCONFIG_CHECKER_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir(".ecrc"),
     ConfigFile::project(".ecrc"),
 ];
-const GOLANGCI_LINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".golangci.yml")];
 const GOLANGCI_LINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir(".golangci.yaml"),
     ConfigFile::config_dir(".golangci.toml"),
@@ -63,7 +51,20 @@ const GOLANGCI_LINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::project(".golangci.toml"),
     ConfigFile::project(".golangci.json"),
 ];
+const SHELLCHECK_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".shellcheckrc")];
+const RUMDL_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".rumdl.toml")];
+const YAMLLINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".yamllint.yml")];
+const TAPLO_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".taplo.toml")];
+const ACTIONLINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir("actionlint.yml")];
+const HADOLINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".hadolint.yaml")];
+const CODESPELL_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".codespellrc")];
+const EDITORCONFIG_CHECKER_BASELINE_CONFIGS: &[ConfigFile] = &[
+    ConfigFile::config_dir(".editorconfig-checker.json"),
+    ConfigFile::project(".editorconfig"),
+];
+const GOLANGCI_LINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".golangci.yml")];
 const BIOME_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::project("biome.jsonc")];
+const BIOME_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[ConfigFile::project("biome.json")];
 const RUSTFMT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir("rustfmt.toml")];
 const RUSTFMT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::project("rustfmt.toml"),
@@ -258,6 +259,7 @@ fn check_biome() -> Check {
     )
     .fix("biome check --fix {FILE}")
     .baseline_configs(BIOME_BASELINE_CONFIGS)
+    .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
     .desc("Lint JS/TS/JSON files")
     .mise_tool("biome")
     .lang()
@@ -272,6 +274,7 @@ fn check_biome_format() -> Check {
     .bin("biome")
     .fix("biome format --write {FILE}")
     .baseline_configs(BIOME_BASELINE_CONFIGS)
+    .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
     .formatter()
     .desc("Format JS/TS/JSON files")
     .mise_tool("biome")

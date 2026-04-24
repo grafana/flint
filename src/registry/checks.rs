@@ -68,9 +68,11 @@ const RUFF_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
 ///
 /// # Naming convention
 ///
-/// A check's `name` is the last path segment of its mise tool key (after `:` or `/`):
+/// A check's `name` is its stable user-facing ID. It usually matches the last path
+/// segment of its mise tool key, but it may intentionally differ from the current
+/// binary or tool key so CLI names and docs remain stable across backend swaps:
 /// - `editorconfig-checker` → name `editorconfig-checker` (not the binary `ec`)
-/// - `cargo:yaml-lint` → name `yaml-lint`
+/// - `github:owenlamont/ryl` → stable name `yaml-lint`
 /// - `github:pinterest/ktlint` → name `ktlint`
 ///
 /// Exception: when the mise tool key is a language toolchain shared across multiple
@@ -109,14 +111,15 @@ fn check_rumdl() -> Check {
 }
 
 fn check_yaml_lint() -> Check {
-    Check::files("yaml-lint", "yaml-lint {FILES}", &["*.yml", "*.yaml"])
-        .fix("yaml-lint --fix {FILES}")
+    Check::files("yaml-lint", "ryl {FILES}", &["*.yml", "*.yaml"])
+        .bin("ryl")
+        .fix("ryl --fix {FILES}")
         .linter_config(".yamllint.yml", "-c")
         .baseline_configs(YAMLLINT_BASELINE_CONFIGS)
         .unsupported_configs(YAMLLINT_UNSUPPORTED_CONFIGS)
         .formatter()
         .desc("Lint YAML files for style and consistency")
-        .mise_tool("cargo:yaml-lint")
+        .mise_tool("github:owenlamont/ryl")
 }
 
 fn check_taplo() -> Check {
@@ -215,7 +218,7 @@ fn check_ruff() -> Check {
         .baseline_configs(RUFF_BASELINE_CONFIGS)
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
         .desc("Lint Python code")
-        .mise_tool("pipx:ruff")
+        .mise_tool("github:astral-sh/ruff")
         .lang()
 }
 
@@ -228,7 +231,7 @@ fn check_ruff_format() -> Check {
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
         .formatter()
         .desc("Format Python code")
-        .mise_tool("pipx:ruff")
+        .mise_tool("github:astral-sh/ruff")
         .lang()
 }
 

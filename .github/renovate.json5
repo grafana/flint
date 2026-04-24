@@ -83,6 +83,7 @@
         "cargo:xmloxide",
         "editorconfig-checker",
         "github:google/google-java-format",
+        "github:owenlamont/ryl",
         "github:koalaman/shellcheck",
         "github:pinterest/ktlint",
         "github:tamasfe/taplo",

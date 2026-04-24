@@ -30,6 +30,10 @@ Then run `mise install` to install the new tools.
 Finally, run `flint run --fix renovate-deps` to regenerate
 `renovate-tracked-deps.json` with all the new tools included.
 
+If your repo already uses flint v2, `flint update` also rewrites obsolete
+tool backends in `mise.toml` when there is a direct replacement. For example,
+it migrates `cargo:yaml-lint` to `github:owenlamont/ryl`.
+
 ### 3. Verify active linters
 
 Run `flint linters` to confirm flint detects all the tools declared in your

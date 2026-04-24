@@ -23,12 +23,13 @@
     "mise": [
       "actionlint",
       "biome",
-      "cargo:yaml-lint",
       "dotnet",
       "editorconfig-checker",
+      "github:astral-sh/ruff",
       "github:google/google-java-format",
       "github:jonwiggins/xmloxide",
       "github:koalaman/shellcheck",
+      "github:owenlamont/ryl",
       "github:pinterest/ktlint",
       "github:tamasfe/taplo",
       "go",
@@ -38,7 +39,6 @@
       "node",
       "npm:renovate",
       "pipx:codespell",
-      "pipx:ruff",
       "rumdl",
       "rust",
       "shfmt"

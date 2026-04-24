@@ -7,7 +7,7 @@ NAME                  BINARY              STATUS         SPEED     FIX  DESCRIPT
 shellcheck            shellcheck          active         fast      no   Lint shell scripts for common mistakes                               *.sh *.bash *.bats
 shfmt                 shfmt               active         fast      yes  Format shell scripts                                                 *.sh *.bash
 rumdl                 rumdl               active         fast      yes  Lint Markdown files for style and consistency                        *.md
-yaml-lint             yaml-lint           active         fast      yes  Lint YAML files for style and consistency                            *.yml *.yaml
+yaml-lint             ryl                 active         fast      yes  Lint YAML files for style and consistency                            *.yml *.yaml
 taplo                 taplo               active         fast      yes  Format TOML files                                                    *.toml
 actionlint            actionlint          active         fast      no   Lint GitHub Actions workflow files                                   .github/workflows/*.yml .github/workflows/*.yaml
 hadolint              hadolint            missing        fast      no   Lint Dockerfiles                                                     Dockerfile Dockerfile.* *.dockerfile
@@ -52,7 +52,7 @@ lychee = '''
 rumdl = '''
 #!/bin/sh
 '''
-yaml-lint = '''
+ryl = '''
 #!/bin/sh
 '''
 taplo = '''

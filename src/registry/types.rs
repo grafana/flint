@@ -89,7 +89,9 @@ pub struct Check {
     /// When set, look for `(filename, flag)` in config_dir: if the file exists, inject
     /// `flag <abs-path>` into the command right after the binary name.
     pub linter_config: Option<(&'static str, &'static str)>,
-    /// Environment variables to set when invoking this check's external process.
+    /// Environment variable overrides to apply only in non-verbose runs when
+    /// invoking this check's external process. These are intentionally not set
+    /// under `--verbose`, so checks must not rely on them always being present.
     pub env: &'static [(&'static str, &'static str)],
     /// Line prefixes to drop from stderr in non-verbose mode. This is only for
     /// low-value log noise; actionable diagnostics must remain visible.

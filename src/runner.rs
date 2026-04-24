@@ -35,6 +35,7 @@ enum PreparedCheck {
         argv_list: Vec<Vec<String>>,
         tracked_files: Vec<PathBuf>,
         windows_java_jar: bool,
+        env: &'static [(&'static str, &'static str)],
     },
     Links {
         name: String,
@@ -63,7 +64,7 @@ impl PreparedCheck {
         }
     }
 
-    async fn execute(self, fix: bool, project_root: &Path) -> CheckResult {
+    async fn execute(self, fix: bool, verbose: bool, project_root: &Path) -> CheckResult {
         let name = self.name().to_string();
         let start = Instant::now();
         let (out, changed): (LinterOutput, bool) = match self {
@@ -71,6 +72,7 @@ impl PreparedCheck {
                 argv_list,
                 tracked_files,
                 windows_java_jar,
+                env,
                 ..
             } => {
                 let before = if fix && !tracked_files.is_empty() {
@@ -78,7 +80,14 @@ impl PreparedCheck {
                 } else {
                     None
                 };
-                let out = run_invocations(&name, &argv_list, windows_java_jar, project_root).await;
+                let out = run_invocations(
+                    &name,
+                    &argv_list,
+                    windows_java_jar,
+                    if verbose { &[] } else { env },
+                    project_root,
+                )
+                .await;
                 let changed =
                     before.is_some_and(|before| before != fingerprint_files(&tracked_files));
                 (out, changed)
@@ -143,7 +152,7 @@ pub async fn run(
     if fix {
         let mut results = vec![];
         for task in prepared {
-            let r = task.execute(fix, project_root).await;
+            let r = task.execute(fix, verbose, project_root).await;
             if !short && (verbose || !r.ok) {
                 eprintln!("[{}]{}", r.name, format_duration_suffix(time, r.duration));
                 flush_output(&r.stdout, &r.stderr);
@@ -156,7 +165,7 @@ pub async fn run(
     let mut set: JoinSet<CheckResult> = JoinSet::new();
     for task in prepared {
         let root = project_root.to_path_buf();
-        set.spawn(async move { task.execute(false, &root).await });
+        set.spawn(async move { task.execute(false, verbose, &root).await });
     }
 
     // Collect all results before printing to avoid interleaved output.
@@ -211,6 +220,7 @@ fn prepare(
                 argv_list,
                 tracked_files,
                 windows_java_jar: check.windows_java_jar,
+                env: check.env,
             })
         }
         CheckKind::Special(SpecialKind::Links) => Some(PreparedCheck::Links {
@@ -441,6 +451,7 @@ async fn run_invocations(
     name: &str,
     invocations: &[Vec<String>],
     windows_java_jar: bool,
+    env: &[(&str, &str)],
     root: &Path,
 ) -> LinterOutput {
     let mut all_ok = true;
@@ -451,11 +462,11 @@ async fn run_invocations(
         if argv.is_empty() {
             continue;
         }
-        let result = crate::linters::spawn_command(argv, windows_java_jar)
-            .current_dir(root)
+        let mut cmd = crate::linters::spawn_command(argv, windows_java_jar);
+        cmd.current_dir(root)
             .stdin(Stdio::null())
-            .output()
-            .await;
+            .envs(env.iter().copied());
+        let result = cmd.output().await;
         match result {
             Ok(out) => {
                 combined_stdout.extend_from_slice(&out.stdout);
@@ -473,6 +484,14 @@ async fn run_invocations(
     }
 
     maybe_append_rust_component_note(name, &mut combined_stderr);
+
+    // Taplo's non-verbose stderr is not stable across runs. Keep the concise
+    // flint wrapper output by suppressing tool diagnostics in default mode;
+    // `--verbose` disables the env override path and preserves native output.
+    if name == "taplo" && !env.is_empty() {
+        combined_stdout.clear();
+        combined_stderr.clear();
+    }
 
     LinterOutput {
         ok: all_ok,
@@ -723,6 +742,7 @@ mod tests {
             patterns,
             excludes_if_active: &[],
             linter_config: None,
+            env: &[],
             baseline_configs: &[],
             unsupported_configs: &[],
             is_formatter: false,

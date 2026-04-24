@@ -1,0 +1,9 @@
+[expected]
+args = "run --full taplo"
+exit = 1
+stderr = '''
+[taplo]
+
+flint: 1 check failed (taplo)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''

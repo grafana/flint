@@ -12,7 +12,7 @@ editorconfig-checker = "v3.6.1"
 "github:tamasfe/taplo" = "0.10.0"
 "github:owenlamont/ryl" = "v0.6.0"
 "rumdl" = "0.1.78"
-"pipx:ruff" = "0.15.11"
+"github:astral-sh/ruff" = "0.15.11"
 "pipx:codespell" = "2.4.2"
 rust = { version = "1.95.0", components = "clippy,rustfmt" }
 

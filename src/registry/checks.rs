@@ -218,7 +218,7 @@ fn check_ruff() -> Check {
         .baseline_configs(RUFF_BASELINE_CONFIGS)
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
         .desc("Lint Python code")
-        .mise_tool("pipx:ruff")
+        .mise_tool("github:astral-sh/ruff")
         .lang()
 }
 
@@ -231,7 +231,7 @@ fn check_ruff_format() -> Check {
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
         .formatter()
         .desc("Format Python code")
-        .mise_tool("pipx:ruff")
+        .mise_tool("github:astral-sh/ruff")
         .lang()
 }
 

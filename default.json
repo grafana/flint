@@ -51,7 +51,7 @@
         "lychee",
         "npm:renovate",
         "pipx:codespell",
-        "pipx:ruff",
+        "github:astral-sh/ruff",
         "rumdl",
         "shellcheck",
         "shfmt"

@@ -17,7 +17,7 @@ it do not need to re-learn the interface.
 
 | Flag                 | Description                                                                                    |
 | -------------------- | ---------------------------------------------------------------------------------------------- |
-| `--fix`              | Fix what's fixable, report what still needs review; exit 1 if anything changed or needs review |
+| `--fix`              | Fix what's fixable, report `clean` / `fixed` / `partial` / `review` outcomes; exit non-zero if anything needs action |
 | `--full`             | Lint all files instead of only changed files                                                   |
 | `--fast-only`        | Skip checks tagged as slow in the registry. Overridden by explicit linter names.               |
 | `--short`            | Compact summary output, no per-check noise                                                     |
@@ -81,9 +81,17 @@ flint: 2 checks failed — flint run --fix rumdl cargo-fmt | review: shellcheck
 ```
 
 **`--fix` output** — fixes what's fixable, then prints the full output of
-any checks that still need review, followed by a summary line. Exits 1 if
-anything was fixed (so the caller commits the fixes before pushing) or if
-anything still needs review. Exits 0 only if everything was already clean:
+any checks that still need review, followed by a summary line. The internal
+outcome model distinguishes `clean`, `fixed`, `review`, and `partial`:
+
+- `clean` — the fixer ran and found nothing to change
+- `fixed` — the fixer resolved the issue; commit before pushing
+- `review` — no fixer was applied; human review is required
+- `partial` — a fixer ran but the check still failed and needs review
+
+Exit status remains intentionally coarse: `0` only when everything was already
+clean, non-zero when anything still needs action. Callers should rely only on
+`0` vs non-`0`, not on specific non-zero codes:
 
 ```text
 [shellcheck]
@@ -93,6 +101,17 @@ echo $1
      ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
 ...
 flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
+```
+
+More `--fix` summary examples:
+
+```text
+flint: fixed: gofmt — commit before pushing
+flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
+flint: fixed: gofmt — commit before pushing | partial: cargo-clippy
+flint: partial: cargo-clippy | review: shellcheck
+flint: partial: cargo-clippy
+flint: review: shellcheck
 ```
 
 Pass one or more linter names to run only those:

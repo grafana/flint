@@ -71,6 +71,7 @@ struct InitArgs {
 struct RunArgs {
     /// Fix what's fixable, report what still needs review.
     /// Exits 1 if anything was fixed (uncommitted) or needs review; 0 if already clean.
+    /// Only 0 vs non-0 is stable for callers.
     #[arg(long, env = "FLINT_FIX")]
     fix: bool,
 
@@ -292,10 +293,7 @@ async fn run(
                 .copied()
                 .partition(|c| supports_single_pass_fix(c));
 
-        let mut reviewable: Vec<CheckResult> = vec![];
-        let mut fixed = vec![];
-        let mut fix_failed = vec![];
-        let mut post_fix_failed = vec![];
+        let mut outcomes = vec![];
 
         if !legacy_checks.is_empty() {
             let check_results = run_checks(
@@ -313,11 +311,11 @@ async fn run(
             )
             .await?;
 
-            let (fixable, legacy_reviewable): (Vec<CheckResult>, Vec<CheckResult>) = check_results
+            let (fixable, reviewable): (Vec<CheckResult>, Vec<CheckResult>) = check_results
                 .into_iter()
                 .filter(|r| !r.ok)
                 .partition(|r| is_fixable(&r.name, &legacy_checks));
-            reviewable.extend(legacy_reviewable);
+            outcomes.extend(reviewable.into_iter().map(FixOutcome::Review));
 
             let mut to_verify = vec![];
             if !fixable.is_empty() {
@@ -347,11 +345,11 @@ async fn run(
                             if check.fix_behavior() == registry::FixBehavior::PartialNeedsVerify {
                                 to_verify.push(r.name);
                             } else {
-                                fixed.push(r.name);
+                                outcomes.push(FixOutcome::Fixed(r.name));
                             }
                         }
                     } else {
-                        fix_failed.push(r.name);
+                        outcomes.push(FixOutcome::Partial(r));
                     }
                 }
             }
@@ -378,9 +376,9 @@ async fn run(
                 .await?;
                 for r in verify_results {
                     if r.ok {
-                        fixed.push(r.name);
+                        outcomes.push(FixOutcome::Fixed(r.name));
                     } else {
-                        post_fix_failed.push(r);
+                        outcomes.push(FixOutcome::Partial(r));
                     }
                 }
             }
@@ -402,19 +400,13 @@ async fn run(
             )
             .await?;
             for r in fix_results {
-                if r.ok && r.changed {
-                    fixed.push(r.name);
-                } else if !r.ok {
-                    post_fix_failed.push(r);
-                } else {
-                    // Already clean: no summary line needed.
-                }
+                outcomes.push(classify_single_pass_fix(r));
             }
         }
 
         // Emit linter output for checks that need manual review so the caller
         // has the failure details without a second flint invocation.
-        for r in reviewable.iter().chain(post_fix_failed.iter()) {
+        for r in outcomes.iter().filter_map(FixOutcome::result) {
             eprintln!("[{}]", r.name);
             if !r.stdout.is_empty() {
                 eprint!("{}", String::from_utf8_lossy(&r.stdout));
@@ -424,13 +416,20 @@ async fn run(
             }
         }
 
-        let remaining: Vec<&str> = reviewable
-            .iter()
-            .map(|r| r.name.as_str())
-            .chain(post_fix_failed.iter().map(|r| r.name.as_str()))
-            .chain(fix_failed.iter().map(String::as_str))
-            .collect();
-
+        let mut fixed = vec![];
+        let mut partial = vec![];
+        let mut review = vec![];
+        for outcome in outcomes {
+            match outcome {
+                FixOutcome::Clean => {}
+                FixOutcome::Fixed(name) => fixed.push(name),
+                FixOutcome::Partial(result) => partial.push(result.name),
+                FixOutcome::Review(result) => review.push(result.name),
+            }
+        }
+        fixed.sort();
+        partial.sort();
+        review.sort();
         let mut segments = vec![];
         if !fixed.is_empty() {
             // Exit 1 even when fixes were applied: in a pre-push context the
@@ -440,8 +439,11 @@ async fn run(
                 fixed.join(", ")
             ));
         }
-        if !remaining.is_empty() {
-            segments.push(format!("review: {}", remaining.join(", ")));
+        if !partial.is_empty() {
+            segments.push(format!("partial: {}", partial.join(", ")));
+        }
+        if !review.is_empty() {
+            segments.push(format!("review: {}", review.join(", ")));
         }
         if !segments.is_empty() {
             eprintln!("flint: {}", segments.join(" | "));
@@ -510,6 +512,36 @@ struct RunContext<'a> {
     project_root: &'a Path,
     cfg: &'a config::Config,
     config_dir: &'a Path,
+}
+
+enum FixOutcome {
+    Clean,
+    Fixed(String),
+    Partial(CheckResult),
+    Review(CheckResult),
+}
+
+impl FixOutcome {
+    fn result(&self) -> Option<&CheckResult> {
+        match self {
+            Self::Partial(result) | Self::Review(result) => Some(result),
+            Self::Clean | Self::Fixed(_) => None,
+        }
+    }
+}
+
+fn classify_single_pass_fix(result: CheckResult) -> FixOutcome {
+    if result.ok {
+        if result.changed {
+            FixOutcome::Fixed(result.name)
+        } else {
+            FixOutcome::Clean
+        }
+    } else if result.changed {
+        FixOutcome::Partial(result)
+    } else {
+        FixOutcome::Review(result)
+    }
 }
 
 async fn run_checks(

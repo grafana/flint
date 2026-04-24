@@ -1,2 +1,2 @@
 [tools]
-"pipx:ruff" = "latest"
+ruff = "latest"

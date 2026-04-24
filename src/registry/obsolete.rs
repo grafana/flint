@@ -30,6 +30,10 @@ pub const OBSOLETE_KEYS: &[(&str, &str)] = &[
 /// These require a docs/config migration rather than a backend swap.
 pub const UNSUPPORTED_KEYS: &[(&str, &str)] = &[
     (
+        "npm:markdownlint-cli",
+        "replace with rumdl and remove markdownlint-era config",
+    ),
+    (
         "npm:markdownlint-cli2",
         "replace with rumdl and remove markdownlint-era config",
     ),

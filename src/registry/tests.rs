@@ -45,6 +45,19 @@ fn find_unsupported_key_detects_markdownlint_stack() {
 }
 
 #[test]
+fn find_unsupported_key_detects_legacy_markdownlint_cli_stack() {
+    let mut tools = HashMap::new();
+    tools.insert("npm:markdownlint-cli".to_string(), "0.39.0".to_string());
+    assert_eq!(
+        find_unsupported_key(&tools),
+        Some((
+            "npm:markdownlint-cli",
+            "replace with rumdl and remove markdownlint-era config",
+        ))
+    );
+}
+
+#[test]
 fn find_unsupported_key_detects_prettier_stack() {
     let mut tools = HashMap::new();
     tools.insert("npm:prettier".to_string(), "3.6.2".to_string());

@@ -14,9 +14,14 @@
    with formatter output.
 
 3. **Rust-native docs/config stack**: Markdown is owned by
-   `rumdl`, YAML by `yaml-lint`, and JS/TS/JSON by `biome`.
+   `rumdl`, YAML is owned by `yaml-lint`, and JS/TS/JSON by `biome`.
    This keeps ownership boundaries explicit and avoids the
    old markdownlint/prettier overlap on `*.md`.
+   `yaml-lint` supports `--fix` and is now treated as the
+   authoritative YAML style owner for `editorconfig-checker`
+   deference. The generated `.yamllint.yml` disables line-length
+   but keeps indentation enabled, so YAML overlap checks live in
+   one tool instead of being split across ec and yamllint.
 
 4. **Fix mode runs serially**: `runner.rs` runs checks in
    parallel in check mode, but serially in fix mode to

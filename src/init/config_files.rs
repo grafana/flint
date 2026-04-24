@@ -43,9 +43,13 @@ pub(super) fn generate_flint_toml(
     Ok(true)
 }
 
-/// Generates `.rumdl.toml` in the project root when rumdl is being set up.
+/// Generates `.rumdl.toml` in the flint config dir when rumdl is being set up.
 /// Returns `true` if the file was written (or an older markdownlint variant was replaced).
-pub(super) fn generate_rumdl_config(project_root: &Path, line_length: u16) -> Result<bool> {
+pub(super) fn generate_rumdl_config(
+    project_root: &Path,
+    config_dir: &Path,
+    line_length: u16,
+) -> Result<bool> {
     const LEGACY_CONFIG_NAMES: &[&str] = &[
         ".markdownlint.json",
         ".markdownlint.jsonc",
@@ -57,9 +61,12 @@ pub(super) fn generate_rumdl_config(project_root: &Path, line_length: u16) -> Re
         ".markdownlint-cli2.cjs",
         ".markdownlint-cli2.mjs",
     ];
-    let target = project_root.join(".rumdl.toml");
+    let target = config_dir.join(".rumdl.toml");
     if target.exists() {
         return Ok(false);
+    }
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent)?;
     }
     for name in LEGACY_CONFIG_NAMES {
         let legacy = project_root.join(name);
@@ -181,16 +188,16 @@ fn add_editorconfig_global_line_length(content: &str, line_length: u16) -> Strin
     updated
 }
 
-/// Updates an existing editorconfig-checker config so Markdown is excluded when
-/// rumdl owns Markdown formatting and line-length enforcement.
+/// Updates an existing editorconfig-checker config so file types owned by
+/// formatter-style linters are excluded from ec overlap checks.
 ///
 /// Checks both the project root and `config_dir`, updating the first config
 /// file that exists. Returns `true` when a config was changed.
-pub(super) fn exclude_markdown_from_editorconfig_checker(
+pub(super) fn exclude_formatter_owned_files_from_editorconfig_checker(
     project_root: &Path,
     config_dir: &Path,
 ) -> Result<bool> {
-    const MARKDOWN_EXCLUDE: &str = ".*\\.md$";
+    const EXCLUDES: &[&str] = &[".*\\.md$", ".*\\.yml$", ".*\\.yaml$"];
     let candidates = [
         config_dir.join(".editorconfig-checker.json"),
         project_root.join(".editorconfig-checker.json"),
@@ -223,14 +230,22 @@ pub(super) fn exclude_markdown_from_editorconfig_checker(
             anyhow::bail!("{} field in {} is not an array", key, path.display());
         };
 
-        if items
-            .iter()
-            .any(|v| v.as_str().is_some_and(|s| s == MARKDOWN_EXCLUDE))
-        {
-            return Ok(false);
+        let mut changed = false;
+        for pattern in EXCLUDES {
+            if items
+                .iter()
+                .any(|v| v.as_str().is_some_and(|s| s == *pattern))
+            {
+                continue;
+            }
+
+            items.push(serde_json::Value::String((*pattern).to_string()));
+            changed = true;
         }
 
-        items.push(serde_json::Value::String(MARKDOWN_EXCLUDE.to_string()));
+        if !changed {
+            return Ok(false);
+        }
         let updated = serde_json::to_string_pretty(&value)? + "\n";
         std::fs::write(&path, updated)?;
         return Ok(true);
@@ -239,21 +254,22 @@ pub(super) fn exclude_markdown_from_editorconfig_checker(
     Ok(false)
 }
 
-/// Generates `.yamllint.yml` in the project root when yaml-lint is being set up.
-pub(super) fn generate_yamllint_config(project_root: &Path, line_length: u16) -> Result<bool> {
-    let target = project_root.join(".yamllint.yml");
+/// Generates `.yamllint.yml` in the flint config dir when yaml-lint is being set up.
+pub(super) fn generate_yamllint_config(config_dir: &Path, _line_length: u16) -> Result<bool> {
+    let target = config_dir.join(".yamllint.yml");
     if target.exists() {
         return Ok(false);
+    }
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent)?;
     }
     let content = [
         "extends: relaxed",
         "",
         "rules:",
         "  document-start: disable",
-        "  line-length:",
-        &format!("    max: {line_length}"),
-        "  indentation:",
-        "    spaces: 2",
+        "  line-length: disable",
+        "  indentation: enable",
         "",
     ]
     .join("\n");

@@ -23,11 +23,11 @@
     "mise": [
       "actionlint",
       "biome",
-      "cargo:xmloxide",
       "cargo:yaml-lint",
       "dotnet",
       "editorconfig-checker",
       "github:google/google-java-format",
+      "github:jonwiggins/xmloxide",
       "github:koalaman/shellcheck",
       "github:pinterest/ktlint",
       "github:tamasfe/taplo",

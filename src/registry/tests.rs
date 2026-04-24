@@ -227,7 +227,7 @@ fn linter_keys_include_mise_and_bare_tool_names() {
     let keys = linter_keys();
     assert!(keys.contains("cargo:yaml-lint"));
     assert!(keys.contains("yaml-lint"));
-    assert!(keys.contains("cargo:xmloxide"));
+    assert!(keys.contains("github:jonwiggins/xmloxide"));
     assert!(keys.contains("xmllint"));
 }
 

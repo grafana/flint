@@ -3,7 +3,6 @@
 ## Scope
 
 Guidance for working on flint v2 — the Rust binary.
-For v1 (bash task scripts), see [AGENTS-V1.md](AGENTS-V1.md).
 
 ## Repository Layout
 
@@ -43,3 +42,27 @@ On failure the test prints a rerun hint, e.g.:
 
 Always run `mise run lint:fix` before committing and review auto-fixed files —
 auto-fixes may produce unexpected results.
+
+## `--fix` outcomes
+
+`flint run --fix` models per-check results as `clean`,
+`fixed`, `partial`, or `review`.
+
+- `clean` — the fixer ran and found nothing to change
+- `fixed` — the fixer resolved the issue; commit before pushing
+- `partial` — a fixer ran but the check still failed
+- `review` — no fixer was applied; human review is required
+
+The process exit contract stays coarse:
+
+- `0` — everything was already clean
+- non-zero — something still needs action
+
+Only `0` vs non-`0` is stable for callers. Use the summary
+line for human/agent guidance, for example:
+
+```text
+flint: fixed: gofmt — commit before pushing
+flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
+flint: fixed: gofmt — commit before pushing | partial: cargo-clippy
+```

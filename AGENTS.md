@@ -3,14 +3,11 @@
 This file provides guidance to AI coding agents when working
 with code in this repository.
 
-## Versions
+## Scope
 
-This repository contains two generations of flint:
-
-- **v1** (stable): reusable bash task scripts consumed as
-  HTTP remote tasks. See [AGENTS-V1.md](AGENTS-V1.md).
-- **v2** (in development, `feat/flint-v2` branch): a single
-  Rust binary. See [AGENTS-V2.md](AGENTS-V2.md).
+This repository is now flint v2: a single Rust binary.
+See [AGENTS-V2.md](AGENTS-V2.md) for codebase-specific
+guidance.
 
 ## Linting
 

@@ -51,6 +51,8 @@ fn git_repo() -> TempDir {
 ///   exit   = 1                          # optional, default 0
 ///   stderr = """..."""                  # optional, default ""
 ///   stdout = """..."""                  # optional, default ""
+///   stderr_contains = ["..."]           # optional substring assertions
+///   stdout_contains = ["..."]           # optional substring assertions
 ///
 ///   [expected.files]                    # optional file contents asserted after run
 ///   ".github/renovate-tracked-deps.json" = """..."""
@@ -501,8 +503,32 @@ fn run_case(case: &Path, name: &str, update: bool) {
         .get("stdout")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    assert_eq!(stderr, exp_stderr, "{name}: stderr mismatch");
-    assert_eq!(stdout, exp_stdout, "{name}: stdout mismatch");
+    if let Some(contains) = expected.get("stderr_contains").and_then(|v| v.as_array()) {
+        for needle in contains {
+            let needle = needle.as_str().unwrap_or_else(|| {
+                panic!("{name}: expected.stderr_contains entries must be strings")
+            });
+            assert!(
+                stderr.contains(needle),
+                "{name}: stderr missing substring:\n{needle}\n\nactual stderr:\n{stderr}"
+            );
+        }
+    } else {
+        assert_eq!(stderr, exp_stderr, "{name}: stderr mismatch");
+    }
+    if let Some(contains) = expected.get("stdout_contains").and_then(|v| v.as_array()) {
+        for needle in contains {
+            let needle = needle.as_str().unwrap_or_else(|| {
+                panic!("{name}: expected.stdout_contains entries must be strings")
+            });
+            assert!(
+                stdout.contains(needle),
+                "{name}: stdout missing substring:\n{needle}\n\nactual stdout:\n{stdout}"
+            );
+        }
+    } else {
+        assert_eq!(stdout, exp_stdout, "{name}: stdout mismatch");
+    }
     assert_eq!(
         out.status.code(),
         Some(expected_exit),

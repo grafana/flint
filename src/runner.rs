@@ -474,12 +474,19 @@ async fn run_invocations(
         let result = cmd.output().await;
         match result {
             Ok(out) => {
-                combined_stdout.extend_from_slice(&out.stdout);
-                if stderr_filter_prefixes.is_empty() {
-                    combined_stderr.extend_from_slice(&out.stderr);
+                if name == "taplo" && !stderr_filter_prefixes.is_empty() && !out.status.success() {
+                    let (stdout, stderr) =
+                        normalize_taplo_nonverbose_output(argv, &out.stdout, &out.stderr);
+                    combined_stdout.extend_from_slice(&stdout);
+                    combined_stderr.extend_from_slice(&stderr);
                 } else {
-                    let filtered = filter_stderr_lines(&out.stderr, stderr_filter_prefixes);
-                    combined_stderr.extend_from_slice(&filtered);
+                    combined_stdout.extend_from_slice(&out.stdout);
+                    if stderr_filter_prefixes.is_empty() {
+                        combined_stderr.extend_from_slice(&out.stderr);
+                    } else {
+                        let filtered = filter_stderr_lines(&out.stderr, stderr_filter_prefixes);
+                        combined_stderr.extend_from_slice(&filtered);
+                    }
                 }
                 if !out.status.success() {
                     all_ok = false;
@@ -522,6 +529,49 @@ fn filter_stderr_lines(stderr: &[u8], prefixes: &[&str]) -> Vec<u8> {
         }
     }
     out.into_bytes()
+}
+
+fn normalize_taplo_nonverbose_output(
+    argv: &[String],
+    stdout: &[u8],
+    stderr: &[u8],
+) -> (Vec<u8>, Vec<u8>) {
+    let raw = format!(
+        "{}{}",
+        String::from_utf8_lossy(stdout),
+        String::from_utf8_lossy(stderr)
+    );
+    let mut error_lines: Vec<String> = raw
+        .lines()
+        .filter(|line| line.starts_with("ERROR"))
+        .map(ToOwned::to_owned)
+        .collect();
+
+    if error_lines.is_empty()
+        && let Some(target) = argv.last()
+    {
+        error_lines.push(format!(
+            "ERROR taplo:format_files: the file is not properly formatted path=\"{target}\""
+        ));
+    }
+
+    if !error_lines.is_empty()
+        && !error_lines.iter().any(|line| {
+            line == "ERROR operation failed error=some files were not properly formatted"
+        })
+    {
+        error_lines.push(
+            "ERROR operation failed error=some files were not properly formatted".to_string(),
+        );
+    }
+
+    let stderr = if error_lines.is_empty() {
+        Vec::new()
+    } else {
+        format!("{}\n", error_lines.join("\n")).into_bytes()
+    };
+
+    (Vec::new(), stderr)
 }
 
 fn maybe_append_rust_component_note(name: &str, stderr: &mut Vec<u8>) {

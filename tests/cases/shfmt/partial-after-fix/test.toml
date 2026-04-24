@@ -1,0 +1,44 @@
+[expected]
+args = "run --full --fix shfmt"
+exit = 1
+stderr = '''
+[shfmt]
+shfmt could not finish formatting
+flint: partial: shfmt
+'''
+
+[expected.files]
+"script.sh" = """
+#!/bin/sh
+printf '%s\\n' "$1"
+"""
+
+[fake_bins]
+shfmt = '''
+#!/bin/sh
+set -eu
+
+fix=0
+file=""
+for arg in "$@"; do
+  case "$arg" in
+    -w) fix=1 ;;
+    -*) ;;
+    *) file="$arg" ;;
+  esac
+done
+
+[ -n "$file" ] || exit 1
+
+if [ "$fix" -eq 1 ]; then
+  cat > "$file" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$1"
+EOF
+  printf '%s\n' 'shfmt could not finish formatting' >&2
+  exit 1
+fi
+
+printf '%s\n' 'script needs formatting' >&2
+exit 1
+'''

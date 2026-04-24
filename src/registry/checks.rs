@@ -71,7 +71,7 @@ const RUFF_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
 /// A check's `name` is the last path segment of its mise tool key (after `:` or `/`):
 /// - `editorconfig-checker` → name `editorconfig-checker` (not the binary `ec`)
 /// - `cargo:yaml-lint` → name `yaml-lint`
-/// - `github:hiromaily/yaml-lint-rs` → name `yaml-lint-rs`
+/// - `github:owenlamont/ryl` → name `ryl`
 /// - `github:pinterest/ktlint` → name `ktlint`
 ///
 /// Exception: when the mise tool key is a language toolchain shared across multiple
@@ -110,14 +110,15 @@ fn check_rumdl() -> Check {
 }
 
 fn check_yaml_lint() -> Check {
-    Check::files("yaml-lint", "yaml-lint {FILES}", &["*.yml", "*.yaml"])
-        .fix("yaml-lint --fix {FILES}")
+    Check::files("yaml-lint", "ryl {FILES}", &["*.yml", "*.yaml"])
+        .bin("ryl")
+        .fix("ryl --fix {FILES}")
         .linter_config(".yamllint.yml", "-c")
         .baseline_configs(YAMLLINT_BASELINE_CONFIGS)
         .unsupported_configs(YAMLLINT_UNSUPPORTED_CONFIGS)
         .formatter()
         .desc("Lint YAML files for style and consistency")
-        .mise_tool("github:hiromaily/yaml-lint-rs")
+        .mise_tool("github:owenlamont/ryl")
 }
 
 fn check_taplo() -> Check {

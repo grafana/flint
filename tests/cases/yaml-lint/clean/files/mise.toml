@@ -1,2 +1,2 @@
 [tools]
-"cargo:yaml-lint" = "latest"
+"github:owenlamont/ryl" = "latest"

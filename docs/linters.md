@@ -284,7 +284,7 @@ Current caveat: Taplo's published docs currently advertise TOML 1.0.0 support, s
 | ----------- | ----------------------------------------- |
 | Description | Lint YAML files for style and consistency |
 | Fix         | yes                                       |
-| Binary      | `yaml-lint`                               |
+| Binary      | `ryl`                                     |
 | Scope       | [files](#scopes)                          |
 | Patterns    | `*.yml *.yaml`                            |
 | Config      | `.yamllint.yml`                           |

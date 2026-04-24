@@ -9,7 +9,7 @@ use super::types::Check;
 /// Also registers normalized aliases for backend-prefixed tools so that checks
 /// can match by their bare package/binary name. For example:
 /// - `"cargo:yaml-lint"` → also registers `"yaml-lint"`
-/// - `"github:hiromaily/yaml-lint-rs"` → also registers `"yaml-lint-rs"`
+/// - `"github:owenlamont/ryl"` → also registers `"ryl"`
 /// - `"github:google/google-java-format"` → also registers `"google-java-format"`
 ///
 /// The original key is always preserved; aliases only fill in missing entries.

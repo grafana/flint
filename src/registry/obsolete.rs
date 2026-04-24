@@ -11,6 +11,9 @@ pub const OBSOLETE_KEYS: &[(&str, &str)] = &[
         "github:google/google-java-format",
     ),
     ("ubi:pinterest/ktlint", "github:pinterest/ktlint"),
+    // Ruff ships standalone GitHub release binaries, so we no longer need the
+    // pipx backend or a Python runtime just to install it.
+    ("pipx:ruff", "github:astral-sh/ruff"),
     // github:mvdan/sh is superseded by bare shfmt; mise resolves it via aqua:mvdan/sh,
     // and the aqua registry now ships Windows support for shfmt.
     ("github:mvdan/sh", "shfmt"),

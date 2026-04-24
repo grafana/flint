@@ -27,6 +27,7 @@
       "cargo:yaml-lint",
       "dotnet",
       "editorconfig-checker",
+      "github:astral-sh/ruff",
       "github:google/google-java-format",
       "github:koalaman/shellcheck",
       "github:pinterest/ktlint",
@@ -38,7 +39,6 @@
       "node",
       "npm:renovate",
       "pipx:codespell",
-      "pipx:ruff",
       "rumdl",
       "rust",
       "shfmt"

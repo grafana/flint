@@ -8,7 +8,7 @@ use tokio::task::JoinSet;
 use crate::config::{Config, LicenseHeaderConfig, LycheeConfig, RenovateDepsConfig};
 use crate::files::FileList;
 use crate::linters::{LinterOutput, license_header, lychee, renovate_deps};
-use crate::registry::{Check, CheckKind, Scope, SpecialKind};
+use crate::registry::{Check, CheckKind, LinterConfig, Scope, SpecialKind};
 
 #[derive(Clone, Copy)]
 pub struct RunOptions {
@@ -335,6 +335,8 @@ fn build_invocations(
     }
 
     let config_args = resolve_linter_config(check, config_dir);
+    let rendered_config_args = render_config_args(&config_args);
+    let inject_config_args = !cmd_template.contains("{CONFIG_ARGS}");
 
     match scope {
         Scope::Project => {
@@ -345,7 +347,13 @@ fn build_invocations(
                 return vec![];
             }
             let cmd = substitute_merge_base(cmd_template, file_list.merge_base.as_deref());
-            vec![inject_config(shell_words(cmd), &config_args)]
+            let cmd = cmd.replace("{CONFIG_ARGS}", &rendered_config_args);
+            let argv = shell_words(cmd);
+            vec![if inject_config_args {
+                inject_config(argv, &config_args)
+            } else {
+                argv
+            }]
         }
 
         Scope::File => {
@@ -353,8 +361,15 @@ fn build_invocations(
             matched
                 .iter()
                 .map(|f| {
-                    let cmd = cmd_template.replace("{FILE}", &quote_path(f));
-                    inject_config(shell_words(cmd), &config_args)
+                    let cmd = cmd_template
+                        .replace("{FILE}", &quote_path(f))
+                        .replace("{CONFIG_ARGS}", &rendered_config_args);
+                    let argv = shell_words(cmd);
+                    if inject_config_args {
+                        inject_config(argv, &config_args)
+                    } else {
+                        argv
+                    }
                 })
                 .collect()
         }
@@ -375,8 +390,15 @@ fn build_invocations(
                     None
                 };
                 if let Some(cmd) = effective {
-                    let cmd = cmd.replace("{ROOT}", &quote_path(project_root));
-                    return vec![inject_config(shell_words(cmd), &config_args)];
+                    let cmd = cmd
+                        .replace("{ROOT}", &quote_path(project_root))
+                        .replace("{CONFIG_ARGS}", &rendered_config_args);
+                    let argv = shell_words(cmd);
+                    return vec![if inject_config_args {
+                        inject_config(argv, &config_args)
+                    } else {
+                        argv
+                    }];
                 }
             }
             let edition_flag = resolve_cargo_edition_flag(project_root);
@@ -393,8 +415,14 @@ fn build_invocations(
             let cmd = cmd_template
                 .replace("{CARGO_EDITION_FLAG}", &edition_flag)
                 .replace("{FILES}", &files_arg)
-                .replace("{RELFILES}", &rel_files_arg);
-            vec![inject_config(shell_words(cmd), &config_args)]
+                .replace("{RELFILES}", &rel_files_arg)
+                .replace("{CONFIG_ARGS}", &rendered_config_args);
+            let argv = shell_words(cmd);
+            vec![if inject_config_args {
+                inject_config(argv, &config_args)
+            } else {
+                argv
+            }]
         }
     }
 }
@@ -424,17 +452,27 @@ fn resolve_cargo_edition_flag(project_root: &Path) -> String {
         .unwrap_or_default()
 }
 
-/// Returns `[flag, abs-path]` if `check.linter_config` is set and the file exists
-/// in `config_dir`, otherwise an empty slice.
+/// Returns config args for `check` based on files present in `config_dir`.
 fn resolve_linter_config(check: &Check, config_dir: &Path) -> Vec<String> {
-    let Some((file, flag)) = check.linter_config else {
+    let Some(config) = &check.linter_config else {
         return vec![];
     };
-    let path = config_dir.join(file);
-    if !path.exists() {
-        return vec![];
+    match config {
+        LinterConfig::File { file, flag } => {
+            let path = config_dir.join(file);
+            if !path.exists() {
+                return vec![];
+            }
+            vec![flag.to_string(), path.to_string_lossy().into_owned()]
+        }
+        LinterConfig::DirIfAny { files, flag } => {
+            if files.iter().any(|file| config_dir.join(file).exists()) {
+                vec![flag.to_string(), config_dir.to_string_lossy().into_owned()]
+            } else {
+                vec![]
+            }
+        }
     }
-    vec![flag.to_string(), path.to_string_lossy().into_owned()]
 }
 
 /// Inserts `config_args` at position 1 (right after the binary name) in `argv`.
@@ -447,6 +485,14 @@ fn inject_config(mut argv: Vec<String>, config_args: &[String]) -> Vec<String> {
     argv.extend_from_slice(config_args);
     argv.extend(tail);
     argv
+}
+
+fn render_config_args(config_args: &[String]) -> String {
+    config_args
+        .iter()
+        .map(|arg| quote_path(Path::new(arg)))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Runs all invocations for one check.
@@ -805,6 +851,29 @@ mod tests {
         let check = Check::file("shellcheck", "shellcheck {FILE}", &["*.sh"]);
         let dir = tempfile::tempdir().unwrap();
         assert!(resolve_linter_config(&check, dir.path()).is_empty());
+    }
+
+    #[test]
+    fn render_config_args_shell_quotes_all_args() {
+        let rendered =
+            render_config_args(&["--config-path".to_string(), "/tmp/my cfg".to_string()]);
+        assert_eq!(rendered, "\"--config-path\" \"/tmp/my cfg\"");
+    }
+
+    #[test]
+    fn resolve_linter_config_dir_if_any_returns_flag_and_dir() {
+        let check = Check::file("biome", "biome check {FILE}", &["*.json"])
+            .linter_config_dir_if_any(&["biome.jsonc"], "--config-path");
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("biome.jsonc"), "{}").unwrap();
+        let result = resolve_linter_config(&check, dir.path());
+        assert_eq!(
+            result,
+            vec![
+                "--config-path".to_string(),
+                dir.path().to_string_lossy().into_owned()
+            ]
+        );
     }
 
     fn project_check(patterns: &'static [&'static str]) -> Check {

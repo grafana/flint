@@ -278,22 +278,81 @@ pub(super) fn generate_yamllint_config(config_dir: &Path, _line_length: u16) -> 
     Ok(true)
 }
 
-/// Generates `biome.json` in the project root when biome is being set up and no
-/// existing biome config is present.
-///
-/// Flint writes explicit space indentation to avoid Biome's default tab
-/// formatting surprising consumers during rollout.
-pub(super) fn generate_biome_config(project_root: &Path) -> Result<bool> {
-    const EXISTING_CONFIG_NAMES: &[&str] = &["biome.json", "biome.jsonc"];
-    if EXISTING_CONFIG_NAMES
+/// Generates `.taplo.toml` in the flint config dir when taplo is being set up.
+pub(super) fn generate_taplo_config(config_dir: &Path, line_length: u16) -> Result<bool> {
+    const SUPPORTED_CONFIG_NAMES: &[&str] = &[".taplo.toml"];
+    const LEGACY_CONFIG_NAMES: &[&str] = &["taplo.toml"];
+    if SUPPORTED_CONFIG_NAMES
         .iter()
-        .map(|name| project_root.join(name))
+        .map(|name| config_dir.join(name))
         .any(|path| path.exists())
+        || LEGACY_CONFIG_NAMES
+            .iter()
+            .map(|name| config_dir.join(name))
+            .any(|path| path.exists())
     {
         return Ok(false);
     }
+    let target = config_dir.join(".taplo.toml");
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let content = format!(
+        "[formatting]\n\
+         column_width = {line_length}\n\
+         indent_string = \"  \"\n"
+    );
+    std::fs::write(&target, content)?;
+    println!("  wrote {}", target.display());
+    Ok(true)
+}
 
-    let target = project_root.join("biome.json");
+/// Generates `rustfmt.toml` in the flint config dir when cargo-fmt is being set up.
+pub(super) fn generate_rustfmt_config(config_dir: &Path, line_length: u16) -> Result<bool> {
+    let target = config_dir.join("rustfmt.toml");
+    if target.exists() {
+        return Ok(false);
+    }
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let content = format!("max_width = {line_length}\n");
+    std::fs::write(&target, content)?;
+    println!("  wrote {}", target.display());
+    Ok(true)
+}
+
+/// Generates `biome.jsonc` in the flint config dir when biome is being set up and no
+/// existing supported config is present.
+///
+/// Flint writes explicit space indentation to avoid Biome's default tab
+/// formatting surprising consumers during rollout.
+pub(super) fn generate_biome_config(project_root: &Path, config_dir: &Path) -> Result<bool> {
+    let target = config_dir.join("biome.jsonc");
+    if target.exists() {
+        return Ok(false);
+    }
+    let legacy_config_dir = config_dir.join("biome.json");
+    if legacy_config_dir.exists() {
+        std::fs::create_dir_all(config_dir)?;
+        std::fs::rename(&legacy_config_dir, &target)?;
+        println!(
+            "  moved {} -> {}",
+            legacy_config_dir.display(),
+            target.display()
+        );
+        return Ok(true);
+    }
+    for name in ["biome.json", "biome.jsonc"] {
+        let legacy = project_root.join(name);
+        if legacy.exists() {
+            return Ok(false);
+        }
+    }
+    if let Some(parent) = config_dir.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::create_dir_all(config_dir)?;
     let content = [
         "{",
         "  \"formatter\": {",

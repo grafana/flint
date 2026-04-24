@@ -15,7 +15,9 @@
 
 Linter runner built for speed and consistency:
 
-- **Fast** — native execution (no Docker), parallel, diff-aware (changed files only), opt-in (undeclared tools don't run), small binary cached by mise
+- **Fast** — native execution (no Docker), parallel, diff-aware
+  (changed files only), opt-in (undeclared tools don't run), small binary
+  cached by mise
 - **Local == CI** — one binary, one config, identical behavior
 - **AI-friendly** — fix silently, surface only what needs review
 - **Cross-platform** — Linux, macOS, Windows
@@ -116,19 +118,20 @@ See the [CLI reference](docs/cli.md) for commands and flags.
 
 ### Config (`flint.toml`)
 
-Optional. Place in the repo root (or in `FLINT_CONFIG_DIR` — see below). All settings have defaults.
+Optional. Place in the repo root (or in `FLINT_CONFIG_DIR` — see below).
+All settings have defaults.
 
 ```toml
 [settings]
-# base_branch = "dev"                           # branch to diff against; defaults to "main"
-exclude = ["CHANGELOG.md", "vendor/**"]         # glob patterns — exclude matching files
+# base_branch = "dev"                   # branch to diff against; defaults to "main"
+exclude = ["CHANGELOG.md", "vendor/**"] # glob patterns — exclude matching files
 
 [checks.links]
-config = ".github/config/lychee.toml"           # lychee config path
-check_all_local = true                          # second pass: local links in all files
+config = ".github/config/lychee.toml" # lychee config path
+check_all_local = true                # second pass: local links in all files
 
 [checks.renovate-deps]
-exclude_managers = ["github-actions", "cargo"]  # skip these Renovate managers
+exclude_managers = ["github-actions", "cargo"] # skip these Renovate managers
 ```
 
 ### `FLINT_CONFIG_DIR`
@@ -141,15 +144,18 @@ Set this env var to consolidate config files in one directory (e.g. `.github/con
 FLINT_CONFIG_DIR = ".github/config"
 ```
 
-When set, `flint.toml` is loaded from that directory, and each linter that supports
-an explicit config file path via a CLI flag will have it injected automatically when
-the corresponding file exists there (see the "Config file" column in the table below).
-Files that are absent are silently skipped — existing project-root configs remain in
-effect.
+When set, `flint.toml` is loaded from that directory, and each linter that
+supports an explicit config path via a CLI flag will have it injected
+automatically when the corresponding file exists there (see the "Config file"
+column in the table below).
+Files that are absent are silently skipped. Some tools still rely on project-root
+discovery semantics, and some alternate upstream config locations are rejected to
+avoid config drift.
 
-**Note:** `editorconfig-checker`'s config file (`.editorconfig-checker.json`) controls its own settings,
-not `.editorconfig` itself — editorconfig discovery always walks up from the file
-being linted and cannot be redirected via a flag.
+**Note:** `editorconfig-checker`'s config file
+(`.editorconfig-checker.json`) controls its own settings, not `.editorconfig`
+itself — editorconfig discovery always walks up from the file being linted and
+cannot be redirected via a flag.
 
 ### Built-in linter registry
 

@@ -66,6 +66,18 @@ pub enum CheckKind {
 }
 
 #[derive(Debug, Clone)]
+pub enum LinterConfig {
+    File {
+        file: &'static str,
+        flag: &'static str,
+    },
+    DirIfAny {
+        files: &'static [&'static str],
+        flag: &'static str,
+    },
+}
+
+#[derive(Debug, Clone)]
 pub struct Check {
     pub name: &'static str,
     /// Binary name used to invoke the tool.
@@ -86,9 +98,9 @@ pub struct Check {
     pub excludes_if_active: &'static [&'static str],
     pub category: Category,
     pub run_policy: RunPolicy,
-    /// When set, look for `(filename, flag)` in config_dir: if the file exists, inject
-    /// `flag <abs-path>` into the command right after the binary name.
-    pub linter_config: Option<(&'static str, &'static str)>,
+    /// When set, look for linter config in `config_dir` and inject an argument
+    /// right after the binary name.
+    pub linter_config: Option<LinterConfig>,
     /// Environment variable overrides to apply only in non-verbose runs when
     /// invoking this check's external process. These are intentionally not set
     /// under `--verbose`, so checks must not rely on them always being present.
@@ -409,7 +421,19 @@ impl Check {
     /// If `config_dir/file` exists at runtime, `flag <abs-path>` is inserted
     /// right after the binary name. Has no effect when the file is absent.
     pub fn linter_config(mut self, file: &'static str, flag: &'static str) -> Self {
-        self.linter_config = Some((file, flag));
+        self.linter_config = Some(LinterConfig::File { file, flag });
+        self
+    }
+
+    /// Inject `flag <config_dir>` when any of the named config files exist in
+    /// `config_dir`. Useful for tools like Biome that accept a config directory
+    /// instead of an individual config file path.
+    pub fn linter_config_dir_if_any(
+        mut self,
+        files: &'static [&'static str],
+        flag: &'static str,
+    ) -> Self {
+        self.linter_config = Some(LinterConfig::DirIfAny { files, flag });
         self
     }
 

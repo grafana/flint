@@ -14,7 +14,8 @@ mod ui;
 
 use config_files::{
     exclude_formatter_owned_files_from_editorconfig_checker, generate_biome_config,
-    generate_editorconfig, generate_flint_toml, generate_rumdl_config, generate_yamllint_config,
+    generate_editorconfig, generate_flint_toml, generate_rumdl_config, generate_rustfmt_config,
+    generate_taplo_config, generate_yamllint_config,
 };
 use detection::{
     build_linter_groups, detect_obsolete_keys, detect_present_patterns, parse_tool_keys,
@@ -261,11 +262,23 @@ Add and stage your source files before running init so the detection is accurate
             .zip(&g.check_selected)
             .any(|(c, &sel)| sel && c.name == "yaml-lint")
     });
+    let has_taplo = groups.iter().any(|g| {
+        g.checks
+            .iter()
+            .zip(&g.check_selected)
+            .any(|(c, &sel)| sel && c.name == "taplo")
+    });
     let has_biome = groups.iter().any(|g| {
         g.checks
             .iter()
             .zip(&g.check_selected)
             .any(|(c, &sel)| sel && (c.name == "biome" || c.name == "biome-format"))
+    });
+    let has_cargo_fmt = groups.iter().any(|g| {
+        g.checks
+            .iter()
+            .zip(&g.check_selected)
+            .any(|(c, &sel)| sel && c.name == "cargo-fmt")
     });
 
     // Prompt for the flint config dir (skipped if already set in mise.toml or --yes).
@@ -345,8 +358,18 @@ Add and stage your source files before running init so the detection is accurate
     } else {
         false
     };
+    let taplo_generated = if has_taplo {
+        generate_taplo_config(&config_dir_path, line_length)?
+    } else {
+        false
+    };
+    let rustfmt_generated = if has_cargo_fmt {
+        generate_rustfmt_config(&config_dir_path, line_length)?
+    } else {
+        false
+    };
     let biome_generated = if has_biome {
-        generate_biome_config(project_root)?
+        generate_biome_config(project_root, &config_dir_path)?
     } else {
         false
     };
@@ -376,6 +399,8 @@ Add and stage your source files before running init so the detection is accurate
         && !editorconfig_generated
         && !editorconfig_formatter_excluded
         && !yamllint_generated
+        && !taplo_generated
+        && !rustfmt_generated
         && !biome_generated
         && !renovate_patched
     {
@@ -873,35 +898,115 @@ rust = { version = "1.0", components = "clippy" }
     }
 
     #[test]
-    fn generate_biome_config_writes_file() {
-        use config_files::generate_biome_config;
+    fn generate_taplo_config_writes_file() {
+        use config_files::generate_taplo_config;
         let tmp = tempfile::TempDir::new().unwrap();
-        let written = generate_biome_config(tmp.path()).unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        let written = generate_taplo_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
         assert!(written);
-        let content = std::fs::read_to_string(tmp.path().join("biome.json")).unwrap();
-        assert!(content.contains("\"indentStyle\": \"space\""));
-        assert!(content.contains("\"indentWidth\": 2"));
+        let content = std::fs::read_to_string(config_dir.join(".taplo.toml")).unwrap();
+        assert!(content.contains("[formatting]"));
+        assert!(content.contains("column_width = 120"));
+        assert!(content.contains("indent_string = \"  \""));
     }
 
     #[test]
-    fn generate_biome_config_skips_existing_json() {
+    fn generate_taplo_config_skips_existing_supported_file() {
+        use config_files::generate_taplo_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(config_dir.join(".taplo.toml"), "existing").unwrap();
+        let written = generate_taplo_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
+        assert!(!written);
+        let content = std::fs::read_to_string(config_dir.join(".taplo.toml")).unwrap();
+        assert_eq!(content, "existing");
+    }
+
+    #[test]
+    fn generate_taplo_config_skips_existing_legacy_name() {
+        use config_files::generate_taplo_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(config_dir.join("taplo.toml"), "existing").unwrap();
+        let written = generate_taplo_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
+        assert!(!written);
+        assert!(!config_dir.join(".taplo.toml").exists());
+    }
+
+    #[test]
+    fn generate_rustfmt_config_writes_file() {
+        use config_files::generate_rustfmt_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        let written = generate_rustfmt_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
+        assert!(written);
+        let content = std::fs::read_to_string(config_dir.join("rustfmt.toml")).unwrap();
+        assert_eq!(content, "max_width = 120\n");
+    }
+
+    #[test]
+    fn generate_rustfmt_config_skips_existing_file() {
+        use config_files::generate_rustfmt_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(config_dir.join("rustfmt.toml"), "existing").unwrap();
+        let written = generate_rustfmt_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
+        assert!(!written);
+        let content = std::fs::read_to_string(config_dir.join("rustfmt.toml")).unwrap();
+        assert_eq!(content, "existing");
+    }
+
+    #[test]
+    fn generate_biome_config_writes_file() {
         use config_files::generate_biome_config;
         let tmp = tempfile::TempDir::new().unwrap();
-        std::fs::write(tmp.path().join("biome.json"), "existing").unwrap();
-        let written = generate_biome_config(tmp.path()).unwrap();
-        assert!(!written);
-        let content = std::fs::read_to_string(tmp.path().join("biome.json")).unwrap();
-        assert_eq!(content, "existing");
+        let config_dir = tmp.path().join(".github/config");
+        let written = generate_biome_config(tmp.path(), &config_dir).unwrap();
+        assert!(written);
+        let content = std::fs::read_to_string(config_dir.join("biome.jsonc")).unwrap();
+        assert!(content.contains("\"indentStyle\": \"space\""));
+        assert!(content.contains("\"indentWidth\": 2"));
     }
 
     #[test]
     fn generate_biome_config_skips_existing_jsonc() {
         use config_files::generate_biome_config;
         let tmp = tempfile::TempDir::new().unwrap();
-        std::fs::write(tmp.path().join("biome.jsonc"), "existing").unwrap();
-        let written = generate_biome_config(tmp.path()).unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(config_dir.join("biome.jsonc"), "existing").unwrap();
+        let written = generate_biome_config(tmp.path(), &config_dir).unwrap();
         assert!(!written);
-        assert!(!tmp.path().join("biome.json").exists());
+        let content = std::fs::read_to_string(config_dir.join("biome.jsonc")).unwrap();
+        assert_eq!(content, "existing");
+    }
+
+    #[test]
+    fn generate_biome_config_migrates_legacy_supported_json_name() {
+        use config_files::generate_biome_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(config_dir.join("biome.json"), "existing").unwrap();
+        let written = generate_biome_config(tmp.path(), &config_dir).unwrap();
+        assert!(written);
+        assert!(!config_dir.join("biome.json").exists());
+        let content = std::fs::read_to_string(config_dir.join("biome.jsonc")).unwrap();
+        assert_eq!(content, "existing");
+    }
+
+    #[test]
+    fn generate_biome_config_skips_legacy_root_json() {
+        use config_files::generate_biome_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::write(tmp.path().join("biome.json"), "existing").unwrap();
+        let written = generate_biome_config(tmp.path(), &config_dir).unwrap();
+        assert!(!written);
+        assert!(!config_dir.join("biome.jsonc").exists());
     }
 
     #[test]

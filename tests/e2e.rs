@@ -242,8 +242,19 @@ exit 0
         r#"#!/bin/sh
 set -eu
 
+config_dir=""
+if [ "${1:-}" = "--config-path" ]; then
+  config_dir="$2"
+  shift 2
+fi
+
 cmd="$1"
 shift
+
+if [ -n "$config_dir" ] && [ ! -f "$config_dir/biome.jsonc" ]; then
+  echo "missing biome config in $config_dir" >&2
+  exit 1
+fi
 
 if [ "$cmd" = "format" ] && [ "${1:-}" = "--write" ]; then
   file="$2"

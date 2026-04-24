@@ -43,3 +43,7 @@ On failure the test prints a rerun hint, e.g.:
 
 Always run `mise run lint:fix` before committing and review auto-fixed files —
 auto-fixes may produce unexpected results.
+
+When working on Biome support, treat `.github/config/biome.jsonc` as the single
+flint-managed Biome config. Do not add parallel support for `biome.json` unless
+there is an explicit design change.

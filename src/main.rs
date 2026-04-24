@@ -8,7 +8,7 @@ mod runner;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
-use registry::{CheckKind, FixBehavior, RunPolicy, Scope, SpecialKind};
+use registry::{CheckKind, FixBehavior, LinterConfig, RunPolicy, Scope, SpecialKind};
 use runner::{CheckResult, RunOptions};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -256,7 +256,8 @@ async fn run(
     }) {
         let canonical = check
             .linter_config
-            .map(|(file, _)| format!("FLINT_CONFIG_DIR/{file}"))
+            .as_ref()
+            .map(canonical_config_path)
             .unwrap_or_else(|| "the flint-managed config".to_string());
         eprintln!(
             "flint: unsupported {name} config file found: {config}\n  Flint only supports {canonical} for {name}. Move the config to the supported location or remove the alternate file.",
@@ -772,7 +773,7 @@ pub fn linter_json(check: &registry::Check) -> serde_json::Value {
         CheckKind::Special(_) => "special",
     };
     let patterns: Vec<&str> = check.patterns.to_vec();
-    let config_file: Option<&str> = check.linter_config.map(|(filename, _)| filename);
+    let config_file = check.linter_config.as_ref().map(display_config_name);
     serde_json::json!({
         "name": check.name,
         "description": check.desc,
@@ -784,6 +785,17 @@ pub fn linter_json(check: &registry::Check) -> serde_json::Value {
         "scope": scope,
         "config_file": config_file,
     })
+}
+
+fn canonical_config_path(config: &LinterConfig) -> String {
+    format!("FLINT_CONFIG_DIR/{}", display_config_name(config))
+}
+
+fn display_config_name(config: &LinterConfig) -> String {
+    match config {
+        LinterConfig::File { file, .. } => (*file).to_string(),
+        LinterConfig::DirIfAny { files, .. } => files.join(" / "),
+    }
 }
 
 fn run_policy_label(run_policy: RunPolicy) -> &'static str {

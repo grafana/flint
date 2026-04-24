@@ -3,8 +3,9 @@
 Every supported check, its config file (when applicable), and its scope. The
 [summary table lives in the README](../README.md#built-in-linter-registry).
 
-**Note:** Biome's config flag (`--config-path`) takes a directory, not a file path —
-config injection for `biome` and `biome-format` is not yet implemented.
+**Note:** Biome's config flag (`--config-path`) takes a directory, so flint injects
+`FLINT_CONFIG_DIR` when that directory contains `biome.jsonc`. Flint is opinionated
+here: use JSONC for the managed Biome config, not `biome.json`.
 
 <!-- editorconfig-checker-disable -->
 <!-- markdownlint-disable MD013 -->
@@ -30,6 +31,7 @@ config injection for `biome` and `biome-format` is not yet implemented.
 | Binary      | `biome`                                |
 | Scope       | [file](#scopes)                        |
 | Patterns    | `*.json *.jsonc *.js *.ts *.jsx *.tsx` |
+| Config      | `biome.jsonc`                          |
 
 ## `biome-format`
 
@@ -40,6 +42,7 @@ config injection for `biome` and `biome-format` is not yet implemented.
 | Binary      | `biome`                                |
 | Scope       | [file](#scopes)                        |
 | Patterns    | `*.json *.jsonc *.js *.ts *.jsx *.tsx` |
+| Config      | `biome.jsonc`                          |
 
 ## `cargo-clippy`
 
@@ -60,6 +63,7 @@ config injection for `biome` and `biome-format` is not yet implemented.
 | Binary      | `rustfmt`                                                 |
 | Scope       | [project](#scopes)                                        |
 | Patterns    | `*.rs`                                                    |
+| Config      | `rustfmt.toml`                                            |
 
 ## `codespell`
 
@@ -261,6 +265,7 @@ exclude_managers = ["github-actions", "github-runners"]
 | Binary      | `taplo`           |
 | Scope       | [file](#scopes)   |
 | Patterns    | `*.toml`          |
+| Config      | `.taplo.toml`     |
 
 Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).
 

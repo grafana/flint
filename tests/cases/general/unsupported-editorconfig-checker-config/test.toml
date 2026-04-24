@@ -1,0 +1,7 @@
+[expected]
+args = "run editorconfig-checker"
+exit = 1
+stderr = '''
+flint: unsupported editorconfig-checker config file found: .ecrc
+  Flint only supports FLINT_CONFIG_DIR/.editorconfig-checker.json for editorconfig-checker. Move the config to the supported location or remove the alternate file.
+'''

@@ -1,0 +1,7 @@
+[expected]
+args = "run codespell"
+exit = 1
+stderr = '''
+flint: unsupported codespell config file found: setup.cfg
+  Flint only supports FLINT_CONFIG_DIR/.codespellrc for codespell. Move the config to the supported location or remove the alternate file.
+'''

@@ -24,6 +24,12 @@ const YAMLLINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::project(".yamllint"),
     ConfigFile::project(".yamllint.yaml"),
 ];
+const TAPLO_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir(".taplo.toml")];
+const TAPLO_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
+    ConfigFile::config_dir("taplo.toml"),
+    ConfigFile::project(".taplo.toml"),
+    ConfigFile::project("taplo.toml"),
+];
 const ACTIONLINT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir("actionlint.yml")];
 const ACTIONLINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir("actionlint.yaml"),
@@ -56,6 +62,12 @@ const GOLANGCI_LINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::project(".golangci.yaml"),
     ConfigFile::project(".golangci.toml"),
     ConfigFile::project(".golangci.json"),
+];
+const BIOME_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir("biome.jsonc")];
+const RUSTFMT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir("rustfmt.toml")];
+const RUSTFMT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
+    ConfigFile::project("rustfmt.toml"),
+    ConfigFile::project(".rustfmt.toml"),
 ];
 const RUFF_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir("ruff.toml")];
 const RUFF_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
@@ -125,6 +137,9 @@ fn check_yaml_lint() -> Check {
 fn check_taplo() -> Check {
     Check::file("taplo", "taplo fmt --check {FILE}", &["*.toml"])
         .fix("taplo fmt {FILE}")
+        .linter_config(".taplo.toml", "--config")
+        .baseline_configs(TAPLO_BASELINE_CONFIGS)
+        .unsupported_configs(TAPLO_UNSUPPORTED_CONFIGS)
         .mise_tool("github:tamasfe/taplo")
         .stderr_filter_prefixes(&[" INFO taplo:"])
         .formatter()
@@ -242,6 +257,8 @@ fn check_biome() -> Check {
         &["*.json", "*.jsonc", "*.js", "*.ts", "*.jsx", "*.tsx"],
     )
     .fix("biome check --fix {FILE}")
+    .linter_config_dir_if_any(&["biome.jsonc"], "--config-path")
+    .baseline_configs(BIOME_BASELINE_CONFIGS)
     .desc("Lint JS/TS/JSON files")
     .mise_tool("biome")
     .lang()
@@ -255,6 +272,8 @@ fn check_biome_format() -> Check {
     )
     .bin("biome")
     .fix("biome format --write {FILE}")
+    .linter_config_dir_if_any(&["biome.jsonc"], "--config-path")
+    .baseline_configs(BIOME_BASELINE_CONFIGS)
     .formatter()
     .desc("Format JS/TS/JSON files")
     .mise_tool("biome")
@@ -276,8 +295,11 @@ fn check_cargo_clippy() -> Check {
 }
 
 fn check_cargo_fmt() -> Check {
-    Check::project("cargo-fmt", "cargo fmt -- --check", &["*.rs"])
-        .fix("cargo fmt")
+    Check::project("cargo-fmt", "cargo fmt -- {CONFIG_ARGS} --check", &["*.rs"])
+        .fix("cargo fmt -- {CONFIG_ARGS}")
+        .linter_config("rustfmt.toml", "--config-path")
+        .baseline_configs(RUSTFMT_BASELINE_CONFIGS)
+        .unsupported_configs(RUSTFMT_UNSUPPORTED_CONFIGS)
         .bin("rustfmt")
         .mise_tool("rust")
         .toolchain_components("rustfmt")

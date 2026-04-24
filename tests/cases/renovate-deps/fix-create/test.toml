@@ -21,9 +21,3 @@ flint: fixed: renovate-deps — commit before pushing
   }
 }
 """
-
-[fake_bins]
-renovate = '''
-#!/bin/sh
-printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"mise":[{"packageFile":"mise.toml","deps":[{"depName":"npm:renovate"}]}],"npm":[{"packageFile":"package.json","deps":[{"depName":"express"},{"depName":"lodash"}]}]}}'
-'''

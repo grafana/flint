@@ -3,6 +3,8 @@ args = "run --full taplo"
 exit = 1
 stderr = '''
 [taplo]
+ERROR the file is not properly formatted path="<REPO>/data.toml"
+ERROR operation failed error=some files were not properly formatted
 
 flint: 1 check failed (taplo)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.

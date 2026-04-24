@@ -485,14 +485,6 @@ async fn run_invocations(
 
     maybe_append_rust_component_note(name, &mut combined_stderr);
 
-    // Taplo's non-verbose stderr is not stable across runs. Keep the concise
-    // flint wrapper output by suppressing tool diagnostics in default mode;
-    // `--verbose` disables the env override path and preserves native output.
-    if name == "taplo" && !env.is_empty() {
-        combined_stdout.clear();
-        combined_stderr.clear();
-    }
-
     LinterOutput {
         ok: all_ok,
         stdout: combined_stdout,

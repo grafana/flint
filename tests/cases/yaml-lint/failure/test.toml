@@ -10,7 +10,7 @@ flint: 1 check failed (yaml-lint)
 '''
 
 [fake_bins]
-yaml-lint = '''
+ryl = '''
 #!/bin/sh
 printf '%s\n' 'config.yml:2: bad spacing'
 exit 1

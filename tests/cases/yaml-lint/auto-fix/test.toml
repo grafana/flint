@@ -13,7 +13,7 @@ items: ["a", "b"]
 """
 
 [fake_bins]
-yaml-lint = '''
+ryl = '''
 #!/bin/sh
 set -eu
 file=""

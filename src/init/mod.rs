@@ -400,7 +400,7 @@ fn find_renovate_config(project_root: &Path) -> Option<std::path::PathBuf> {
 /// via `flint init`, or `None` if no mise entry is needed (built-in or
 /// unconditionally active checks).
 ///
-/// Preference order: `mise_install_key` → `mise_tool_name` → `bin_name`.
+/// Preference order: `mise_tool_name` → `bin_name`.
 pub fn install_key(check: &Check) -> Option<&'static str> {
     if !check.uses_binary() || check.activate_unconditionally {
         return None;

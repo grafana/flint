@@ -11,6 +11,9 @@ pub const OBSOLETE_KEYS: &[(&str, &str)] = &[
         "github:google/google-java-format",
     ),
     ("ubi:pinterest/ktlint", "github:pinterest/ktlint"),
+    // ryl ships standalone GitHub release binaries, so we no longer need the
+    // cargo backend for yaml-lint.
+    ("cargo:yaml-lint", "github:owenlamont/ryl"),
     // Ruff ships standalone GitHub release binaries, so we no longer need the
     // pipx backend or a Python runtime just to install it.
     ("pipx:ruff", "github:astral-sh/ruff"),

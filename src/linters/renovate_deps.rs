@@ -17,7 +17,7 @@ pub(crate) const RENOVATE_CONFIG_PATTERNS: &[&str] = &[
     ".renovaterc.json",
     ".renovaterc.json5",
 ];
-const PACKAGE_FILES_MSG: &str = "Extracted dependencies";
+const PACKAGE_FILES_MSGS: &[&str] = &["Extracted dependencies", "packageFiles with updates"];
 const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value", "invalid-version"];
 
 /// `{file_path: {manager: [dep_name, ...]}}` — all collections sorted.
@@ -246,13 +246,20 @@ fn extract_deps(log_bytes: &[u8], exclude_managers: &[String]) -> anyhow::Result
         let Ok(entry) = serde_json::from_str::<serde_json::Value>(line) else {
             continue;
         };
-        if entry.get("msg").and_then(|v| v.as_str()) == Some(PACKAGE_FILES_MSG) {
-            config_obj = entry.get("packageFiles").cloned();
+        if entry
+            .get("msg")
+            .and_then(|v| v.as_str())
+            .is_some_and(|msg| PACKAGE_FILES_MSGS.contains(&msg))
+        {
+            config_obj = entry
+                .get("packageFiles")
+                .cloned()
+                .or_else(|| entry.get("config").cloned());
         }
     }
 
     let config = config_obj
-        .ok_or_else(|| anyhow::anyhow!("'{PACKAGE_FILES_MSG}' not found in Renovate log"))?;
+        .ok_or_else(|| anyhow::anyhow!("none of {:?} found in Renovate log", PACKAGE_FILES_MSGS))?;
 
     let mut deps_by_file: BTreeMap<String, BTreeMap<String, BTreeSet<String>>> = BTreeMap::new();
 
@@ -434,7 +441,11 @@ mod tests {
     fn missing_message_returns_error() {
         let bytes = b"{\"msg\":\"something else\"}\n";
         let err = extract_deps(bytes, &[]).unwrap_err();
-        assert!(err.to_string().contains(PACKAGE_FILES_MSG));
+        assert!(
+            PACKAGE_FILES_MSGS
+                .iter()
+                .any(|msg| err.to_string().contains(msg))
+        );
     }
 
     #[test]

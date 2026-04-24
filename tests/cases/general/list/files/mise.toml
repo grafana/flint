@@ -8,7 +8,7 @@ shellcheck = "v0.11.0"
 shfmt = "v3.13.1"
 actionlint = "1.7.10"
 editorconfig-checker = "v3.6.1"
-"pipx:ruff" = "0.15.0"
+"github:astral-sh/ruff" = "0.15.0"
 "pipx:codespell" = "2.4.1"
 rumdl = "0.1.78"
 rust = { version = "1.94.1", components = "clippy,rustfmt" }

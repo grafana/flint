@@ -349,7 +349,7 @@ pub(super) fn normalize_tools_section(path: &Path) -> Result<bool> {
     let Some(tools) = doc.get_mut("tools").and_then(|i| i.as_table_mut()) else {
         return Ok(false);
     };
-    sort_and_group_tools(tools);
+    sort_and_group_tools(tools, &content);
     let new_content = doc.to_string();
     if new_content == content {
         return Ok(false);
@@ -360,10 +360,9 @@ pub(super) fn normalize_tools_section(path: &Path) -> Result<bool> {
 }
 
 /// Sorts `[tools]` entries alphabetically and inserts a `# Linters` comment
-/// before the first linter entry. Toolchain keys (derived from registry checks
-/// marked `.toolchain()`, plus `node`) stay above the header; every other key
-/// goes below.
-fn sort_and_group_tools(tools: &mut toml_edit::Table) {
+/// before the first linter entry. Runtime, SDK, and unrelated project tools stay
+/// above the header; known linter keys go below.
+fn sort_and_group_tools(tools: &mut toml_edit::Table, original: &str) {
     let mut entries: Vec<(String, toml_edit::Item)> = tools
         .iter()
         .map(|(k, v)| (k.to_string(), v.clone()))
@@ -371,12 +370,27 @@ fn sort_and_group_tools(tools: &mut toml_edit::Table) {
     if entries.is_empty() {
         return;
     }
-    let toolchains = crate::registry::toolchain_keys();
-    let (mut runtimes, mut linters): (Vec<_>, Vec<_>) = entries
+    let linter_keys = crate::registry::linter_keys();
+    let (mut linters, mut runtimes): (Vec<_>, Vec<_>) = entries
         .drain(..)
-        .partition(|(k, _)| toolchains.contains(k.as_str()));
+        .partition(|(k, _)| linter_keys.contains(k.as_str()));
     runtimes.sort_by(|a, b| a.0.cmp(&b.0));
     linters.sort_by(|a, b| a.0.cmp(&b.0));
+    let preserved_prefixes: std::collections::HashMap<String, String> = tools
+        .iter()
+        .filter_map(|(k, _)| {
+            let prefix = tools
+                .key(k)
+                .and_then(|key| key.leaf_decor().prefix())
+                .and_then(|prefix| {
+                    prefix
+                        .as_str()
+                        .or_else(|| prefix.span().and_then(|span| original.get(span)))
+                })?;
+            let is_header = prefix == "\n# Linters\n";
+            (!is_header && !prefix.is_empty()).then(|| (k.to_string(), prefix.to_string()))
+        })
+        .collect();
 
     let keys: Vec<String> = tools.iter().map(|(k, _)| k.to_string()).collect();
     for k in keys {
@@ -388,6 +402,22 @@ fn sort_and_group_tools(tools: &mut toml_edit::Table) {
     let first_linter_key = linters.first().map(|(k, _)| k.clone());
     for (k, v) in linters {
         tools.insert(&k, v);
+    }
+    for k in tools.iter().map(|(k, _)| k.to_string()).collect::<Vec<_>>() {
+        if let Some(mut key_mut) = tools.key_mut(&k) {
+            if let Some(prefix) = preserved_prefixes.get(&k) {
+                key_mut.leaf_decor_mut().set_prefix(prefix);
+                continue;
+            }
+            let existing_prefix = key_mut.leaf_decor().prefix().and_then(|prefix| {
+                prefix
+                    .as_str()
+                    .or_else(|| prefix.span().and_then(|span| original.get(span)))
+            });
+            if existing_prefix == Some("\n# Linters\n") {
+                key_mut.leaf_decor_mut().set_prefix("");
+            }
+        }
     }
     if let Some(k) = first_linter_key
         && let Some(mut key_mut) = tools.key_mut(&k)
@@ -559,8 +589,6 @@ pub(super) fn prompt_config_dir(existing: Option<&str>, yes: bool) -> Result<Str
     }
 }
 
-/// Generates `.github/workflows/lint.yml` if it does not already exist.
-/// Returns `true` if the file was written.
 #[cfg(test)]
 mod node_prereq_tests {
     use super::{ensure_node_for_npm, needs_node_for_npm};

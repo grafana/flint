@@ -30,6 +30,7 @@
       "github:google/google-java-format",
       "github:koalaman/shellcheck",
       "github:pinterest/ktlint",
+      "github:tamasfe/taplo",
       "go",
       "golangci-lint",
       "hadolint",

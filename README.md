@@ -36,7 +36,7 @@ Add `flint` to your repo's `mise.toml`:
 
 ```toml
 [tools]
-"github:grafana/flint" = "0.20.2"
+"github:grafana/flint" = "0.20.3"
 ```
 
 Bootstrap a repo with `flint init` (scaffolds config). Install a
@@ -58,7 +58,7 @@ Add the linting tools your project needs alongside the `flint` binary itself:
 
 ```toml
 [tools]
-"github:grafana/flint" = "0.20.2"
+"github:grafana/flint" = "0.20.3"
 
 # Add whichever linters apply to your repo:
 shellcheck              = "v0.11.0"
@@ -79,10 +79,6 @@ Then wire up lint tasks:
 [tasks.lint]
 description = "Run all lints"
 run = "flint run"
-
-[tasks."lint:pre-commit"]
-description = "Fast auto-fix lint pass — for pre-push hooks and agentic pipelines"
-run = "flint run --fix --fast-only"
 
 [tasks."lint:fix"]
 description = "Auto-fix lint issues"
@@ -187,6 +183,7 @@ Click a name in the table below for details. See the
 | [`rumdl`](docs/linters.md#rumdl)                               | Lint Markdown files for style and consistency                       | yes |
 | [`shellcheck`](docs/linters.md#shellcheck)                     | Lint shell scripts for common mistakes                              | —   |
 | [`shfmt`](docs/linters.md#shfmt)                               | Format shell scripts                                                | yes |
+| [`taplo`](docs/linters.md#taplo)                               | Format TOML files                                                   | yes |
 | [`xmllint`](docs/linters.md#xmllint)                           | Validate XML files are well-formed                                  | —   |
 | [`yaml-lint`](docs/linters.md#yaml-lint)                       | Lint YAML files for style and consistency                           | yes |
 

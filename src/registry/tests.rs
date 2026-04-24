@@ -222,6 +222,15 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
     );
 }
 
+#[test]
+fn linter_keys_include_mise_and_bare_tool_names() {
+    let keys = linter_keys();
+    assert!(keys.contains("cargo:yaml-lint"));
+    assert!(keys.contains("yaml-lint"));
+    assert!(keys.contains("cargo:xmloxide"));
+    assert!(keys.contains("xmllint"));
+}
+
 /// Verifies README summary table and docs/linters.md detail sections stay
 /// in sync with the registry. The summary table lives in README.md between
 /// `registry-table-*` markers; the per-linter detail sections live in

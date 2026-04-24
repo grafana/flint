@@ -117,7 +117,7 @@ fn task_has_removed_dep(tasks: &toml_edit::Table, name: &str, removed: &[String]
 pub(super) fn apply_env_and_tasks(
     mise_path: &Path,
     config_dir_rel: &str,
-    has_slow: bool,
+    _has_slow: bool,
     removed_v1_tasks: &[String],
 ) -> Result<bool> {
     let content = std::fs::read_to_string(mise_path).unwrap_or_default();
@@ -138,7 +138,7 @@ pub(super) fn apply_env_and_tasks(
         }
     }
 
-    // [tasks] — add lint / lint:fix / (lint:pre-commit)
+    // [tasks] — add lint / lint:fix
     {
         if !doc.contains_key("tasks") {
             let mut tasks_table = toml_edit::Table::new();
@@ -160,14 +160,6 @@ pub(super) fn apply_env_and_tasks(
         }
 
         changed |= add_task_if_absent(tasks, "lint:fix", "Auto-fix lint issues", "flint run --fix");
-        if has_slow {
-            changed |= add_task_if_absent(
-                tasks,
-                "lint:pre-commit",
-                "Fast auto-fix lint (skips slow checks) — for pre-commit/pre-push hooks",
-                "flint run --fix --fast-only",
-            );
-        }
     }
 
     if changed {
@@ -179,7 +171,7 @@ pub(super) fn apply_env_and_tasks(
 /// Offers to install the git pre-commit hook via `flint hook install`.
 /// Prompts the user unless `yes` is true. Silently skips if the hook is already installed.
 pub(super) fn maybe_install_hook(project_root: &Path, yes: bool) -> Result<()> {
-    let hook_path = project_root.join(".git/hooks/pre-commit");
+    let hook_path = crate::hook::pre_commit_path(project_root)?;
     if hook_path.exists() {
         return Ok(());
     }

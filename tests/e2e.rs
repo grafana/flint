@@ -51,6 +51,8 @@ fn git_repo() -> TempDir {
 ///   exit   = 1                          # optional, default 0
 ///   stderr = """..."""                  # optional, default ""
 ///   stdout = """..."""                  # optional, default ""
+///   stderr_contains = ["..."]           # optional substring assertions
+///   stdout_contains = ["..."]           # optional substring assertions
 ///
 ///   [expected.files]                    # optional file contents asserted after run
 ///   ".github/renovate-tracked-deps.json" = """..."""
@@ -501,8 +503,32 @@ fn run_case(case: &Path, name: &str, update: bool) {
         .get("stdout")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    assert_eq!(stderr, exp_stderr, "{name}: stderr mismatch");
-    assert_eq!(stdout, exp_stdout, "{name}: stdout mismatch");
+    if let Some(contains) = expected.get("stderr_contains").and_then(|v| v.as_array()) {
+        for needle in contains {
+            let needle = needle.as_str().unwrap_or_else(|| {
+                panic!("{name}: expected.stderr_contains entries must be strings")
+            });
+            assert!(
+                stderr.contains(needle),
+                "{name}: stderr missing substring:\n{needle}\n\nactual stderr:\n{stderr}"
+            );
+        }
+    } else {
+        assert_eq!(stderr, exp_stderr, "{name}: stderr mismatch");
+    }
+    if let Some(contains) = expected.get("stdout_contains").and_then(|v| v.as_array()) {
+        for needle in contains {
+            let needle = needle.as_str().unwrap_or_else(|| {
+                panic!("{name}: expected.stdout_contains entries must be strings")
+            });
+            assert!(
+                stdout.contains(needle),
+                "{name}: stdout missing substring:\n{needle}\n\nactual stdout:\n{stdout}"
+            );
+        }
+    } else {
+        assert_eq!(stdout, exp_stdout, "{name}: stdout mismatch");
+    }
     assert_eq!(
         out.status.code(),
         Some(expected_exit),
@@ -525,19 +551,23 @@ fn run_case(case: &Path, name: &str, update: bool) {
 /// Rewrites test.toml updating snapshot fields ([expected].exit/stderr/stdout)
 /// while preserving everything else (args, env, fake_bins, expected.files).
 fn write_test_toml(path: &Path, cfg: &toml::Value, exit: i32, stderr: &str, stdout: &str) {
-    let args_str = cfg["expected"]["args"].as_str().unwrap_or("");
-    let existing_files = cfg
-        .get("expected")
-        .and_then(|v| v.get("files"))
-        .and_then(|v| v.as_table());
+    let expected = &cfg["expected"];
+    let args_str = expected["args"].as_str().unwrap_or("");
+    let existing_files = expected.get("files").and_then(|v| v.as_table());
+    let existing_stderr_contains = expected.get("stderr_contains").and_then(|v| v.as_array());
+    let existing_stdout_contains = expected.get("stdout_contains").and_then(|v| v.as_array());
 
     let mut out = String::from("[expected]\n");
     out += &format!("args = \"{}\"\n", toml_escape(args_str));
     out += &format!("exit = {exit}\n");
-    if !stderr.is_empty() {
+    if let Some(contains) = existing_stderr_contains {
+        out += &format!("stderr_contains = {}\n", toml_string_array(contains));
+    } else if !stderr.is_empty() {
         out += &format!("stderr = '''\n{stderr}'''\n");
     }
-    if !stdout.is_empty() {
+    if let Some(contains) = existing_stdout_contains {
+        out += &format!("stdout_contains = {}\n", toml_string_array(contains));
+    } else if !stdout.is_empty() {
         out += &format!("stdout = '''\n{stdout}'''\n");
     }
     if let Some(files) = existing_files {
@@ -580,6 +610,43 @@ fn write_test_toml(path: &Path, cfg: &toml::Value, exit: i32, stderr: &str, stdo
 /// Escapes a string for use inside TOML basic double-quoted strings.
 fn toml_escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn toml_string_array(values: &[toml::Value]) -> String {
+    let values = values
+        .iter()
+        .map(|value| {
+            let value = value
+                .as_str()
+                .expect("expected string entries in TOML string array");
+            format!("\"{}\"", toml_escape(value))
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("[{values}]")
+}
+
+#[test]
+fn write_test_toml_preserves_contains_assertions() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("test.toml");
+    let src = r#"[expected]
+args = "run --full --verbose taplo"
+exit = 1
+stderr_contains = ["keep stderr"]
+stdout_contains = ["keep stdout"]
+"#;
+    std::fs::write(&path, src).expect("write test.toml");
+
+    let cfg: toml::Value = toml::from_str(src).expect("parse test.toml");
+    write_test_toml(&path, &cfg, 0, "new stderr", "new stdout");
+
+    let updated = std::fs::read_to_string(&path).expect("read updated test.toml");
+    assert!(updated.contains("exit = 0"));
+    assert!(updated.contains("stderr_contains = [\"keep stderr\"]"));
+    assert!(updated.contains("stdout_contains = [\"keep stdout\"]"));
+    assert!(!updated.contains("new stderr"));
+    assert!(!updated.contains("new stdout"));
 }
 
 /// Normalises timing suffixes on check header lines so snapshots are stable.

@@ -13,8 +13,8 @@ mod scaffold;
 mod ui;
 
 use config_files::{
-    exclude_markdown_from_editorconfig_checker, generate_biome_config, generate_editorconfig,
-    generate_flint_toml, generate_rumdl_config, generate_yamllint_config,
+    exclude_formatter_owned_files_from_editorconfig_checker, generate_biome_config,
+    generate_editorconfig, generate_flint_toml, generate_rumdl_config, generate_yamllint_config,
 };
 use detection::{
     build_linter_groups, detect_obsolete_keys, detect_present_patterns, parse_tool_keys,
@@ -316,21 +316,32 @@ Add and stage your source files before running init so the detection is accurate
         || (current_tool_keys.contains("rust") && !final_remove.iter().any(|k| k == "rust"));
     let workflow_generated = generate_lint_workflow(project_root, &base_branch, has_rust)?;
     let rumdl_generated = if has_rumdl {
-        generate_rumdl_config(project_root, line_length)?
+        generate_rumdl_config(project_root, &config_dir_path, line_length)?
     } else {
         false
     };
     let editorconfig_generated = generate_editorconfig(project_root, line_length)?;
-    let editorconfig_markdown_excluded = if has_rumdl {
-        exclude_markdown_from_editorconfig_checker(project_root, &config_dir_path)?
+    let editorconfig_formatter_excluded = if has_rumdl || has_yaml_lint {
+        exclude_formatter_owned_files_from_editorconfig_checker(project_root, &config_dir_path)?
     } else {
         false
     };
-    if editorconfig_markdown_excluded {
-        println!("  patched editorconfig-checker config — Markdown is now owned by rumdl");
+    if editorconfig_formatter_excluded {
+        let formatter_owned_message = match (has_rumdl, has_yaml_lint) {
+            (true, true) => "Markdown and YAML are now owned by their linters",
+            (true, false) => "Markdown is now owned by its linter",
+            (false, true) => "YAML is now owned by its linter",
+            (false, false) => unreachable!(
+                "editorconfig formatter exclusions were applied without formatter-owned file types"
+            ),
+        };
+        println!(
+            "  patched editorconfig-checker config — {}",
+            formatter_owned_message
+        );
     }
     let yamllint_generated = if has_yaml_lint {
-        generate_yamllint_config(project_root, line_length)?
+        generate_yamllint_config(&config_dir_path, line_length)?
     } else {
         false
     };
@@ -363,7 +374,7 @@ Add and stage your source files before running init so the detection is accurate
         && !workflow_generated
         && !rumdl_generated
         && !editorconfig_generated
-        && !editorconfig_markdown_excluded
+        && !editorconfig_formatter_excluded
         && !yamllint_generated
         && !biome_generated
         && !renovate_patched
@@ -548,6 +559,56 @@ rust = { version = "1.95.0", components = "clippy,rustfmt" }
     }
 
     #[test]
+    fn normalize_tools_section_moves_node_above_linters_header() {
+        let content = r#"[tools]
+rust = { version = "1.95.0", components = "clippy,rustfmt" }
+
+# Linters
+bats = "1.13.0"
+java = "temurin-25.0.2+10.0.LTS"
+node = "24.15.0"
+"npm:renovate" = "43.0.0"
+shellcheck = "0.11.0"
+"#;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), content).unwrap();
+        let changed = normalize_tools_section(tmp.path()).unwrap();
+        assert!(changed);
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        let bats_pos = result.find("bats =").expect("bats present");
+        let java_pos = result.find("java =").expect("java present");
+        let node_pos = result.find("node =").expect("node present");
+        let header_pos = result.find("# Linters").expect("header present");
+        let renovate_pos = result.find("\"npm:renovate\"").expect("renovate present");
+        assert!(
+            bats_pos < header_pos
+                && java_pos < header_pos
+                && node_pos < header_pos
+                && header_pos < renovate_pos,
+            "non-linter tools must stay above linter header:\n{result}"
+        );
+        assert_eq!(result.matches("# Linters").count(), 1, "single header");
+    }
+
+    #[test]
+    fn normalize_tools_section_preserves_unrelated_tool_comments() {
+        let content = r#"[tools]
+# Runtime comment
+node = "24.15.0"
+
+# Linters
+shellcheck = "0.11.0"
+"#;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), content).unwrap();
+        normalize_tools_section(tmp.path()).unwrap();
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(result.contains("# Runtime comment"));
+        assert!(result.contains("# Linters"));
+        assert_eq!(result.matches("# Linters").count(), 1);
+    }
+
+    #[test]
     fn apply_changes_upgrade_preserves_version() {
         let content = "[tools]\nrust = \"1.80.0\"\n";
         let tmp = tempfile::NamedTempFile::new().unwrap();
@@ -677,9 +738,10 @@ rust = { version = "1.0", components = "clippy" }
     fn generate_rumdl_config_writes_file() {
         use config_files::generate_rumdl_config;
         let tmp = tempfile::TempDir::new().unwrap();
-        let written = generate_rumdl_config(tmp.path(), DEFAULT_LINE_LENGTH).unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        let written = generate_rumdl_config(tmp.path(), &config_dir, DEFAULT_LINE_LENGTH).unwrap();
         assert!(written);
-        let content = std::fs::read_to_string(tmp.path().join(".rumdl.toml")).unwrap();
+        let content = std::fs::read_to_string(config_dir.join(".rumdl.toml")).unwrap();
         assert!(content.contains("line-length = 120"));
         assert!(content.contains("code-blocks = false"));
         assert!(!content.contains("[global]"));
@@ -689,10 +751,12 @@ rust = { version = "1.0", components = "clippy" }
     fn generate_rumdl_config_skips_when_target_exists() {
         use config_files::generate_rumdl_config;
         let tmp = tempfile::TempDir::new().unwrap();
-        std::fs::write(tmp.path().join(".rumdl.toml"), "existing").unwrap();
-        let written = generate_rumdl_config(tmp.path(), DEFAULT_LINE_LENGTH).unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(config_dir.join(".rumdl.toml"), "existing").unwrap();
+        let written = generate_rumdl_config(tmp.path(), &config_dir, DEFAULT_LINE_LENGTH).unwrap();
         assert!(!written);
-        let content = std::fs::read_to_string(tmp.path().join(".rumdl.toml")).unwrap();
+        let content = std::fs::read_to_string(config_dir.join(".rumdl.toml")).unwrap();
         assert_eq!(content, "existing");
     }
 
@@ -700,11 +764,12 @@ rust = { version = "1.0", components = "clippy" }
     fn generate_rumdl_config_replaces_legacy_json() {
         use config_files::generate_rumdl_config;
         let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
         std::fs::write(tmp.path().join(".markdownlint.json"), r#"{"MD013":false}"#).unwrap();
-        let written = generate_rumdl_config(tmp.path(), DEFAULT_LINE_LENGTH).unwrap();
+        let written = generate_rumdl_config(tmp.path(), &config_dir, DEFAULT_LINE_LENGTH).unwrap();
         assert!(written);
         assert!(!tmp.path().join(".markdownlint.json").exists());
-        let content = std::fs::read_to_string(tmp.path().join(".rumdl.toml")).unwrap();
+        let content = std::fs::read_to_string(config_dir.join(".rumdl.toml")).unwrap();
         assert!(content.contains("[MD013]"));
     }
 
@@ -752,8 +817,8 @@ rust = { version = "1.0", components = "clippy" }
     }
 
     #[test]
-    fn exclude_markdown_from_editorconfig_checker_updates_config_dir_file() {
-        use config_files::exclude_markdown_from_editorconfig_checker;
+    fn exclude_formatter_owned_files_from_editorconfig_checker_updates_config_dir_file() {
+        use config_files::exclude_formatter_owned_files_from_editorconfig_checker;
         let tmp = tempfile::TempDir::new().unwrap();
         let config_dir = tmp.path().join(".github/config");
         std::fs::create_dir_all(&config_dir).unwrap();
@@ -763,27 +828,33 @@ rust = { version = "1.0", components = "clippy" }
         )
         .unwrap();
 
-        let changed = exclude_markdown_from_editorconfig_checker(tmp.path(), &config_dir).unwrap();
+        let changed =
+            exclude_formatter_owned_files_from_editorconfig_checker(tmp.path(), &config_dir)
+                .unwrap();
         assert!(changed);
         let content =
             std::fs::read_to_string(config_dir.join(".editorconfig-checker.json")).unwrap();
         assert!(content.contains(".*\\\\.java$"));
         assert!(content.contains(".*\\\\.md$"));
+        assert!(content.contains(".*\\\\.yml$"));
+        assert!(content.contains(".*\\\\.yaml$"));
     }
 
     #[test]
-    fn exclude_markdown_from_editorconfig_checker_is_idempotent() {
-        use config_files::exclude_markdown_from_editorconfig_checker;
+    fn exclude_formatter_owned_files_from_editorconfig_checker_is_idempotent() {
+        use config_files::exclude_formatter_owned_files_from_editorconfig_checker;
         let tmp = tempfile::TempDir::new().unwrap();
         let config_dir = tmp.path().join(".github/config");
         std::fs::create_dir_all(&config_dir).unwrap();
         std::fs::write(
             config_dir.join(".editorconfig-checker.json"),
-            "{\n  \"Exclude\": [\".*\\\\.md$\"]\n}\n",
+            "{\n  \"Exclude\": [\".*\\\\.md$\", \".*\\\\.yml$\", \".*\\\\.yaml$\"]\n}\n",
         )
         .unwrap();
 
-        let changed = exclude_markdown_from_editorconfig_checker(tmp.path(), &config_dir).unwrap();
+        let changed =
+            exclude_formatter_owned_files_from_editorconfig_checker(tmp.path(), &config_dir)
+                .unwrap();
         assert!(!changed);
     }
 
@@ -791,11 +862,14 @@ rust = { version = "1.0", components = "clippy" }
     fn generate_yamllint_config_writes_file() {
         use config_files::generate_yamllint_config;
         let tmp = tempfile::TempDir::new().unwrap();
-        let written = generate_yamllint_config(tmp.path(), DEFAULT_LINE_LENGTH).unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        let written = generate_yamllint_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
         assert!(written);
-        let content = std::fs::read_to_string(tmp.path().join(".yamllint.yml")).unwrap();
+        let content = std::fs::read_to_string(config_dir.join(".yamllint.yml")).unwrap();
         assert!(content.contains("extends: relaxed"));
         assert!(content.contains("document-start: disable"));
+        assert!(content.contains("line-length: disable"));
+        assert!(content.contains("indentation: enable"));
     }
 
     #[test]
@@ -947,17 +1021,17 @@ rust = { version = "1.0", components = "clippy" }
         assert!(content.contains("FLINT_CONFIG_DIR = \".github/config\""));
         assert!(content.contains("flint run"));
         assert!(content.contains("flint run --fix"));
-        assert!(!content.contains("--fast-only")); // no slow linters
+        assert!(!content.contains("--fast-only"));
     }
 
     #[test]
-    fn apply_env_and_tasks_adds_pre_commit_task_when_slow() {
+    fn apply_env_and_tasks_does_not_add_pre_commit_task_when_slow() {
         let tmp = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(tmp.path(), "").unwrap();
         apply_env_and_tasks(tmp.path(), ".", true, &[]).unwrap();
         let content = std::fs::read_to_string(tmp.path()).unwrap();
-        assert!(content.contains("--fast-only"));
-        assert!(content.contains("lint:pre-commit"));
+        assert!(!content.contains("--fast-only"));
+        assert!(!content.contains("lint:pre-commit"));
     }
 
     #[test]

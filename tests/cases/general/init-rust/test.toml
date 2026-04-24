@@ -9,9 +9,9 @@ Tip: flint init detects languages from tracked files (`git ls-files`). Add and s
   wrote <REPO>/.github/config/flint.toml
   wrote <REPO>/.github/workflows/lint.yml
   removed <REPO>/.markdownlint.json (replaced by .rumdl.toml)
-  wrote <REPO>/.rumdl.toml
+  wrote <REPO>/.github/config/.rumdl.toml
   patched <REPO>/.editorconfig — set max_line_length = 120
-  wrote <REPO>/.yamllint.yml
+  wrote <REPO>/.github/config/.yamllint.yml
   wrote <REPO>/biome.json
 installed pre-commit hook (.git/hooks/pre-commit)
 Done. Run `mise install` to install the new tools.
@@ -26,7 +26,7 @@ Done. Run `mise install` to install the new tools.
 [settings]
 # exclude = ["CHANGELOG\\.md"]
 '''
-".rumdl.toml" = '''
+".github/config/.rumdl.toml" = '''
 [MD013]
 enabled = true
 line-length = 120
@@ -44,15 +44,13 @@ indent_style = space
 indent_size = 2
 max_line_length = 120
 '''
-".yamllint.yml" = '''
+".github/config/.yamllint.yml" = '''
 extends: relaxed
 
 rules:
   document-start: disable
-  line-length:
-    max: 120
-  indentation:
-    spaces: 2
+  line-length: disable
+  indentation: enable
 '''
 "biome.json" = '''
 {

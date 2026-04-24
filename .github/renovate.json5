@@ -85,6 +85,7 @@
         "github:google/google-java-format",
         "github:koalaman/shellcheck",
         "github:pinterest/ktlint",
+        "github:tamasfe/taplo",
         "golangci-lint",
         "hadolint",
         "lychee",

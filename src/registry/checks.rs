@@ -63,7 +63,7 @@ const GOLANGCI_LINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::project(".golangci.toml"),
     ConfigFile::project(".golangci.json"),
 ];
-const BIOME_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir("biome.jsonc")];
+const BIOME_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::project("biome.jsonc")];
 const RUSTFMT_BASELINE_CONFIGS: &[ConfigFile] = &[ConfigFile::config_dir("rustfmt.toml")];
 const RUSTFMT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::project("rustfmt.toml"),
@@ -257,7 +257,6 @@ fn check_biome() -> Check {
         &["*.json", "*.jsonc", "*.js", "*.ts", "*.jsx", "*.tsx"],
     )
     .fix("biome check --fix {FILE}")
-    .linter_config_dir_if_any(&["biome.jsonc"], "--config-path")
     .baseline_configs(BIOME_BASELINE_CONFIGS)
     .desc("Lint JS/TS/JSON files")
     .mise_tool("biome")
@@ -272,7 +271,6 @@ fn check_biome_format() -> Check {
     )
     .bin("biome")
     .fix("biome format --write {FILE}")
-    .linter_config_dir_if_any(&["biome.jsonc"], "--config-path")
     .baseline_configs(BIOME_BASELINE_CONFIGS)
     .formatter()
     .desc("Format JS/TS/JSON files")

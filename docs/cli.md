@@ -9,7 +9,9 @@ flint linters
 flint version
 ```
 
-Commands and flags follow [golangci-lint](https://golangci-lint.run/) conventions — teams already using it don't need to re-learn the interface.
+Commands and flags follow
+[golangci-lint](https://golangci-lint.run/) conventions. Teams already using
+it do not need to re-learn the interface.
 
 ## `flint run` flags
 
@@ -69,6 +71,7 @@ passes config paths explicitly. If an active linter has a known alternate
 upstream config file, Flint fails before running the linter instead of silently
 ignoring or partially auto-discovering that config. Move the config to the
 Flint-managed filename under `FLINT_CONFIG_DIR`, or remove the alternate file.
+Biome is the exception: its canonical config is root `biome.jsonc`.
 
 **`--short` output** — failed checks partitioned by fixability, fixable ones
 expressed as the exact command to run:
@@ -101,9 +104,9 @@ flint run --fix rumdl             # fix only Markdown issues
 
 ## `flint update`
 
-`flint update` applies non-interactive migrations to `mise.toml` — replaces obsolete
-tool keys with their modern equivalents, preserving the declared version. Run it when
-`flint run` reports an obsolete key error:
+`flint update` applies non-interactive migrations to `mise.toml`. It replaces
+obsolete tool keys with their modern equivalents while preserving the declared
+version. Run it when `flint run` reports an obsolete key error:
 
 ```text
 flint: obsolete tool key in mise.toml: "github:mvdan/sh" (replaced by "shfmt")

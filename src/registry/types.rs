@@ -426,8 +426,8 @@ impl Check {
     }
 
     /// Inject `flag <config_dir>` when any of the named config files exist in
-    /// `config_dir`. Useful for tools like Biome that accept a config directory
-    /// instead of an individual config file path.
+    /// `config_dir`. Useful for tools that accept a config directory instead of
+    /// an individual config file path.
     pub fn linter_config_dir_if_any(
         mut self,
         files: &'static [&'static str],

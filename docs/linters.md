@@ -3,9 +3,10 @@
 Every supported check, its config file (when applicable), and its scope. The
 [summary table lives in the README](../README.md#built-in-linter-registry).
 
-**Note:** Biome's config flag (`--config-path`) takes a directory, so flint injects
-`FLINT_CONFIG_DIR` when that directory contains `biome.jsonc`. Flint is opinionated
-here: use JSONC for the managed Biome config, not `biome.json`.
+**Note:** Biome is the exception to `FLINT_CONFIG_DIR`: its real CLI does not
+work reliably with a nested managed config, so flint treats root `biome.jsonc`
+as the canonical Biome config. Flint is opinionated here: use JSONC, not
+`biome.json`.
 
 <!-- editorconfig-checker-disable -->
 <!-- markdownlint-disable MD013 -->
@@ -31,7 +32,6 @@ here: use JSONC for the managed Biome config, not `biome.json`.
 | Binary      | `biome`                                |
 | Scope       | [file](#scopes)                        |
 | Patterns    | `*.json *.jsonc *.js *.ts *.jsx *.tsx` |
-| Config      | `biome.jsonc`                          |
 
 ## `biome-format`
 
@@ -42,7 +42,6 @@ here: use JSONC for the managed Biome config, not `biome.json`.
 | Binary      | `biome`                                |
 | Scope       | [file](#scopes)                        |
 | Patterns    | `*.json *.jsonc *.js *.ts *.jsx *.tsx` |
-| Config      | `biome.jsonc`                          |
 
 ## `cargo-clippy`
 

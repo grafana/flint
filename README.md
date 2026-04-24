@@ -157,6 +157,10 @@ avoid config drift.
 itself — editorconfig discovery always walks up from the file being linted and
 cannot be redirected via a flag.
 
+**Note:** Biome is also root-discovered on purpose. Flint treats root
+`biome.jsonc` as the canonical Biome config rather than managing it through
+`FLINT_CONFIG_DIR`.
+
 ### Built-in linter registry
 
 Click a name in the table below for details. See the

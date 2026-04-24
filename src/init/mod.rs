@@ -369,7 +369,7 @@ Add and stage your source files before running init so the detection is accurate
         false
     };
     let biome_generated = if has_biome {
-        generate_biome_config(project_root, &config_dir_path)?
+        generate_biome_config(project_root)?
     } else {
         false
     };
@@ -963,10 +963,9 @@ rust = { version = "1.0", components = "clippy" }
     fn generate_biome_config_writes_file() {
         use config_files::generate_biome_config;
         let tmp = tempfile::TempDir::new().unwrap();
-        let config_dir = tmp.path().join(".github/config");
-        let written = generate_biome_config(tmp.path(), &config_dir).unwrap();
+        let written = generate_biome_config(tmp.path()).unwrap();
         assert!(written);
-        let content = std::fs::read_to_string(config_dir.join("biome.jsonc")).unwrap();
+        let content = std::fs::read_to_string(tmp.path().join("biome.jsonc")).unwrap();
         assert!(content.contains("\"indentStyle\": \"space\""));
         assert!(content.contains("\"indentWidth\": 2"));
     }
@@ -975,12 +974,10 @@ rust = { version = "1.0", components = "clippy" }
     fn generate_biome_config_skips_existing_jsonc() {
         use config_files::generate_biome_config;
         let tmp = tempfile::TempDir::new().unwrap();
-        let config_dir = tmp.path().join(".github/config");
-        std::fs::create_dir_all(&config_dir).unwrap();
-        std::fs::write(config_dir.join("biome.jsonc"), "existing").unwrap();
-        let written = generate_biome_config(tmp.path(), &config_dir).unwrap();
+        std::fs::write(tmp.path().join("biome.jsonc"), "existing").unwrap();
+        let written = generate_biome_config(tmp.path()).unwrap();
         assert!(!written);
-        let content = std::fs::read_to_string(config_dir.join("biome.jsonc")).unwrap();
+        let content = std::fs::read_to_string(tmp.path().join("biome.jsonc")).unwrap();
         assert_eq!(content, "existing");
     }
 
@@ -988,25 +985,12 @@ rust = { version = "1.0", components = "clippy" }
     fn generate_biome_config_migrates_legacy_supported_json_name() {
         use config_files::generate_biome_config;
         let tmp = tempfile::TempDir::new().unwrap();
-        let config_dir = tmp.path().join(".github/config");
-        std::fs::create_dir_all(&config_dir).unwrap();
-        std::fs::write(config_dir.join("biome.json"), "existing").unwrap();
-        let written = generate_biome_config(tmp.path(), &config_dir).unwrap();
-        assert!(written);
-        assert!(!config_dir.join("biome.json").exists());
-        let content = std::fs::read_to_string(config_dir.join("biome.jsonc")).unwrap();
-        assert_eq!(content, "existing");
-    }
-
-    #[test]
-    fn generate_biome_config_skips_legacy_root_json() {
-        use config_files::generate_biome_config;
-        let tmp = tempfile::TempDir::new().unwrap();
-        let config_dir = tmp.path().join(".github/config");
         std::fs::write(tmp.path().join("biome.json"), "existing").unwrap();
-        let written = generate_biome_config(tmp.path(), &config_dir).unwrap();
-        assert!(!written);
-        assert!(!config_dir.join("biome.jsonc").exists());
+        let written = generate_biome_config(tmp.path()).unwrap();
+        assert!(written);
+        assert!(!tmp.path().join("biome.json").exists());
+        let content = std::fs::read_to_string(tmp.path().join("biome.jsonc")).unwrap();
+        assert_eq!(content, "existing");
     }
 
     #[test]

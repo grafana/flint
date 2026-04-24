@@ -13,7 +13,7 @@ Tip: flint init detects languages from tracked files (`git ls-files`). Add and s
   patched <REPO>/.editorconfig — set max_line_length = 120
   wrote <REPO>/.github/config/.yamllint.yml
   wrote <REPO>/.github/config/rustfmt.toml
-  wrote <REPO>/.github/config/biome.jsonc
+  wrote <REPO>/biome.jsonc
 installed pre-commit hook (.git/hooks/pre-commit)
 Done. Run `mise install` to install the new tools.
 '''
@@ -56,7 +56,7 @@ rules:
 ".github/config/rustfmt.toml" = '''
 max_width = 120
 '''
-".github/config/biome.jsonc" = '''
+"biome.jsonc" = '''
 {
   "formatter": {
     "indentStyle": "space",

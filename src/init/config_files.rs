@@ -322,37 +322,22 @@ pub(super) fn generate_rustfmt_config(config_dir: &Path, line_length: u16) -> Re
     Ok(true)
 }
 
-/// Generates `biome.jsonc` in the flint config dir when biome is being set up and no
+/// Generates root `biome.jsonc` when biome is being set up and no
 /// existing supported config is present.
 ///
 /// Flint writes explicit space indentation to avoid Biome's default tab
 /// formatting surprising consumers during rollout.
-pub(super) fn generate_biome_config(project_root: &Path, config_dir: &Path) -> Result<bool> {
-    let target = config_dir.join("biome.jsonc");
+pub(super) fn generate_biome_config(project_root: &Path) -> Result<bool> {
+    let target = project_root.join("biome.jsonc");
     if target.exists() {
         return Ok(false);
     }
-    let legacy_config_dir = config_dir.join("biome.json");
-    if legacy_config_dir.exists() {
-        std::fs::create_dir_all(config_dir)?;
-        std::fs::rename(&legacy_config_dir, &target)?;
-        println!(
-            "  moved {} -> {}",
-            legacy_config_dir.display(),
-            target.display()
-        );
+    let legacy = project_root.join("biome.json");
+    if legacy.exists() {
+        std::fs::rename(&legacy, &target)?;
+        println!("  moved {} -> {}", legacy.display(), target.display());
         return Ok(true);
     }
-    for name in ["biome.json", "biome.jsonc"] {
-        let legacy = project_root.join(name);
-        if legacy.exists() {
-            return Ok(false);
-        }
-    }
-    if let Some(parent) = config_dir.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::create_dir_all(config_dir)?;
     let content = [
         "{",
         "  \"formatter\": {",

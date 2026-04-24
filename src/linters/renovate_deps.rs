@@ -251,10 +251,13 @@ fn extract_deps(log_bytes: &[u8], exclude_managers: &[String]) -> anyhow::Result
             .and_then(|v| v.as_str())
             .is_some_and(|msg| PACKAGE_FILES_MSGS.contains(&msg))
         {
-            config_obj = entry
+            let extracted_config = entry
                 .get("packageFiles")
                 .cloned()
                 .or_else(|| entry.get("config").cloned());
+            if extracted_config.is_some() {
+                config_obj = extracted_config;
+            }
         }
     }
 
@@ -457,7 +460,8 @@ mod tests {
     fn missing_message_returns_error() {
         let bytes = b"{\"msg\":\"something else\"}\n";
         let err = extract_deps(bytes, &[]).unwrap_err();
-        assert!(err.to_string().contains("packageFiles with updates"));
+        assert!(err.to_string().contains("none of"));
+        assert!(err.to_string().contains(PACKAGE_FILES_MSGS[0]));
     }
 
     #[test]

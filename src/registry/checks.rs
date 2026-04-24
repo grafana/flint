@@ -119,6 +119,26 @@ fn check_yaml_lint() -> Check {
         .mise_tool("cargo:yaml-lint")
 }
 
+fn check_taplo() -> Check {
+    Check::file("taplo", "taplo fmt --check {FILE}", &["*.toml"])
+        .fix("taplo fmt {FILE}")
+        .mise_tool("github:tamasfe/taplo")
+        .env(&[("RUST_LOG", "error")])
+        .formatter()
+        .desc("Format TOML files")
+        .docs(
+            "Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).\n\
+            \n\
+            This check intentionally stays basic: it uses `taplo fmt --check` for \
+            verification and `taplo fmt` for `--fix`. That keeps behavior aligned \
+            with flint's existing formatter-style checks.\n\
+            \n\
+            Current caveat: Taplo's published docs currently advertise TOML 1.0.0 \
+            support, so treat this check as TOML 1.0-oriented for now.",
+        )
+        .style()
+}
+
 fn check_actionlint() -> Check {
     Check::file(
         "actionlint",
@@ -380,6 +400,7 @@ pub fn builtin() -> Vec<Check> {
         check_shfmt(),
         check_rumdl(),
         check_yaml_lint(),
+        check_taplo(),
         check_actionlint(),
         check_hadolint(),
         check_xmllint(),

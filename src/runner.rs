@@ -35,6 +35,7 @@ enum PreparedCheck {
         argv_list: Vec<Vec<String>>,
         tracked_files: Vec<PathBuf>,
         windows_java_jar: bool,
+        env: &'static [(&'static str, &'static str)],
     },
     Links {
         name: String,
@@ -45,6 +46,7 @@ enum PreparedCheck {
     RenovateDeps {
         name: String,
         cfg: RenovateDepsConfig,
+        tracked_files: Vec<PathBuf>,
     },
     LicenseHeader {
         name: String,
@@ -63,7 +65,7 @@ impl PreparedCheck {
         }
     }
 
-    async fn execute(self, fix: bool, project_root: &Path) -> CheckResult {
+    async fn execute(self, fix: bool, verbose: bool, project_root: &Path) -> CheckResult {
         let name = self.name().to_string();
         let start = Instant::now();
         let (out, changed): (LinterOutput, bool) = match self {
@@ -71,6 +73,7 @@ impl PreparedCheck {
                 argv_list,
                 tracked_files,
                 windows_java_jar,
+                env,
                 ..
             } => {
                 let before = if fix && !tracked_files.is_empty() {
@@ -78,7 +81,15 @@ impl PreparedCheck {
                 } else {
                     None
                 };
-                let out = run_invocations(&name, &argv_list, windows_java_jar, project_root).await;
+                let mut out = run_invocations(
+                    &name,
+                    &argv_list,
+                    windows_java_jar,
+                    if verbose { &[] } else { env },
+                    project_root,
+                )
+                .await;
+                normalize_output(&name, verbose, &mut out);
                 let changed =
                     before.is_some_and(|before| before != fingerprint_files(&tracked_files));
                 (out, changed)
@@ -92,8 +103,18 @@ impl PreparedCheck {
                 lychee::run(&cfg, &file_list, project_root, &config_dir).await,
                 false,
             ),
-            Self::RenovateDeps { cfg, .. } => {
-                (renovate_deps::run(&cfg, fix, project_root).await, false)
+            Self::RenovateDeps {
+                cfg, tracked_files, ..
+            } => {
+                let before = if fix && !tracked_files.is_empty() {
+                    Some(fingerprint_files(&tracked_files))
+                } else {
+                    None
+                };
+                let out = renovate_deps::run(&cfg, fix, project_root).await;
+                let changed =
+                    before.is_some_and(|before| before != fingerprint_files(&tracked_files));
+                (out, changed)
             }
             Self::LicenseHeader { cfg, files, .. } => {
                 (license_header::run(&cfg, project_root, &files).await, false)
@@ -143,7 +164,7 @@ pub async fn run(
     if fix {
         let mut results = vec![];
         for task in prepared {
-            let r = task.execute(fix, project_root).await;
+            let r = task.execute(fix, verbose, project_root).await;
             if !short && (verbose || !r.ok) {
                 eprintln!("[{}]{}", r.name, format_duration_suffix(time, r.duration));
                 flush_output(&r.stdout, &r.stderr);
@@ -156,7 +177,7 @@ pub async fn run(
     let mut set: JoinSet<CheckResult> = JoinSet::new();
     for task in prepared {
         let root = project_root.to_path_buf();
-        set.spawn(async move { task.execute(false, &root).await });
+        set.spawn(async move { task.execute(false, verbose, &root).await });
     }
 
     // Collect all results before printing to avoid interleaved output.
@@ -211,6 +232,7 @@ fn prepare(
                 argv_list,
                 tracked_files,
                 windows_java_jar: check.windows_java_jar,
+                env: check.env,
             })
         }
         CheckKind::Special(SpecialKind::Links) => Some(PreparedCheck::Links {
@@ -222,6 +244,10 @@ fn prepare(
         CheckKind::Special(SpecialKind::RenovateDeps) => Some(PreparedCheck::RenovateDeps {
             name,
             cfg: cfg.checks.renovate_deps.clone(),
+            tracked_files: renovate_deps::COMMITTED_PATHS
+                .iter()
+                .map(|path| project_root.join(path))
+                .collect(),
         }),
         CheckKind::Special(SpecialKind::LicenseHeader) => {
             if cfg.checks.license_header.text.is_empty() {
@@ -441,6 +467,7 @@ async fn run_invocations(
     name: &str,
     invocations: &[Vec<String>],
     windows_java_jar: bool,
+    env: &[(&str, &str)],
     root: &Path,
 ) -> LinterOutput {
     let mut all_ok = true;
@@ -451,11 +478,11 @@ async fn run_invocations(
         if argv.is_empty() {
             continue;
         }
-        let result = crate::linters::spawn_command(argv, windows_java_jar)
-            .current_dir(root)
+        let mut cmd = crate::linters::spawn_command(argv, windows_java_jar);
+        cmd.current_dir(root)
             .stdin(Stdio::null())
-            .output()
-            .await;
+            .envs(env.iter().copied());
+        let result = cmd.output().await;
         match result {
             Ok(out) => {
                 combined_stdout.extend_from_slice(&out.stdout);
@@ -537,6 +564,24 @@ fn flush_output(stdout: &[u8], stderr: &[u8]) {
     }
     if !stderr.is_empty() {
         eprint!("{}", String::from_utf8_lossy(stderr));
+    }
+}
+
+fn normalize_output(name: &str, verbose: bool, out: &mut LinterOutput) {
+    if verbose || name != "taplo" || out.stderr.is_empty() {
+        return;
+    }
+
+    // Taplo's non-verbose stderr can nondeterministically include this
+    // aggregate line under concurrent test execution. Strip it so the
+    // user-facing output remains stable while preserving the primary error.
+    let needle = b"ERROR operation failed error=some files were not properly formatted\n";
+    if let Some(pos) = out
+        .stderr
+        .windows(needle.len())
+        .position(|window| window == needle)
+    {
+        out.stderr.drain(pos..pos + needle.len());
     }
 }
 
@@ -723,6 +768,7 @@ mod tests {
             patterns,
             excludes_if_active: &[],
             linter_config: None,
+            env: &[],
             baseline_configs: &[],
             unsupported_configs: &[],
             is_formatter: false,

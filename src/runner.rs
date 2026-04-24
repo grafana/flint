@@ -35,7 +35,6 @@ enum PreparedCheck {
         argv_list: Vec<Vec<String>>,
         tracked_files: Vec<PathBuf>,
         windows_java_jar: bool,
-        env: &'static [(&'static str, &'static str)],
     },
     Links {
         name: String,
@@ -65,7 +64,7 @@ impl PreparedCheck {
         }
     }
 
-    async fn execute(self, fix: bool, verbose: bool, project_root: &Path) -> CheckResult {
+    async fn execute(self, fix: bool, _verbose: bool, project_root: &Path) -> CheckResult {
         let name = self.name().to_string();
         let start = Instant::now();
         let (out, changed): (LinterOutput, bool) = match self {
@@ -73,7 +72,6 @@ impl PreparedCheck {
                 argv_list,
                 tracked_files,
                 windows_java_jar,
-                env,
                 ..
             } => {
                 let before = if fix && !tracked_files.is_empty() {
@@ -81,15 +79,7 @@ impl PreparedCheck {
                 } else {
                     None
                 };
-                let mut out = run_invocations(
-                    &name,
-                    &argv_list,
-                    windows_java_jar,
-                    if verbose { &[] } else { env },
-                    project_root,
-                )
-                .await;
-                normalize_output(&name, verbose, &mut out);
+                let out = run_invocations(&name, &argv_list, windows_java_jar, project_root).await;
                 let changed =
                     before.is_some_and(|before| before != fingerprint_files(&tracked_files));
                 (out, changed)
@@ -232,7 +222,6 @@ fn prepare(
                 argv_list,
                 tracked_files,
                 windows_java_jar: check.windows_java_jar,
-                env: check.env,
             })
         }
         CheckKind::Special(SpecialKind::Links) => Some(PreparedCheck::Links {
@@ -467,7 +456,6 @@ async fn run_invocations(
     name: &str,
     invocations: &[Vec<String>],
     windows_java_jar: bool,
-    env: &[(&str, &str)],
     root: &Path,
 ) -> LinterOutput {
     let mut all_ok = true;
@@ -479,9 +467,7 @@ async fn run_invocations(
             continue;
         }
         let mut cmd = crate::linters::spawn_command(argv, windows_java_jar);
-        cmd.current_dir(root)
-            .stdin(Stdio::null())
-            .envs(env.iter().copied());
+        cmd.current_dir(root).stdin(Stdio::null());
         let result = cmd.output().await;
         match result {
             Ok(out) => {
@@ -564,24 +550,6 @@ fn flush_output(stdout: &[u8], stderr: &[u8]) {
     }
     if !stderr.is_empty() {
         eprint!("{}", String::from_utf8_lossy(stderr));
-    }
-}
-
-fn normalize_output(name: &str, verbose: bool, out: &mut LinterOutput) {
-    if verbose || name != "taplo" || out.stderr.is_empty() {
-        return;
-    }
-
-    // Taplo's non-verbose stderr can nondeterministically include this
-    // aggregate line under concurrent test execution. Strip it so the
-    // user-facing output remains stable while preserving the primary error.
-    let needle = b"ERROR operation failed error=some files were not properly formatted\n";
-    if let Some(pos) = out
-        .stderr
-        .windows(needle.len())
-        .position(|window| window == needle)
-    {
-        out.stderr.drain(pos..pos + needle.len());
     }
 }
 
@@ -768,7 +736,6 @@ mod tests {
             patterns,
             excludes_if_active: &[],
             linter_config: None,
-            env: &[],
             baseline_configs: &[],
             unsupported_configs: &[],
             is_formatter: false,

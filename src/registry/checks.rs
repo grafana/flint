@@ -123,7 +123,7 @@ fn check_taplo() -> Check {
     Check::file("taplo", "taplo fmt --check {FILE}", &["*.toml"])
         .fix("taplo fmt {FILE}")
         .mise_tool("github:tamasfe/taplo")
-        .env(&[("RUST_LOG", "error")])
+        .stderr_filter_prefixes(&[" INFO taplo:"])
         .formatter()
         .desc("Format TOML files")
         .docs(

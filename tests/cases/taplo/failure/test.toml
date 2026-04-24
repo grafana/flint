@@ -3,7 +3,7 @@ args = "run --full taplo"
 exit = 1
 stderr = '''
 [taplo]
-ERROR the file is not properly formatted path="<REPO>/data.toml"
+ERROR taplo:format_files: the file is not properly formatted path="<REPO>/data.toml"
 ERROR operation failed error=some files were not properly formatted
 
 flint: 1 check failed (taplo)

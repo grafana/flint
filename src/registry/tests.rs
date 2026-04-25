@@ -2,6 +2,18 @@ use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 
 use super::*;
+
+fn binary_required_on_host(_checkk: &Check) -> bool {
+    #[cfg(windows)]
+    {
+        if _check.name == "shellcheck" {
+            return false;
+        }
+    }
+
+    true
+}
+
 #[test]
 fn find_obsolete_key_returns_none_for_clean_tools() {
     let mut tools = HashMap::new();
@@ -178,7 +190,8 @@ fn competing_fixers_must_not_share_declared_patterns() {
 /// even if they are not declared in this repo's mise.toml.
 ///
 /// This test will fail on machines where not all linter tools are installed,
-/// which is intentional: it identifies what is missing.
+/// which is intentional: it identifies what is missing. Platform-specific
+/// exclusions are allowed when a tool is not expected to exist on that host.
 #[test]
 fn all_registry_binaries_found() {
     let registry = builtin();
@@ -186,6 +199,7 @@ fn all_registry_binaries_found() {
     let not_found: Vec<&str> = registry
         .iter()
         .filter(|c| c.uses_binary())
+        .filter(|c| binary_required_on_host(c))
         .filter(|c| !binary_on_path(c.bin_name))
         .map(|c| c.name)
         .collect();

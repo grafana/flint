@@ -16,7 +16,7 @@ use config_files::{
     disable_editorconfig_line_length_for_patterns, generate_biome_config, generate_editorconfig,
     generate_flint_toml, generate_rumdl_config, generate_rustfmt_config, generate_taplo_config,
     generate_yamllint_config, remove_legacy_lint_files,
-    remove_stale_markdownlint_line_length_directives,
+    remove_stale_editorconfig_checker_directives, remove_stale_markdownlint_line_length_directives,
 };
 use detection::{
     build_linter_groups, detect_obsolete_keys, detect_present_patterns, parse_tool_keys,
@@ -78,6 +78,40 @@ fn selected_editorconfig_line_length_sections(
         }
     }
     out
+}
+
+fn active_editorconfig_line_length_sections(
+    tool_keys: &HashSet<String>,
+) -> Vec<(&'static [&'static str], &'static str)> {
+    let mut seen = HashSet::new();
+    let mut out = vec![];
+    for check in builtin() {
+        let Some(key) = install_key(&check) else {
+            continue;
+        };
+        if !tool_keys.contains(key) {
+            continue;
+        }
+        let EditorconfigLineLengthPolicy::DisableForPatterns { patterns, comment } =
+            check.editorconfig_line_length_policy
+        else {
+            continue;
+        };
+        let dedupe_key = patterns.join(",");
+        if seen.insert(dedupe_key) {
+            out.push((patterns, comment));
+        }
+    }
+    out
+}
+
+fn delegated_patterns_include(
+    delegated_patterns: &[&'static [&'static str]],
+    needle: &str,
+) -> bool {
+    delegated_patterns
+        .iter()
+        .any(|patterns| patterns.contains(&needle))
 }
 
 /// Desired tools for a profile: maps each mise tool key to its optional components string.
@@ -170,6 +204,7 @@ struct RepoMigrationSummary {
     node_added: bool,
     legacy_files_removed: Vec<String>,
     stale_md013_comments_removed: Vec<String>,
+    stale_editorconfig_checker_comments_removed: Vec<String>,
 }
 
 impl RepoMigrationSummary {
@@ -179,6 +214,7 @@ impl RepoMigrationSummary {
             && !self.node_added
             && self.legacy_files_removed.is_empty()
             && self.stale_md013_comments_removed.is_empty()
+            && self.stale_editorconfig_checker_comments_removed.is_empty()
     }
 
     fn print_messages(&self) {
@@ -197,13 +233,16 @@ impl RepoMigrationSummary {
         for rel in &self.stale_md013_comments_removed {
             println!("  removed stale markdownlint MD013 directives from <REPO>/{rel}");
         }
+        for rel in &self.stale_editorconfig_checker_comments_removed {
+            println!("  removed stale editorconfig-checker directives from <REPO>/{rel}");
+        }
     }
 }
 
 fn apply_repo_migrations(
     project_root: &Path,
     config_dir: &Path,
-    strip_stale_md013_directives: bool,
+    delegated_patterns: &[&'static [&'static str]],
 ) -> Result<RepoMigrationSummary> {
     let replaced_obsolete =
         generation::replace_obsolete_keys(project_root, crate::registry::OBSOLETE_KEYS)?;
@@ -216,10 +255,15 @@ fn apply_repo_migrations(
     )?;
     let node_added = ensure_node_for_npm(project_root)?;
     let legacy_files_removed = remove_legacy_lint_files(project_root, config_dir)?;
-    let stale_md013_comments_removed = if strip_stale_md013_directives {
+    let stale_md013_comments_removed = if delegated_patterns_include(delegated_patterns, "*.md") {
         remove_stale_markdownlint_line_length_directives(project_root)?
     } else {
         vec![]
+    };
+    let stale_editorconfig_checker_comments_removed = if delegated_patterns.is_empty() {
+        vec![]
+    } else {
+        remove_stale_editorconfig_checker_directives(project_root, delegated_patterns)?
     };
 
     Ok(RepoMigrationSummary {
@@ -228,6 +272,7 @@ fn apply_repo_migrations(
         node_added,
         legacy_files_removed,
         stale_md013_comments_removed,
+        stale_editorconfig_checker_comments_removed,
     })
 }
 
@@ -431,10 +476,15 @@ Add and stage your source files before running init so the detection is accurate
     } else {
         false
     };
-    let migration_summary = apply_repo_migrations(project_root, &config_dir_path, has_rumdl)?;
+    let editorconfig_line_length_sections = selected_editorconfig_line_length_sections(&groups);
+    let delegated_patterns = editorconfig_line_length_sections
+        .iter()
+        .map(|(patterns, _)| *patterns)
+        .collect::<Vec<_>>();
+    let migration_summary =
+        apply_repo_migrations(project_root, &config_dir_path, &delegated_patterns)?;
     migration_summary.print_messages();
     let editorconfig_generated = generate_editorconfig(project_root, line_length)?;
-    let editorconfig_line_length_sections = selected_editorconfig_line_length_sections(&groups);
     let editorconfig_line_length_disabled = disable_editorconfig_line_length_for_patterns(
         project_root,
         &editorconfig_line_length_sections,
@@ -510,15 +560,23 @@ pub fn update(project_root: &Path, config_dir: &Path) -> Result<()> {
     let mise_path = project_root.join("mise.toml");
     let current_content = std::fs::read_to_string(&mise_path).unwrap_or_default();
     let current_tool_keys = parse_tool_keys(&current_content);
-    let should_strip_md013 = current_tool_keys.contains("rumdl");
-    let migration_summary = apply_repo_migrations(project_root, config_dir, should_strip_md013)?;
+    let delegated_sections = active_editorconfig_line_length_sections(&current_tool_keys);
+    let delegated_patterns = delegated_sections
+        .iter()
+        .map(|(patterns, _)| *patterns)
+        .collect::<Vec<_>>();
+    let migration_summary = apply_repo_migrations(project_root, config_dir, &delegated_patterns)?;
+    let tools_normalized = normalize_tools_section(&mise_path)?;
 
-    if migration_summary.is_noop() {
+    if migration_summary.is_noop() && !tools_normalized {
         println!("flint: repo lint migration is up to date");
         return Ok(());
     }
 
     migration_summary.print_messages();
+    if tools_normalized {
+        println!("  normalized [tools] in {}", mise_path.display());
+    }
 
     Ok(())
 }
@@ -951,6 +1009,35 @@ rust = { version = "1.0", components = "clippy" }
         assert!(!updated.contains("markdownlint-enable MD013"));
         assert!(updated.contains("markdownlint-disable MD033"));
         assert!(updated.contains("markdownlint-enable MD033"));
+    }
+
+    #[test]
+    fn remove_stale_editorconfig_checker_directives_strips_delegated_markdown_comments() {
+        use config_files::remove_stale_editorconfig_checker_directives;
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::process::Command::new("git")
+            .args(["init", "-b", "main"])
+            .current_dir(tmp.path())
+            .output()
+            .unwrap();
+        std::fs::write(
+            tmp.path().join("README.md"),
+            "# Title\n\n<!-- editorconfig-checker-disable -->\n- [Link](https://example.com) <!-- editorconfig-checker-disable-line -->\n<!-- editorconfig-checker-enable -->\n",
+        )
+        .unwrap();
+        std::process::Command::new("git")
+            .args(["add", "README.md"])
+            .current_dir(tmp.path())
+            .output()
+            .unwrap();
+
+        let changed =
+            remove_stale_editorconfig_checker_directives(tmp.path(), &[&["*.md"]]).unwrap();
+        assert_eq!(changed, vec!["README.md".to_string()]);
+        let updated = std::fs::read_to_string(tmp.path().join("README.md")).unwrap();
+        assert!(!updated.contains("editorconfig-checker-disable"));
+        assert!(!updated.contains("editorconfig-checker-enable"));
+        assert!(updated.contains("- [Link](https://example.com)"));
     }
 
     #[test]

@@ -150,6 +150,54 @@ pub(super) fn remove_stale_markdownlint_line_length_directives(
     Ok(changed_files)
 }
 
+fn tracked_files_for_patterns(project_root: &Path, patterns: &[&[&str]]) -> Result<Vec<String>> {
+    let mut tracked_files = std::collections::BTreeSet::new();
+    for group in patterns {
+        for pattern in *group {
+            let output = Command::new("git")
+                .args(["ls-files", "--", pattern])
+                .current_dir(project_root)
+                .output()
+                .with_context(|| format!("failed to list tracked files for {pattern}"))?;
+            if !output.status.success() {
+                anyhow::bail!("git ls-files failed while scanning {pattern}");
+            }
+            let stdout =
+                String::from_utf8(output.stdout).context("git ls-files output was not UTF-8")?;
+            tracked_files.extend(
+                stdout
+                    .lines()
+                    .filter(|line| !line.trim().is_empty())
+                    .map(str::to_string),
+            );
+        }
+    }
+    Ok(tracked_files.into_iter().collect())
+}
+
+/// Removes stale editorconfig-checker suppressions from tracked files whose
+/// line length is now delegated through root `.editorconfig`.
+pub(super) fn remove_stale_editorconfig_checker_directives(
+    project_root: &Path,
+    delegated_patterns: &[&[&str]],
+) -> Result<Vec<String>> {
+    let tracked_files = tracked_files_for_patterns(project_root, delegated_patterns)?;
+    let mut changed_files = vec![];
+    for rel in tracked_files {
+        let path = project_root.join(rel.as_str());
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let updated = strip_stale_editorconfig_checker_directives(&content);
+        if updated == content {
+            continue;
+        }
+        std::fs::write(&path, updated)?;
+        changed_files.push(rel.to_string());
+    }
+    Ok(changed_files)
+}
+
 fn strip_stale_markdownlint_md013_directives(content: &str) -> String {
     let mut kept = Vec::with_capacity(content.lines().count());
     let had_trailing_newline = content.ends_with('\n');
@@ -178,6 +226,42 @@ fn is_stale_markdownlint_md013_directive(line: &str) -> bool {
             | "<!-- markdownlint-disable-next-line MD013 -->"
             | "<!-- markdownlint-disable-file MD013 -->"
     )
+}
+
+fn strip_stale_editorconfig_checker_directives(content: &str) -> String {
+    let had_trailing_newline = content.ends_with('\n');
+    let mut kept = Vec::with_capacity(content.lines().count());
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if matches!(
+            trimmed,
+            "<!-- editorconfig-checker-disable -->"
+                | "<!-- editorconfig-checker-enable -->"
+                | "<!-- editorconfig-checker-disable-file -->"
+        ) {
+            continue;
+        }
+
+        let mut updated = line.to_string();
+        for marker in [
+            "<!-- editorconfig-checker-disable-line -->",
+            "// editorconfig-checker-disable-line",
+            "# editorconfig-checker-disable-line",
+        ] {
+            if let Some(idx) = updated.find(marker) {
+                updated.truncate(idx);
+                updated = updated.trim_end().to_string();
+            }
+        }
+        kept.push(updated);
+    }
+
+    let mut updated = kept.join("\n");
+    if had_trailing_newline {
+        updated.push('\n');
+    }
+    updated
 }
 
 /// Generates or updates `.editorconfig` in the project root.

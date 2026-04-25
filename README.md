@@ -50,9 +50,9 @@ enable during the prompt, or trim the generated tool list afterward if you run
 
 Flint reads your `[tools]` section to discover which linters to run — declaring
 a tool is the opt-in. No separate configuration needed to activate a check: if
-`shellcheck` is in `[tools]`, flint runs shellcheck; if it isn't, that check is
-skipped. `mise install` puts all declared tools on PATH; flint picks up whatever
-is there.
+ShellCheck's Flint-managed tool key is in `[tools]`, flint runs shellcheck; if
+it isn't, that check is skipped. `mise install` puts all declared tools on PATH;
+flint picks up whatever is there.
 
 Add the linting tools your project needs alongside the `flint` binary itself:
 
@@ -61,8 +61,8 @@ Add the linting tools your project needs alongside the `flint` binary itself:
 "github:grafana/flint" = "0.20.3"
 
 # Add whichever linters apply to your repo:
-shellcheck              = "v0.11.0"
-"github:mvdan/sh"       = "v3.13.1"  # activates shfmt
+"github:koalaman/shellcheck" = "0.11.0"
+shfmt                   = "3.13.1"
 actionlint              = "1.7.10"
 rumdl                   = "0.1.78"
 ruff                    = "0.15.11"

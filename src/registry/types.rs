@@ -9,6 +9,16 @@ pub enum Scope {
     Project,
 }
 
+impl Scope {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::File => "file",
+            Self::Files => "files",
+            Self::Project => "project",
+        }
+    }
+}
+
 /// Which init profile a check belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Category {
@@ -43,6 +53,33 @@ pub enum SpecialKind {
     FlintSetup,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpecialCheck {
+    kind: SpecialKind,
+    has_fix: bool,
+}
+
+impl SpecialCheck {
+    fn new(kind: SpecialKind, has_fix: bool) -> Self {
+        Self { kind, has_fix }
+    }
+
+    pub fn kind(self) -> SpecialKind {
+        self.kind
+    }
+
+    pub fn has_fix(self) -> bool {
+        self.has_fix
+    }
+
+    pub fn uses_binary(self) -> bool {
+        !matches!(
+            self.kind,
+            SpecialKind::LicenseHeader | SpecialKind::FlintSetup
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FixBehavior {
     #[default]
@@ -63,7 +100,27 @@ pub enum CheckKind {
         full_fix_cmd: &'static str,
         scope: Scope,
     },
-    Special(SpecialKind),
+    Special(SpecialCheck),
+}
+
+impl CheckKind {
+    pub fn scope_name(&self) -> &'static str {
+        match self {
+            Self::Template { scope, .. } => scope.name(),
+            Self::Special(_) => "special",
+        }
+    }
+
+    pub fn special_kind(&self) -> Option<SpecialKind> {
+        match self {
+            Self::Template { .. } => None,
+            Self::Special(special) => Some(special.kind()),
+        }
+    }
+
+    pub fn is_special_kind(&self, kind: SpecialKind) -> bool {
+        self.special_kind() == Some(kind)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -179,19 +236,16 @@ impl Check {
     pub fn has_fix(&self) -> bool {
         match &self.kind {
             CheckKind::Template { fix_cmd, .. } => !fix_cmd.is_empty(),
-            CheckKind::Special(SpecialKind::Links) => false,
-            CheckKind::Special(SpecialKind::RenovateDeps) => true,
-            CheckKind::Special(SpecialKind::LicenseHeader) => false,
-            CheckKind::Special(SpecialKind::FlintSetup) => true,
+            CheckKind::Special(special) => special.has_fix(),
         }
     }
 
     /// Returns false for checks implemented entirely in-process with no external binary.
     pub fn uses_binary(&self) -> bool {
-        !matches!(
-            self.kind,
-            CheckKind::Special(SpecialKind::LicenseHeader | SpecialKind::FlintSetup)
-        )
+        match &self.kind {
+            CheckKind::Template { .. } => true,
+            CheckKind::Special(special) => special.uses_binary(),
+        }
     }
 
     pub fn fix_behavior(&self) -> FixBehavior {
@@ -285,7 +339,12 @@ impl Check {
     }
 
     /// Special check with custom logic (not a simple command template).
-    pub fn special(name: &'static str, bin_name: &'static str, kind: SpecialKind) -> Self {
+    pub fn special(
+        name: &'static str,
+        bin_name: &'static str,
+        kind: SpecialKind,
+        has_fix: bool,
+    ) -> Self {
         Check {
             name,
             bin_name,
@@ -308,7 +367,7 @@ impl Check {
             toolchain: None,
             windows_java_jar: false,
             fix_behavior: FixBehavior::Definitive,
-            kind: CheckKind::Special(kind),
+            kind: CheckKind::Special(SpecialCheck::new(kind, has_fix)),
             desc: "",
             docs: "",
         }

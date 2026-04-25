@@ -272,47 +272,50 @@ fn prepare(
                 stderr_filter_prefixes: check.stderr_filter_prefixes,
             })
         }
-        CheckKind::Special(SpecialKind::Links) => Some(PreparedCheck::Links {
-            name,
-            cfg: cfg.checks.lychee.clone(),
-            settings: cfg.settings.clone(),
-            file_list: file_list.clone(),
-            config_dir: config_dir.to_path_buf(),
-        }),
-        CheckKind::Special(SpecialKind::RenovateDeps) => Some(PreparedCheck::RenovateDeps {
-            name,
-            cfg: cfg.checks.renovate_deps.clone(),
-        }),
-        CheckKind::Special(SpecialKind::LicenseHeader) => {
-            if cfg.checks.license_header.text.is_empty() {
-                return None;
-            }
-            let patterns: Vec<&str> = cfg
-                .checks
-                .license_header
-                .patterns
-                .iter()
-                .map(String::as_str)
-                .collect();
-            let files: Vec<PathBuf> = match_files(&file_list.files, &patterns, &[], project_root)
-                .into_iter()
-                .cloned()
-                .collect();
-            if files.is_empty() {
-                return None;
-            }
-            Some(PreparedCheck::LicenseHeader {
+        CheckKind::Special(special) => match special.kind() {
+            SpecialKind::Links => Some(PreparedCheck::Links {
                 name,
-                cfg: cfg.checks.license_header.clone(),
-                files,
-            })
-        }
-        CheckKind::Special(SpecialKind::FlintSetup) => Some(PreparedCheck::FlintSetup {
-            name,
-            path: project_root.join("mise.toml"),
-            config_dir: config_dir.to_path_buf(),
-            setup_version: cfg.settings.setup_version,
-        }),
+                cfg: cfg.checks.lychee.clone(),
+                settings: cfg.settings.clone(),
+                file_list: file_list.clone(),
+                config_dir: config_dir.to_path_buf(),
+            }),
+            SpecialKind::RenovateDeps => Some(PreparedCheck::RenovateDeps {
+                name,
+                cfg: cfg.checks.renovate_deps.clone(),
+            }),
+            SpecialKind::LicenseHeader => {
+                if cfg.checks.license_header.text.is_empty() {
+                    return None;
+                }
+                let patterns: Vec<&str> = cfg
+                    .checks
+                    .license_header
+                    .patterns
+                    .iter()
+                    .map(String::as_str)
+                    .collect();
+                let files: Vec<PathBuf> =
+                    match_files(&file_list.files, &patterns, &[], project_root)
+                        .into_iter()
+                        .cloned()
+                        .collect();
+                if files.is_empty() {
+                    return None;
+                }
+                Some(PreparedCheck::LicenseHeader {
+                    name,
+                    cfg: cfg.checks.license_header.clone(),
+                    files,
+                })
+            }
+            SpecialKind::FlintSetup => Some(PreparedCheck::FlintSetup {
+                name,
+                path: project_root.join("mise.toml"),
+                config_dir: config_dir.to_path_buf(),
+                setup_version: cfg.settings.setup_version,
+            }),
+        },
     }
 }
 

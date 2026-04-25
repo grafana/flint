@@ -209,7 +209,7 @@ async fn run(
     let mise_tools = registry::read_mise_tools(project_root);
     let flint_setup_selected = checks
         .iter()
-        .any(|c| matches!(&c.kind, CheckKind::Special(SpecialKind::FlintSetup)));
+        .any(|c| c.kind.is_special_kind(SpecialKind::FlintSetup));
     if !flint_setup_selected {
         if let Some((old, new)) = registry::find_obsolete_key(&mise_tools) {
             eprintln!("flint: obsolete tool key in mise.toml: {old:?} (replaced by {new:?})");
@@ -234,7 +234,7 @@ async fn run(
                         RunPolicy::Fast => true,
                         RunPolicy::Slow => false,
                         RunPolicy::Adaptive => match &c.kind {
-                            CheckKind::Special(SpecialKind::RenovateDeps) => {
+                            kind if kind.is_special_kind(SpecialKind::RenovateDeps) => {
                                 linters::renovate_deps::is_relevant(&file_list, project_root)
                             }
                             _ => true,
@@ -613,7 +613,7 @@ fn classify_single_pass_fix(result: CheckResult) -> FixOutcome {
 }
 
 fn is_flint_setup(check: &registry::Check) -> bool {
-    matches!(&check.kind, CheckKind::Special(SpecialKind::FlintSetup))
+    check.kind.is_special_kind(SpecialKind::FlintSetup)
 }
 
 async fn run_checks(
@@ -695,8 +695,7 @@ fn baseline_check_names(
                 || registry::tool_version_changed(check, &previous_tools, current_tools)
                 || flint_toml.as_ref().is_some_and(|change| {
                     change.settings_changed
-                        || (matches!(check.kind, CheckKind::Special(_))
-                            && change.check_changed(check.name))
+                        || (check.kind.special_kind().is_some() && change.check_changed(check.name))
                 })
                 || check.baseline_config.as_ref().is_some_and(|config| {
                     changed.contains(&config_file_rel_path(project_root, config_dir, config))
@@ -868,14 +867,7 @@ fn print_linters_json(registry: &[registry::Check]) {
 }
 
 pub fn linter_json(check: &registry::Check) -> serde_json::Value {
-    let scope = match &check.kind {
-        CheckKind::Template { scope, .. } => match scope {
-            Scope::File => "file",
-            Scope::Files => "files",
-            Scope::Project => "project",
-        },
-        CheckKind::Special(_) => "special",
-    };
+    let scope = check.kind.scope_name();
     let patterns: Vec<&str> = check.patterns.to_vec();
     let config_file = check
         .linter_config

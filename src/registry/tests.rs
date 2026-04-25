@@ -576,14 +576,7 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     };
     rows.push(("Binary", binary));
 
-    let scope = match &check.kind {
-        CheckKind::Template { scope, .. } => match scope {
-            Scope::File => "file",
-            Scope::Files => "files",
-            Scope::Project => "project",
-        },
-        CheckKind::Special(_) => "special",
-    };
+    let scope = check.kind.scope_name();
     rows.push(("Scope", format!("[{scope}](#scopes)")));
 
     if !check.patterns.is_empty() {
@@ -593,7 +586,7 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     match check.linter_config.as_ref() {
         Some(config) => rows.push(("Config", format!("`{}`", config.display_name()))),
         None => {
-            if matches!(&check.kind, CheckKind::Special(SpecialKind::Links)) {
+            if check.kind.is_special_kind(SpecialKind::Links) {
                 rows.push(("Config", "via `[checks.links]` in flint.toml".to_string()));
             }
         }

@@ -573,11 +573,13 @@ mod tests {
         use detection::detect_obsolete_keys;
         let mut keys = HashSet::new();
         keys.insert("github:mvdan/sh".to_string());
-        keys.insert("github:koalaman/shellcheck".to_string());
+        keys.insert("shellcheck".to_string());
         let found = detect_obsolete_keys(&keys);
-        assert_eq!(found.len(), 1);
+        assert_eq!(found.len(), 2);
         assert_eq!(found[0].0, "github:mvdan/sh");
         assert_eq!(found[0].1, "shfmt");
+        assert_eq!(found[1].0, "shellcheck");
+        assert_eq!(found[1].1, "github:koalaman/shellcheck");
     }
 
     #[test]

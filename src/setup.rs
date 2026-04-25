@@ -36,6 +36,9 @@ const OBSOLETE_KEYS_TO_NEXT: &[(&str, &str)] = &[
     ("pipx:ruff", "ruff"),
     ("github:astral-sh/ruff", "ruff"),
     ("github:tamasfe/taplo", "taplo"),
+    // Bare shellcheck currently resolves through aqua in mise, but that path
+    // failed Windows CI. Use the GitHub backend until the aqua entry is fixed.
+    ("shellcheck", "github:koalaman/shellcheck"),
     // npm-installed biome is superseded by the standalone biome binary.
     ("npm:@biomejs/biome", "biome"),
     // xmloxide now publishes GitHub releases consumable via mise's github: backend.
@@ -76,8 +79,15 @@ pub fn find_obsolete_key(
     SETUP_MIGRATIONS
         .iter()
         .flat_map(|migration| migration.obsolete_keys.iter())
-        .find(|(old, _)| mise_tools.contains_key(*old))
+        .find(|(old, _)| obsolete_key_present(mise_tools, old))
         .copied()
+}
+
+fn obsolete_key_present(mise_tools: &HashMap<String, String>, old: &str) -> bool {
+    if old == "shellcheck" && mise_tools.contains_key("github:koalaman/shellcheck") {
+        return false;
+    }
+    mise_tools.contains_key(old)
 }
 
 pub fn find_unsupported_key(
@@ -176,6 +186,7 @@ mod tests {
         let unsupported = unsupported_keys_after(DEPLOYED_SETUP_VERSION);
 
         assert!(obsolete.contains(&("pipx:ruff", "ruff")));
+        assert!(obsolete.contains(&("shellcheck", "github:koalaman/shellcheck")));
         assert!(
             unsupported
                 .iter()
@@ -184,5 +195,18 @@ mod tests {
         assert!(unsupported.iter().any(|(old, _)| *old == "npm:prettier"));
         assert!(obsolete_keys_after(CURRENT_SETUP_VERSION).is_empty());
         assert!(unsupported_keys_after(CURRENT_SETUP_VERSION).is_empty());
+    }
+
+    #[test]
+    fn shellcheck_alias_does_not_make_github_backend_obsolete() {
+        let tools = HashMap::from([
+            (
+                "github:koalaman/shellcheck".to_string(),
+                "0.11.0".to_string(),
+            ),
+            ("shellcheck".to_string(), "0.11.0".to_string()),
+        ]);
+
+        assert_eq!(find_obsolete_key(&tools), None);
     }
 }

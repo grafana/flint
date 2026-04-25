@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 
+// Name only durable setup boundaries. Routine migration targets can stay numeric
+// in SETUP_MIGRATIONS unless they become a baseline that call sites need to
+// reference directly. LATEST_SUPPORTED_SETUP_VERSION is intentionally the only
+// moving constant.
 pub const V1_BOOTSTRAP_SETUP_VERSION: u32 = 0;
 pub const V2_BASELINE_SETUP_VERSION: u32 = 1;
 pub const LATEST_SUPPORTED_SETUP_VERSION: u32 = 2;

@@ -199,6 +199,24 @@ fn all_registry_binaries_found() {
 }
 
 #[test]
+fn editorconfig_checker_json_is_optional_not_generated_baseline() {
+    let registry = builtin();
+    let check = registry
+        .iter()
+        .find(|check| check.name == "editorconfig-checker")
+        .expect("editorconfig-checker exists");
+
+    assert!(
+        check.linter_config.is_some(),
+        "existing .editorconfig-checker.json should still be passed to ec"
+    );
+    assert!(
+        check.baseline_config.is_none(),
+        ".editorconfig-checker.json should not be treated as generated baseline config"
+    );
+}
+
+#[test]
 fn default_renovate_preset_covers_all_linter_tools_weekly() {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let default_json_path = manifest_dir.join("default.json");

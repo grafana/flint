@@ -200,7 +200,6 @@ fn check_editorconfig_checker() -> Check {
         .mise_tool("editorconfig-checker")
         .defer_to_formatters()
         .linter_config(".editorconfig-checker.json", "-config")
-        .baseline_config(ConfigFile::config_dir(".editorconfig-checker.json"))
         .unsupported_configs(EDITORCONFIG_CHECKER_UNSUPPORTED_CONFIGS)
         .desc("Check files comply with EditorConfig settings")
 }

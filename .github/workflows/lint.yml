@@ -3,7 +3,7 @@ name: Lint
 
 on:
   push:
-    branches: [main] # warms the Rust cache so PR branches get a cache hit
+    branches: [main]  # warms the Rust cache so PR branches get a cache hit
   pull_request:
 
 permissions: {}
@@ -17,13 +17,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
-          fetch-depth: 0 # needed for merge-base used in lint:links
+          fetch-depth: 0  # needed for merge-base used in lint:links
 
       - name: Setup mise
-        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151  # v4.0.1
         with:
           version: v2026.4.18
           sha256: 6ae2d5f0f23a2f2149bc5d9bf264fe0922a1da843f1903e453516c462b23cc1f
@@ -33,7 +33,7 @@ jobs:
         run: rustup component add clippy rustfmt
 
       - name: Restore cache
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
 
       - name: Lint
         env:

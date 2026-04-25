@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use std::io;
 use std::path::Path;
+use std::process::Command;
 
 /// Writes a skeleton `flint.toml` in `config_dir`. Creates the directory if needed.
 /// Returns `true` if the file was written, `false` if it already existed.
@@ -85,6 +86,98 @@ pub(super) fn generate_rumdl_config(
     std::fs::write(&target, content)?;
     println!("  wrote {}", target.display());
     Ok(true)
+}
+
+/// Removes stale v1/super-linter-era files that flint v2 no longer uses.
+/// Returns the list of removed paths relative to `project_root`.
+pub(super) fn remove_legacy_lint_files(
+    project_root: &Path,
+    config_dir: &Path,
+) -> Result<Vec<String>> {
+    let candidates = [
+        project_root.join(".prettierignore"),
+        project_root.join(".gitleaksignore"),
+        config_dir.join("super-linter.env"),
+        project_root.join(".github/config/super-linter.env"),
+        project_root.join(".github/super-linter.env"),
+    ];
+
+    let mut removed = vec![];
+    for path in candidates {
+        if !path.exists() {
+            continue;
+        }
+        std::fs::remove_file(&path)?;
+        let rel = path
+            .strip_prefix(project_root)
+            .unwrap_or(&path)
+            .display()
+            .to_string();
+        removed.push(rel);
+    }
+    Ok(removed)
+}
+
+/// Removes stale markdownlint MD013 directives from tracked Markdown files.
+/// These long-line suppressions belong to the old markdownlint stack and should
+/// disappear once rumdl owns Markdown formatting.
+pub(super) fn remove_stale_markdownlint_line_length_directives(
+    project_root: &Path,
+) -> Result<Vec<String>> {
+    let output = Command::new("git")
+        .args(["ls-files", "--", "*.md"])
+        .current_dir(project_root)
+        .output()
+        .context("failed to list tracked Markdown files")?;
+    if !output.status.success() {
+        anyhow::bail!("git ls-files failed while scanning Markdown files");
+    }
+
+    let stdout = String::from_utf8(output.stdout).context("git ls-files output was not UTF-8")?;
+    let mut changed_files = vec![];
+    for rel in stdout.lines().filter(|line| !line.trim().is_empty()) {
+        let path = project_root.join(rel);
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let updated = strip_stale_markdownlint_md013_directives(&content);
+        if updated == content {
+            continue;
+        }
+        std::fs::write(&path, updated)?;
+        changed_files.push(rel.to_string());
+    }
+    Ok(changed_files)
+}
+
+fn strip_stale_markdownlint_md013_directives(content: &str) -> String {
+    let mut kept = Vec::with_capacity(content.lines().count());
+    let had_trailing_newline = content.ends_with('\n');
+
+    for line in content.lines() {
+        if is_stale_markdownlint_md013_directive(line) {
+            continue;
+        }
+        kept.push(line);
+    }
+
+    let mut updated = kept.join("\n");
+    if had_trailing_newline {
+        updated.push('\n');
+    }
+    updated
+}
+
+fn is_stale_markdownlint_md013_directive(line: &str) -> bool {
+    let trimmed = line.trim();
+    matches!(
+        trimmed,
+        "<!-- markdownlint-disable MD013 -->"
+            | "<!-- markdownlint-enable MD013 -->"
+            | "<!-- markdownlint-disable-line MD013 -->"
+            | "<!-- markdownlint-disable-next-line MD013 -->"
+            | "<!-- markdownlint-disable-file MD013 -->"
+    )
 }
 
 /// Generates or updates `.editorconfig` in the project root.
@@ -270,6 +363,7 @@ pub(super) fn generate_yamllint_config(config_dir: &Path, _line_length: u16) -> 
         "  document-start: disable",
         "  line-length: disable",
         "  indentation: enable",
+        "  truthy: disable",
         "",
     ]
     .join("\n");

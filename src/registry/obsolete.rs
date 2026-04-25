@@ -10,20 +10,24 @@ pub const OBSOLETE_KEYS: &[(&str, &str)] = &[
         "ubi:google/google-java-format",
         "github:google/google-java-format",
     ),
-    ("ubi:pinterest/ktlint", "github:pinterest/ktlint"),
-    // ryl ships standalone GitHub release binaries, so we no longer need the
-    // cargo backend for yaml-lint.
-    ("cargo:yaml-lint", "github:owenlamont/ryl"),
-    // Ruff ships standalone GitHub release binaries, so we no longer need the
-    // pipx backend or a Python runtime just to install it.
-    ("pipx:ruff", "github:astral-sh/ruff"),
+    ("ubi:pinterest/ktlint", "ktlint"),
+    // ryl is available from aqua-registry, but current mise releases still require
+    // the explicit aqua-prefixed key instead of exposing a bare `ryl` tool.
+    ("cargo:yaml-lint", "aqua:owenlamont/ryl"),
+    ("github:owenlamont/ryl", "aqua:owenlamont/ryl"),
+    // Ruff is available as a bare aqua-backed tool key.
+    ("pipx:ruff", "ruff"),
+    ("github:astral-sh/ruff", "ruff"),
+    ("github:koalaman/shellcheck", "shellcheck"),
     // github:mvdan/sh is superseded by bare shfmt; mise resolves it via aqua:mvdan/sh,
     // and the aqua registry now ships Windows support for shfmt.
     ("github:mvdan/sh", "shfmt"),
+    ("github:tamasfe/taplo", "taplo"),
     // npm-installed biome is superseded by the standalone biome binary.
     ("npm:@biomejs/biome", "biome"),
     // xmloxide now publishes GitHub releases consumable via mise's github: backend.
     ("cargo:xmloxide", "github:jonwiggins/xmloxide"),
+    ("github:pinterest/ktlint", "ktlint"),
 ];
 
 /// Mise tool keys that flint no longer supports and cannot auto-rewrite 1:1.

@@ -9,7 +9,7 @@ pub use mise::{
     check_active, flint_version_changed, read_mise_tools, read_mise_tools_at_ref,
     tool_version_changed,
 };
-pub use obsolete::{OBSOLETE_KEYS, find_obsolete_key, find_unsupported_key};
+pub use obsolete::{OBSOLETE_KEYS, UNSUPPORTED_KEYS, find_obsolete_key, find_unsupported_key};
 pub use resolve::binary_on_path;
 pub use types::{
     Category, Check, CheckKind, ConfigBase, ConfigFile, ConfigMatch, FixBehavior, LinterConfig,

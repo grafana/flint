@@ -144,19 +144,7 @@ async fn main() -> Result<()> {
             init::run(&project_root, args.profile, args.yes)?;
         }
         SubCommand::Update => {
-            let replaced =
-                init::generation::replace_obsolete_keys(&project_root, registry::OBSOLETE_KEYS)?;
-            let node_added = init::generation::ensure_node_for_npm(&project_root)?;
-            if replaced.is_empty() && !node_added {
-                println!("flint: mise.toml is up to date");
-            } else {
-                for (old, new) in &replaced {
-                    println!("  replaced {old:?} → {new:?}");
-                }
-                if node_added {
-                    println!("  added node (LTS) — required by npm: backend tools");
-                }
-            }
+            init::update(&project_root, &config_dir)?;
         }
         SubCommand::Hook(args) => match args.command {
             HookCommand::Install => hook::install(&project_root)?,

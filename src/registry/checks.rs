@@ -69,12 +69,10 @@ const RUFF_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
 ///
 /// # Naming convention
 ///
-/// A check's `name` is its stable user-facing ID. It usually matches the last path
-/// segment of its mise tool key, but it may intentionally differ from the current
-/// binary or tool key so CLI names and docs remain stable across backend swaps:
+/// A check's `name` is the last path segment of its mise tool key (after `:` or `/`):
 /// - `editorconfig-checker` → name `editorconfig-checker` (not the binary `ec`)
-/// - `github:owenlamont/ryl` → stable name `yaml-lint`
-/// - `github:pinterest/ktlint` → name `ktlint`
+/// - `aqua:owenlamont/ryl` → name `yaml-lint`
+/// - `ktlint` → name `ktlint`
 ///
 /// Exception: when the mise tool key is a language toolchain shared across multiple
 /// binaries (e.g. `rust`, `go`, `dotnet`), use the binary name instead — the toolchain
@@ -108,7 +106,6 @@ fn check_rumdl() -> Check {
         .unsupported_configs(RUMDL_UNSUPPORTED_CONFIGS)
         .formatter()
         .desc("Lint Markdown files for style and consistency")
-        .mise_tool("rumdl")
 }
 
 fn check_yaml_lint() -> Check {
@@ -120,7 +117,7 @@ fn check_yaml_lint() -> Check {
         .unsupported_configs(YAMLLINT_UNSUPPORTED_CONFIGS)
         .formatter()
         .desc("Lint YAML files for style and consistency")
-        .mise_tool("github:owenlamont/ryl")
+        .mise_tool("aqua:owenlamont/ryl")
 }
 
 fn check_taplo() -> Check {
@@ -129,7 +126,6 @@ fn check_taplo() -> Check {
         .linter_config(".taplo.toml", "--config")
         .baseline_config(ConfigFile::config_dir(".taplo.toml"))
         .unsupported_configs(TAPLO_UNSUPPORTED_CONFIGS)
-        .mise_tool("github:tamasfe/taplo")
         .stderr_filter_prefixes(&[" INFO taplo:"])
         .formatter()
         .desc("Format TOML files")
@@ -222,7 +218,6 @@ fn check_ruff() -> Check {
         .baseline_config(RUFF_BASELINE_CONFIG)
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
         .desc("Lint Python code")
-        .mise_tool("github:astral-sh/ruff")
         .lang()
 }
 
@@ -235,7 +230,7 @@ fn check_ruff_format() -> Check {
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
         .formatter()
         .desc("Format Python code")
-        .mise_tool("github:astral-sh/ruff")
+        .mise_tool("ruff")
         .lang()
 }
 
@@ -249,7 +244,6 @@ fn check_biome() -> Check {
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
     .desc("Lint JS/TS/JSON files")
-    .mise_tool("biome")
     .lang()
 }
 

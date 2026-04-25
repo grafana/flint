@@ -32,6 +32,23 @@ fn find_obsolete_key_detects_legacy_biome_backend() {
 }
 
 #[test]
+fn find_obsolete_key_detects_legacy_yaml_lint_backend() {
+    let mut tools = HashMap::new();
+    tools.insert("cargo:yaml-lint".to_string(), "0.1.0".to_string());
+    assert_eq!(
+        find_obsolete_key(&tools),
+        Some(("cargo:yaml-lint", "aqua:owenlamont/ryl"))
+    );
+}
+
+#[test]
+fn find_obsolete_key_detects_legacy_ruff_backend() {
+    let mut tools = HashMap::new();
+    tools.insert("pipx:ruff".to_string(), "0.15.0".to_string());
+    assert_eq!(find_obsolete_key(&tools), Some(("pipx:ruff", "ruff")));
+}
+
+#[test]
 fn find_unsupported_key_detects_markdownlint_stack() {
     let mut tools = HashMap::new();
     tools.insert("npm:markdownlint-cli2".to_string(), "0.18.1".to_string());
@@ -239,15 +256,9 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
 #[test]
 fn linter_keys_include_mise_and_bare_tool_names() {
     let keys = linter_keys();
-    assert!(keys.contains("cargo:yaml-lint"));
-<<<<<<< HEAD
-    assert!(keys.contains("github:jonwiggins/xmloxide"));
-    assert!(keys.contains("github:owenlamont/ryl"));
+    assert!(keys.contains("aqua:owenlamont/ryl"));
     assert!(keys.contains("ryl"));
-=======
-    assert!(keys.contains("yaml-lint"));
     assert!(keys.contains("github:jonwiggins/xmloxide"));
->>>>>>> 94ffc4b (fix: switch xmloxide to github backend)
     assert!(keys.contains("xmllint"));
 }
 

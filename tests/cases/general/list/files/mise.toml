@@ -1,14 +1,14 @@
 [tools]
 biome = "2.3.14"
-"github:tamasfe/taplo" = "0.10.0"
-"github:owenlamont/ryl" = "v0.6.0"
+"aqua:owenlamont/ryl" = "0.6.0"
+taplo = "0.10.0"
 lychee = "0.22.0"
 "npm:renovate" = "43.92.1"
 shellcheck = "v0.11.0"
 shfmt = "v3.13.1"
 actionlint = "1.7.10"
 editorconfig-checker = "v3.6.1"
-"github:astral-sh/ruff" = "0.15.0"
+ruff = "0.15.0"
 "pipx:codespell" = "2.4.1"
 rumdl = "0.1.78"
 rust = { version = "1.94.1", components = "clippy,rustfmt" }

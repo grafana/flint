@@ -15,7 +15,8 @@ mod ui;
 use config_files::{
     exclude_formatter_owned_files_from_editorconfig_checker, generate_biome_config,
     generate_editorconfig, generate_flint_toml, generate_rumdl_config, generate_rustfmt_config,
-    generate_taplo_config, generate_yamllint_config,
+    generate_taplo_config, generate_yamllint_config, remove_legacy_lint_files,
+    remove_stale_markdownlint_line_length_directives,
 };
 use detection::{
     build_linter_groups, detect_obsolete_keys, detect_present_patterns, parse_tool_keys,
@@ -23,7 +24,7 @@ use detection::{
 use generation::{
     apply_changes, detect_base_branch, ensure_flint_self_pin, ensure_node_for_npm, flint_preset,
     get_existing_config_dir, has_slow_selected, normalize_tools_section, patch_renovate_extends,
-    prompt_config_dir, remove_v1_tasks,
+    prompt_config_dir, remove_tool_keys, remove_v1_tasks,
 };
 use scaffold::{apply_env_and_tasks, generate_lint_workflow, maybe_install_hook};
 use ui::{interactive_select_linters, select_categories_arrow};
@@ -139,6 +140,73 @@ fn default_category_items() -> Vec<CategoryItem> {
     ]
 }
 
+struct RepoMigrationSummary {
+    replaced_obsolete: Vec<(String, String)>,
+    removed_unsupported: Vec<String>,
+    node_added: bool,
+    legacy_files_removed: Vec<String>,
+    stale_md013_comments_removed: Vec<String>,
+}
+
+impl RepoMigrationSummary {
+    fn is_noop(&self) -> bool {
+        self.replaced_obsolete.is_empty()
+            && self.removed_unsupported.is_empty()
+            && !self.node_added
+            && self.legacy_files_removed.is_empty()
+            && self.stale_md013_comments_removed.is_empty()
+    }
+
+    fn print_messages(&self) {
+        for (old, new) in &self.replaced_obsolete {
+            println!("  replaced {old:?} → {new:?}");
+        }
+        for old_key in &self.removed_unsupported {
+            println!("  removed unsupported legacy linter {old_key:?}");
+        }
+        if self.node_added {
+            println!("  added node (LTS) — required by npm: backend tools");
+        }
+        for rel in &self.legacy_files_removed {
+            println!("  removed <REPO>/{rel} (legacy flint v1 / super-linter file)");
+        }
+        for rel in &self.stale_md013_comments_removed {
+            println!("  removed stale markdownlint MD013 directives from <REPO>/{rel}");
+        }
+    }
+}
+
+fn apply_repo_migrations(
+    project_root: &Path,
+    config_dir: &Path,
+    strip_stale_md013_directives: bool,
+) -> Result<RepoMigrationSummary> {
+    let replaced_obsolete =
+        generation::replace_obsolete_keys(project_root, crate::registry::OBSOLETE_KEYS)?;
+    let removed_unsupported = remove_tool_keys(
+        project_root,
+        &crate::registry::UNSUPPORTED_KEYS
+            .iter()
+            .map(|(old_key, _)| *old_key)
+            .collect::<Vec<_>>(),
+    )?;
+    let node_added = ensure_node_for_npm(project_root)?;
+    let legacy_files_removed = remove_legacy_lint_files(project_root, config_dir)?;
+    let stale_md013_comments_removed = if strip_stale_md013_directives {
+        remove_stale_markdownlint_line_length_directives(project_root)?
+    } else {
+        vec![]
+    };
+
+    Ok(RepoMigrationSummary {
+        replaced_obsolete,
+        removed_unsupported,
+        node_added,
+        legacy_files_removed,
+        stale_md013_comments_removed,
+    })
+}
+
 pub fn run(project_root: &Path, profile_arg: Option<Profile>, yes: bool) -> Result<()> {
     println!(
         "Tip: flint init detects languages from tracked files (`git ls-files`). \
@@ -184,6 +252,10 @@ Add and stage your source files before running init so the detection is accurate
     let current_content = std::fs::read_to_string(&mise_path).unwrap_or_default();
     let current_tool_keys = parse_tool_keys(&current_content);
     let known_keys: HashSet<&str> = registry.iter().filter_map(install_key).collect();
+    let unsupported_keys: Vec<&str> = crate::registry::UNSUPPORTED_KEYS
+        .iter()
+        .filter_map(|(old_key, _)| current_tool_keys.contains(*old_key).then_some(*old_key))
+        .collect();
 
     // Step 2: build one group per install key, covering all checks whose files are
     // present in the repo or which are already installed.
@@ -211,6 +283,9 @@ Add and stage your source files before running init so the detection is accurate
     let obsolete = detect_obsolete_keys(&current_tool_keys);
     for (old_key, replacement) in &obsolete {
         println!("  removing obsolete linter {old_key} (replaced by {replacement})");
+    }
+    for old_key in &unsupported_keys {
+        println!("  removing unsupported legacy linter {old_key}");
     }
 
     // Derive changes from final selection state.
@@ -241,6 +316,9 @@ Add and stage your source files before running init so the detection is accurate
     // Always remove obsolete tool keys (detected before the interactive selection).
     for (old_key, _) in &obsolete {
         final_remove.push(old_key.to_string());
+    }
+    for old_key in &unsupported_keys {
+        final_remove.push((*old_key).to_string());
     }
 
     let has_slow = has_slow_selected(&groups);
@@ -296,10 +374,6 @@ Add and stage your source files before running init so the detection is accurate
             &final_upgrade,
         )?;
     }
-    let node_added = ensure_node_for_npm(project_root)?;
-    if node_added {
-        println!("  added node (LTS) — required by npm: backend tools");
-    }
     let flint_pinned = ensure_flint_self_pin(project_root)?;
     if flint_pinned {
         println!("  pinned flint itself — reproducible lint runs across contributors");
@@ -333,6 +407,8 @@ Add and stage your source files before running init so the detection is accurate
     } else {
         false
     };
+    let migration_summary = apply_repo_migrations(project_root, &config_dir_path, has_rumdl)?;
+    migration_summary.print_messages();
     let editorconfig_generated = generate_editorconfig(project_root, line_length)?;
     let editorconfig_formatter_excluded = if has_rumdl || has_yaml_lint {
         exclude_formatter_owned_files_from_editorconfig_checker(project_root, &config_dir_path)?
@@ -387,7 +463,7 @@ Add and stage your source files before running init so the detection is accurate
         .unwrap_or(false);
 
     if !tools_changed
-        && !node_added
+        && migration_summary.is_noop()
         && !flint_pinned
         && !tools_normalized
         && v1.removed_tasks.is_empty()
@@ -411,6 +487,23 @@ Add and stage your source files before running init so the detection is accurate
     maybe_install_hook(project_root, yes)?;
 
     println!("Done. Run `mise install` to install the new tools.");
+    Ok(())
+}
+
+pub fn update(project_root: &Path, config_dir: &Path) -> Result<()> {
+    let mise_path = project_root.join("mise.toml");
+    let current_content = std::fs::read_to_string(&mise_path).unwrap_or_default();
+    let current_tool_keys = parse_tool_keys(&current_content);
+    let should_strip_md013 = current_tool_keys.contains("rumdl");
+    let migration_summary = apply_repo_migrations(project_root, config_dir, should_strip_md013)?;
+
+    if migration_summary.is_noop() {
+        println!("flint: repo lint migration is up to date");
+        return Ok(());
+    }
+
+    migration_summary.print_messages();
+
     Ok(())
 }
 
@@ -799,6 +892,52 @@ rust = { version = "1.0", components = "clippy" }
     }
 
     #[test]
+    fn remove_legacy_lint_files_removes_v1_artifacts() {
+        use config_files::remove_legacy_lint_files;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(tmp.path().join(".prettierignore"), "docs/themes/**\n").unwrap();
+        std::fs::write(tmp.path().join(".gitleaksignore"), "secret\n").unwrap();
+        std::fs::write(config_dir.join("super-linter.env"), "LOG_LEVEL=ERROR\n").unwrap();
+
+        let removed = remove_legacy_lint_files(tmp.path(), &config_dir).unwrap();
+        assert_eq!(removed.len(), 3);
+        assert!(!tmp.path().join(".prettierignore").exists());
+        assert!(!tmp.path().join(".gitleaksignore").exists());
+        assert!(!config_dir.join("super-linter.env").exists());
+    }
+
+    #[test]
+    fn remove_stale_markdownlint_line_length_directives_strips_md013_only() {
+        use config_files::remove_stale_markdownlint_line_length_directives;
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::process::Command::new("git")
+            .args(["init", "-b", "main"])
+            .current_dir(tmp.path())
+            .output()
+            .unwrap();
+        std::fs::write(
+            tmp.path().join("README.md"),
+            "# Title\n\n<!-- markdownlint-disable MD013 -->\nlong line\n<!-- markdownlint-enable MD013 -->\n<!-- markdownlint-disable MD033 -->\nhtml\n<!-- markdownlint-enable MD033 -->\n",
+        )
+        .unwrap();
+        std::process::Command::new("git")
+            .args(["add", "README.md"])
+            .current_dir(tmp.path())
+            .output()
+            .unwrap();
+
+        let changed = remove_stale_markdownlint_line_length_directives(tmp.path()).unwrap();
+        assert_eq!(changed, vec!["README.md".to_string()]);
+        let updated = std::fs::read_to_string(tmp.path().join("README.md")).unwrap();
+        assert!(!updated.contains("markdownlint-disable MD013"));
+        assert!(!updated.contains("markdownlint-enable MD013"));
+        assert!(updated.contains("markdownlint-disable MD033"));
+        assert!(updated.contains("markdownlint-enable MD033"));
+    }
+
+    #[test]
     fn generate_editorconfig_writes_file() {
         use config_files::generate_editorconfig;
         let tmp = tempfile::TempDir::new().unwrap();
@@ -895,6 +1034,7 @@ rust = { version = "1.0", components = "clippy" }
         assert!(content.contains("document-start: disable"));
         assert!(content.contains("line-length: disable"));
         assert!(content.contains("indentation: enable"));
+        assert!(content.contains("truthy: disable"));
     }
 
     #[test]

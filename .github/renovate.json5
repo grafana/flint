@@ -95,7 +95,7 @@
         "npm:prettier",
         "npm:renovate",
         "pipx:codespell",
-        "pipx:ruff",
+        "github:astral-sh/ruff",
         "shellcheck",
         "shfmt",
       ],

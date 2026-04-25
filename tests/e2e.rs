@@ -329,6 +329,106 @@ exit 1
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn rumdl_fix_hides_success_noise_when_another_file_fails() {
+    let repo = git_repo();
+
+    std::fs::write(
+        repo.path().join("mise.toml"),
+        r#"[tools]
+rumdl = "0.1.78"
+"#,
+    )
+    .unwrap();
+    std::fs::write(repo.path().join("clean.md"), "# Clean\n").unwrap();
+    std::fs::write(repo.path().join("failing.md"), "# Failing\n").unwrap();
+
+    let out = Command::new("git")
+        .args(["add", "-A"])
+        .current_dir(repo.path())
+        .output()
+        .expect("failed to spawn git add");
+    assert!(
+        out.status.success(),
+        "git add failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let out = Command::new("git")
+        .args(["commit", "-q", "-m", "init"])
+        .current_dir(repo.path())
+        .output()
+        .expect("failed to spawn git commit");
+    assert!(
+        out.status.success(),
+        "git commit failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let fake_bin_dir = tempfile::tempdir().expect("fake_bin tempdir");
+    let rumdl = fake_bin_dir.path().join("rumdl");
+    std::fs::write(
+        &rumdl,
+        r#"#!/bin/sh
+set -eu
+
+cmd="$1"
+shift
+
+if [ "$cmd" != "check" ]; then
+  echo "unsupported rumdl invocation: $cmd $*" >&2
+  exit 1
+fi
+
+for arg in "$@"; do
+  case "$arg" in
+    -*)
+      continue
+      ;;
+    *clean.md)
+      echo "Success: No issues found in 1 file (8ms)"
+      ;;
+    *failing.md)
+      echo "failing.md:1:121: [MD013] Line length 140 exceeds 120 characters"
+      exit 1
+      ;;
+    *)
+      echo "unexpected rumdl target: $arg" >&2
+      exit 1
+      ;;
+  esac
+done
+
+exit 0
+"#,
+    )
+    .unwrap();
+
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&rumdl, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let fake_path = format!(
+        "{}:{}",
+        fake_bin_dir.path().display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let out = flint_with_env(
+        &["run", "--full", "--fix", "rumdl"],
+        repo.path(),
+        &[("PATH", &fake_path)],
+    );
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("failing.md:1:121: [MD013] Line length 140 exceeds 120 characters"),
+        "unexpected fix stderr:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("Success: No issues found in 1 file (8ms)"),
+        "unexpected rumdl success noise in fix stderr:\n{stderr}"
+    );
+}
+
 /// Recursively finds all directories containing a `test.toml` file.
 fn collect_cases(dir: &Path) -> Vec<PathBuf> {
     let mut cases = Vec::new();

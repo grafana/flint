@@ -27,6 +27,14 @@ pub struct CheckResult {
     pub duration: Duration,
 }
 
+#[derive(Clone, Copy)]
+struct InvocationOutputPolicy<'a> {
+    nonverbose: bool,
+    env: &'a [(&'static str, &'static str)],
+    nonverbose_filter_prefixes: &'a [&'static str],
+    stderr_filter_prefixes: &'a [&'static str],
+}
+
 /// A check with all inputs pre-resolved, ready to execute without borrowing
 /// the registry or config. Built by `prepare()` before the fix/check split.
 enum PreparedCheck {
@@ -36,6 +44,7 @@ enum PreparedCheck {
         tracked_files: Vec<PathBuf>,
         windows_java_jar: bool,
         env: &'static [(&'static str, &'static str)],
+        nonverbose_filter_prefixes: &'static [&'static str],
         stderr_filter_prefixes: &'static [&'static str],
     },
     Links {
@@ -74,6 +83,7 @@ impl PreparedCheck {
                 tracked_files,
                 windows_java_jar,
                 env,
+                nonverbose_filter_prefixes,
                 stderr_filter_prefixes,
                 ..
             } => {
@@ -86,8 +96,16 @@ impl PreparedCheck {
                     &name,
                     &argv_list,
                     windows_java_jar,
-                    if verbose { &[] } else { env },
-                    if verbose { &[] } else { stderr_filter_prefixes },
+                    InvocationOutputPolicy {
+                        nonverbose: !verbose,
+                        env: if verbose { &[] } else { env },
+                        nonverbose_filter_prefixes: if verbose {
+                            &[]
+                        } else {
+                            nonverbose_filter_prefixes
+                        },
+                        stderr_filter_prefixes: if verbose { &[] } else { stderr_filter_prefixes },
+                    },
                     project_root,
                 )
                 .await;
@@ -224,6 +242,7 @@ fn prepare(
                 tracked_files,
                 windows_java_jar: check.windows_java_jar,
                 env: check.env,
+                nonverbose_filter_prefixes: check.nonverbose_filter_prefixes,
                 stderr_filter_prefixes: check.stderr_filter_prefixes,
             })
         }
@@ -501,8 +520,7 @@ async fn run_invocations(
     name: &str,
     invocations: &[Vec<String>],
     windows_java_jar: bool,
-    env: &[(&str, &str)],
-    stderr_filter_prefixes: &[&str],
+    output_policy: InvocationOutputPolicy<'_>,
     root: &Path,
 ) -> LinterOutput {
     let mut all_ok = true;
@@ -516,22 +534,50 @@ async fn run_invocations(
         let mut cmd = crate::linters::spawn_command(argv, windows_java_jar);
         cmd.current_dir(root)
             .stdin(Stdio::null())
-            .envs(env.iter().copied());
+            .envs(output_policy.env.iter().copied());
         let result = cmd.output().await;
         match result {
             Ok(out) => {
-                if name == "taplo" && !stderr_filter_prefixes.is_empty() && !out.status.success() {
+                if name == "taplo"
+                    && !output_policy.stderr_filter_prefixes.is_empty()
+                    && !out.status.success()
+                {
                     let (stdout, stderr) =
                         normalize_taplo_nonverbose_output(argv, &out.stdout, &out.stderr);
                     combined_stdout.extend_from_slice(&stdout);
                     combined_stderr.extend_from_slice(&stderr);
                 } else {
-                    combined_stdout.extend_from_slice(&out.stdout);
-                    if stderr_filter_prefixes.is_empty() {
-                        combined_stderr.extend_from_slice(&out.stderr);
+                    let stdout =
+                        if output_policy.nonverbose
+                            && !output_policy.nonverbose_filter_prefixes.is_empty()
+                        {
+                        filter_output_lines(&out.stdout, |line| {
+                            output_policy
+                                .nonverbose_filter_prefixes
+                                .iter()
+                                .any(|prefix| line.starts_with(prefix))
+                        })
                     } else {
-                        let filtered = filter_stderr_lines(&out.stderr, stderr_filter_prefixes);
+                        out.stdout
+                    };
+                    combined_stdout.extend_from_slice(&stdout);
+                    let stderr = if output_policy.stderr_filter_prefixes.is_empty() {
+                        out.stderr
+                    } else {
+                        filter_stderr_lines(&out.stderr, output_policy.stderr_filter_prefixes)
+                    };
+                    if output_policy.nonverbose
+                        && !output_policy.nonverbose_filter_prefixes.is_empty()
+                    {
+                        let filtered = filter_output_lines(&stderr, |line| {
+                            output_policy
+                                .nonverbose_filter_prefixes
+                                .iter()
+                                .any(|prefix| line.starts_with(prefix))
+                        });
                         combined_stderr.extend_from_slice(&filtered);
+                    } else {
+                        combined_stderr.extend_from_slice(&stderr);
                     }
                 }
                 if !out.status.success() {
@@ -618,6 +664,28 @@ fn normalize_taplo_nonverbose_output(
     };
 
     (Vec::new(), stderr)
+}
+
+fn filter_output_lines(output: &[u8], predicate: impl Fn(&str) -> bool) -> Vec<u8> {
+    let text = String::from_utf8_lossy(output);
+    let mut out = String::new();
+    for line in text.split_inclusive('\n') {
+        let trimmed = line.trim_end_matches('\n');
+        if predicate(trimmed) {
+            continue;
+        }
+        out.push_str(line);
+    }
+    if !text.is_empty() && !text.ends_with('\n') {
+        let tail = text
+            .rsplit_once('\n')
+            .map(|(_, tail)| tail)
+            .unwrap_or(&text);
+        if !predicate(tail) && !out.ends_with(tail) {
+            out.push_str(tail);
+        }
+    }
+    out.into_bytes()
 }
 
 fn maybe_append_rust_component_note(name: &str, stderr: &mut Vec<u8>) {
@@ -886,6 +954,7 @@ mod tests {
             excludes_if_active: &[],
             linter_config: None,
             env: &[],
+            nonverbose_filter_prefixes: &[],
             stderr_filter_prefixes: &[],
             baseline_config: None,
             unsupported_configs: &[],
@@ -1004,5 +1073,27 @@ mod tests {
         let stderr = b"ERROR useful\n";
         let filtered = filter_stderr_lines(stderr, &[" INFO taplo:"]);
         assert_eq!(String::from_utf8(filtered).unwrap(), "ERROR useful\n");
+    }
+
+    #[test]
+    fn filters_rumdl_success_lines_from_nonverbose_output() {
+        let output =
+            b"Success: No issues found in 1 file (8ms)\nerror[MD013]: too long\n".as_slice();
+        let filtered = filter_output_lines(output, |line| {
+            line.starts_with("Success: No issues found in ")
+        });
+        assert_eq!(
+            String::from_utf8(filtered).unwrap(),
+            "error[MD013]: too long\n"
+        );
+    }
+
+    #[test]
+    fn preserves_non_success_rumdl_lines() {
+        let output = b"warning: keep me\n".as_slice();
+        let filtered = filter_output_lines(output, |line| {
+            line.starts_with("Success: No issues found in ")
+        });
+        assert_eq!(String::from_utf8(filtered).unwrap(), "warning: keep me\n");
     }
 }

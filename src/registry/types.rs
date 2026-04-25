@@ -132,6 +132,9 @@ pub struct Check {
     /// invoking this check's external process. These are intentionally not set
     /// under `--verbose`, so checks must not rely on them always being present.
     pub env: &'static [(&'static str, &'static str)],
+    /// Line prefixes to drop from stdout/stderr in non-verbose mode. This is
+    /// only for low-value noise; actionable diagnostics must remain visible.
+    pub nonverbose_filter_prefixes: &'static [&'static str],
     /// Line prefixes to drop from stderr in non-verbose mode. This is only for
     /// low-value log noise; actionable diagnostics must remain visible.
     pub stderr_filter_prefixes: &'static [&'static str],
@@ -251,6 +254,7 @@ impl Check {
             excludes_if_active: &[],
             linter_config: None,
             env: &[],
+            nonverbose_filter_prefixes: &[],
             stderr_filter_prefixes: &[],
             baseline_config: None,
             unsupported_configs: &[],
@@ -286,6 +290,7 @@ impl Check {
             excludes_if_active: &[],
             linter_config: None,
             env: &[],
+            nonverbose_filter_prefixes: &[],
             stderr_filter_prefixes: &[],
             baseline_config: None,
             unsupported_configs: &[],
@@ -488,6 +493,11 @@ impl Check {
 
     pub fn stderr_filter_prefixes(mut self, prefixes: &'static [&'static str]) -> Self {
         self.stderr_filter_prefixes = prefixes;
+        self
+    }
+
+    pub fn nonverbose_filter_prefixes(mut self, prefixes: &'static [&'static str]) -> Self {
+        self.nonverbose_filter_prefixes = prefixes;
         self
     }
 

@@ -105,6 +105,7 @@ fn check_rumdl() -> Check {
         .linter_config(".rumdl.toml", "--config")
         .baseline_config(ConfigFile::config_dir(".rumdl.toml"))
         .unsupported_configs(RUMDL_UNSUPPORTED_CONFIGS)
+        .nonverbose_filter_prefixes(&["Success: No issues found in "])
         .formatter()
         .editorconfig_line_length_off(&["*.md"], "Markdown line length is handled by rumdl")
         .desc("Lint Markdown files for style and consistency")

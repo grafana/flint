@@ -56,6 +56,9 @@ jobs:
           sha256: ${{ matrix.mise_sha256 }}
           cache_key_prefix: mise-v2
 
+      - name: Install mise tools
+        run: mise install
+
       - name: Install Rust lint components
         run: rustup component add clippy rustfmt
 

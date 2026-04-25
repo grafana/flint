@@ -12,8 +12,8 @@ pub use mise::{
 pub use obsolete::{OBSOLETE_KEYS, UNSUPPORTED_KEYS, find_obsolete_key, find_unsupported_key};
 pub use resolve::binary_on_path;
 pub use types::{
-    Category, Check, CheckKind, ConfigBase, ConfigFile, ConfigMatch, FixBehavior, LinterConfig,
-    RunPolicy, Scope, SpecialKind,
+    Category, Check, CheckKind, ConfigBase, ConfigFile, ConfigMatch, EditorconfigLineLengthPolicy,
+    FixBehavior, LinterConfig, RunPolicy, Scope, SpecialKind,
 };
 
 /// Returns the set of `mise.toml` tool keys that belong under the `# Linters`

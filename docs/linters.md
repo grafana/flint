@@ -317,12 +317,12 @@ Checks use one of three run policies:
 Use `--fast-only` for local/pre-push feedback and the full set in CI.
 
 **`editorconfig-checker` defers to formatters**: `editorconfig-checker` runs on
-all files, but
-automatically skips file types owned by an active line-length-enforcing
-formatter. When `cargo-fmt`, `ruff-format`, `biome-format`, `rumdl`, or
-`yaml-lint`
-are active, their file types are excluded from `editorconfig-checker` — those
-formatters
-already enforce line length and would conflict with `editorconfig-checker`'s
-`max_line_length` editorconfig check. If none of those formatters are
-installed, `editorconfig-checker` checks those files itself.
+all files, but automatically skips file types owned by an active formatter. If
+none of those formatters are installed, `editorconfig-checker` checks those
+files itself.
+
+**`flint init` / `flint update` writes shared `.editorconfig` carve-outs for
+known formatter-owned line length**: today that means `rumdl` for `*.md` and
+`google-java-format` for `*.java`. Those sections use `max_line_length = off`
+so editors and `editorconfig-checker` share the same intent instead of relying
+on checker-specific JSON excludes.

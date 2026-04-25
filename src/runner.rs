@@ -891,6 +891,7 @@ mod tests {
             unsupported_configs: &[],
             is_formatter: false,
             defers_to_formatters: false,
+            editorconfig_line_length_policy: crate::registry::EditorconfigLineLengthPolicy::Default,
             activate_unconditionally: false,
             category: Category::Default,
             run_policy: RunPolicy::Fast,

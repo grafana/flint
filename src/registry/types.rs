@@ -95,6 +95,15 @@ impl LinterConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditorconfigLineLengthPolicy {
+    Default,
+    DisableForPatterns {
+        patterns: &'static [&'static str],
+        comment: &'static str,
+    },
+}
+
 #[derive(Debug, Clone)]
 pub struct Check {
     pub name: &'static str,
@@ -136,6 +145,8 @@ pub struct Check {
     pub is_formatter: bool,
     /// Skip files owned by active formatters (used by ec to avoid double-checking).
     pub defers_to_formatters: bool,
+    /// Optional `.editorconfig` line-length carve-out owned by this check.
+    pub editorconfig_line_length_policy: EditorconfigLineLengthPolicy,
     /// Always considered active regardless of mise.toml (used for config-activated checks).
     pub activate_unconditionally: bool,
     /// Toolchain status and optional components for `mise_tool_name`.
@@ -245,6 +256,7 @@ impl Check {
             unsupported_configs: &[],
             is_formatter: false,
             defers_to_formatters: false,
+            editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
             activate_unconditionally: false,
             category: Category::Default,
             run_policy: RunPolicy::Fast,
@@ -279,6 +291,7 @@ impl Check {
             unsupported_configs: &[],
             is_formatter: false,
             defers_to_formatters: false,
+            editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
             activate_unconditionally: false,
             category: Category::Default,
             run_policy: RunPolicy::Fast,
@@ -377,6 +390,18 @@ impl Check {
     /// Skip files owned by active formatters (for ec — avoids double-checking).
     pub fn defer_to_formatters(mut self) -> Self {
         self.defers_to_formatters = true;
+        self
+    }
+
+    /// Declare that this check owns `max_line_length` in `.editorconfig` for the
+    /// given file patterns.
+    pub fn editorconfig_line_length_off(
+        mut self,
+        patterns: &'static [&'static str],
+        comment: &'static str,
+    ) -> Self {
+        self.editorconfig_line_length_policy =
+            EditorconfigLineLengthPolicy::DisableForPatterns { patterns, comment };
         self
     }
 

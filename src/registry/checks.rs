@@ -105,6 +105,7 @@ fn check_rumdl() -> Check {
         .baseline_config(ConfigFile::config_dir(".rumdl.toml"))
         .unsupported_configs(RUMDL_UNSUPPORTED_CONFIGS)
         .formatter()
+        .editorconfig_line_length_off(&["*.md"], "Markdown line length is handled by rumdl")
         .desc("Lint Markdown files for style and consistency")
 }
 
@@ -310,6 +311,10 @@ fn check_google_java_format() -> Check {
     .fix("google-java-format -i {FILES}")
     .mise_tool("github:google/google-java-format")
     .formatter()
+    .editorconfig_line_length_off(
+        &["*.java"],
+        "Java line length is handled by google-java-format",
+    )
     .desc("Format Java code")
     .lang()
 }

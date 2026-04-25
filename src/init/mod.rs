@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
 
-use crate::registry::{Category, Check, builtin};
+use crate::registry::{Category, Check, EditorconfigLineLengthPolicy, builtin};
 
 mod config_files;
 mod detection;
@@ -13,9 +13,9 @@ mod scaffold;
 mod ui;
 
 use config_files::{
-    exclude_formatter_owned_files_from_editorconfig_checker, generate_biome_config,
-    generate_editorconfig, generate_flint_toml, generate_rumdl_config, generate_rustfmt_config,
-    generate_taplo_config, generate_yamllint_config, remove_legacy_lint_files,
+    disable_editorconfig_line_length_for_patterns, generate_biome_config, generate_editorconfig,
+    generate_flint_toml, generate_rumdl_config, generate_rustfmt_config, generate_taplo_config,
+    generate_yamllint_config, remove_legacy_lint_files,
     remove_stale_markdownlint_line_length_directives,
 };
 use detection::{
@@ -54,6 +54,30 @@ fn profile_to_categories(profile: Profile) -> HashSet<Category> {
         ]
         .into(),
     }
+}
+
+fn selected_editorconfig_line_length_sections(
+    groups: &[LinterGroup<'_>],
+) -> Vec<(&'static [&'static str], &'static str)> {
+    let mut seen = HashSet::new();
+    let mut out = vec![];
+    for group in groups {
+        for (check, selected) in group.checks.iter().zip(&group.check_selected) {
+            if !selected {
+                continue;
+            }
+            let EditorconfigLineLengthPolicy::DisableForPatterns { patterns, comment } =
+                check.editorconfig_line_length_policy
+            else {
+                continue;
+            };
+            let key = patterns.join(",");
+            if seen.insert(key) {
+                out.push((patterns, comment));
+            }
+        }
+    }
+    out
 }
 
 /// Desired tools for a profile: maps each mise tool key to its optional components string.
@@ -410,23 +434,15 @@ Add and stage your source files before running init so the detection is accurate
     let migration_summary = apply_repo_migrations(project_root, &config_dir_path, has_rumdl)?;
     migration_summary.print_messages();
     let editorconfig_generated = generate_editorconfig(project_root, line_length)?;
-    let editorconfig_formatter_excluded = if has_rumdl || has_yaml_lint {
-        exclude_formatter_owned_files_from_editorconfig_checker(project_root, &config_dir_path)?
-    } else {
-        false
-    };
-    if editorconfig_formatter_excluded {
-        let formatter_owned_message = match (has_rumdl, has_yaml_lint) {
-            (true, true) => "Markdown and YAML are now owned by their linters",
-            (true, false) => "Markdown is now owned by its linter",
-            (false, true) => "YAML is now owned by its linter",
-            (false, false) => unreachable!(
-                "editorconfig formatter exclusions were applied without formatter-owned file types"
-            ),
-        };
+    let editorconfig_line_length_sections = selected_editorconfig_line_length_sections(&groups);
+    let editorconfig_line_length_disabled = disable_editorconfig_line_length_for_patterns(
+        project_root,
+        &editorconfig_line_length_sections,
+    )?;
+    if !editorconfig_line_length_disabled.is_empty() {
         println!(
-            "  patched editorconfig-checker config — {}",
-            formatter_owned_message
+            "  patched <REPO>/.editorconfig — disable max_line_length for {}",
+            editorconfig_line_length_disabled.join(", ")
         );
     }
     let yamllint_generated = if has_yaml_lint {
@@ -473,7 +489,7 @@ Add and stage your source files before running init so the detection is accurate
         && !workflow_generated
         && !rumdl_generated
         && !editorconfig_generated
-        && !editorconfig_formatter_excluded
+        && editorconfig_line_length_disabled.is_empty()
         && !yamllint_generated
         && !taplo_generated
         && !rustfmt_generated
@@ -981,45 +997,41 @@ rust = { version = "1.0", components = "clippy" }
     }
 
     #[test]
-    fn exclude_formatter_owned_files_from_editorconfig_checker_updates_config_dir_file() {
-        use config_files::exclude_formatter_owned_files_from_editorconfig_checker;
+    fn disable_editorconfig_line_length_for_patterns_updates_editorconfig() {
+        use config_files::disable_editorconfig_line_length_for_patterns;
         let tmp = tempfile::TempDir::new().unwrap();
-        let config_dir = tmp.path().join(".github/config");
-        std::fs::create_dir_all(&config_dir).unwrap();
         std::fs::write(
-            config_dir.join(".editorconfig-checker.json"),
-            "{\n  \"Exclude\": [\".*\\\\.java$\"]\n}\n",
+            tmp.path().join(".editorconfig"),
+            "root = true\n\n[*]\nmax_line_length = 120\n",
         )
         .unwrap();
-
-        let changed =
-            exclude_formatter_owned_files_from_editorconfig_checker(tmp.path(), &config_dir)
-                .unwrap();
-        assert!(changed);
-        let content =
-            std::fs::read_to_string(config_dir.join(".editorconfig-checker.json")).unwrap();
-        assert!(content.contains(".*\\\\.java$"));
-        assert!(content.contains(".*\\\\.md$"));
-        assert!(content.contains(".*\\\\.yml$"));
-        assert!(content.contains(".*\\\\.yaml$"));
+        let changed = disable_editorconfig_line_length_for_patterns(
+            tmp.path(),
+            &[(&["*.md"], "Markdown line length is handled by rumdl")],
+        )
+        .unwrap();
+        assert_eq!(changed, vec!["[*.md]".to_string()]);
+        let content = std::fs::read_to_string(tmp.path().join(".editorconfig")).unwrap();
+        assert!(content.contains("[*.md]"));
+        assert!(content.contains("# Markdown line length is handled by rumdl"));
+        assert!(content.contains("max_line_length = off"));
     }
 
     #[test]
-    fn exclude_formatter_owned_files_from_editorconfig_checker_is_idempotent() {
-        use config_files::exclude_formatter_owned_files_from_editorconfig_checker;
+    fn disable_editorconfig_line_length_for_patterns_is_idempotent() {
+        use config_files::disable_editorconfig_line_length_for_patterns;
         let tmp = tempfile::TempDir::new().unwrap();
-        let config_dir = tmp.path().join(".github/config");
-        std::fs::create_dir_all(&config_dir).unwrap();
         std::fs::write(
-            config_dir.join(".editorconfig-checker.json"),
-            "{\n  \"Exclude\": [\".*\\\\.md$\", \".*\\\\.yml$\", \".*\\\\.yaml$\"]\n}\n",
+            tmp.path().join(".editorconfig"),
+            "root = true\n\n[*]\nmax_line_length = 120\n\n[*.md]\n# Markdown line length is handled by rumdl\nmax_line_length = off\n",
         )
         .unwrap();
-
-        let changed =
-            exclude_formatter_owned_files_from_editorconfig_checker(tmp.path(), &config_dir)
-                .unwrap();
-        assert!(!changed);
+        let changed = disable_editorconfig_line_length_for_patterns(
+            tmp.path(),
+            &[(&["*.md"], "Markdown line length is handled by rumdl")],
+        )
+        .unwrap();
+        assert!(changed.is_empty());
     }
 
     #[test]

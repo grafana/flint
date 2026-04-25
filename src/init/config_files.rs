@@ -281,70 +281,78 @@ fn add_editorconfig_global_line_length(content: &str, line_length: u16) -> Strin
     updated
 }
 
-/// Updates an existing editorconfig-checker config so file types owned by
-/// formatter-style linters are excluded from ec overlap checks.
-///
-/// Checks both the project root and `config_dir`, updating the first config
-/// file that exists. Returns `true` when a config was changed.
-pub(super) fn exclude_formatter_owned_files_from_editorconfig_checker(
+pub(super) fn disable_editorconfig_line_length_for_patterns(
     project_root: &Path,
-    config_dir: &Path,
-) -> Result<bool> {
-    const EXCLUDES: &[&str] = &[".*\\.md$", ".*\\.yml$", ".*\\.yaml$"];
-    let candidates = [
-        config_dir.join(".editorconfig-checker.json"),
-        project_root.join(".editorconfig-checker.json"),
-    ];
+    sections: &[(&'static [&'static str], &'static str)],
+) -> Result<Vec<String>> {
+    if sections.is_empty() {
+        return Ok(vec![]);
+    }
 
-    for path in candidates {
-        if !path.exists() {
-            continue;
-        }
+    let path = project_root.join(".editorconfig");
+    let content = std::fs::read_to_string(&path)
+        .with_context(|| format!("failed to read {}", path.display()))?;
+    let had_trailing_newline = content.ends_with('\n');
+    let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
+    let mut changed_sections = vec![];
 
-        let content = std::fs::read_to_string(&path)?;
-        let mut value: serde_json::Value = serde_json::from_str(&content)
-            .with_context(|| format!("failed to parse {}", path.display()))?;
-        let Some(obj) = value.as_object_mut() else {
-            anyhow::bail!("{} is not a JSON object", path.display());
-        };
-
-        let key = if obj.contains_key("Exclude") {
-            "Exclude"
-        } else if obj.contains_key("exclude") {
-            "exclude"
-        } else {
-            "Exclude"
-        };
-
-        let entry = obj
-            .entry(key.to_string())
-            .or_insert_with(|| serde_json::Value::Array(vec![]));
-        let Some(items) = entry.as_array_mut() else {
-            anyhow::bail!("{} field in {} is not an array", key, path.display());
-        };
-
-        let mut changed = false;
-        for pattern in EXCLUDES {
-            if items
+    for (patterns, comment) in sections {
+        let header = editorconfig_section_header(patterns);
+        let comment_line = format!("# {comment}");
+        if let Some(section_start) = lines.iter().position(|line| line.trim() == header) {
+            let section_end = lines
                 .iter()
-                .any(|v| v.as_str().is_some_and(|s| s == *pattern))
+                .enumerate()
+                .skip(section_start + 1)
+                .find_map(|(idx, line)| {
+                    let trimmed = line.trim();
+                    (trimmed.starts_with('[') && trimmed.ends_with(']')).then_some(idx)
+                })
+                .unwrap_or(lines.len());
+            let section_lines = &lines[section_start + 1..section_end];
+            if section_lines
+                .iter()
+                .any(|line| line.trim_start().starts_with("max_line_length"))
             {
                 continue;
             }
-
-            items.push(serde_json::Value::String((*pattern).to_string()));
-            changed = true;
+            let mut insert = vec![];
+            if !section_lines.iter().any(|line| line.trim() == comment_line) {
+                insert.push(comment_line);
+            }
+            insert.push("max_line_length = off".to_string());
+            lines.splice(section_end..section_end, insert);
+            changed_sections.push(header);
+            continue;
         }
 
-        if !changed {
-            return Ok(false);
+        if !lines.is_empty() && !lines.last().is_some_and(|line| line.is_empty()) {
+            lines.push(String::new());
         }
-        let updated = serde_json::to_string_pretty(&value)? + "\n";
-        std::fs::write(&path, updated)?;
-        return Ok(true);
+        lines.push(header.clone());
+        lines.push(comment_line);
+        lines.push("max_line_length = off".to_string());
+        changed_sections.push(header);
     }
 
-    Ok(false)
+    if changed_sections.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let mut updated = lines.join("\n");
+    if had_trailing_newline {
+        updated.push('\n');
+    }
+    std::fs::write(&path, updated)?;
+    Ok(changed_sections)
+}
+
+fn editorconfig_section_header(patterns: &[&str]) -> String {
+    if patterns.len() == 1 {
+        format!("[{}]", patterns[0])
+    } else {
+        format!("[{{{}}}]", patterns.join(","))
+    }
 }
 
 /// Generates `.yamllint.yml` in the flint config dir when yaml-lint is being set up.

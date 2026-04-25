@@ -928,7 +928,8 @@ fn print_linters(
         .max(4);
     let bin_w = registry
         .iter()
-        .map(|c| c.bin_name.len())
+        .map(display_binary)
+        .map(str::len)
         .max()
         .unwrap_or(6)
         .max(6);
@@ -972,24 +973,24 @@ fn print_linters(
         let speed = run_policy_label(check.run_policy);
         let fix = if check.has_fix() { "yes" } else { "no" };
         let patterns_str = check.patterns.join(" ");
+        let binary = display_binary(check);
         if patterns_str.is_empty() {
             println!(
-                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {:<desc_w$}",
+                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {}",
                 check.name,
-                check.bin_name,
+                binary,
                 status,
                 speed,
                 fix,
                 check.desc,
                 name_w = name_w,
                 bin_w = bin_w,
-                desc_w = desc_w,
             );
         } else {
             println!(
                 "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {:<desc_w$}  {}",
                 check.name,
-                check.bin_name,
+                binary,
                 status,
                 speed,
                 fix,
@@ -1000,5 +1001,13 @@ fn print_linters(
                 desc_w = desc_w,
             );
         }
+    }
+}
+
+fn display_binary(check: &registry::Check) -> &'static str {
+    if check.uses_binary() {
+        check.bin_name
+    } else {
+        "(built-in)"
     }
 }

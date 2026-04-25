@@ -359,7 +359,7 @@ fn check_dotnet_format() -> Check {
 }
 
 fn check_lychee() -> Check {
-    Check::special("lychee", "lychee", SpecialKind::Links, false)
+    Check::special_with_bin("lychee", "lychee", SpecialKind::Links, false)
         .desc("Check for broken links")
         .docs(
             "Orchestrates [lychee](https://lychee.cli.rs/) for link checking. \
@@ -381,7 +381,7 @@ fn check_lychee() -> Check {
 }
 
 fn check_renovate_deps() -> Check {
-    Check::special("renovate-deps", "renovate", SpecialKind::RenovateDeps, true)
+    Check::special_with_bin("renovate-deps", "renovate", SpecialKind::RenovateDeps, true)
         .adaptive()
         .mise_tool("npm:renovate")
         .patterns(RENOVATE_CONFIG_PATTERNS)
@@ -403,18 +403,13 @@ fn check_renovate_deps() -> Check {
 }
 
 fn check_license_header() -> Check {
-    Check::special(
-        "license-header",
-        "license-header",
-        SpecialKind::LicenseHeader,
-        false,
-    )
-    .activate_unconditionally()
-    .desc("Check source files have the required license header")
+    Check::special("license-header", SpecialKind::LicenseHeader, false)
+        .activate_unconditionally()
+        .desc("Check source files have the required license header")
 }
 
 fn check_flint_setup() -> Check {
-    Check::special("flint-setup", "flint-setup", SpecialKind::FlintSetup, true)
+    Check::special("flint-setup", SpecialKind::FlintSetup, true)
         .activate_unconditionally()
         .patterns(&["mise.toml"])
         .desc("Keep Flint setup current and mise.toml lint tooling canonical")

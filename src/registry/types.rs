@@ -339,7 +339,12 @@ impl Check {
     }
 
     /// Special check with custom logic (not a simple command template).
-    pub fn special(
+    pub fn special(name: &'static str, kind: SpecialKind, has_fix: bool) -> Self {
+        Self::special_with_bin(name, "", kind, has_fix)
+    }
+
+    /// Special check with custom logic backed by an external binary.
+    pub fn special_with_bin(
         name: &'static str,
         bin_name: &'static str,
         kind: SpecialKind,

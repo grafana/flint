@@ -5,7 +5,6 @@ stdout = '''
 Tip: flint init detects languages from tracked files (`git ls-files`). Add and stage your source files before running init so the detection is accurate.
 
   pinned flint itself — reproducible lint runs across contributors
-  normalized [tools] in <REPO>/mise.toml
   wrote <REPO>/.github/config/flint.toml
   wrote <REPO>/.github/workflows/lint.yml
   removed <REPO>/.markdownlint.json (replaced by .rumdl.toml)

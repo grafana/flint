@@ -9,14 +9,14 @@ use crate::registry::{Category, Check, EditorconfigLineLengthPolicy, builtin};
 mod config_files;
 mod detection;
 pub(crate) mod generation;
+mod migrations;
 mod scaffold;
 mod ui;
 
 use config_files::{
     disable_editorconfig_line_length_for_patterns, generate_biome_config, generate_editorconfig,
     generate_flint_toml, generate_rumdl_config, generate_rustfmt_config, generate_taplo_config,
-    generate_yamllint_config, remove_legacy_lint_files,
-    remove_stale_editorconfig_checker_directives, remove_stale_markdownlint_line_length_directives,
+    generate_yamllint_config,
 };
 use detection::{
     build_linter_groups, detect_obsolete_keys, detect_present_patterns, parse_tool_keys,
@@ -26,6 +26,7 @@ use generation::{
     get_existing_config_dir, has_slow_selected, normalize_tools_section, patch_renovate_extends,
     prompt_config_dir, remove_tool_keys, remove_v1_tasks,
 };
+use migrations::{active_editorconfig_line_length_sections, apply_repo_migrations};
 use scaffold::{apply_env_and_tasks, generate_lint_workflow, maybe_install_hook};
 use ui::{interactive_select_linters, select_categories_arrow};
 
@@ -78,40 +79,6 @@ fn selected_editorconfig_line_length_sections(
         }
     }
     out
-}
-
-fn active_editorconfig_line_length_sections(
-    tool_keys: &HashSet<String>,
-) -> Vec<(&'static [&'static str], &'static str)> {
-    let mut seen = HashSet::new();
-    let mut out = vec![];
-    for check in builtin() {
-        let Some(key) = install_key(&check) else {
-            continue;
-        };
-        if !tool_keys.contains(key) {
-            continue;
-        }
-        let EditorconfigLineLengthPolicy::DisableForPatterns { patterns, comment } =
-            check.editorconfig_line_length_policy
-        else {
-            continue;
-        };
-        let dedupe_key = patterns.join(",");
-        if seen.insert(dedupe_key) {
-            out.push((patterns, comment));
-        }
-    }
-    out
-}
-
-fn delegated_patterns_include(
-    delegated_patterns: &[&'static [&'static str]],
-    needle: &str,
-) -> bool {
-    delegated_patterns
-        .iter()
-        .any(|patterns| patterns.contains(&needle))
 }
 
 /// Desired tools for a profile: maps each mise tool key to its optional components string.
@@ -196,84 +163,6 @@ fn default_category_items() -> Vec<CategoryItem> {
             label: "slow    — slow linters (renovate-deps)",
         },
     ]
-}
-
-struct RepoMigrationSummary {
-    replaced_obsolete: Vec<(String, String)>,
-    removed_unsupported: Vec<String>,
-    node_added: bool,
-    legacy_files_removed: Vec<String>,
-    stale_md013_comments_removed: Vec<String>,
-    stale_editorconfig_checker_comments_removed: Vec<String>,
-}
-
-impl RepoMigrationSummary {
-    fn is_noop(&self) -> bool {
-        self.replaced_obsolete.is_empty()
-            && self.removed_unsupported.is_empty()
-            && !self.node_added
-            && self.legacy_files_removed.is_empty()
-            && self.stale_md013_comments_removed.is_empty()
-            && self.stale_editorconfig_checker_comments_removed.is_empty()
-    }
-
-    fn print_messages(&self) {
-        for (old, new) in &self.replaced_obsolete {
-            println!("  replaced {old:?} → {new:?}");
-        }
-        for old_key in &self.removed_unsupported {
-            println!("  removed unsupported legacy linter {old_key:?}");
-        }
-        if self.node_added {
-            println!("  added node (LTS) — required by npm: backend tools");
-        }
-        for rel in &self.legacy_files_removed {
-            println!("  removed <REPO>/{rel} (legacy flint v1 / super-linter file)");
-        }
-        for rel in &self.stale_md013_comments_removed {
-            println!("  removed stale markdownlint MD013 directives from <REPO>/{rel}");
-        }
-        for rel in &self.stale_editorconfig_checker_comments_removed {
-            println!("  removed stale editorconfig-checker directives from <REPO>/{rel}");
-        }
-    }
-}
-
-fn apply_repo_migrations(
-    project_root: &Path,
-    config_dir: &Path,
-    delegated_patterns: &[&'static [&'static str]],
-) -> Result<RepoMigrationSummary> {
-    let replaced_obsolete =
-        generation::replace_obsolete_keys(project_root, crate::registry::OBSOLETE_KEYS)?;
-    let removed_unsupported = remove_tool_keys(
-        project_root,
-        &crate::registry::UNSUPPORTED_KEYS
-            .iter()
-            .map(|(old_key, _)| *old_key)
-            .collect::<Vec<_>>(),
-    )?;
-    let node_added = ensure_node_for_npm(project_root)?;
-    let legacy_files_removed = remove_legacy_lint_files(project_root, config_dir)?;
-    let stale_md013_comments_removed = if delegated_patterns_include(delegated_patterns, "*.md") {
-        remove_stale_markdownlint_line_length_directives(project_root)?
-    } else {
-        vec![]
-    };
-    let stale_editorconfig_checker_comments_removed = if delegated_patterns.is_empty() {
-        vec![]
-    } else {
-        remove_stale_editorconfig_checker_directives(project_root, delegated_patterns)?
-    };
-
-    Ok(RepoMigrationSummary {
-        replaced_obsolete,
-        removed_unsupported,
-        node_added,
-        legacy_files_removed,
-        stale_md013_comments_removed,
-        stale_editorconfig_checker_comments_removed,
-    })
 }
 
 pub fn run(project_root: &Path, profile_arg: Option<Profile>, yes: bool) -> Result<()> {
@@ -574,9 +463,6 @@ pub fn update(project_root: &Path, config_dir: &Path) -> Result<()> {
     }
 
     migration_summary.print_messages();
-    if tools_normalized {
-        println!("  normalized [tools] in {}", mise_path.display());
-    }
 
     Ok(())
 }

@@ -214,25 +214,25 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
         .find(|rule| rule["groupName"].as_str() == Some("linters"))
         .expect("default.json must define a packageRules entry with groupName 'linters'");
 
-    let actual: BTreeSet<&str> = linters_rule["matchPackageNames"]
-        .as_array()
-        .expect("linters package rule must declare matchPackageNames")
-        .iter()
-        .map(|value| {
-            value
-                .as_str()
-                .expect("linters package names must be strings")
-        })
-        .collect();
-
-    let mut expected: BTreeSet<&str> = builtin()
+    let actual = package_names(linters_rule);
+    let expected: Vec<&str> = builtin()
         .into_iter()
         .filter(|check| check.uses_binary())
         .filter(|check| !check.is_toolchain())
         .filter_map(|check| check.mise_tool_name.or(Some(check.bin_name)))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
         .collect();
-    // Backward-compatible alias still used in this repo's own mise.toml.
-    expected.insert("github:koalaman/shellcheck");
+
+    assert_eq!(
+        actual, expected,
+        "default.json weekly linters rule must stay sorted and in sync with the linter registry"
+    );
+    assert_eq!(
+        actual,
+        sorted_package_names(linters_rule),
+        "default.json weekly linters rule matchPackageNames must be sorted"
+    );
 
     assert_eq!(
         linters_rule["schedule"].as_array(),
@@ -242,12 +242,8 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
         "linters package rule must remain on the weekly Monday schedule"
     );
     assert!(
-        !actual.contains("node"),
+        !actual.contains(&"node"),
         "node is a runtime prerequisite, not a linter, and must not be in the weekly linters rule"
-    );
-    assert_eq!(
-        actual, expected,
-        "default.json weekly linters rule is out of sync with the linter registry"
     );
 }
 
@@ -285,6 +281,11 @@ fn repo_renovate_config_stays_aligned_with_shared_preset_contract() {
             package_names(default_rule),
             package_names(repo_rule),
             "package rule {group_name:?} matchPackageNames in .github/renovate.json5 drifted from default.json"
+        );
+        assert_eq!(
+            package_names(repo_rule),
+            sorted_package_names(repo_rule),
+            "package rule {group_name:?} matchPackageNames in .github/renovate.json5 must be sorted"
         );
     }
 
@@ -328,7 +329,7 @@ fn custom_manager_by_description<'a>(
         .find(|manager| manager["description"].as_str() == Some(description))
 }
 
-fn package_names(rule: &serde_json::Value) -> BTreeSet<&str> {
+fn package_names(rule: &serde_json::Value) -> Vec<&str> {
     rule["matchPackageNames"]
         .as_array()
         .expect("package rule must declare matchPackageNames")
@@ -339,6 +340,12 @@ fn package_names(rule: &serde_json::Value) -> BTreeSet<&str> {
                 .expect("package rule matchPackageNames entries must be strings")
         })
         .collect()
+}
+
+fn sorted_package_names(rule: &serde_json::Value) -> Vec<&str> {
+    let mut names = package_names(rule);
+    names.sort_unstable();
+    names
 }
 
 /// Verifies README summary table and docs/linters.md detail sections stay

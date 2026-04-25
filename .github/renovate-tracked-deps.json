@@ -22,26 +22,26 @@
   "mise.toml": {
     "mise": [
       "actionlint",
+      "aqua:owenlamont/ryl",
       "biome",
       "dotnet",
       "editorconfig-checker",
-      "github:astral-sh/ruff",
       "github:google/google-java-format",
       "github:jonwiggins/xmloxide",
-      "github:koalaman/shellcheck",
-      "github:owenlamont/ryl",
-      "github:pinterest/ktlint",
-      "github:tamasfe/taplo",
       "go",
       "golangci-lint",
       "hadolint",
+      "ktlint",
       "lychee",
       "node",
       "npm:renovate",
       "pipx:codespell",
+      "ruff",
       "rumdl",
       "rust",
-      "shfmt"
+      "shellcheck",
+      "shfmt",
+      "taplo"
     ]
   },
   "src/init/scaffold.rs": {

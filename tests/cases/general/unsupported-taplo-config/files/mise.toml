@@ -1,2 +1,2 @@
 [tools]
-"github:tamasfe/taplo" = "latest"
+taplo = "latest"

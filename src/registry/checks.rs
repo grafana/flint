@@ -325,7 +325,6 @@ fn check_ktlint() -> Check {
         "ktlint --log-level=error {ROOT}",
         "ktlint --format --log-level=error {ROOT}",
     )
-    .mise_tool("github:pinterest/ktlint")
     .windows_java_jar()
     .formatter()
     .desc("Lint and format Kotlin code")

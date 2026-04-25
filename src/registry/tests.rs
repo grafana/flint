@@ -48,6 +48,55 @@ fn find_obsolete_key_detects_legacy_ruff_backend() {
 }
 
 #[test]
+fn shellcheck_alias_does_not_make_github_backend_obsolete() {
+    let tools = HashMap::from([
+        (
+            "github:koalaman/shellcheck".to_string(),
+            "0.11.0".to_string(),
+        ),
+        ("shellcheck".to_string(), "0.11.0".to_string()),
+    ]);
+
+    assert_eq!(find_obsolete_key(&tools), None);
+}
+
+#[test]
+fn check_owned_tool_migrations_apply_after_v2_baseline() {
+    let obsolete = obsolete_keys_after(crate::setup::V2_BASELINE_SETUP_VERSION);
+
+    assert!(obsolete.contains(&("cargo:yaml-lint", "aqua:owenlamont/ryl")));
+    assert!(obsolete.contains(&("github:owenlamont/ryl", "aqua:owenlamont/ryl")));
+    assert!(obsolete.contains(&("pipx:ruff", "ruff")));
+    assert!(obsolete.contains(&("github:astral-sh/ruff", "ruff")));
+    assert!(obsolete.contains(&("shellcheck", "github:koalaman/shellcheck")));
+    assert!(obsolete.contains(&("cargo:xmloxide", "github:jonwiggins/xmloxide")));
+    assert!(obsolete_keys_after(crate::setup::LATEST_SUPPORTED_SETUP_VERSION).is_empty());
+}
+
+#[test]
+fn registry_tool_key_migrations_are_unique_and_have_targets() {
+    let mut seen = std::collections::HashSet::new();
+
+    for check in builtin() {
+        if check.tool_key_migrations.is_empty() {
+            continue;
+        }
+        assert!(
+            check.install_key().is_some(),
+            "{} declares tool-key migrations but has no install key",
+            check.name
+        );
+        for migration in &check.tool_key_migrations {
+            assert!(
+                seen.insert(migration.old_key),
+                "duplicate registry tool-key migration: {}",
+                migration.old_key
+            );
+        }
+    }
+}
+
+#[test]
 fn find_unsupported_key_detects_markdownlint_stack() {
     let mut tools = HashMap::new();
     tools.insert("npm:markdownlint-cli2".to_string(), "0.18.1".to_string());

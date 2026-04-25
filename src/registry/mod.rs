@@ -9,7 +9,11 @@ pub use mise::{
     check_active, flint_version_changed, read_mise_tools, read_mise_tools_at_ref,
     tool_version_changed,
 };
-pub use obsolete::{find_obsolete_key, find_unsupported_key, obsolete_keys, unsupported_keys};
+#[cfg(test)]
+pub(crate) use obsolete::latest_registry_tool_migration_target_version;
+pub use obsolete::{
+    find_obsolete_key, find_unsupported_key, obsolete_keys, obsolete_keys_after, unsupported_keys,
+};
 pub use resolve::binary_on_path;
 pub use types::{
     Category, Check, CheckKind, ConfigBase, ConfigFile, ConfigMatch, EditorconfigLineLengthPolicy,

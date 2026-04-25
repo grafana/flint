@@ -1,5 +1,6 @@
 use super::types::{Check, ConfigFile, SpecialKind};
 use crate::linters::renovate_deps::RENOVATE_CONFIG_PATTERNS;
+use crate::setup::{V1_BOOTSTRAP_SETUP_VERSION, V2_BASELINE_SETUP_VERSION};
 
 const TOOL_RUMDL: &[&str] = &["tool", "rumdl"];
 const TOOL_CODESPELL: &[&str] = &["tool", "codespell"];
@@ -87,6 +88,7 @@ fn check_shellcheck() -> Check {
     .linter_config(".shellcheckrc", "--rcfile")
     .baseline_config(ConfigFile::config_dir(".shellcheckrc"))
     .unsupported_configs(SHELLCHECK_UNSUPPORTED_CONFIGS)
+    .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["shellcheck"])
     .desc("Lint shell scripts for common mistakes")
     .style()
 }
@@ -95,6 +97,7 @@ fn check_shfmt() -> Check {
     Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"])
         .fix("shfmt -w {FILE}")
         .formatter()
+        .migrate_tool_keys_after(V1_BOOTSTRAP_SETUP_VERSION, &["github:mvdan/sh"])
         .desc("Format shell scripts")
         .style()
 }
@@ -121,6 +124,10 @@ fn check_yaml_lint() -> Check {
         .formatter()
         .desc("Lint YAML files for style and consistency")
         .mise_tool("aqua:owenlamont/ryl")
+        .migrate_tool_keys_after(
+            V2_BASELINE_SETUP_VERSION,
+            &["cargo:yaml-lint", "github:owenlamont/ryl"],
+        )
 }
 
 fn check_taplo() -> Check {
@@ -135,6 +142,7 @@ fn check_taplo() -> Check {
     .unsupported_configs(TAPLO_UNSUPPORTED_CONFIGS)
     .stderr_filter_prefixes(&[" INFO taplo:"])
     .formatter()
+    .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["github:tamasfe/taplo"])
     .desc("Format TOML files")
     .docs(
         "Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).\n\
@@ -178,6 +186,7 @@ fn check_hadolint() -> Check {
 fn check_xmllint() -> Check {
     Check::files("xmllint", "xmllint --noout {FILES}", &["*.xml"])
         .mise_tool("github:jonwiggins/xmloxide")
+        .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["cargo:xmloxide"])
         .desc("Validate XML files are well-formed")
 }
 
@@ -223,6 +232,10 @@ fn check_ruff() -> Check {
         .linter_config("ruff.toml", "--config")
         .baseline_config(RUFF_BASELINE_CONFIG)
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
+        .migrate_tool_keys_after(
+            V2_BASELINE_SETUP_VERSION,
+            &["pipx:ruff", "github:astral-sh/ruff"],
+        )
         .desc("Lint Python code")
         .lang()
 }
@@ -249,6 +262,7 @@ fn check_biome() -> Check {
     .fix("biome check --fix {FILE}")
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
+    .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["npm:@biomejs/biome"])
     .desc("Lint JS/TS/JSON files")
     .lang()
 }
@@ -320,6 +334,10 @@ fn check_google_java_format() -> Check {
         &["*.java"],
         "Java line length is handled by google-java-format",
     )
+    .migrate_tool_keys_after(
+        V1_BOOTSTRAP_SETUP_VERSION,
+        &["ubi:google/google-java-format"],
+    )
     .desc("Format Java code")
     .lang()
 }
@@ -337,6 +355,8 @@ fn check_ktlint() -> Check {
     )
     .windows_java_jar()
     .formatter()
+    .migrate_tool_keys_after(V1_BOOTSTRAP_SETUP_VERSION, &["ubi:pinterest/ktlint"])
+    .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["github:pinterest/ktlint"])
     .desc("Lint and format Kotlin code")
     .lang()
 }

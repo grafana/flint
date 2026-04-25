@@ -14,41 +14,6 @@ pub struct SetupMigration {
     pub unsupported_keys: &'static [(&'static str, &'static str)],
 }
 
-const OBSOLETE_KEYS_TO_SETUP_VERSION_1: &[(&str, &str)] = &[
-    // markdownlint-cli was superseded by markdownlint-cli2 before the deployed
-    // v2 baseline. Keep this migration so old v1 repos can converge.
-    ("npm:markdownlint-cli", "npm:markdownlint-cli2"),
-    // ubi: was deprecated in mise; the github: backend is the modern replacement.
-    // Repos that adopted flint before this change may still have ubi: keys.
-    (
-        "ubi:google/google-java-format",
-        "github:google/google-java-format",
-    ),
-    ("ubi:pinterest/ktlint", "github:pinterest/ktlint"),
-    // github:mvdan/sh is superseded by bare shfmt; mise resolves it via aqua:mvdan/sh,
-    // and the aqua registry now ships Windows support for shfmt.
-    ("github:mvdan/sh", "shfmt"),
-];
-
-const OBSOLETE_KEYS_TO_SETUP_VERSION_2: &[(&str, &str)] = &[
-    ("github:pinterest/ktlint", "ktlint"),
-    // ryl is available from aqua-registry, but current mise releases still require
-    // the explicit aqua-prefixed key instead of exposing a bare `ryl` tool.
-    ("cargo:yaml-lint", "aqua:owenlamont/ryl"),
-    ("github:owenlamont/ryl", "aqua:owenlamont/ryl"),
-    // Ruff is available as a bare aqua-backed tool key.
-    ("pipx:ruff", "ruff"),
-    ("github:astral-sh/ruff", "ruff"),
-    ("github:tamasfe/taplo", "taplo"),
-    // Bare shellcheck currently resolves through aqua in mise, but that path
-    // failed Windows CI. Use the GitHub backend until the aqua entry is fixed.
-    ("shellcheck", "github:koalaman/shellcheck"),
-    // npm-installed biome is superseded by the standalone biome binary.
-    ("npm:@biomejs/biome", "biome"),
-    // xmloxide now publishes GitHub releases consumable via mise's github: backend.
-    ("cargo:xmloxide", "github:jonwiggins/xmloxide"),
-];
-
 const UNSUPPORTED_KEYS_TO_SETUP_VERSION_2: &[(&str, &str)] = &[
     (
         "npm:markdownlint-cli",
@@ -67,32 +32,15 @@ const UNSUPPORTED_KEYS_TO_SETUP_VERSION_2: &[(&str, &str)] = &[
 pub const SETUP_MIGRATIONS: &[SetupMigration] = &[
     SetupMigration {
         target_version: V2_BASELINE_SETUP_VERSION,
-        obsolete_keys: OBSOLETE_KEYS_TO_SETUP_VERSION_1,
+        obsolete_keys: &[],
         unsupported_keys: &[],
     },
     SetupMigration {
         target_version: LATEST_SUPPORTED_SETUP_VERSION,
-        obsolete_keys: OBSOLETE_KEYS_TO_SETUP_VERSION_2,
+        obsolete_keys: &[],
         unsupported_keys: UNSUPPORTED_KEYS_TO_SETUP_VERSION_2,
     },
 ];
-
-pub fn find_obsolete_key(
-    mise_tools: &HashMap<String, String>,
-) -> Option<(&'static str, &'static str)> {
-    SETUP_MIGRATIONS
-        .iter()
-        .flat_map(|migration| migration.obsolete_keys.iter())
-        .find(|(old, _)| obsolete_key_present(mise_tools, old))
-        .copied()
-}
-
-fn obsolete_key_present(mise_tools: &HashMap<String, String>, old: &str) -> bool {
-    if old == "shellcheck" && mise_tools.contains_key("github:koalaman/shellcheck") {
-        return false;
-    }
-    mise_tools.contains_key(old)
-}
 
 pub fn find_unsupported_key(
     mise_tools: &HashMap<String, String>,
@@ -139,12 +87,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn latest_supported_setup_version_matches_latest_migration() {
-        let latest = SETUP_MIGRATIONS
+    fn latest_supported_setup_version_matches_latest_migration_target() {
+        let latest_setup_migration = SETUP_MIGRATIONS
             .iter()
             .map(|migration| migration.target_version)
             .max()
             .unwrap_or(0);
+        let latest_registry_migration =
+            crate::registry::latest_registry_tool_migration_target_version().unwrap_or(0);
+        let latest = latest_setup_migration.max(latest_registry_migration);
         assert_eq!(
             LATEST_SUPPORTED_SETUP_VERSION, latest,
             "LATEST_SUPPORTED_SETUP_VERSION must match the latest setup migration target version"
@@ -185,12 +136,14 @@ mod tests {
     }
 
     #[test]
-    fn v2_baseline_migrations_are_explicit() {
+    fn v2_baseline_tombstones_are_explicit() {
         let obsolete = obsolete_keys_after(V2_BASELINE_SETUP_VERSION);
         let unsupported = unsupported_keys_after(V2_BASELINE_SETUP_VERSION);
 
-        assert!(obsolete.contains(&("pipx:ruff", "ruff")));
-        assert!(obsolete.contains(&("shellcheck", "github:koalaman/shellcheck")));
+        assert!(
+            obsolete.is_empty(),
+            "live tool-key migrations should live in the registry"
+        );
         assert!(
             unsupported
                 .iter()
@@ -199,18 +152,5 @@ mod tests {
         assert!(unsupported.iter().any(|(old, _)| *old == "npm:prettier"));
         assert!(obsolete_keys_after(LATEST_SUPPORTED_SETUP_VERSION).is_empty());
         assert!(unsupported_keys_after(LATEST_SUPPORTED_SETUP_VERSION).is_empty());
-    }
-
-    #[test]
-    fn shellcheck_alias_does_not_make_github_backend_obsolete() {
-        let tools = HashMap::from([
-            (
-                "github:koalaman/shellcheck".to_string(),
-                "0.11.0".to_string(),
-            ),
-            ("shellcheck".to_string(), "0.11.0".to_string()),
-        ]);
-
-        assert_eq!(find_obsolete_key(&tools), None);
     }
 }

@@ -98,10 +98,12 @@ pub(super) fn get_entry_components(content: &str, key: &str) -> Option<String> {
 pub(super) fn detect_obsolete_keys(
     current_tool_keys: &HashSet<String>,
 ) -> Vec<(&'static str, &'static str)> {
-    obsolete_keys()
+    let mut found = obsolete_keys()
         .into_iter()
         .filter(|(old, _)| current_tool_keys.contains(*old))
-        .collect()
+        .collect::<Vec<_>>();
+    found.sort_by_key(|(old, _)| *old);
+    found
 }
 
 /// Builds one `LinterGroup` per install key, covering all checks whose file patterns

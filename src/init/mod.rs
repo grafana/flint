@@ -508,10 +508,7 @@ fn find_renovate_config(project_root: &Path) -> Option<std::path::PathBuf> {
 ///
 /// Preference order: `mise_tool_name` → `bin_name`.
 pub fn install_key(check: &Check) -> Option<&'static str> {
-    if !check.uses_binary() || check.activate_unconditionally {
-        return None;
-    }
-    Some(check.mise_tool_name.unwrap_or(check.bin_name))
+    check.install_key()
 }
 
 /// Compute the map of `tool_key → optional_components` for the given category set,

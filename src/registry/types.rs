@@ -162,6 +162,12 @@ pub enum EditorconfigLineLengthPolicy {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ToolKeyMigration {
+    pub after_setup_version: u32,
+    pub old_key: &'static str,
+}
+
 #[derive(Debug, Clone)]
 pub struct Check {
     pub name: &'static str,
@@ -202,6 +208,8 @@ pub struct Check {
     /// Known upstream config locations that flint does not support for this
     /// check. Their presence is a hard failure to avoid silent config drift.
     pub unsupported_configs: &'static [ConfigFile],
+    /// Old mise tool keys that should migrate to this check's current install key.
+    pub tool_key_migrations: Vec<ToolKeyMigration>,
     /// This check is a formatter — it owns certain file types for formatting purposes.
     pub is_formatter: bool,
     /// Skip files owned by active formatters (used by ec to avoid double-checking).
@@ -269,6 +277,15 @@ impl Check {
         self.toolchain.flatten()
     }
 
+    /// Returns the canonical mise.toml tool key to write when installing this
+    /// check, or `None` if no mise entry is needed.
+    pub fn install_key(&self) -> Option<&'static str> {
+        if !self.uses_binary() || self.activate_unconditionally {
+            return None;
+        }
+        Some(self.mise_tool_name.unwrap_or(self.bin_name))
+    }
+
     // --- Constructors ---
 
     /// Check invoked once per matched file (`{FILE}`). `name` is also used as `bin_name`.
@@ -317,6 +334,7 @@ impl Check {
             stderr_filter_prefixes: &[],
             baseline_config: None,
             unsupported_configs: &[],
+            tool_key_migrations: vec![],
             is_formatter: false,
             defers_to_formatters: false,
             editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
@@ -363,6 +381,7 @@ impl Check {
             stderr_filter_prefixes: &[],
             baseline_config: None,
             unsupported_configs: &[],
+            tool_key_migrations: vec![],
             is_formatter: false,
             defers_to_formatters: false,
             editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
@@ -577,6 +596,21 @@ impl Check {
 
     pub fn unsupported_configs(mut self, files: &'static [ConfigFile]) -> Self {
         self.unsupported_configs = files;
+        self
+    }
+
+    /// Old mise tool keys that should migrate to this check's current install
+    /// key when the repo setup version is at or before `after_setup_version`.
+    pub fn migrate_tool_keys_after(
+        mut self,
+        after_setup_version: u32,
+        old_keys: &'static [&'static str],
+    ) -> Self {
+        self.tool_key_migrations
+            .extend(old_keys.iter().map(|old_key| ToolKeyMigration {
+                after_setup_version,
+                old_key,
+            }));
         self
     }
 }

@@ -99,7 +99,7 @@ pub(super) fn apply_setup_migrations_after(
     delegated_patterns: &[&'static [&'static str]],
     setup_version: u32,
 ) -> Result<RepoMigrationSummary> {
-    let obsolete_keys = crate::setup::obsolete_keys_after(setup_version);
+    let obsolete_keys = crate::registry::obsolete_keys_after(setup_version);
     let unsupported_keys = crate::setup::unsupported_keys_after(setup_version);
     apply_repo_migrations_with_keys(
         project_root,

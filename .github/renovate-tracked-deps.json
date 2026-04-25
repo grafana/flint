@@ -23,11 +23,11 @@
     "mise": [
       "actionlint",
       "biome",
-      "cargo:xmloxide",
       "dotnet",
       "editorconfig-checker",
       "github:astral-sh/ruff",
       "github:google/google-java-format",
+      "github:jonwiggins/xmloxide",
       "github:koalaman/shellcheck",
       "github:owenlamont/ryl",
       "github:pinterest/ktlint",

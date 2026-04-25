@@ -1,2 +1,2 @@
 [tools]
-"cargo:xmloxide" = "0.4.1"
+"github:jonwiggins/xmloxide" = "v0.4.2"

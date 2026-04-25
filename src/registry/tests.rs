@@ -245,9 +245,10 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
 #[test]
 fn linter_keys_include_mise_and_bare_tool_names() {
     let keys = linter_keys();
+    assert!(keys.contains("cargo:yaml-lint"));
+    assert!(keys.contains("github:jonwiggins/xmloxide"));
     assert!(keys.contains("github:owenlamont/ryl"));
     assert!(keys.contains("ryl"));
-    assert!(keys.contains("cargo:xmloxide"));
     assert!(keys.contains("xmllint"));
 }
 

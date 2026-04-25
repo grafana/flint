@@ -22,6 +22,8 @@ pub const OBSOLETE_KEYS: &[(&str, &str)] = &[
     ("github:mvdan/sh", "shfmt"),
     // npm-installed biome is superseded by the standalone biome binary.
     ("npm:@biomejs/biome", "biome"),
+    // xmloxide now publishes GitHub releases consumable via mise's github: backend.
+    ("cargo:xmloxide", "github:jonwiggins/xmloxide"),
 ];
 
 /// Mise tool keys that flint no longer supports and cannot auto-rewrite 1:1.

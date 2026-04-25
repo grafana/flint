@@ -40,7 +40,7 @@
         "actionlint",
         "biome",
         "github:tamasfe/taplo",
-        "cargo:xmloxide",
+        "github:jonwiggins/xmloxide",
         "editorconfig-checker",
         "github:google/google-java-format",
         "github:owenlamont/ryl",

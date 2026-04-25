@@ -36,18 +36,15 @@ fn find_obsolete_key_detects_legacy_yaml_lint_backend() {
     tools.insert("cargo:yaml-lint".to_string(), "0.1.0".to_string());
     assert_eq!(
         find_obsolete_key(&tools),
-        Some(("cargo:yaml-lint", "github:owenlamont/ryl"))
+        Some(("cargo:yaml-lint", "aqua:owenlamont/ryl"))
     );
 }
 
 #[test]
 fn find_obsolete_key_detects_legacy_ruff_backend() {
     let mut tools = HashMap::new();
-    tools.insert("pipx:ruff".to_string(), "0.15.11".to_string());
-    assert_eq!(
-        find_obsolete_key(&tools),
-        Some(("pipx:ruff", "github:astral-sh/ruff"))
-    );
+    tools.insert("pipx:ruff".to_string(), "0.15.0".to_string());
+    assert_eq!(find_obsolete_key(&tools), Some(("pipx:ruff", "ruff")));
 }
 
 #[test]
@@ -58,6 +55,19 @@ fn find_unsupported_key_detects_markdownlint_stack() {
         find_unsupported_key(&tools),
         Some((
             "npm:markdownlint-cli2",
+            "replace with rumdl and remove markdownlint-era config",
+        ))
+    );
+}
+
+#[test]
+fn find_unsupported_key_detects_legacy_markdownlint_cli_stack() {
+    let mut tools = HashMap::new();
+    tools.insert("npm:markdownlint-cli".to_string(), "0.39.0".to_string());
+    assert_eq!(
+        find_unsupported_key(&tools),
+        Some((
+            "npm:markdownlint-cli",
             "replace with rumdl and remove markdownlint-era config",
         ))
     );
@@ -205,25 +215,25 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
         .find(|rule| rule["groupName"].as_str() == Some("linters"))
         .expect("default.json must define a packageRules entry with groupName 'linters'");
 
-    let actual: BTreeSet<&str> = linters_rule["matchPackageNames"]
-        .as_array()
-        .expect("linters package rule must declare matchPackageNames")
-        .iter()
-        .map(|value| {
-            value
-                .as_str()
-                .expect("linters package names must be strings")
-        })
-        .collect();
-
-    let mut expected: BTreeSet<&str> = builtin()
+    let actual = package_names(linters_rule);
+    let expected: Vec<&str> = builtin()
         .into_iter()
         .filter(|check| check.uses_binary())
         .filter(|check| !check.is_toolchain())
         .filter_map(|check| check.mise_tool_name.or(Some(check.bin_name)))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
         .collect();
-    // Backward-compatible alias still used in this repo's own mise.toml.
-    expected.insert("github:koalaman/shellcheck");
+
+    assert_eq!(
+        actual, expected,
+        "default.json weekly linters rule must stay sorted and in sync with the linter registry"
+    );
+    assert_eq!(
+        actual,
+        sorted_package_names(linters_rule),
+        "default.json weekly linters rule matchPackageNames must be sorted"
+    );
 
     assert_eq!(
         linters_rule["schedule"].as_array(),
@@ -233,23 +243,110 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
         "linters package rule must remain on the weekly Monday schedule"
     );
     assert!(
-        !actual.contains("node"),
+        !actual.contains(&"node"),
         "node is a runtime prerequisite, not a linter, and must not be in the weekly linters rule"
     );
+}
+
+#[test]
+fn repo_renovate_config_stays_aligned_with_shared_preset_contract() {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let default_json_path = manifest_dir.join("default.json");
+    let repo_renovate_path = manifest_dir.join(".github/renovate.json5");
+
+    let default_json =
+        std::fs::read_to_string(&default_json_path).expect("default.json must be readable");
+    let repo_renovate = std::fs::read_to_string(&repo_renovate_path)
+        .expect(".github/renovate.json5 must be readable");
+
+    let default_parsed: serde_json::Value =
+        serde_json::from_str(&default_json).expect("default.json must be valid JSON");
+    let repo_parsed: serde_json::Value =
+        json5::from_str(&repo_renovate).expect(".github/renovate.json5 must be valid JSON5");
+
+    for group_name in ["linters", "mise"] {
+        let default_rule = package_rule_by_group_name(&default_parsed, group_name)
+            .unwrap_or_else(|| panic!("default.json missing package rule {group_name:?}"));
+        let repo_rule = package_rule_by_group_name(&repo_parsed, group_name).unwrap_or_else(|| {
+            panic!(".github/renovate.json5 missing package rule {group_name:?}")
+        });
+        assert_eq!(
+            default_rule["description"], repo_rule["description"],
+            "package rule {group_name:?} description in .github/renovate.json5 drifted from default.json"
+        );
+        assert_eq!(
+            default_rule["schedule"], repo_rule["schedule"],
+            "package rule {group_name:?} schedule in .github/renovate.json5 drifted from default.json"
+        );
+        assert_eq!(
+            package_names(default_rule),
+            package_names(repo_rule),
+            "package rule {group_name:?} matchPackageNames in .github/renovate.json5 drifted from default.json"
+        );
+        assert_eq!(
+            package_names(repo_rule),
+            sorted_package_names(repo_rule),
+            "package rule {group_name:?} matchPackageNames in .github/renovate.json5 must be sorted"
+        );
+    }
+
+    let description = "Update mise version in GitHub Actions workflows";
+    let default_manager = custom_manager_by_description(&default_parsed, description)
+        .unwrap_or_else(|| panic!("default.json missing custom manager {description:?}"));
+    let repo_manager = custom_manager_by_description(&repo_parsed, description)
+        .unwrap_or_else(|| panic!(".github/renovate.json5 missing custom manager {description:?}"));
     assert_eq!(
-        actual, expected,
-        "default.json weekly linters rule is out of sync with the linter registry"
+        default_manager, repo_manager,
+        "custom manager {description:?} in .github/renovate.json5 drifted from default.json"
     );
 }
 
 #[test]
 fn linter_keys_include_mise_and_bare_tool_names() {
     let keys = linter_keys();
-    assert!(keys.contains("cargo:yaml-lint"));
-    assert!(keys.contains("github:jonwiggins/xmloxide"));
-    assert!(keys.contains("github:owenlamont/ryl"));
+    assert!(keys.contains("aqua:owenlamont/ryl"));
     assert!(keys.contains("ryl"));
+    assert!(keys.contains("github:jonwiggins/xmloxide"));
     assert!(keys.contains("xmllint"));
+}
+
+fn package_rule_by_group_name<'a>(
+    parsed: &'a serde_json::Value,
+    group_name: &str,
+) -> Option<&'a serde_json::Value> {
+    parsed["packageRules"]
+        .as_array()?
+        .iter()
+        .find(|rule| rule["groupName"].as_str() == Some(group_name))
+}
+
+fn custom_manager_by_description<'a>(
+    parsed: &'a serde_json::Value,
+    description: &str,
+) -> Option<&'a serde_json::Value> {
+    parsed["customManagers"]
+        .as_array()?
+        .iter()
+        .find(|manager| manager["description"].as_str() == Some(description))
+}
+
+fn package_names(rule: &serde_json::Value) -> Vec<&str> {
+    rule["matchPackageNames"]
+        .as_array()
+        .expect("package rule must declare matchPackageNames")
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .expect("package rule matchPackageNames entries must be strings")
+        })
+        .collect()
+}
+
+fn sorted_package_names(rule: &serde_json::Value) -> Vec<&str> {
+    let mut names = package_names(rule);
+    names.sort_unstable();
+    names
 }
 
 /// Verifies README summary table and docs/linters.md detail sections stay
@@ -465,8 +562,8 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
         rows.push(("Patterns", format!("`{}`", check.patterns.join(" "))));
     }
 
-    match check.linter_config {
-        Some((filename, _)) => rows.push(("Config", format!("`{filename}`"))),
+    match check.linter_config.as_ref() {
+        Some(config) => rows.push(("Config", format!("`{}`", config.display_name()))),
         None => {
             if matches!(&check.kind, CheckKind::Special(SpecialKind::Links)) {
                 rows.push(("Config", "via `[checks.links]` in flint.toml".to_string()));
@@ -489,7 +586,6 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
 
     rows
 }
-
 /// Smoke test: every check whose tool key resolves in this repo's expanded
 /// mise_tools map must pass check_active. This catches tool-name mismatches
 /// (wrong lookup key) and version-range violations without a hardcoded list —

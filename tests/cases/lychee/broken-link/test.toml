@@ -6,7 +6,7 @@ stderr = '''
 ==> Checking all links in all files
 Issues found in 1 input. Find details below.
 
-[./README.md]:
+[README.md]:
 [ERROR] file://<REPO>/nonexistent.md | Cannot find file: File not found. Check if file exists and path is correct
 
 🔍 1 Total (in 0s) ✅ 0 OK 🚫 1 Error

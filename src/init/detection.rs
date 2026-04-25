@@ -134,7 +134,7 @@ pub(super) fn build_linter_groups<'a>(
             } else {
                 None
             };
-            // Pre-select each check individually: select if its category is in the
+            // Preselect each check individually: select if its category is in the
             // default set and its patterns are present, OR if the key is already installed.
             let check_selected: Vec<bool> = checks
                 .iter()

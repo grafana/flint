@@ -5,14 +5,15 @@ stdout = '''
 Tip: flint init detects languages from tracked files (`git ls-files`). Add and stage your source files before running init so the detection is accurate.
 
   pinned flint itself — reproducible lint runs across contributors
-  normalized [tools] in <REPO>/mise.toml
   wrote <REPO>/.github/config/flint.toml
   wrote <REPO>/.github/workflows/lint.yml
   removed <REPO>/.markdownlint.json (replaced by .rumdl.toml)
   wrote <REPO>/.github/config/.rumdl.toml
   patched <REPO>/.editorconfig — set max_line_length = 120
+  patched <REPO>/.editorconfig — disable max_line_length for [*.md]
   wrote <REPO>/.github/config/.yamllint.yml
-  wrote <REPO>/biome.json
+  wrote <REPO>/.github/config/rustfmt.toml
+  wrote <REPO>/biome.jsonc
 installed pre-commit hook (.git/hooks/pre-commit)
 Done. Run `mise install` to install the new tools.
 '''
@@ -32,6 +33,10 @@ enabled = true
 line-length = 120
 code-blocks = false
 tables = false
+
+[MD060]
+enabled = true
+style = "aligned"
 '''
 ".editorconfig" = '''
 root = true
@@ -43,16 +48,25 @@ charset = utf-8
 indent_style = space
 indent_size = 2
 max_line_length = 120
+
+[*.md]
+# Markdown line length is handled by rumdl
+max_line_length = off
 '''
 ".github/config/.yamllint.yml" = '''
 extends: relaxed
 
 rules:
   document-start: disable
-  line-length: disable
-  indentation: enable
+  line-length:
+    max: 120
+  indentation:
+    spaces: 2
 '''
-"biome.json" = '''
+".github/config/rustfmt.toml" = '''
+max_width = 120
+'''
+"biome.jsonc" = '''
 {
   "formatter": {
     "indentStyle": "space",
@@ -66,10 +80,10 @@ rust = { version = "1.0.0", components = "clippy,rustfmt" }
 
 # Linters
 actionlint = "1.0.0"
+"aqua:owenlamont/ryl" = "1.0.0"
 biome = "1.0.0"
 editorconfig-checker = "1.0.0"
 "github:grafana/flint" = "1.0.0"
-"github:owenlamont/ryl" = "1.0.0"
 lychee = "1.0.0"
 "pipx:codespell" = "1.0.0"
 rumdl = "1.0.0"

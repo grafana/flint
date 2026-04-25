@@ -1,2 +1,2 @@
 [tools]
-shellcheck = "0.11.0"
+"github:koalaman/shellcheck" = "0.11.0"

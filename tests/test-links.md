@@ -12,10 +12,7 @@ these links verify that each remap rule works correctly during CI.
 
 ## Scroll to Text Fragment anchors (`#:~:text=...`) — fragment stripped, remapped to raw
 
-<!-- editorconfig-checker-disable -->
-
 - [links.sh text fragment](https://github.com/grafana/flint/blob/main/tasks/lint/links.sh#:~:text=build_remap_args)
-<!-- editorconfig-checker-enable -->
 
 ## External Scroll to Text Fragment anchors — fragment stripped, remapped to raw
 
@@ -39,10 +36,7 @@ These test the global remap that strips line-number anchors from ANY
 GitHub repository (not just the current one). The file is remapped to
 raw.githubusercontent.com and the JS-rendered fragment is skipped.
 
-<!-- editorconfig-checker-disable -->
-
 - [okhttp build.gradle#L144-L153](https://github.com/square/okhttp/blob/96a2118dd447ebc28a64d9b11a431ca642edc441/build.gradle#L144-L153)
-<!-- editorconfig-checker-enable -->
 - [lychee main.rs#L1](https://github.com/lycheeverse/lychee/blob/master/lychee-bin/src/main.rs#L1)
 
 ## Issue comment anchors — fragment stripped globally

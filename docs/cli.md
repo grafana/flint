@@ -9,19 +9,21 @@ flint linters
 flint version
 ```
 
-Commands and flags follow [golangci-lint](https://golangci-lint.run/) conventions — teams already using it don't need to re-learn the interface.
+Commands and flags follow
+[golangci-lint](https://golangci-lint.run/) conventions. Teams already using
+it do not need to re-learn the interface.
 
 ## `flint run` flags
 
-| Flag                 | Description                                                                                    |
-| -------------------- | ---------------------------------------------------------------------------------------------- |
-| `--fix`              | Fix what's fixable, report what still needs review; exit 1 if anything changed or needs review |
-| `--full`             | Lint all files instead of only changed files                                                   |
-| `--fast-only`        | Skip checks tagged as slow in the registry. Overridden by explicit linter names.               |
-| `--short`            | Compact summary output, no per-check noise                                                     |
-| `--verbose`          | Show all linter output, not just failures                                                      |
-| `--new-from-rev REV` | Diff base (default: merge base with base branch)                                               |
-| `--to-ref REF`       | Diff head (default: HEAD)                                                                      |
+| Flag                 | Description                                                                                                          |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `--fix`              | Fix what's fixable, report `clean` / `fixed` / `partial` / `review` outcomes; exit non-zero if anything needs action |
+| `--full`             | Lint all files instead of only changed files                                                                         |
+| `--fast-only`        | Skip checks tagged as slow in the registry. Overridden by explicit linter names.                                     |
+| `--short`            | Compact summary output, no per-check noise                                                                           |
+| `--verbose`          | Show all linter output, not just failures                                                                            |
+| `--new-from-rev REV` | Diff base (default: merge base with base branch)                                                                     |
+| `--to-ref REF`       | Diff head (default: HEAD)                                                                                            |
 
 Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`, `FLINT_FAST_ONLY`,
 `FLINT_VERBOSE`, `FLINT_SHORT`, `FLINT_NEW_FROM_REV`, `FLINT_TO_REF`.
@@ -69,6 +71,7 @@ passes config paths explicitly. If an active linter has a known alternate
 upstream config file, Flint fails before running the linter instead of silently
 ignoring or partially auto-discovering that config. Move the config to the
 Flint-managed filename under `FLINT_CONFIG_DIR`, or remove the alternate file.
+Biome is the exception: its canonical config is root `biome.jsonc`.
 
 **`--short` output** — failed checks partitioned by fixability, fixable ones
 expressed as the exact command to run:
@@ -78,9 +81,17 @@ flint: 2 checks failed — flint run --fix rumdl cargo-fmt | review: shellcheck
 ```
 
 **`--fix` output** — fixes what's fixable, then prints the full output of
-any checks that still need review, followed by a summary line. Exits 1 if
-anything was fixed (so the caller commits the fixes before pushing) or if
-anything still needs review. Exits 0 only if everything was already clean:
+any checks that still need review, followed by a summary line. The internal
+outcome model distinguishes `clean`, `fixed`, `review`, and `partial`:
+
+- `clean` — the fixer ran and found nothing to change
+- `fixed` — the fixer resolved the issue; commit before pushing
+- `review` — no fixer was applied; human review is required
+- `partial` — a fixer ran but the check still failed and needs review
+
+Exit status remains intentionally coarse: `0` only when everything was already
+clean, non-zero when anything still needs action. Callers should rely only on
+`0` vs non-`0`, not on specific non-zero codes:
 
 ```text
 [shellcheck]
@@ -92,6 +103,17 @@ echo $1
 flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
 ```
 
+More `--fix` summary examples:
+
+```text
+flint: fixed: gofmt — commit before pushing
+flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
+flint: fixed: gofmt — commit before pushing | partial: cargo-clippy
+flint: partial: cargo-clippy | review: shellcheck
+flint: partial: cargo-clippy
+flint: review: shellcheck
+```
+
 Pass one or more linter names to run only those:
 
 ```bash
@@ -101,9 +123,9 @@ flint run --fix rumdl             # fix only Markdown issues
 
 ## `flint update`
 
-`flint update` applies non-interactive migrations to `mise.toml` — replaces obsolete
-tool keys with their modern equivalents, preserving the declared version. Run it when
-`flint run` reports an obsolete key error:
+`flint update` applies non-interactive migrations to `mise.toml`. It replaces
+obsolete tool keys with their modern equivalents while preserving the declared
+version. Run it when `flint run` reports an obsolete key error:
 
 ```text
 flint: obsolete tool key in mise.toml: "github:mvdan/sh" (replaced by "shfmt")

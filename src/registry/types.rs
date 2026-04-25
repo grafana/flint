@@ -66,6 +66,45 @@ pub enum CheckKind {
 }
 
 #[derive(Debug, Clone)]
+pub enum LinterConfig {
+    File {
+        file: &'static str,
+        flag: &'static str,
+    },
+    DirIfAny {
+        files: &'static [&'static str],
+        flag: &'static str,
+    },
+}
+
+impl LinterConfig {
+    pub fn display_name(&self) -> String {
+        match self {
+            Self::File { file, .. } => (*file).to_string(),
+            Self::DirIfAny { files, .. } => files.join(" / "),
+        }
+    }
+
+    pub fn canonical_location(&self) -> String {
+        match self {
+            Self::File { file, .. } => format!("FLINT_CONFIG_DIR/{file}"),
+            Self::DirIfAny { files, .. } => {
+                format!("FLINT_CONFIG_DIR (with one of: {})", files.join(", "))
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditorconfigLineLengthPolicy {
+    Default,
+    DisableForPatterns {
+        patterns: &'static [&'static str],
+        comment: &'static str,
+    },
+}
+
+#[derive(Debug, Clone)]
 pub struct Check {
     pub name: &'static str,
     /// Binary name used to invoke the tool.
@@ -86,19 +125,22 @@ pub struct Check {
     pub excludes_if_active: &'static [&'static str],
     pub category: Category,
     pub run_policy: RunPolicy,
-    /// When set, look for `(filename, flag)` in config_dir: if the file exists, inject
-    /// `flag <abs-path>` into the command right after the binary name.
-    pub linter_config: Option<(&'static str, &'static str)>,
+    /// When set, look for linter config in `config_dir` and inject an argument
+    /// right after the binary name.
+    pub linter_config: Option<LinterConfig>,
     /// Environment variable overrides to apply only in non-verbose runs when
     /// invoking this check's external process. These are intentionally not set
     /// under `--verbose`, so checks must not rely on them always being present.
     pub env: &'static [(&'static str, &'static str)],
+    /// Line prefixes to drop from stdout/stderr in non-verbose mode. This is
+    /// only for low-value noise; actionable diagnostics must remain visible.
+    pub nonverbose_filter_prefixes: &'static [&'static str],
     /// Line prefixes to drop from stderr in non-verbose mode. This is only for
     /// low-value log noise; actionable diagnostics must remain visible.
     pub stderr_filter_prefixes: &'static [&'static str],
-    /// Config-like files that affect this check's results and should trigger
+    /// Config-like file that affects this check's results and should trigger
     /// a one-time all-files baseline run when changed.
-    pub baseline_configs: &'static [ConfigFile],
+    pub baseline_config: Option<ConfigFile>,
     /// Known upstream config locations that flint does not support for this
     /// check. Their presence is a hard failure to avoid silent config drift.
     pub unsupported_configs: &'static [ConfigFile],
@@ -106,6 +148,8 @@ pub struct Check {
     pub is_formatter: bool,
     /// Skip files owned by active formatters (used by ec to avoid double-checking).
     pub defers_to_formatters: bool,
+    /// Optional `.editorconfig` line-length carve-out owned by this check.
+    pub editorconfig_line_length_policy: EditorconfigLineLengthPolicy,
     /// Always considered active regardless of mise.toml (used for config-activated checks).
     pub activate_unconditionally: bool,
     /// Toolchain status and optional components for `mise_tool_name`.
@@ -210,11 +254,13 @@ impl Check {
             excludes_if_active: &[],
             linter_config: None,
             env: &[],
+            nonverbose_filter_prefixes: &[],
             stderr_filter_prefixes: &[],
-            baseline_configs: &[],
+            baseline_config: None,
             unsupported_configs: &[],
             is_formatter: false,
             defers_to_formatters: false,
+            editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
             activate_unconditionally: false,
             category: Category::Default,
             run_policy: RunPolicy::Fast,
@@ -244,11 +290,13 @@ impl Check {
             excludes_if_active: &[],
             linter_config: None,
             env: &[],
+            nonverbose_filter_prefixes: &[],
             stderr_filter_prefixes: &[],
-            baseline_configs: &[],
+            baseline_config: None,
             unsupported_configs: &[],
             is_formatter: false,
             defers_to_formatters: false,
+            editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
             activate_unconditionally: false,
             category: Category::Default,
             run_policy: RunPolicy::Fast,
@@ -350,6 +398,18 @@ impl Check {
         self
     }
 
+    /// Declare that this check owns `max_line_length` in `.editorconfig` for the
+    /// given file patterns.
+    pub fn editorconfig_line_length_off(
+        mut self,
+        patterns: &'static [&'static str],
+        comment: &'static str,
+    ) -> Self {
+        self.editorconfig_line_length_policy =
+            EditorconfigLineLengthPolicy::DisableForPatterns { patterns, comment };
+        self
+    }
+
     /// Always considered active regardless of mise.toml (for config-activated checks).
     pub fn activate_unconditionally(mut self) -> Self {
         self.activate_unconditionally = true;
@@ -409,7 +469,19 @@ impl Check {
     /// If `config_dir/file` exists at runtime, `flag <abs-path>` is inserted
     /// right after the binary name. Has no effect when the file is absent.
     pub fn linter_config(mut self, file: &'static str, flag: &'static str) -> Self {
-        self.linter_config = Some((file, flag));
+        self.linter_config = Some(LinterConfig::File { file, flag });
+        self
+    }
+
+    /// Inject `flag <config_dir>` when any of the named config files exist in
+    /// `config_dir`. Useful for tools that accept a config directory instead of
+    /// an individual config file path.
+    pub fn linter_config_dir_if_any(
+        mut self,
+        files: &'static [&'static str],
+        flag: &'static str,
+    ) -> Self {
+        self.linter_config = Some(LinterConfig::DirIfAny { files, flag });
         self
     }
 
@@ -424,8 +496,13 @@ impl Check {
         self
     }
 
-    pub fn baseline_configs(mut self, files: &'static [ConfigFile]) -> Self {
-        self.baseline_configs = files;
+    pub fn nonverbose_filter_prefixes(mut self, prefixes: &'static [&'static str]) -> Self {
+        self.nonverbose_filter_prefixes = prefixes;
+        self
+    }
+
+    pub fn baseline_config(mut self, file: ConfigFile) -> Self {
+        self.baseline_config = Some(file);
         self
     }
 

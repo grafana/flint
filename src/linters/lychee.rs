@@ -2,12 +2,13 @@ use std::path::Path;
 use std::process::Stdio;
 use tokio::process::Command;
 
-use crate::config::LycheeConfig;
+use crate::config::{Config, LycheeConfig, Settings};
 use crate::files::FileList;
 use crate::linters::LinterOutput;
 
 pub async fn run(
     cfg: &LycheeConfig,
+    settings: &Settings,
     file_list: &FileList,
     project_root: &Path,
     config_dir: &Path,
@@ -23,6 +24,18 @@ pub async fn run(
     };
 
     let remap_args = build_remap_args(project_root).await;
+    let checkable_all_files = match lychee_checkable_files(project_root, settings) {
+        Ok(files) => files,
+        Err(e) => {
+            return LinterOutput {
+                ok: false,
+                stdout: Vec::new(),
+                stderr: format!("flint: links: failed to collect files: {e}\n").into_bytes(),
+            };
+        }
+    };
+    let checkable_all_file_refs: Vec<&str> =
+        checkable_all_files.iter().map(String::as_str).collect();
 
     // Full mode: no merge base (shallow clone or --full flag)
     if file_list.merge_base.is_none() {
@@ -30,7 +43,7 @@ pub async fn run(
             "Checking all links in all files",
             &lychee_cfg,
             &remap_args,
-            &["."],
+            &checkable_all_file_refs,
             false,
             project_root,
         )
@@ -48,7 +61,7 @@ pub async fn run(
             "Checking all links in all files",
             &lychee_cfg,
             &remap_args,
-            &["."],
+            &checkable_all_file_refs,
             false,
             project_root,
         )
@@ -99,7 +112,7 @@ pub async fn run(
             "Checking local links in all files",
             &lychee_cfg,
             &remap_args,
-            &["."],
+            &checkable_all_file_refs,
             true,
             project_root,
         )
@@ -114,6 +127,25 @@ pub async fn run(
         stdout: combined_stdout,
         stderr: combined_stderr,
     }
+}
+
+fn lychee_checkable_files(project_root: &Path, settings: &Settings) -> anyhow::Result<Vec<String>> {
+    let cfg = Config {
+        settings: settings.clone(),
+        ..Config::default()
+    };
+    let all_files = crate::files::all(project_root, &cfg)?;
+    Ok(all_files
+        .files
+        .iter()
+        .filter(|f| is_link_checkable(f))
+        .map(|f| {
+            f.strip_prefix(project_root)
+                .unwrap_or(f)
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect())
 }
 
 async fn run_lychee_cmd(
@@ -382,6 +414,7 @@ fn is_link_checkable(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Settings;
 
     #[test]
     fn parse_github_repo_https() {
@@ -473,5 +506,49 @@ mod tests {
         assert!(!is_link_checkable(Path::new("config.toml")));
         assert!(!is_link_checkable(Path::new("script.sh")));
         assert!(!is_link_checkable(Path::new("Makefile")));
+    }
+
+    #[test]
+    fn lychee_checkable_files_respects_flint_excludes() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir_all(tmp.path().join("tests/cases/demo")).unwrap();
+        std::fs::create_dir_all(tmp.path().join("docs")).unwrap();
+        std::fs::write(tmp.path().join("README.md"), "# ok\n").unwrap();
+        std::fs::write(tmp.path().join("docs/page.md"), "# doc\n").unwrap();
+        std::fs::write(tmp.path().join("tests/cases/demo/README.md"), "# fixture\n").unwrap();
+
+        let out = std::process::Command::new("git")
+            .args(["init", "-b", "main"])
+            .current_dir(tmp.path())
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git init failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let out = std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(tmp.path())
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git add failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+
+        let files = lychee_checkable_files(
+            tmp.path(),
+            &Settings {
+                base_branch: "main".to_string(),
+                exclude: vec!["tests/cases/**".to_string()],
+            },
+        )
+        .unwrap();
+
+        assert!(files.contains(&"README.md".to_string()));
+        assert!(files.contains(&"docs/page.md".to_string()));
+        assert!(!files.contains(&"tests/cases/demo/README.md".to_string()));
     }
 }

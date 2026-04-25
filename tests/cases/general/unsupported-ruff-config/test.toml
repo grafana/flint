@@ -1,0 +1,7 @@
+[expected]
+args = "run ruff"
+exit = 1
+stderr = '''
+flint: unsupported ruff config file found: .ruff.toml
+  Flint only supports FLINT_CONFIG_DIR/ruff.toml for ruff. Move the config to the supported location or remove the alternate file.
+'''

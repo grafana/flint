@@ -5,10 +5,10 @@ use std::process::Stdio;
 use std::time::{Duration, Instant};
 use tokio::task::JoinSet;
 
-use crate::config::{Config, LicenseHeaderConfig, LycheeConfig, RenovateDepsConfig};
+use crate::config::{Config, LicenseHeaderConfig, LycheeConfig, RenovateDepsConfig, Settings};
 use crate::files::FileList;
 use crate::linters::{LinterOutput, license_header, lychee, renovate_deps};
-use crate::registry::{Check, CheckKind, Scope, SpecialKind};
+use crate::registry::{Check, CheckKind, LinterConfig, Scope, SpecialKind};
 
 #[derive(Clone, Copy)]
 pub struct RunOptions {
@@ -27,6 +27,14 @@ pub struct CheckResult {
     pub duration: Duration,
 }
 
+#[derive(Clone, Copy)]
+struct InvocationOutputPolicy<'a> {
+    nonverbose: bool,
+    env: &'a [(&'static str, &'static str)],
+    nonverbose_filter_prefixes: &'a [&'static str],
+    stderr_filter_prefixes: &'a [&'static str],
+}
+
 /// A check with all inputs pre-resolved, ready to execute without borrowing
 /// the registry or config. Built by `prepare()` before the fix/check split.
 enum PreparedCheck {
@@ -36,11 +44,13 @@ enum PreparedCheck {
         tracked_files: Vec<PathBuf>,
         windows_java_jar: bool,
         env: &'static [(&'static str, &'static str)],
+        nonverbose_filter_prefixes: &'static [&'static str],
         stderr_filter_prefixes: &'static [&'static str],
     },
     Links {
         name: String,
         cfg: LycheeConfig,
+        settings: Settings,
         file_list: FileList,
         config_dir: PathBuf,
     },
@@ -74,6 +84,7 @@ impl PreparedCheck {
                 tracked_files,
                 windows_java_jar,
                 env,
+                nonverbose_filter_prefixes,
                 stderr_filter_prefixes,
                 ..
             } => {
@@ -86,8 +97,16 @@ impl PreparedCheck {
                     &name,
                     &argv_list,
                     windows_java_jar,
-                    if verbose { &[] } else { env },
-                    if verbose { &[] } else { stderr_filter_prefixes },
+                    InvocationOutputPolicy {
+                        nonverbose: !verbose,
+                        env: if verbose { &[] } else { env },
+                        nonverbose_filter_prefixes: if verbose {
+                            &[]
+                        } else {
+                            nonverbose_filter_prefixes
+                        },
+                        stderr_filter_prefixes: if verbose { &[] } else { stderr_filter_prefixes },
+                    },
                     project_root,
                 )
                 .await;
@@ -97,11 +116,12 @@ impl PreparedCheck {
             }
             Self::Links {
                 cfg,
+                settings,
                 file_list,
                 config_dir,
                 ..
             } => (
-                lychee::run(&cfg, &file_list, project_root, &config_dir).await,
+                lychee::run(&cfg, &settings, &file_list, project_root, &config_dir).await,
                 false,
             ),
             Self::RenovateDeps { cfg, .. } => {
@@ -224,12 +244,14 @@ fn prepare(
                 tracked_files,
                 windows_java_jar: check.windows_java_jar,
                 env: check.env,
+                nonverbose_filter_prefixes: check.nonverbose_filter_prefixes,
                 stderr_filter_prefixes: check.stderr_filter_prefixes,
             })
         }
         CheckKind::Special(SpecialKind::Links) => Some(PreparedCheck::Links {
             name,
             cfg: cfg.checks.lychee.clone(),
+            settings: cfg.settings.clone(),
             file_list: file_list.clone(),
             config_dir: config_dir.to_path_buf(),
         }),
@@ -335,6 +357,8 @@ fn build_invocations(
     }
 
     let config_args = resolve_linter_config(check, config_dir);
+    let rendered_config_args = render_config_args(&config_args);
+    let inject_config_args = !cmd_template.contains("{CONFIG_ARGS}");
 
     match scope {
         Scope::Project => {
@@ -345,7 +369,13 @@ fn build_invocations(
                 return vec![];
             }
             let cmd = substitute_merge_base(cmd_template, file_list.merge_base.as_deref());
-            vec![inject_config(shell_words(cmd), &config_args)]
+            let cmd = cmd.replace("{CONFIG_ARGS}", &rendered_config_args);
+            let argv = shell_words(cmd);
+            vec![if inject_config_args {
+                inject_config(argv, &config_args)
+            } else {
+                argv
+            }]
         }
 
         Scope::File => {
@@ -353,8 +383,15 @@ fn build_invocations(
             matched
                 .iter()
                 .map(|f| {
-                    let cmd = cmd_template.replace("{FILE}", &quote_path(f));
-                    inject_config(shell_words(cmd), &config_args)
+                    let cmd = cmd_template
+                        .replace("{FILE}", &quote_path(f))
+                        .replace("{CONFIG_ARGS}", &rendered_config_args);
+                    let argv = shell_words(cmd);
+                    if inject_config_args {
+                        inject_config(argv, &config_args)
+                    } else {
+                        argv
+                    }
                 })
                 .collect()
         }
@@ -375,8 +412,15 @@ fn build_invocations(
                     None
                 };
                 if let Some(cmd) = effective {
-                    let cmd = cmd.replace("{ROOT}", &quote_path(project_root));
-                    return vec![inject_config(shell_words(cmd), &config_args)];
+                    let cmd = cmd
+                        .replace("{ROOT}", &quote_path(project_root))
+                        .replace("{CONFIG_ARGS}", &rendered_config_args);
+                    let argv = shell_words(cmd);
+                    return vec![if inject_config_args {
+                        inject_config(argv, &config_args)
+                    } else {
+                        argv
+                    }];
                 }
             }
             let edition_flag = resolve_cargo_edition_flag(project_root);
@@ -393,8 +437,14 @@ fn build_invocations(
             let cmd = cmd_template
                 .replace("{CARGO_EDITION_FLAG}", &edition_flag)
                 .replace("{FILES}", &files_arg)
-                .replace("{RELFILES}", &rel_files_arg);
-            vec![inject_config(shell_words(cmd), &config_args)]
+                .replace("{RELFILES}", &rel_files_arg)
+                .replace("{CONFIG_ARGS}", &rendered_config_args);
+            let argv = shell_words(cmd);
+            vec![if inject_config_args {
+                inject_config(argv, &config_args)
+            } else {
+                argv
+            }]
         }
     }
 }
@@ -424,17 +474,27 @@ fn resolve_cargo_edition_flag(project_root: &Path) -> String {
         .unwrap_or_default()
 }
 
-/// Returns `[flag, abs-path]` if `check.linter_config` is set and the file exists
-/// in `config_dir`, otherwise an empty slice.
+/// Returns config args for `check` based on files present in `config_dir`.
 fn resolve_linter_config(check: &Check, config_dir: &Path) -> Vec<String> {
-    let Some((file, flag)) = check.linter_config else {
+    let Some(config) = &check.linter_config else {
         return vec![];
     };
-    let path = config_dir.join(file);
-    if !path.exists() {
-        return vec![];
+    match config {
+        LinterConfig::File { file, flag } => {
+            let path = config_dir.join(file);
+            if !path.exists() {
+                return vec![];
+            }
+            vec![flag.to_string(), path.to_string_lossy().into_owned()]
+        }
+        LinterConfig::DirIfAny { files, flag } => {
+            if files.iter().any(|file| config_dir.join(file).exists()) {
+                vec![flag.to_string(), config_dir.to_string_lossy().into_owned()]
+            } else {
+                vec![]
+            }
+        }
     }
-    vec![flag.to_string(), path.to_string_lossy().into_owned()]
 }
 
 /// Inserts `config_args` at position 1 (right after the binary name) in `argv`.
@@ -449,14 +509,21 @@ fn inject_config(mut argv: Vec<String>, config_args: &[String]) -> Vec<String> {
     argv
 }
 
+fn render_config_args(config_args: &[String]) -> String {
+    config_args
+        .iter()
+        .map(|arg| quote_path(Path::new(arg)))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Runs all invocations for one check.
 /// Never prints — callers decide when and whether to flush output.
 async fn run_invocations(
     name: &str,
     invocations: &[Vec<String>],
     windows_java_jar: bool,
-    env: &[(&str, &str)],
-    stderr_filter_prefixes: &[&str],
+    output_policy: InvocationOutputPolicy<'_>,
     root: &Path,
 ) -> LinterOutput {
     let mut all_ok = true;
@@ -470,22 +537,49 @@ async fn run_invocations(
         let mut cmd = crate::linters::spawn_command(argv, windows_java_jar);
         cmd.current_dir(root)
             .stdin(Stdio::null())
-            .envs(env.iter().copied());
+            .envs(output_policy.env.iter().copied());
         let result = cmd.output().await;
         match result {
             Ok(out) => {
-                if name == "taplo" && !stderr_filter_prefixes.is_empty() && !out.status.success() {
+                if name == "taplo"
+                    && !output_policy.stderr_filter_prefixes.is_empty()
+                    && !out.status.success()
+                {
                     let (stdout, stderr) =
                         normalize_taplo_nonverbose_output(argv, &out.stdout, &out.stderr);
                     combined_stdout.extend_from_slice(&stdout);
                     combined_stderr.extend_from_slice(&stderr);
                 } else {
-                    combined_stdout.extend_from_slice(&out.stdout);
-                    if stderr_filter_prefixes.is_empty() {
-                        combined_stderr.extend_from_slice(&out.stderr);
+                    let stdout = if output_policy.nonverbose
+                        && !output_policy.nonverbose_filter_prefixes.is_empty()
+                    {
+                        filter_output_lines(&out.stdout, |line| {
+                            output_policy
+                                .nonverbose_filter_prefixes
+                                .iter()
+                                .any(|prefix| line.starts_with(prefix))
+                        })
                     } else {
-                        let filtered = filter_stderr_lines(&out.stderr, stderr_filter_prefixes);
+                        out.stdout
+                    };
+                    combined_stdout.extend_from_slice(&stdout);
+                    let stderr = if output_policy.stderr_filter_prefixes.is_empty() {
+                        out.stderr
+                    } else {
+                        filter_stderr_lines(&out.stderr, output_policy.stderr_filter_prefixes)
+                    };
+                    if output_policy.nonverbose
+                        && !output_policy.nonverbose_filter_prefixes.is_empty()
+                    {
+                        let filtered = filter_output_lines(&stderr, |line| {
+                            output_policy
+                                .nonverbose_filter_prefixes
+                                .iter()
+                                .any(|prefix| line.starts_with(prefix))
+                        });
                         combined_stderr.extend_from_slice(&filtered);
+                    } else {
+                        combined_stderr.extend_from_slice(&stderr);
                     }
                 }
                 if !out.status.success() {
@@ -572,6 +666,28 @@ fn normalize_taplo_nonverbose_output(
     };
 
     (Vec::new(), stderr)
+}
+
+fn filter_output_lines(output: &[u8], predicate: impl Fn(&str) -> bool) -> Vec<u8> {
+    let text = String::from_utf8_lossy(output);
+    let mut out = String::new();
+    for line in text.split_inclusive('\n') {
+        let trimmed = line.trim_end_matches('\n');
+        if predicate(trimmed) {
+            continue;
+        }
+        out.push_str(line);
+    }
+    if !text.is_empty() && !text.ends_with('\n') {
+        let tail = text
+            .rsplit_once('\n')
+            .map(|(_, tail)| tail)
+            .unwrap_or(&text);
+        if !predicate(tail) && !out.ends_with(tail) {
+            out.push_str(tail);
+        }
+    }
+    out.into_bytes()
 }
 
 fn maybe_append_rust_component_note(name: &str, stderr: &mut Vec<u8>) {
@@ -807,6 +923,29 @@ mod tests {
         assert!(resolve_linter_config(&check, dir.path()).is_empty());
     }
 
+    #[test]
+    fn render_config_args_shell_quotes_all_args() {
+        let rendered =
+            render_config_args(&["--config-path".to_string(), "/tmp/my cfg".to_string()]);
+        assert_eq!(rendered, "\"--config-path\" \"/tmp/my cfg\"");
+    }
+
+    #[test]
+    fn resolve_linter_config_dir_if_any_returns_flag_and_dir() {
+        let check = Check::file("biome", "biome check {FILE}", &["*.json"])
+            .linter_config_dir_if_any(&["biome.jsonc"], "--config-path");
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("biome.jsonc"), "{}").unwrap();
+        let result = resolve_linter_config(&check, dir.path());
+        assert_eq!(
+            result,
+            vec![
+                "--config-path".to_string(),
+                dir.path().to_string_lossy().into_owned()
+            ]
+        );
+    }
+
     fn project_check(patterns: &'static [&'static str]) -> Check {
         Check {
             name: "test",
@@ -817,11 +956,13 @@ mod tests {
             excludes_if_active: &[],
             linter_config: None,
             env: &[],
+            nonverbose_filter_prefixes: &[],
             stderr_filter_prefixes: &[],
-            baseline_configs: &[],
+            baseline_config: None,
             unsupported_configs: &[],
             is_formatter: false,
             defers_to_formatters: false,
+            editorconfig_line_length_policy: crate::registry::EditorconfigLineLengthPolicy::Default,
             activate_unconditionally: false,
             category: Category::Default,
             run_policy: RunPolicy::Fast,
@@ -934,5 +1075,27 @@ mod tests {
         let stderr = b"ERROR useful\n";
         let filtered = filter_stderr_lines(stderr, &[" INFO taplo:"]);
         assert_eq!(String::from_utf8(filtered).unwrap(), "ERROR useful\n");
+    }
+
+    #[test]
+    fn filters_rumdl_success_lines_from_nonverbose_output() {
+        let output =
+            b"Success: No issues found in 1 file (8ms)\nerror[MD013]: too long\n".as_slice();
+        let filtered = filter_output_lines(output, |line| {
+            line.starts_with("Success: No issues found in ")
+        });
+        assert_eq!(
+            String::from_utf8(filtered).unwrap(),
+            "error[MD013]: too long\n"
+        );
+    }
+
+    #[test]
+    fn preserves_non_success_rumdl_lines() {
+        let output = b"warning: keep me\n".as_slice();
+        let filtered = filter_output_lines(output, |line| {
+            line.starts_with("Success: No issues found in ")
+        });
+        assert_eq!(String::from_utf8(filtered).unwrap(), "warning: keep me\n");
     }
 }

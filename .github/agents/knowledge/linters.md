@@ -54,12 +54,9 @@ Check::file("rumdl", "rumdl check {FILE}", &["*.md"])
 **When NOT to use it:**
 
 - The tool has no explicit `--config`/`--rcfile`/equivalent flag (e.g. `shfmt`)
-- The flag accepts a **directory** rather than a file (e.g. biome's
-  `--config-path <dir>`) — a different injection shape is needed. For biome,
-  check for `biome.json` existence but pass `config_dir` itself as the arg:
-  `biome --config-path <config_dir> check <file>`. This requires a variant of
-  `.linter_config` that injects the directory rather than the full file path
-  (not yet implemented)
+- The tool is a known root-discovery exception even though it has a config flag
+  (e.g. biome). Flint is opinionated here: use root `biome.jsonc`, not
+  `biome.json`
 - The tool is project-scoped and its config must live at the project root to
   function (no explicit `--config` flag exists)
 

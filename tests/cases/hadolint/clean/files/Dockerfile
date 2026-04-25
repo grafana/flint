@@ -1,3 +1,2 @@
-FROM ubuntu:22.04
-COPY app /app
-CMD ["/app"]
+FROM ubuntu:latest
+RUN apt-get install -y curl

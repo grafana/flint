@@ -147,6 +147,7 @@ pub(crate) fn ensure_node_for_npm(project_root: &Path) -> Result<bool> {
         return Ok(false);
     }
     if pin_tool_via_mise(project_root, "node", "lts") {
+        let _ = normalize_tools_section_impl(&mise_path, false)?;
         return Ok(true);
     }
     // Fallback: write a soft pin so mise.toml still declares the prereq.
@@ -156,6 +157,7 @@ pub(crate) fn ensure_node_for_npm(project_root: &Path) -> Result<bool> {
         .context("[tools] is not a table")?;
     tools.insert("node", toml_edit::value("lts"));
     std::fs::write(&mise_path, doc.to_string())?;
+    let _ = normalize_tools_section_impl(&mise_path, false)?;
     Ok(true)
 }
 
@@ -166,18 +168,19 @@ pub(crate) fn ensure_node_for_npm(project_root: &Path) -> Result<bool> {
 ///
 /// Returns `true` if a flint entry was added.
 pub(crate) fn ensure_flint_self_pin(project_root: &Path) -> Result<bool> {
-    const KEY: &str = "github:grafana/flint";
+    const RELEASE_KEY: &str = "github:grafana/flint";
     let mise_path = project_root.join("mise.toml");
     let content = std::fs::read_to_string(&mise_path).unwrap_or_default();
     if let Ok(doc) = content.parse::<toml_edit::DocumentMut>()
         && let Some(tools) = doc.get("tools").and_then(|t| t.as_table())
-        && tools.contains_key(KEY)
+        && tools.iter().any(|(key, _)| is_flint_tool_key(key))
     {
         return Ok(false);
     }
     let ver = env!("CARGO_PKG_VERSION");
     let ver = ver.split('-').next().unwrap_or(ver);
-    if pin_tool_via_mise(project_root, KEY, ver) {
+    if pin_tool_via_mise(project_root, RELEASE_KEY, ver) {
+        let _ = normalize_tools_section_impl(&mise_path, false)?;
         return Ok(true);
     }
     let mut doc: toml_edit::DocumentMut = if content.is_empty() {
@@ -188,9 +191,16 @@ pub(crate) fn ensure_flint_self_pin(project_root: &Path) -> Result<bool> {
     let tools = doc["tools"]
         .as_table_mut()
         .context("[tools] is not a table")?;
-    tools.insert(KEY, toml_edit::value(ver));
+    tools.insert(RELEASE_KEY, toml_edit::value(ver));
     std::fs::write(&mise_path, doc.to_string())?;
+    let _ = normalize_tools_section_impl(&mise_path, false)?;
     Ok(true)
+}
+
+fn is_flint_tool_key(key: &str) -> bool {
+    key == "github:grafana/flint"
+        || key.starts_with("cargo:https://github.com/grafana/flint")
+        || key.starts_with("cargo:https://github.com/grafana/flint.git")
 }
 
 /// Replaces obsolete tool keys in mise.toml with their modern equivalents,
@@ -221,8 +231,36 @@ pub fn replace_obsolete_keys(
 
     if !replaced.is_empty() {
         std::fs::write(&path, doc.to_string()).context("failed to write mise.toml")?;
+        let _ = normalize_tools_section_impl(&path, false)?;
     }
     Ok(replaced)
+}
+
+/// Removes specific tool keys from mise.toml.
+/// Returns the list of removed keys. No-ops if the file doesn't exist or none are present.
+pub fn remove_tool_keys(project_root: &Path, keys: &[&str]) -> Result<Vec<String>> {
+    let path = project_root.join("mise.toml");
+    let content = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(vec![]),
+        Err(e) => return Err(e).with_context(|| format!("failed to read {}", path.display())),
+    };
+    let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse mise.toml")?;
+
+    let mut removed = vec![];
+    if let Some(tools) = doc.get_mut("tools").and_then(|t| t.as_table_mut()) {
+        for key in keys {
+            if tools.remove(key).is_some() {
+                removed.push((*key).to_string());
+            }
+        }
+    }
+
+    if !removed.is_empty() {
+        std::fs::write(&path, doc.to_string()).context("failed to write mise.toml")?;
+        let _ = normalize_tools_section_impl(&path, false)?;
+    }
+    Ok(removed)
 }
 
 pub(super) fn apply_changes(
@@ -332,12 +370,13 @@ pub(super) fn apply_changes(
     }
 
     std::fs::write(path, doc.to_string())?;
+    let _ = normalize_tools_section_impl(path, false)?;
     Ok(())
 }
 
 /// Sorts `[tools]` entries and inserts the `# Linters` header when they are not
 /// already in canonical form. Returns `true` if the file was rewritten.
-pub(super) fn normalize_tools_section(path: &Path) -> Result<bool> {
+fn normalize_tools_section_impl(path: &Path, verbose: bool) -> Result<bool> {
     let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
         Err(_) => return Ok(false),
@@ -355,8 +394,14 @@ pub(super) fn normalize_tools_section(path: &Path) -> Result<bool> {
         return Ok(false);
     }
     std::fs::write(path, new_content)?;
-    println!("  normalized [tools] in {}", path.display());
+    if verbose {
+        println!("  normalized [tools] in {}", path.display());
+    }
     Ok(true)
+}
+
+pub(super) fn normalize_tools_section(path: &Path) -> Result<bool> {
+    normalize_tools_section_impl(path, true)
 }
 
 /// Sorts `[tools]` entries alphabetically and inserts a `# Linters` comment
@@ -591,7 +636,7 @@ pub(super) fn prompt_config_dir(existing: Option<&str>, yes: bool) -> Result<Str
 
 #[cfg(test)]
 mod node_prereq_tests {
-    use super::{ensure_node_for_npm, needs_node_for_npm};
+    use super::{ensure_flint_self_pin, ensure_node_for_npm, needs_node_for_npm};
 
     // Full end-to-end ensure_node_for_npm coverage (npm-present, node-absent →
     // node added, file modified) lives in the e2e case `general/update-adds-node`.
@@ -605,7 +650,7 @@ mod node_prereq_tests {
 
     #[test]
     fn no_node_needed_when_no_npm_keys() {
-        let content = "[tools]\nshellcheck = \"v0.11.0\"\n";
+        let content = "[tools]\n\"github:koalaman/shellcheck\" = \"v0.11.0\"\n";
         assert!(!needs_node_for_npm(content));
     }
 
@@ -636,9 +681,20 @@ mod node_prereq_tests {
     fn noop_without_npm_tools() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mise.toml");
-        let original = "[tools]\nshellcheck = \"v0.11.0\"\n";
+        let original = "[tools]\n\"github:koalaman/shellcheck\" = \"v0.11.0\"\n";
         std::fs::write(&path, original).unwrap();
         let added = ensure_node_for_npm(dir.path()).unwrap();
+        assert!(!added);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+    }
+
+    #[test]
+    fn flint_self_pin_skips_when_cargo_git_pin_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        let original = "[tools]\n\"cargo:https://github.com/grafana/flint\" = \"rev:deadbeef\"\n";
+        std::fs::write(&path, original).unwrap();
+        let added = ensure_flint_self_pin(dir.path()).unwrap();
         assert!(!added);
         assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
     }
@@ -646,7 +702,7 @@ mod node_prereq_tests {
 
 #[cfg(test)]
 mod replace_obsolete_tests {
-    use super::replace_obsolete_keys;
+    use super::{remove_tool_keys, replace_obsolete_keys};
 
     #[test]
     fn replaces_old_key_preserving_version() {
@@ -674,6 +730,63 @@ mod replace_obsolete_tests {
         std::fs::write(&path, "[tools]\nshfmt = \"v3.13.1\"\n").unwrap();
         let replaced = replace_obsolete_keys(dir.path(), &[("github:mvdan/sh", "shfmt")]).unwrap();
         assert!(replaced.is_empty());
+    }
+
+    #[test]
+    fn replace_obsolete_keys_preserves_linters_header() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        std::fs::write(
+            &path,
+            "[tools]\nnode = \"24.15.0\"\n\n# Linters\n\"github:mvdan/sh\" = \"v3.13.1\"\n\"github:koalaman/shellcheck\" = \"v0.11.0\"\n",
+        )
+        .unwrap();
+        let replaced = replace_obsolete_keys(dir.path(), &[("github:mvdan/sh", "shfmt")]).unwrap();
+        assert_eq!(
+            replaced,
+            vec![("github:mvdan/sh".to_string(), "shfmt".to_string())]
+        );
+        let result = std::fs::read_to_string(&path).unwrap();
+        assert!(result.contains("# Linters"));
+        assert_eq!(result.matches("# Linters").count(), 1);
+        assert!(result.contains("node = \"24.15.0\""));
+        assert!(result.contains("\"github:koalaman/shellcheck\" = \"v0.11.0\""));
+        assert!(result.contains("shfmt = \"v3.13.1\""));
+    }
+
+    #[test]
+    fn removes_requested_tool_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        std::fs::write(
+            &path,
+            "[tools]\n\"npm:prettier\" = \"3.6.2\"\n\"npm:markdownlint-cli2\" = \"0.18.1\"\n",
+        )
+        .unwrap();
+        let removed = remove_tool_keys(dir.path(), &["npm:prettier"]);
+        assert_eq!(removed.unwrap(), vec!["npm:prettier".to_string()]);
+        let result = std::fs::read_to_string(&path).unwrap();
+        assert!(!result.contains("npm:prettier"));
+        assert!(result.contains("npm:markdownlint-cli2"));
+    }
+
+    #[test]
+    fn remove_tool_keys_preserves_linters_header() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        std::fs::write(
+            &path,
+            "[tools]\nnode = \"24.15.0\"\n\n# Linters\n\"github:koalaman/shellcheck\" = \"v0.11.0\"\nshfmt = \"v3.13.1\"\n",
+        )
+        .unwrap();
+        let removed = remove_tool_keys(dir.path(), &["github:koalaman/shellcheck"]).unwrap();
+        assert_eq!(removed, vec!["github:koalaman/shellcheck".to_string()]);
+        let result = std::fs::read_to_string(&path).unwrap();
+        assert!(result.contains("# Linters"));
+        assert_eq!(result.matches("# Linters").count(), 1);
+        assert!(result.contains("node = \"24.15.0\""));
+        assert!(result.contains("shfmt = \"v3.13.1\""));
+        assert!(!result.contains("\"github:koalaman/shellcheck\" ="));
     }
 }
 

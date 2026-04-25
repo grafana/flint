@@ -1,2 +1,2 @@
 [tools]
-"github:tamasfe/taplo" = "0.10.0"
+taplo = "0.10.0"

@@ -10,7 +10,7 @@ pub struct SetupMigration {
     pub unsupported_keys: &'static [(&'static str, &'static str)],
 }
 
-const OBSOLETE_KEYS_TO_DEPLOYED: &[(&str, &str)] = &[
+const OBSOLETE_KEYS_TO_SETUP_VERSION_1: &[(&str, &str)] = &[
     // markdownlint-cli was superseded by markdownlint-cli2 before the deployed
     // v2 baseline. Keep this migration so old v1 repos can converge.
     ("npm:markdownlint-cli", "npm:markdownlint-cli2"),
@@ -26,7 +26,7 @@ const OBSOLETE_KEYS_TO_DEPLOYED: &[(&str, &str)] = &[
     ("github:mvdan/sh", "shfmt"),
 ];
 
-const OBSOLETE_KEYS_TO_NEXT: &[(&str, &str)] = &[
+const OBSOLETE_KEYS_TO_SETUP_VERSION_2: &[(&str, &str)] = &[
     ("github:pinterest/ktlint", "ktlint"),
     // ryl is available from aqua-registry, but current mise releases still require
     // the explicit aqua-prefixed key instead of exposing a bare `ryl` tool.
@@ -45,7 +45,7 @@ const OBSOLETE_KEYS_TO_NEXT: &[(&str, &str)] = &[
     ("cargo:xmloxide", "github:jonwiggins/xmloxide"),
 ];
 
-const UNSUPPORTED_KEYS_TO_NEXT: &[(&str, &str)] = &[
+const UNSUPPORTED_KEYS_TO_SETUP_VERSION_2: &[(&str, &str)] = &[
     (
         "npm:markdownlint-cli",
         "replace with rumdl and remove markdownlint-era config",
@@ -63,13 +63,13 @@ const UNSUPPORTED_KEYS_TO_NEXT: &[(&str, &str)] = &[
 pub const SETUP_MIGRATIONS: &[SetupMigration] = &[
     SetupMigration {
         target_version: DEPLOYED_SETUP_VERSION,
-        obsolete_keys: OBSOLETE_KEYS_TO_DEPLOYED,
+        obsolete_keys: OBSOLETE_KEYS_TO_SETUP_VERSION_1,
         unsupported_keys: &[],
     },
     SetupMigration {
         target_version: CURRENT_SETUP_VERSION,
-        obsolete_keys: OBSOLETE_KEYS_TO_NEXT,
-        unsupported_keys: UNSUPPORTED_KEYS_TO_NEXT,
+        obsolete_keys: OBSOLETE_KEYS_TO_SETUP_VERSION_2,
+        unsupported_keys: UNSUPPORTED_KEYS_TO_SETUP_VERSION_2,
     },
 ];
 

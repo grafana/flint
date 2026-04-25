@@ -543,7 +543,7 @@ mod tests {
             &Settings {
                 base_branch: "main".to_string(),
                 exclude: vec!["tests/cases/**".to_string()],
-                setup_version: crate::setup::DEPLOYED_SETUP_VERSION,
+                setup_version: crate::setup::V2_BASELINE_SETUP_VERSION,
             },
         )
         .unwrap();

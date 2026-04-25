@@ -359,9 +359,9 @@ Add and stage your source files before running init so the detection is accurate
     let base_branch = detect_base_branch(project_root);
     let config_dir_path = project_root.join(&config_dir_rel);
     let setup_version = if v1.removed_tasks.is_empty() && !v1.removed_renovate_env {
-        crate::setup::DEPLOYED_SETUP_VERSION
+        crate::setup::V2_BASELINE_SETUP_VERSION
     } else {
-        crate::setup::V1_SETUP_VERSION
+        crate::setup::V1_BOOTSTRAP_SETUP_VERSION
     };
     let toml_generated = generate_flint_toml(
         &config_dir_path,
@@ -1193,7 +1193,7 @@ rust = { version = "1.0", components = "clippy" }
         let written = generate_flint_toml(
             &dir,
             "main",
-            crate::setup::DEPLOYED_SETUP_VERSION,
+            crate::setup::V2_BASELINE_SETUP_VERSION,
             false,
             None,
         )
@@ -1211,7 +1211,7 @@ rust = { version = "1.0", components = "clippy" }
         let written = generate_flint_toml(
             tmp.path(),
             "master",
-            crate::setup::DEPLOYED_SETUP_VERSION,
+            crate::setup::V2_BASELINE_SETUP_VERSION,
             false,
             None,
         )
@@ -1227,7 +1227,7 @@ rust = { version = "1.0", components = "clippy" }
         generate_flint_toml(
             tmp.path(),
             "main",
-            crate::setup::DEPLOYED_SETUP_VERSION,
+            crate::setup::V2_BASELINE_SETUP_VERSION,
             true,
             None,
         )
@@ -1244,7 +1244,7 @@ rust = { version = "1.0", components = "clippy" }
         generate_flint_toml(
             tmp.path(),
             "main",
-            crate::setup::DEPLOYED_SETUP_VERSION,
+            crate::setup::V2_BASELINE_SETUP_VERSION,
             true,
             Some(&managers),
         )
@@ -1265,7 +1265,7 @@ rust = { version = "1.0", components = "clippy" }
         let written = generate_flint_toml(
             tmp.path(),
             "main",
-            crate::setup::DEPLOYED_SETUP_VERSION,
+            crate::setup::V2_BASELINE_SETUP_VERSION,
             false,
             None,
         )

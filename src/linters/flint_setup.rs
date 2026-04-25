@@ -14,15 +14,15 @@ pub async fn run(
     let flint_toml = config_dir.join("flint.toml");
     let mut errors = vec![];
 
-    if flint_toml.exists() && setup_version > crate::setup::CURRENT_SETUP_VERSION {
+    if flint_toml.exists() && setup_version > crate::setup::LATEST_SUPPORTED_SETUP_VERSION {
         errors.push(format!(
             "flint.toml setup_version is {setup_version}, but this flint only supports {}.",
-            crate::setup::CURRENT_SETUP_VERSION
+            crate::setup::LATEST_SUPPORTED_SETUP_VERSION
         ));
-    } else if flint_toml.exists() && setup_version < crate::setup::CURRENT_SETUP_VERSION {
+    } else if flint_toml.exists() && setup_version < crate::setup::LATEST_SUPPORTED_SETUP_VERSION {
         errors.push(format!(
             "flint.toml setup_version is {setup_version}, expected {}.",
-            crate::setup::CURRENT_SETUP_VERSION
+            crate::setup::LATEST_SUPPORTED_SETUP_VERSION
         ));
     }
 
@@ -61,7 +61,7 @@ pub async fn run(
         ));
     }
 
-    if flint_toml.exists() && setup_version > crate::setup::CURRENT_SETUP_VERSION {
+    if flint_toml.exists() && setup_version > crate::setup::LATEST_SUPPORTED_SETUP_VERSION {
         return LinterOutput::err(format!(
             "ERROR: {}\nUpgrade flint before changing this repo setup.\n",
             errors.join("\nERROR: ")
@@ -75,7 +75,11 @@ pub async fn run(
         return LinterOutput::err(format!("flint: flint-setup: {e}\n"));
     }
     if flint_toml.exists()
-        && let Err(e) = write_setup_version(config_dir, "main", crate::setup::CURRENT_SETUP_VERSION)
+        && let Err(e) = write_setup_version(
+            config_dir,
+            "main",
+            crate::setup::LATEST_SUPPORTED_SETUP_VERSION,
+        )
     {
         return LinterOutput::err(format!("flint: flint-setup: {e}\n"));
     }
@@ -104,7 +108,7 @@ mod tests {
             false,
             tmp.path(),
             tmp.path(),
-            crate::setup::CURRENT_SETUP_VERSION,
+            crate::setup::LATEST_SUPPORTED_SETUP_VERSION,
         )
         .await;
         let content = std::fs::read_to_string(tmp.path().join("mise.toml")).unwrap();
@@ -131,7 +135,7 @@ mod tests {
             true,
             tmp.path(),
             tmp.path(),
-            crate::setup::CURRENT_SETUP_VERSION,
+            crate::setup::LATEST_SUPPORTED_SETUP_VERSION,
         )
         .await;
         let content = std::fs::read_to_string(tmp.path().join("mise.toml")).unwrap();
@@ -152,7 +156,7 @@ mod tests {
             false,
             tmp.path(),
             tmp.path(),
-            crate::setup::DEPLOYED_SETUP_VERSION,
+            crate::setup::V2_BASELINE_SETUP_VERSION,
         )
         .await;
 
@@ -174,7 +178,7 @@ mod tests {
             true,
             tmp.path(),
             tmp.path(),
-            crate::setup::DEPLOYED_SETUP_VERSION,
+            crate::setup::V2_BASELINE_SETUP_VERSION,
         )
         .await;
         let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-pub const V1_SETUP_VERSION: u32 = 0;
-pub const DEPLOYED_SETUP_VERSION: u32 = 1;
-pub const CURRENT_SETUP_VERSION: u32 = 2;
+pub const V1_BOOTSTRAP_SETUP_VERSION: u32 = 0;
+pub const V2_BASELINE_SETUP_VERSION: u32 = 1;
+pub const LATEST_SUPPORTED_SETUP_VERSION: u32 = 2;
 
 pub struct SetupMigration {
     pub target_version: u32,
@@ -62,12 +62,12 @@ const UNSUPPORTED_KEYS_TO_SETUP_VERSION_2: &[(&str, &str)] = &[
 
 pub const SETUP_MIGRATIONS: &[SetupMigration] = &[
     SetupMigration {
-        target_version: DEPLOYED_SETUP_VERSION,
+        target_version: V2_BASELINE_SETUP_VERSION,
         obsolete_keys: OBSOLETE_KEYS_TO_SETUP_VERSION_1,
         unsupported_keys: &[],
     },
     SetupMigration {
-        target_version: CURRENT_SETUP_VERSION,
+        target_version: LATEST_SUPPORTED_SETUP_VERSION,
         obsolete_keys: OBSOLETE_KEYS_TO_SETUP_VERSION_2,
         unsupported_keys: UNSUPPORTED_KEYS_TO_SETUP_VERSION_2,
     },
@@ -135,21 +135,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn current_setup_version_matches_latest_migration() {
+    fn latest_supported_setup_version_matches_latest_migration() {
         let latest = SETUP_MIGRATIONS
             .iter()
             .map(|migration| migration.target_version)
             .max()
             .unwrap_or(0);
         assert_eq!(
-            CURRENT_SETUP_VERSION, latest,
-            "CURRENT_SETUP_VERSION must match the latest setup migration target version"
+            LATEST_SUPPORTED_SETUP_VERSION, latest,
+            "LATEST_SUPPORTED_SETUP_VERSION must match the latest setup migration target version"
         );
     }
 
     #[test]
     fn setup_migration_versions_are_strictly_increasing() {
-        let mut previous = V1_SETUP_VERSION;
+        let mut previous = V1_BOOTSTRAP_SETUP_VERSION;
         for migration in SETUP_MIGRATIONS {
             assert!(
                 migration.target_version > previous,
@@ -181,9 +181,9 @@ mod tests {
     }
 
     #[test]
-    fn deployed_baseline_migrations_are_explicit() {
-        let obsolete = obsolete_keys_after(DEPLOYED_SETUP_VERSION);
-        let unsupported = unsupported_keys_after(DEPLOYED_SETUP_VERSION);
+    fn v2_baseline_migrations_are_explicit() {
+        let obsolete = obsolete_keys_after(V2_BASELINE_SETUP_VERSION);
+        let unsupported = unsupported_keys_after(V2_BASELINE_SETUP_VERSION);
 
         assert!(obsolete.contains(&("pipx:ruff", "ruff")));
         assert!(obsolete.contains(&("shellcheck", "github:koalaman/shellcheck")));
@@ -193,8 +193,8 @@ mod tests {
                 .any(|(old, _)| *old == "npm:markdownlint-cli2")
         );
         assert!(unsupported.iter().any(|(old, _)| *old == "npm:prettier"));
-        assert!(obsolete_keys_after(CURRENT_SETUP_VERSION).is_empty());
-        assert!(unsupported_keys_after(CURRENT_SETUP_VERSION).is_empty());
+        assert!(obsolete_keys_after(LATEST_SUPPORTED_SETUP_VERSION).is_empty());
+        assert!(unsupported_keys_after(LATEST_SUPPORTED_SETUP_VERSION).is_empty());
     }
 
     #[test]

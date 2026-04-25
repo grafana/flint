@@ -8,6 +8,6 @@ stdout = "  replaced \"github:mvdan/sh\" → \"shfmt\"\n"
 [tools]
 
 # Linters
-shellcheck = "v0.11.0"
+"github:koalaman/shellcheck" = "v0.11.0"
 shfmt = "v3.13.1"
 '''

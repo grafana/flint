@@ -43,6 +43,7 @@
         "editorconfig-checker",
         "github:google/google-java-format",
         "github:jonwiggins/xmloxide",
+        "github:koalaman/shellcheck",
         "golangci-lint",
         "hadolint",
         "ktlint",
@@ -51,7 +52,6 @@
         "pipx:codespell",
         "ruff",
         "rumdl",
-        "shellcheck",
         "shfmt",
         "taplo"
       ],

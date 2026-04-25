@@ -83,6 +83,7 @@ fn check_shellcheck() -> Check {
         "shellcheck -x -P SCRIPTDIR {FILE}",
         &["*.sh", "*.bash", "*.bats"],
     )
+    .mise_tool("github:koalaman/shellcheck")
     .linter_config(".shellcheckrc", "--rcfile")
     .baseline_config(ConfigFile::config_dir(".shellcheckrc"))
     .unsupported_configs(SHELLCHECK_UNSUPPORTED_CONFIGS)

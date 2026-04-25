@@ -650,7 +650,7 @@ mod node_prereq_tests {
 
     #[test]
     fn no_node_needed_when_no_npm_keys() {
-        let content = "[tools]\nshellcheck = \"v0.11.0\"\n";
+        let content = "[tools]\n\"github:koalaman/shellcheck\" = \"v0.11.0\"\n";
         assert!(!needs_node_for_npm(content));
     }
 
@@ -681,7 +681,7 @@ mod node_prereq_tests {
     fn noop_without_npm_tools() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mise.toml");
-        let original = "[tools]\nshellcheck = \"v0.11.0\"\n";
+        let original = "[tools]\n\"github:koalaman/shellcheck\" = \"v0.11.0\"\n";
         std::fs::write(&path, original).unwrap();
         let added = ensure_node_for_npm(dir.path()).unwrap();
         assert!(!added);
@@ -738,7 +738,7 @@ mod replace_obsolete_tests {
         let path = dir.path().join("mise.toml");
         std::fs::write(
             &path,
-            "[tools]\nnode = \"24.15.0\"\n\n# Linters\n\"github:mvdan/sh\" = \"v3.13.1\"\nshellcheck = \"v0.11.0\"\n",
+            "[tools]\nnode = \"24.15.0\"\n\n# Linters\n\"github:mvdan/sh\" = \"v3.13.1\"\n\"github:koalaman/shellcheck\" = \"v0.11.0\"\n",
         )
         .unwrap();
         let replaced = replace_obsolete_keys(dir.path(), &[("github:mvdan/sh", "shfmt")]).unwrap();
@@ -750,7 +750,7 @@ mod replace_obsolete_tests {
         assert!(result.contains("# Linters"));
         assert_eq!(result.matches("# Linters").count(), 1);
         assert!(result.contains("node = \"24.15.0\""));
-        assert!(result.contains("shellcheck = \"v0.11.0\""));
+        assert!(result.contains("\"github:koalaman/shellcheck\" = \"v0.11.0\""));
         assert!(result.contains("shfmt = \"v3.13.1\""));
     }
 
@@ -776,17 +776,17 @@ mod replace_obsolete_tests {
         let path = dir.path().join("mise.toml");
         std::fs::write(
             &path,
-            "[tools]\nnode = \"24.15.0\"\n\n# Linters\nshellcheck = \"v0.11.0\"\nshfmt = \"v3.13.1\"\n",
+            "[tools]\nnode = \"24.15.0\"\n\n# Linters\n\"github:koalaman/shellcheck\" = \"v0.11.0\"\nshfmt = \"v3.13.1\"\n",
         )
         .unwrap();
-        let removed = remove_tool_keys(dir.path(), &["shellcheck"]).unwrap();
-        assert_eq!(removed, vec!["shellcheck".to_string()]);
+        let removed = remove_tool_keys(dir.path(), &["github:koalaman/shellcheck"]).unwrap();
+        assert_eq!(removed, vec!["github:koalaman/shellcheck".to_string()]);
         let result = std::fs::read_to_string(&path).unwrap();
         assert!(result.contains("# Linters"));
         assert_eq!(result.matches("# Linters").count(), 1);
         assert!(result.contains("node = \"24.15.0\""));
         assert!(result.contains("shfmt = \"v3.13.1\""));
-        assert!(!result.contains("shellcheck ="));
+        assert!(!result.contains("\"github:koalaman/shellcheck\" ="));
     }
 }
 

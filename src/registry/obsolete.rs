@@ -18,7 +18,6 @@ pub const OBSOLETE_KEYS: &[(&str, &str)] = &[
     // Ruff is available as a bare aqua-backed tool key.
     ("pipx:ruff", "ruff"),
     ("github:astral-sh/ruff", "ruff"),
-    ("github:koalaman/shellcheck", "shellcheck"),
     // github:mvdan/sh is superseded by bare shfmt; mise resolves it via aqua:mvdan/sh,
     // and the aqua registry now ships Windows support for shfmt.
     ("github:mvdan/sh", "shfmt"),

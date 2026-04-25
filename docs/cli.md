@@ -15,27 +15,27 @@ it do not need to re-learn the interface.
 
 ## `flint run` flags
 
-| Flag                 | Description                                                                                    |
-| -------------------- | ---------------------------------------------------------------------------------------------- |
-| `--fix`              | Fix what's fixable, report `clean` / `fixed` / `partial` / `review` outcomes; exit non-zero if anything needs action |
-| `--full`             | Lint all files instead of only changed files                                                   |
-| `--fast-only`        | Skip checks tagged as slow in the registry. Overridden by explicit linter names.               |
-| `--short`            | Compact summary output, no per-check noise                                                     |
-| `--verbose`          | Show all linter output, not just failures                                                      |
-| `--new-from-rev REV` | Diff base (default: merge base with base branch)                                               |
-| `--to-ref REF`       | Diff head (default: HEAD)                                                                      |
+| Flag | Description |
+| ---- | ----------- |
+| `--fix` | Fix what's fixable, report `clean` / `fixed` / `partial` / `review` outcomes; exit non-zero if anything needs action |
+| `--full` | Lint all files instead of only changed files |
+| `--fast-only` | Skip checks tagged as slow in the registry. Overridden by explicit linter names. |
+| `--short` | Compact summary output, no per-check noise |
+| `--verbose` | Show all linter output, not just failures |
+| `--new-from-rev REV` | Diff base (default: merge base with base branch) |
+| `--to-ref REF` | Diff head (default: HEAD) |
 
 Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`, `FLINT_FAST_ONLY`,
 `FLINT_VERBOSE`, `FLINT_SHORT`, `FLINT_NEW_FROM_REV`, `FLINT_TO_REF`.
 
 ## Intended use by context
 
-| Context                      | Command                                | Why                                                               |
-| ---------------------------- | -------------------------------------- | ----------------------------------------------------------------- |
-| Interactive development      | `flint run` or `flint run --fast-only` | Full output so you can read the details                           |
-| Human wanting a summary      | `flint run --short`                    | Compact output, no per-check noise                                |
-| Pre-push hook (CC / agentic) | `flint run --fix --fast-only`          | Fixes what it can silently, surfaces only what needs human review |
-| CI                           | `flint run`                            | Full output for humans reading CI logs                            |
+| Context | Command | Why |
+| ------- | ------- | --- |
+| Interactive development | `flint run` or `flint run --fast-only` | Full output so you can read the details |
+| Human wanting a summary | `flint run --short` | Compact output, no per-check noise |
+| Pre-push hook (CC / agentic) | `flint run --fix --fast-only` | Fixes what it can silently, surfaces only what needs human review |
+| CI | `flint run` | Full output for humans reading CI logs |
 
 ## Changed-file and baseline runs
 

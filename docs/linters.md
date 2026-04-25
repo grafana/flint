@@ -3,10 +3,11 @@
 Every supported check, its config file (when applicable), and its scope. The
 [summary table lives in the README](../README.md#built-in-linter-registry).
 
-**Note:** Biome is the exception to `FLINT_CONFIG_DIR`: its real CLI does not
-work reliably with a nested managed config, so flint treats root `biome.jsonc`
-as the canonical Biome config. Flint is opinionated here: use JSONC, not
-`biome.json`.
+> [!NOTE]
+> Biome is the exception to `FLINT_CONFIG_DIR`: its real CLI does not work
+> reliably with a nested managed config, so flint treats root `biome.jsonc` as
+> the canonical Biome config. Flint is opinionated here: use JSONC, not
+> `biome.json`.
 
 <!-- editorconfig-checker-disable -->
 <!-- markdownlint-disable MD013 -->

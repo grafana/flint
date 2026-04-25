@@ -81,7 +81,11 @@ pub(super) fn generate_rumdl_config(
          enabled = true\n\
          line-length = {line_length}\n\
          code-blocks = false\n\
-         tables = false\n",
+         tables = false\n\
+         \n\
+         [MD060]\n\
+         enabled = true\n\
+         style = \"aligned\"\n",
     );
     std::fs::write(&target, content)?;
     println!("  wrote {}", target.display());

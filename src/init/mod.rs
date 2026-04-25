@@ -857,6 +857,8 @@ rust = { version = "1.0", components = "clippy" }
         let content = std::fs::read_to_string(config_dir.join(".rumdl.toml")).unwrap();
         assert!(content.contains("line-length = 120"));
         assert!(content.contains("code-blocks = false"));
+        assert!(content.contains("[MD060]"));
+        assert!(content.contains("style = \"aligned\""));
         assert!(!content.contains("[global]"));
     }
 

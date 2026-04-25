@@ -2,8 +2,6 @@ use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 
 use super::*;
-use crate::registry::LinterConfig;
-
 #[test]
 fn find_obsolete_key_returns_none_for_clean_tools() {
     let mut tools = HashMap::new();
@@ -476,7 +474,7 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     }
 
     match check.linter_config.as_ref() {
-        Some(config) => rows.push(("Config", format!("`{}`", display_config_name(config)))),
+        Some(config) => rows.push(("Config", format!("`{}`", config.display_name()))),
         None => {
             if matches!(&check.kind, CheckKind::Special(SpecialKind::Links)) {
                 rows.push(("Config", "via `[checks.links]` in flint.toml".to_string()));
@@ -499,14 +497,6 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
 
     rows
 }
-
-fn display_config_name(config: &LinterConfig) -> String {
-    match config {
-        LinterConfig::File { file, .. } => (*file).to_string(),
-        LinterConfig::DirIfAny { files, .. } => files.join(" / "),
-    }
-}
-
 /// Smoke test: every check whose tool key resolves in this repo's expanded
 /// mise_tools map must pass check_active. This catches tool-name mismatches
 /// (wrong lookup key) and version-range violations without a hardcoded list —

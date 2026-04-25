@@ -77,6 +77,24 @@ pub enum LinterConfig {
     },
 }
 
+impl LinterConfig {
+    pub fn display_name(&self) -> String {
+        match self {
+            Self::File { file, .. } => (*file).to_string(),
+            Self::DirIfAny { files, .. } => files.join(" / "),
+        }
+    }
+
+    pub fn canonical_location(&self) -> String {
+        match self {
+            Self::File { file, .. } => format!("FLINT_CONFIG_DIR/{file}"),
+            Self::DirIfAny { files, .. } => {
+                format!("FLINT_CONFIG_DIR (with one of: {})", files.join(", "))
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Check {
     pub name: &'static str,

@@ -773,7 +773,10 @@ pub fn linter_json(check: &registry::Check) -> serde_json::Value {
         CheckKind::Special(_) => "special",
     };
     let patterns: Vec<&str> = check.patterns.to_vec();
-    let config_file = check.linter_config.as_ref().map(display_config_name);
+    let config_file = check
+        .linter_config
+        .as_ref()
+        .map(LinterConfig::canonical_location);
     serde_json::json!({
         "name": check.name,
         "description": check.desc,
@@ -788,14 +791,7 @@ pub fn linter_json(check: &registry::Check) -> serde_json::Value {
 }
 
 fn canonical_config_path(config: &LinterConfig) -> String {
-    format!("FLINT_CONFIG_DIR/{}", display_config_name(config))
-}
-
-fn display_config_name(config: &LinterConfig) -> String {
-    match config {
-        LinterConfig::File { file, .. } => (*file).to_string(),
-        LinterConfig::DirIfAny { files, .. } => files.join(" / "),
-    }
+    config.canonical_location()
 }
 
 fn run_policy_label(run_policy: RunPolicy) -> &'static str {

@@ -391,11 +391,13 @@ pub(super) fn generate_taplo_config(config_dir: &Path, line_length: u16) -> Resu
     if let Some(parent) = target.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let content = format!(
-        "[formatting]\n\
-         column_width = {line_length}\n\
-         indent_string = \"  \"\n"
-    );
+    let content = [
+        "[formatting]".to_string(),
+        format!("column_width = {line_length}"),
+        "indent_string = \"  \"".to_string(),
+    ]
+    .join("\n")
+        + "\n";
     std::fs::write(&target, content)?;
     println!("  wrote {}", target.display());
     Ok(true)

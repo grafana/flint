@@ -1032,9 +1032,10 @@ rust = { version = "1.0", components = "clippy" }
         let content = std::fs::read_to_string(config_dir.join(".yamllint.yml")).unwrap();
         assert!(content.contains("extends: relaxed"));
         assert!(content.contains("document-start: disable"));
-        assert!(content.contains("line-length: disable"));
-        assert!(content.contains("indentation: enable"));
-        assert!(content.contains("truthy: disable"));
+        assert!(content.contains("line-length:"));
+        assert!(content.contains("max: 120"));
+        assert!(content.contains("indentation:"));
+        assert!(content.contains("spaces: 2"));
     }
 
     #[test]

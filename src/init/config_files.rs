@@ -348,7 +348,7 @@ pub(super) fn exclude_formatter_owned_files_from_editorconfig_checker(
 }
 
 /// Generates `.yamllint.yml` in the flint config dir when yaml-lint is being set up.
-pub(super) fn generate_yamllint_config(config_dir: &Path, _line_length: u16) -> Result<bool> {
+pub(super) fn generate_yamllint_config(config_dir: &Path, line_length: u16) -> Result<bool> {
     let target = config_dir.join(".yamllint.yml");
     if target.exists() {
         return Ok(false);
@@ -361,9 +361,10 @@ pub(super) fn generate_yamllint_config(config_dir: &Path, _line_length: u16) -> 
         "",
         "rules:",
         "  document-start: disable",
-        "  line-length: disable",
-        "  indentation: enable",
-        "  truthy: disable",
+        "  line-length:",
+        &format!("    max: {line_length}"),
+        "  indentation:",
+        "    spaces: 2",
         "",
     ]
     .join("\n");

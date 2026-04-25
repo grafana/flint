@@ -50,9 +50,10 @@ extends: relaxed
 
 rules:
   document-start: disable
-  line-length: disable
-  indentation: enable
-  truthy: disable
+  line-length:
+    max: 120
+  indentation:
+    spaces: 2
 '''
 ".github/config/rustfmt.toml" = '''
 max_width = 120

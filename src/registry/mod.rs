@@ -16,11 +16,13 @@ pub use types::{
     FixBehavior, LinterConfig, RunPolicy, Scope, SpecialKind,
 };
 
-/// Returns the set of `mise.toml` tool keys that belong under the `# Linters`
-/// header. Runtime, SDK, and unrelated project tools stay above the header.
+/// Returns the explicit set of flint-managed tool keys that belong under the
+/// `# Linters` header in `mise.toml`.
 ///
-/// Includes unsupported legacy lint tools so existing configs still group
-/// lint-related entries together before `flint init` removes or replaces them.
+/// This is intentionally invite-only: runtime, SDK, repo-specific, and unknown
+/// tools stay above the header unless flint explicitly manages them. Unsupported
+/// legacy lint tools are included so existing configs still group lint-related
+/// entries together before `flint init` removes or replaces them.
 pub fn linter_keys() -> std::collections::HashSet<&'static str> {
     let mut keys: std::collections::HashSet<&'static str> = std::collections::HashSet::new();
     for check in builtin()

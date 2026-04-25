@@ -687,6 +687,39 @@ shellcheck = "0.11.0"
     }
 
     #[test]
+    fn normalize_tools_section_keeps_unknown_tools_above_linters_header() {
+        let content = r#"[tools]
+
+# Linters
+custom-tool = "1.0.0"
+java = "temurin-25.0.3+9.0.LTS"
+node = "24.15.0"
+protoc = "34.1"
+shellcheck = "0.11.0"
+"#;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), content).unwrap();
+        let changed = normalize_tools_section(tmp.path()).unwrap();
+        assert!(changed);
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        let custom_pos = result.find("custom-tool =").expect("custom tool present");
+        let java_pos = result.find("java =").expect("java present");
+        let node_pos = result.find("node =").expect("node present");
+        let protoc_pos = result.find("protoc =").expect("protoc present");
+        let header_pos = result.find("# Linters").expect("header present");
+        let shellcheck_pos = result.find("shellcheck =").expect("shellcheck present");
+        assert!(
+            custom_pos < header_pos
+                && java_pos < header_pos
+                && node_pos < header_pos
+                && protoc_pos < header_pos
+                && header_pos < shellcheck_pos,
+            "only explicitly managed linter keys belong below the header:\n{result}"
+        );
+        assert_eq!(result.matches("# Linters").count(), 1, "single header");
+    }
+
+    #[test]
     fn apply_changes_upgrade_preserves_version() {
         let content = "[tools]\nrust = \"1.80.0\"\n";
         let tmp = tempfile::NamedTempFile::new().unwrap();

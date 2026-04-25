@@ -252,12 +252,93 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
 }
 
 #[test]
+fn repo_renovate_config_stays_aligned_with_shared_preset_contract() {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let default_json_path = manifest_dir.join("default.json");
+    let repo_renovate_path = manifest_dir.join(".github/renovate.json5");
+
+    let default_json =
+        std::fs::read_to_string(&default_json_path).expect("default.json must be readable");
+    let repo_renovate = std::fs::read_to_string(&repo_renovate_path)
+        .expect(".github/renovate.json5 must be readable");
+
+    let default_parsed: serde_json::Value =
+        serde_json::from_str(&default_json).expect("default.json must be valid JSON");
+    let repo_parsed: serde_json::Value =
+        json5::from_str(&repo_renovate).expect(".github/renovate.json5 must be valid JSON5");
+
+    for group_name in ["linters", "mise"] {
+        let default_rule = package_rule_by_group_name(&default_parsed, group_name)
+            .unwrap_or_else(|| panic!("default.json missing package rule {group_name:?}"));
+        let repo_rule = package_rule_by_group_name(&repo_parsed, group_name).unwrap_or_else(|| {
+            panic!(".github/renovate.json5 missing package rule {group_name:?}")
+        });
+        assert_eq!(
+            default_rule["description"], repo_rule["description"],
+            "package rule {group_name:?} description in .github/renovate.json5 drifted from default.json"
+        );
+        assert_eq!(
+            default_rule["schedule"], repo_rule["schedule"],
+            "package rule {group_name:?} schedule in .github/renovate.json5 drifted from default.json"
+        );
+        assert_eq!(
+            package_names(default_rule),
+            package_names(repo_rule),
+            "package rule {group_name:?} matchPackageNames in .github/renovate.json5 drifted from default.json"
+        );
+    }
+
+    let description = "Update mise version in GitHub Actions workflows";
+    let default_manager = custom_manager_by_description(&default_parsed, description)
+        .unwrap_or_else(|| panic!("default.json missing custom manager {description:?}"));
+    let repo_manager = custom_manager_by_description(&repo_parsed, description)
+        .unwrap_or_else(|| panic!(".github/renovate.json5 missing custom manager {description:?}"));
+    assert_eq!(
+        default_manager, repo_manager,
+        "custom manager {description:?} in .github/renovate.json5 drifted from default.json"
+    );
+}
+
+#[test]
 fn linter_keys_include_mise_and_bare_tool_names() {
     let keys = linter_keys();
     assert!(keys.contains("aqua:owenlamont/ryl"));
     assert!(keys.contains("ryl"));
     assert!(keys.contains("github:jonwiggins/xmloxide"));
     assert!(keys.contains("xmllint"));
+}
+
+fn package_rule_by_group_name<'a>(
+    parsed: &'a serde_json::Value,
+    group_name: &str,
+) -> Option<&'a serde_json::Value> {
+    parsed["packageRules"]
+        .as_array()?
+        .iter()
+        .find(|rule| rule["groupName"].as_str() == Some(group_name))
+}
+
+fn custom_manager_by_description<'a>(
+    parsed: &'a serde_json::Value,
+    description: &str,
+) -> Option<&'a serde_json::Value> {
+    parsed["customManagers"]
+        .as_array()?
+        .iter()
+        .find(|manager| manager["description"].as_str() == Some(description))
+}
+
+fn package_names(rule: &serde_json::Value) -> BTreeSet<&str> {
+    rule["matchPackageNames"]
+        .as_array()
+        .expect("package rule must declare matchPackageNames")
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .expect("package rule matchPackageNames entries must be strings")
+        })
+        .collect()
 }
 
 /// Verifies README summary table and docs/linters.md detail sections stay

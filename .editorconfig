@@ -16,3 +16,11 @@ max_line_length = off
 
 [{CLAUDE.md,.editorconfig,super-linter.env,lychee.toml,renovate.json5,default.json,mise.toml}]
 max_line_length = 300
+
+[*.java]
+# Java line length is handled by google-java-format
+max_line_length = off
+
+[*.md]
+# Markdown line length is handled by rumdl
+max_line_length = off

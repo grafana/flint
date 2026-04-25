@@ -124,16 +124,20 @@ fn check_yaml_lint() -> Check {
 }
 
 fn check_taplo() -> Check {
-    Check::file("taplo", "taplo fmt --check {FILE}", &["*.toml"])
-        .fix("taplo fmt {FILE}")
-        .linter_config(".taplo.toml", "--config")
-        .baseline_config(ConfigFile::config_dir(".taplo.toml"))
-        .unsupported_configs(TAPLO_UNSUPPORTED_CONFIGS)
-        .stderr_filter_prefixes(&[" INFO taplo:"])
-        .formatter()
-        .desc("Format TOML files")
-        .docs(
-            "Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).\n\
+    Check::file(
+        "taplo",
+        "taplo fmt {CONFIG_ARGS} --check {FILE}",
+        &["*.toml"],
+    )
+    .fix("taplo fmt {CONFIG_ARGS} {FILE}")
+    .linter_config(".taplo.toml", "--config")
+    .baseline_config(ConfigFile::config_dir(".taplo.toml"))
+    .unsupported_configs(TAPLO_UNSUPPORTED_CONFIGS)
+    .stderr_filter_prefixes(&[" INFO taplo:"])
+    .formatter()
+    .desc("Format TOML files")
+    .docs(
+        "Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).\n\
             \n\
             This check intentionally stays basic: it uses `taplo fmt --check` for \
             verification and `taplo fmt` for `--fix`. That keeps behavior aligned \
@@ -141,8 +145,8 @@ fn check_taplo() -> Check {
             \n\
             Current caveat: Taplo's published docs currently advertise TOML 1.0.0 \
             support, so treat this check as TOML 1.0-oriented for now.",
-        )
-        .style()
+    )
+    .style()
 }
 
 fn check_actionlint() -> Check {

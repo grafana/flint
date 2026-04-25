@@ -9,7 +9,6 @@ Every supported check, its config file (when applicable), and its scope. The
 > the canonical Biome config. Flint is opinionated here: use JSONC, not
 > `biome.json`.
 
-<!-- editorconfig-checker-disable -->
 <!-- markdownlint-disable MD013 -->
 <!-- linter-details-start -->
 <!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
@@ -296,7 +295,6 @@ Current caveat: Taplo's published docs currently advertise TOML 1.0.0 support, s
 
 <!-- linter-details-end -->
 <!-- markdownlint-enable MD013 -->
-<!-- editorconfig-checker-enable -->
 
 ## Scopes
 

@@ -1,4 +1,3 @@
-<!-- editorconfig-checker-disable -->
 <!-- markdownlint-disable MD033 MD041 -->
 <p align="center">
   <img src="assets/icon.svg" width="128" height="128" alt="flint logo">
@@ -11,7 +10,6 @@
   <a href="https://github.com/grafana/flint/releases"><img src="https://img.shields.io/github/v/release/grafana/flint" alt="GitHub Release"></a>
 </p>
 <!-- markdownlint-enable MD033 MD041 -->
-<!-- editorconfig-checker-enable -->
 
 Linter runner built for speed and consistency:
 
@@ -174,7 +172,6 @@ applies to Markdown via `rumdl` and Java via `google-java-format`.
 Click a name in the table below for details. See the
 [linter reference](docs/linters.md) for scope semantics and per-linter notes.
 
-<!-- editorconfig-checker-disable -->
 <!-- registry-table-start -->
 <!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
 
@@ -206,7 +203,6 @@ Click a name in the table below for details. See the
 | [`yaml-lint`](docs/linters.md#yaml-lint)                       | Lint YAML files for style and consistency                           | yes |
 
 <!-- registry-table-end -->
-<!-- editorconfig-checker-enable -->
 
 ## Versioning
 

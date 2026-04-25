@@ -5,7 +5,7 @@ use std::process::Stdio;
 use std::time::{Duration, Instant};
 use tokio::task::JoinSet;
 
-use crate::config::{Config, LicenseHeaderConfig, LycheeConfig, RenovateDepsConfig};
+use crate::config::{Config, LicenseHeaderConfig, LycheeConfig, RenovateDepsConfig, Settings};
 use crate::files::FileList;
 use crate::linters::{LinterOutput, license_header, lychee, renovate_deps};
 use crate::registry::{Check, CheckKind, LinterConfig, Scope, SpecialKind};
@@ -50,6 +50,7 @@ enum PreparedCheck {
     Links {
         name: String,
         cfg: LycheeConfig,
+        settings: Settings,
         file_list: FileList,
         config_dir: PathBuf,
     },
@@ -115,11 +116,12 @@ impl PreparedCheck {
             }
             Self::Links {
                 cfg,
+                settings,
                 file_list,
                 config_dir,
                 ..
             } => (
-                lychee::run(&cfg, &file_list, project_root, &config_dir).await,
+                lychee::run(&cfg, &settings, &file_list, project_root, &config_dir).await,
                 false,
             ),
             Self::RenovateDeps { cfg, .. } => {
@@ -249,6 +251,7 @@ fn prepare(
         CheckKind::Special(SpecialKind::Links) => Some(PreparedCheck::Links {
             name,
             cfg: cfg.checks.lychee.clone(),
+            settings: cfg.settings.clone(),
             file_list: file_list.clone(),
             config_dir: config_dir.to_path_buf(),
         }),
@@ -547,10 +550,9 @@ async fn run_invocations(
                     combined_stdout.extend_from_slice(&stdout);
                     combined_stderr.extend_from_slice(&stderr);
                 } else {
-                    let stdout =
-                        if output_policy.nonverbose
-                            && !output_policy.nonverbose_filter_prefixes.is_empty()
-                        {
+                    let stdout = if output_policy.nonverbose
+                        && !output_policy.nonverbose_filter_prefixes.is_empty()
+                    {
                         filter_output_lines(&out.stdout, |line| {
                             output_policy
                                 .nonverbose_filter_prefixes

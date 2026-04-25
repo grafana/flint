@@ -13,6 +13,8 @@ mod migrations;
 mod scaffold;
 mod ui;
 
+pub(crate) use config_files::write_setup_version;
+
 use config_files::{
     disable_editorconfig_line_length_for_patterns, generate_biome_config, generate_editorconfig,
     generate_flint_toml, generate_rumdl_config, generate_rustfmt_config, generate_taplo_config,
@@ -23,10 +25,12 @@ use detection::{
 };
 use generation::{
     apply_changes, detect_base_branch, ensure_flint_self_pin, ensure_node_for_npm, flint_preset,
-    get_existing_config_dir, has_slow_selected, normalize_tools_section, patch_renovate_extends,
-    prompt_config_dir, remove_tool_keys, remove_v1_tasks,
+    get_existing_config_dir, has_slow_selected, patch_renovate_extends, prompt_config_dir,
+    remove_tool_keys, remove_v1_tasks,
 };
-use migrations::{active_editorconfig_line_length_sections, apply_repo_migrations};
+use migrations::{
+    active_editorconfig_line_length_sections, apply_repo_migrations, apply_setup_migrations_after,
+};
 use scaffold::{apply_env_and_tasks, generate_lint_workflow, maybe_install_hook};
 use ui::{interactive_select_linters, select_categories_arrow};
 
@@ -210,9 +214,9 @@ Add and stage your source files before running init so the detection is accurate
     let current_content = std::fs::read_to_string(&mise_path).unwrap_or_default();
     let current_tool_keys = parse_tool_keys(&current_content);
     let known_keys: HashSet<&str> = registry.iter().filter_map(install_key).collect();
-    let unsupported_keys: Vec<&str> = crate::registry::UNSUPPORTED_KEYS
-        .iter()
-        .filter_map(|(old_key, _)| current_tool_keys.contains(*old_key).then_some(*old_key))
+    let unsupported_keys: Vec<&str> = crate::registry::unsupported_keys()
+        .into_iter()
+        .filter_map(|(old_key, _)| current_tool_keys.contains(old_key).then_some(old_key))
         .collect();
 
     // Step 2: build one group per install key, covering all checks whose files are
@@ -336,8 +340,6 @@ Add and stage your source files before running init so the detection is accurate
     if flint_pinned {
         println!("  pinned flint itself — reproducible lint runs across contributors");
     }
-    let tools_normalized = normalize_tools_section(&mise_path)?;
-
     let v1 = remove_v1_tasks(&mise_path)?;
     for key in &v1.removed_tasks {
         println!("  removing v1 task {key}");
@@ -351,9 +353,15 @@ Add and stage your source files before running init so the detection is accurate
 
     let base_branch = detect_base_branch(project_root);
     let config_dir_path = project_root.join(&config_dir_rel);
+    let setup_version = if v1.removed_tasks.is_empty() && !v1.removed_renovate_env {
+        crate::setup::DEPLOYED_SETUP_VERSION
+    } else {
+        crate::setup::V1_SETUP_VERSION
+    };
     let toml_generated = generate_flint_toml(
         &config_dir_path,
         &base_branch,
+        setup_version,
         has_renovate,
         v1.renovate_exclude_managers.as_deref(),
     )?;
@@ -420,7 +428,6 @@ Add and stage your source files before running init so the detection is accurate
     if !tools_changed
         && migration_summary.is_noop()
         && !flint_pinned
-        && !tools_normalized
         && v1.removed_tasks.is_empty()
         && !v1.removed_renovate_env
         && !meta_changed
@@ -455,9 +462,7 @@ pub fn update(project_root: &Path, config_dir: &Path) -> Result<()> {
         .map(|(patterns, _)| *patterns)
         .collect::<Vec<_>>();
     let migration_summary = apply_repo_migrations(project_root, config_dir, &delegated_patterns)?;
-    let tools_normalized = normalize_tools_section(&mise_path)?;
-
-    if migration_summary.is_noop() && !tools_normalized {
+    if migration_summary.is_noop() {
         println!("flint: repo lint migration is up to date");
         return Ok(());
     }
@@ -465,6 +470,24 @@ pub fn update(project_root: &Path, config_dir: &Path) -> Result<()> {
     migration_summary.print_messages();
 
     Ok(())
+}
+
+pub(crate) fn apply_setup_migrations(
+    project_root: &Path,
+    config_dir: &Path,
+    setup_version: u32,
+) -> Result<bool> {
+    let mise_path = project_root.join("mise.toml");
+    let current_content = std::fs::read_to_string(&mise_path).unwrap_or_default();
+    let current_tool_keys = parse_tool_keys(&current_content);
+    let delegated_sections = active_editorconfig_line_length_sections(&current_tool_keys);
+    let delegated_patterns = delegated_sections
+        .iter()
+        .map(|(patterns, _)| *patterns)
+        .collect::<Vec<_>>();
+    let migration_summary =
+        apply_setup_migrations_after(project_root, config_dir, &delegated_patterns, setup_version)?;
+    Ok(!migration_summary.is_noop())
 }
 
 fn find_renovate_config(project_root: &Path) -> Option<std::path::PathBuf> {
@@ -1160,7 +1183,14 @@ rust = { version = "1.0", components = "clippy" }
     fn generate_flint_toml_writes_skeleton() {
         let tmp = tempfile::TempDir::new().unwrap();
         let dir = tmp.path().join("config");
-        let written = generate_flint_toml(&dir, "main", false, None).unwrap();
+        let written = generate_flint_toml(
+            &dir,
+            "main",
+            crate::setup::DEPLOYED_SETUP_VERSION,
+            false,
+            None,
+        )
+        .unwrap();
         assert!(written);
         let content = std::fs::read_to_string(dir.join("flint.toml")).unwrap();
         assert!(content.contains("[settings]"));
@@ -1171,7 +1201,14 @@ rust = { version = "1.0", components = "clippy" }
     #[test]
     fn generate_flint_toml_non_main_branch() {
         let tmp = tempfile::TempDir::new().unwrap();
-        let written = generate_flint_toml(tmp.path(), "master", false, None).unwrap();
+        let written = generate_flint_toml(
+            tmp.path(),
+            "master",
+            crate::setup::DEPLOYED_SETUP_VERSION,
+            false,
+            None,
+        )
+        .unwrap();
         assert!(written);
         let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
         assert!(content.contains("base_branch = \"master\""));
@@ -1180,7 +1217,14 @@ rust = { version = "1.0", components = "clippy" }
     #[test]
     fn generate_flint_toml_with_renovate_placeholder() {
         let tmp = tempfile::TempDir::new().unwrap();
-        generate_flint_toml(tmp.path(), "main", true, None).unwrap();
+        generate_flint_toml(
+            tmp.path(),
+            "main",
+            crate::setup::DEPLOYED_SETUP_VERSION,
+            true,
+            None,
+        )
+        .unwrap();
         let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
         assert!(content.contains("[checks.renovate-deps]"));
         assert!(content.contains("# exclude_managers ="));
@@ -1190,7 +1234,14 @@ rust = { version = "1.0", components = "clippy" }
     fn generate_flint_toml_with_renovate_managers() {
         let tmp = tempfile::TempDir::new().unwrap();
         let managers = vec!["github-actions".to_string(), "cargo".to_string()];
-        generate_flint_toml(tmp.path(), "main", true, Some(&managers)).unwrap();
+        generate_flint_toml(
+            tmp.path(),
+            "main",
+            crate::setup::DEPLOYED_SETUP_VERSION,
+            true,
+            Some(&managers),
+        )
+        .unwrap();
         let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
         assert!(content.contains("[checks.renovate-deps]"));
         assert!(
@@ -1204,7 +1255,14 @@ rust = { version = "1.0", components = "clippy" }
     fn generate_flint_toml_skips_existing() {
         let tmp = tempfile::TempDir::new().unwrap();
         std::fs::write(tmp.path().join("flint.toml"), "existing content").unwrap();
-        let written = generate_flint_toml(tmp.path(), "main", false, None).unwrap();
+        let written = generate_flint_toml(
+            tmp.path(),
+            "main",
+            crate::setup::DEPLOYED_SETUP_VERSION,
+            false,
+            None,
+        )
+        .unwrap();
         assert!(!written);
         let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
         assert_eq!(content, "existing content");

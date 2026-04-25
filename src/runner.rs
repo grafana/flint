@@ -7,7 +7,7 @@ use tokio::task::JoinSet;
 
 use crate::config::{Config, LicenseHeaderConfig, LycheeConfig, RenovateDepsConfig, Settings};
 use crate::files::FileList;
-use crate::linters::{LinterOutput, license_header, lychee, renovate_deps};
+use crate::linters::{LinterOutput, flint_setup, license_header, lychee, renovate_deps};
 use crate::registry::{Check, CheckKind, LinterConfig, Scope, SpecialKind};
 
 #[derive(Clone, Copy)]
@@ -63,6 +63,12 @@ enum PreparedCheck {
         cfg: LicenseHeaderConfig,
         files: Vec<PathBuf>,
     },
+    FlintSetup {
+        name: String,
+        path: PathBuf,
+        config_dir: PathBuf,
+        setup_version: u32,
+    },
 }
 
 impl PreparedCheck {
@@ -71,7 +77,8 @@ impl PreparedCheck {
             Self::Invocations { name, .. }
             | Self::Links { name, .. }
             | Self::RenovateDeps { name, .. }
-            | Self::LicenseHeader { name, .. } => name,
+            | Self::LicenseHeader { name, .. }
+            | Self::FlintSetup { name, .. } => name,
         }
     }
 
@@ -129,6 +136,23 @@ impl PreparedCheck {
             }
             Self::LicenseHeader { cfg, files, .. } => {
                 (license_header::run(&cfg, project_root, &files).await, false)
+            }
+            Self::FlintSetup {
+                path,
+                config_dir,
+                setup_version,
+                ..
+            } => {
+                let tracked_files = vec![path.clone(), config_dir.join("flint.toml")];
+                let before = if fix {
+                    Some(fingerprint_files(&tracked_files))
+                } else {
+                    None
+                };
+                let out = flint_setup::run(fix, project_root, &config_dir, setup_version).await;
+                let changed =
+                    before.is_some_and(|before| before != fingerprint_files(&tracked_files));
+                (out, changed)
             }
         };
         CheckResult {
@@ -283,6 +307,12 @@ fn prepare(
                 files,
             })
         }
+        CheckKind::Special(SpecialKind::FlintSetup) => Some(PreparedCheck::FlintSetup {
+            name,
+            path: project_root.join("mise.toml"),
+            config_dir: config_dir.to_path_buf(),
+            setup_version: cfg.settings.setup_version,
+        }),
     }
 }
 

@@ -9,7 +9,6 @@ Every supported check, its config file (when applicable), and its scope. The
 > the canonical Biome config. Flint is opinionated here: use JSONC, not
 > `biome.json`.
 
-<!-- markdownlint-disable MD013 -->
 <!-- linter-details-start -->
 <!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
 ## `actionlint`
@@ -96,6 +95,26 @@ Every supported check, its config file (when applicable), and its scope. The
 | Patterns    | `*`                                           |
 | Config      | `.editorconfig-checker.json`                  |
 
+## `flint-setup`
+
+|             |                                                                    |
+| ----------- | ------------------------------------------------------------------ |
+| Description | Keep mise.toml tools sorted and lint tools grouped under # Linters |
+| Fix         | yes                                                                |
+| Binary      | (built-in)                                                         |
+| Scope       | [special](#scopes)                                                 |
+| Patterns    | `mise.toml`                                                        |
+
+Checks the repo's `mise.toml` for Flint's canonical `[tools]` ordering.
+
+This normalizes `mise.toml` directly during linting:
+
+- sort `[tools]` entries into Flint's canonical order
+- keep lint-managed tool entries under the `# Linters` header
+- keep runtime, SDK, and unknown tool entries above that header
+
+With `--fix`, rewrites `mise.toml` in place.
+
 ## `gofmt`
 
 |             |                 |
@@ -169,7 +188,10 @@ Every supported check, its config file (when applicable), and its scope. The
 
 Orchestrates [lychee](https://lychee.cli.rs/) for link checking. Requires `lychee` in `[tools]`.
 
-Default behavior: checks all links in changed files. When `check_all_local = true` in `flint.toml`, adds a second pass over local links in all files — useful when broken internal links from unchanged files also matter.
+Default behavior: checks all links in changed files. When
+`check_all_local = true` in `flint.toml`, adds a second pass over local links
+in all files — useful when broken internal links from unchanged files also
+matter.
 
 Configure via `flint.toml`:
 
@@ -190,7 +212,9 @@ check_all_local = true
 | Patterns    | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
 | Run policy  | adaptive — runs in `--fast-only` only when relevant                                                                        |
 
-Verifies `.github/renovate-tracked-deps.json` is up to date by running Renovate locally and comparing its output against the committed snapshot. Requires `renovate` in `[tools]`.
+Verifies `.github/renovate-tracked-deps.json` is up to date by running
+Renovate locally and comparing its output against the committed snapshot.
+Requires `renovate` in `[tools]`.
 
 With `--fix`, automatically regenerates and commits the snapshot.
 
@@ -268,9 +292,12 @@ exclude_managers = ["github-actions", "github-runners"]
 
 Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).
 
-This check intentionally stays basic: it uses `taplo fmt --check` for verification and `taplo fmt` for `--fix`. That keeps behavior aligned with flint's existing formatter-style checks.
+This check intentionally stays basic: it uses `taplo fmt --check` for
+verification and `taplo fmt` for `--fix`. That keeps behavior aligned with
+flint's existing formatter-style checks.
 
-Current caveat: Taplo's published docs currently advertise TOML 1.0.0 support, so treat this check as TOML 1.0-oriented for now.
+Current caveat: Taplo's published docs currently advertise TOML 1.0.0
+support, so treat this check as TOML 1.0-oriented for now.
 
 ## `xmllint`
 
@@ -294,7 +321,6 @@ Current caveat: Taplo's published docs currently advertise TOML 1.0.0 support, s
 | Config      | `.yamllint.yml`                           |
 
 <!-- linter-details-end -->
-<!-- markdownlint-enable MD013 -->
 
 ## Scopes
 

@@ -147,7 +147,6 @@ pub(crate) fn ensure_node_for_npm(project_root: &Path) -> Result<bool> {
         return Ok(false);
     }
     if pin_tool_via_mise(project_root, "node", "lts") {
-        let _ = normalize_tools_section_impl(&mise_path, false)?;
         return Ok(true);
     }
     // Fallback: write a soft pin so mise.toml still declares the prereq.
@@ -157,7 +156,6 @@ pub(crate) fn ensure_node_for_npm(project_root: &Path) -> Result<bool> {
         .context("[tools] is not a table")?;
     tools.insert("node", toml_edit::value("lts"));
     std::fs::write(&mise_path, doc.to_string())?;
-    let _ = normalize_tools_section_impl(&mise_path, false)?;
     Ok(true)
 }
 
@@ -180,7 +178,6 @@ pub(crate) fn ensure_flint_self_pin(project_root: &Path) -> Result<bool> {
     let ver = env!("CARGO_PKG_VERSION");
     let ver = ver.split('-').next().unwrap_or(ver);
     if pin_tool_via_mise(project_root, RELEASE_KEY, ver) {
-        let _ = normalize_tools_section_impl(&mise_path, false)?;
         return Ok(true);
     }
     let mut doc: toml_edit::DocumentMut = if content.is_empty() {
@@ -193,7 +190,6 @@ pub(crate) fn ensure_flint_self_pin(project_root: &Path) -> Result<bool> {
         .context("[tools] is not a table")?;
     tools.insert(RELEASE_KEY, toml_edit::value(ver));
     std::fs::write(&mise_path, doc.to_string())?;
-    let _ = normalize_tools_section_impl(&mise_path, false)?;
     Ok(true)
 }
 
@@ -231,7 +227,6 @@ pub fn replace_obsolete_keys(
 
     if !replaced.is_empty() {
         std::fs::write(&path, doc.to_string()).context("failed to write mise.toml")?;
-        let _ = normalize_tools_section_impl(&path, false)?;
     }
     Ok(replaced)
 }
@@ -258,7 +253,6 @@ pub fn remove_tool_keys(project_root: &Path, keys: &[&str]) -> Result<Vec<String
 
     if !removed.is_empty() {
         std::fs::write(&path, doc.to_string()).context("failed to write mise.toml")?;
-        let _ = normalize_tools_section_impl(&path, false)?;
     }
     Ok(removed)
 }
@@ -370,7 +364,6 @@ pub(super) fn apply_changes(
     }
 
     std::fs::write(path, doc.to_string())?;
-    let _ = normalize_tools_section_impl(path, false)?;
     Ok(())
 }
 
@@ -400,7 +393,23 @@ fn normalize_tools_section_impl(path: &Path, verbose: bool) -> Result<bool> {
     Ok(true)
 }
 
-pub(super) fn normalize_tools_section(path: &Path) -> Result<bool> {
+pub(crate) fn tools_section_needs_normalization(path: &Path) -> Result<bool> {
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(_) => return Ok(false),
+    };
+    let mut doc: toml_edit::DocumentMut = match content.parse() {
+        Ok(d) => d,
+        Err(_) => return Ok(false),
+    };
+    let Some(tools) = doc.get_mut("tools").and_then(|i| i.as_table_mut()) else {
+        return Ok(false);
+    };
+    sort_and_group_tools(tools, &content);
+    Ok(doc.to_string() != content)
+}
+
+pub(crate) fn normalize_tools_section(path: &Path) -> Result<bool> {
     normalize_tools_section_impl(path, true)
 }
 
@@ -733,7 +742,7 @@ mod replace_obsolete_tests {
     }
 
     #[test]
-    fn replace_obsolete_keys_preserves_linters_header() {
+    fn replace_obsolete_keys_replaces_keys_without_normalizing_tools_section() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mise.toml");
         std::fs::write(
@@ -747,8 +756,6 @@ mod replace_obsolete_tests {
             vec![("github:mvdan/sh".to_string(), "shfmt".to_string())]
         );
         let result = std::fs::read_to_string(&path).unwrap();
-        assert!(result.contains("# Linters"));
-        assert_eq!(result.matches("# Linters").count(), 1);
         assert!(result.contains("node = \"24.15.0\""));
         assert!(result.contains("\"github:koalaman/shellcheck\" = \"v0.11.0\""));
         assert!(result.contains("shfmt = \"v3.13.1\""));
@@ -771,7 +778,7 @@ mod replace_obsolete_tests {
     }
 
     #[test]
-    fn remove_tool_keys_preserves_linters_header() {
+    fn remove_tool_keys_removes_entries_without_normalizing_tools_section() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mise.toml");
         std::fs::write(
@@ -782,8 +789,6 @@ mod replace_obsolete_tests {
         let removed = remove_tool_keys(dir.path(), &["github:koalaman/shellcheck"]).unwrap();
         assert_eq!(removed, vec!["github:koalaman/shellcheck".to_string()]);
         let result = std::fs::read_to_string(&path).unwrap();
-        assert!(result.contains("# Linters"));
-        assert_eq!(result.matches("# Linters").count(), 1);
         assert!(result.contains("node = \"24.15.0\""));
         assert!(result.contains("shfmt = \"v3.13.1\""));
         assert!(!result.contains("\"github:koalaman/shellcheck\" ="));

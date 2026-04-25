@@ -5,6 +5,7 @@ mod init;
 mod linters;
 mod registry;
 mod runner;
+mod setup;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
@@ -197,16 +198,21 @@ async fn run(
     // --fast-only policy (skipped when linters are named explicitly, relevance-gated for
     // adaptive checks). mise guarantees declared tools are on PATH, so no PATH check needed.
     let mise_tools = registry::read_mise_tools(project_root);
-    if let Some((old, new)) = registry::find_obsolete_key(&mise_tools) {
-        eprintln!("flint: obsolete tool key in mise.toml: {old:?} (replaced by {new:?})");
-        eprintln!("  Run `flint update` to apply the migration automatically.");
-        std::process::exit(1);
-    }
-    if let Some((old, hint)) = registry::find_unsupported_key(&mise_tools) {
-        eprintln!("flint: unsupported legacy lint tool in mise.toml: {old:?}");
-        eprintln!("  Migration required: {hint}.");
-        eprintln!("  Run `flint init` to upgrade the lint toolchain.");
-        std::process::exit(1);
+    let flint_setup_selected = checks
+        .iter()
+        .any(|c| matches!(&c.kind, CheckKind::Special(SpecialKind::FlintSetup)));
+    if !flint_setup_selected {
+        if let Some((old, new)) = registry::find_obsolete_key(&mise_tools) {
+            eprintln!("flint: obsolete tool key in mise.toml: {old:?} (replaced by {new:?})");
+            eprintln!("  Run `flint run --fix flint-setup` to apply the migration automatically.");
+            std::process::exit(1);
+        }
+        if let Some((old, hint)) = registry::find_unsupported_key(&mise_tools) {
+            eprintln!("flint: unsupported legacy lint tool in mise.toml: {old:?}");
+            eprintln!("  Migration required: {hint}.");
+            eprintln!("  Run `flint init` to upgrade the lint toolchain.");
+            std::process::exit(1);
+        }
     }
     let active: Vec<&registry::Check> = {
         let mut out = vec![];
@@ -239,6 +245,55 @@ async fn run(
         }
         out
     };
+
+    let setup_check = active.iter().copied().find(|check| is_flint_setup(check));
+    if let Some(check) = setup_check {
+        let setup_results = run_checks(
+            &[check],
+            &file_list,
+            None,
+            &HashSet::new(),
+            RunOptions {
+                fix: args.fix,
+                verbose: args.verbose,
+                short: args.short,
+                time: args.time,
+            },
+            RunContext {
+                active_checks: &active,
+                project_root,
+                cfg: &cfg,
+                config_dir,
+            },
+        )
+        .await?;
+        let setup_result = setup_results
+            .into_iter()
+            .next()
+            .expect("flint-setup preflight produced a result");
+        if args.fix {
+            finish_fix_outcomes(vec![classify_single_pass_fix(setup_result)]);
+        } else if !setup_result.ok {
+            let failed = [setup_result.name.as_str()];
+            if args.short {
+                eprintln!("flint: 1 check failed — flint run --fix {}", failed[0]);
+            } else {
+                eprintln!("\nflint: 1 check failed ({})", failed[0]);
+                eprintln!(
+                    "💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify."
+                );
+            }
+            std::process::exit(1);
+        }
+    }
+    let active: Vec<&registry::Check> = active
+        .into_iter()
+        .filter(|check| !is_flint_setup(check))
+        .collect();
+
+    if active.is_empty() {
+        return Ok(());
+    }
 
     if let Some((check, config)) = active.iter().find_map(|check| {
         unsupported_config(check, project_root, config_dir).map(|config| (*check, config))
@@ -404,51 +459,7 @@ async fn run(
             }
         }
 
-        // Emit linter output for checks that need manual review so the caller
-        // has the failure details without a second flint invocation.
-        for r in outcomes.iter().filter_map(FixOutcome::result) {
-            eprintln!("[{}]", r.name);
-            if !r.stdout.is_empty() {
-                eprint!("{}", String::from_utf8_lossy(&r.stdout));
-            }
-            if !r.stderr.is_empty() {
-                eprint!("{}", String::from_utf8_lossy(&r.stderr));
-            }
-        }
-
-        let mut fixed = vec![];
-        let mut partial = vec![];
-        let mut review = vec![];
-        for outcome in outcomes {
-            match outcome {
-                FixOutcome::Clean => {}
-                FixOutcome::Fixed(name) => fixed.push(name),
-                FixOutcome::Partial(result) => partial.push(result.name),
-                FixOutcome::Review(result) => review.push(result.name),
-            }
-        }
-        fixed.sort();
-        partial.sort();
-        review.sort();
-        let mut segments = vec![];
-        if !fixed.is_empty() {
-            // Exit 1 even when fixes were applied: in a pre-push context the
-            // fixed files are uncommitted. The caller must commit them first.
-            segments.push(format!(
-                "fixed: {} — commit before pushing",
-                fixed.join(", ")
-            ));
-        }
-        if !partial.is_empty() {
-            segments.push(format!("partial: {}", partial.join(", ")));
-        }
-        if !review.is_empty() {
-            segments.push(format!("review: {}", review.join(", ")));
-        }
-        if !segments.is_empty() {
-            eprintln!("flint: {}", segments.join(" | "));
-            std::process::exit(1);
-        }
+        finish_fix_outcomes(outcomes);
         return Ok(());
     }
 
@@ -530,6 +541,54 @@ impl FixOutcome {
     }
 }
 
+fn finish_fix_outcomes(outcomes: Vec<FixOutcome>) {
+    // Emit linter output for checks that need manual review so the caller has
+    // the failure details without a second flint invocation.
+    for r in outcomes.iter().filter_map(FixOutcome::result) {
+        eprintln!("[{}]", r.name);
+        if !r.stdout.is_empty() {
+            eprint!("{}", String::from_utf8_lossy(&r.stdout));
+        }
+        if !r.stderr.is_empty() {
+            eprint!("{}", String::from_utf8_lossy(&r.stderr));
+        }
+    }
+
+    let mut fixed = vec![];
+    let mut partial = vec![];
+    let mut review = vec![];
+    for outcome in outcomes {
+        match outcome {
+            FixOutcome::Clean => {}
+            FixOutcome::Fixed(name) => fixed.push(name),
+            FixOutcome::Partial(result) => partial.push(result.name),
+            FixOutcome::Review(result) => review.push(result.name),
+        }
+    }
+    fixed.sort();
+    partial.sort();
+    review.sort();
+    let mut segments = vec![];
+    if !fixed.is_empty() {
+        // Exit 1 even when fixes were applied: in a pre-push context the fixed
+        // files are uncommitted. The caller must commit them first.
+        segments.push(format!(
+            "fixed: {} — commit before pushing",
+            fixed.join(", ")
+        ));
+    }
+    if !partial.is_empty() {
+        segments.push(format!("partial: {}", partial.join(", ")));
+    }
+    if !review.is_empty() {
+        segments.push(format!("review: {}", review.join(", ")));
+    }
+    if !segments.is_empty() {
+        eprintln!("flint: {}", segments.join(" | "));
+        std::process::exit(1);
+    }
+}
+
 fn classify_single_pass_fix(result: CheckResult) -> FixOutcome {
     if result.ok {
         if result.changed {
@@ -542,6 +601,10 @@ fn classify_single_pass_fix(result: CheckResult) -> FixOutcome {
     } else {
         FixOutcome::Review(result)
     }
+}
+
+fn is_flint_setup(check: &registry::Check) -> bool {
+    matches!(&check.kind, CheckKind::Special(SpecialKind::FlintSetup))
 }
 
 async fn run_checks(

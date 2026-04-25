@@ -12,6 +12,7 @@ use std::process::Command;
 pub(super) fn generate_flint_toml(
     config_dir: &Path,
     base_branch: &str,
+    setup_version: u32,
     has_renovate: bool,
     exclude_managers: Option<&[String]>,
 ) -> Result<bool> {
@@ -24,6 +25,7 @@ pub(super) fn generate_flint_toml(
     if base_branch != "main" {
         content.push_str(&format!("base_branch = \"{base_branch}\"\n"));
     }
+    content.push_str(&format!("setup_version = {setup_version}\n"));
     content.push_str("# exclude = [\"CHANGELOG\\\\.md\"]\n");
     if has_renovate {
         content.push_str("\n[checks.renovate-deps]\n");
@@ -41,6 +43,39 @@ pub(super) fn generate_flint_toml(
     }
     std::fs::write(&toml_path, &content)?;
     println!("  wrote {}", toml_path.display());
+    Ok(true)
+}
+
+pub(crate) fn write_setup_version(
+    config_dir: &Path,
+    base_branch: &str,
+    version: u32,
+) -> Result<bool> {
+    let toml_path = config_dir.join("flint.toml");
+    if !toml_path.exists() {
+        return generate_flint_toml(config_dir, base_branch, version, false, None);
+    }
+
+    let content = std::fs::read_to_string(&toml_path)
+        .with_context(|| format!("failed to read {}", toml_path.display()))?;
+    let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse flint.toml")?;
+    if doc.get("settings").is_none() {
+        doc["settings"] = toml_edit::table();
+    }
+    let Some(settings) = doc.get_mut("settings").and_then(|item| item.as_table_mut()) else {
+        anyhow::bail!("[settings] is not a table in {}", toml_path.display());
+    };
+    let current = settings
+        .get("setup_version")
+        .and_then(|item| item.as_value())
+        .and_then(|value| value.as_integer())
+        .and_then(|value| u32::try_from(value).ok());
+    if current == Some(version) {
+        return Ok(false);
+    }
+    settings.insert("setup_version", toml_edit::value(i64::from(version)));
+    std::fs::write(&toml_path, doc.to_string())
+        .with_context(|| format!("failed to write {}", toml_path.display()))?;
     Ok(true)
 }
 

@@ -82,11 +82,45 @@ pub(super) fn apply_repo_migrations(
     config_dir: &Path,
     delegated_patterns: &[&'static [&'static str]],
 ) -> Result<RepoMigrationSummary> {
-    let replaced_obsolete =
-        generation::replace_obsolete_keys(project_root, crate::registry::OBSOLETE_KEYS)?;
+    let obsolete_keys = crate::registry::obsolete_keys();
+    let unsupported_keys = crate::registry::unsupported_keys();
+    apply_repo_migrations_with_keys(
+        project_root,
+        config_dir,
+        delegated_patterns,
+        &obsolete_keys,
+        &unsupported_keys,
+    )
+}
+
+pub(super) fn apply_setup_migrations_after(
+    project_root: &Path,
+    config_dir: &Path,
+    delegated_patterns: &[&'static [&'static str]],
+    setup_version: u32,
+) -> Result<RepoMigrationSummary> {
+    let obsolete_keys = crate::setup::obsolete_keys_after(setup_version);
+    let unsupported_keys = crate::setup::unsupported_keys_after(setup_version);
+    apply_repo_migrations_with_keys(
+        project_root,
+        config_dir,
+        delegated_patterns,
+        &obsolete_keys,
+        &unsupported_keys,
+    )
+}
+
+fn apply_repo_migrations_with_keys(
+    project_root: &Path,
+    config_dir: &Path,
+    delegated_patterns: &[&'static [&'static str]],
+    obsolete_keys: &[(&'static str, &'static str)],
+    unsupported_keys: &[(&'static str, &'static str)],
+) -> Result<RepoMigrationSummary> {
+    let replaced_obsolete = generation::replace_obsolete_keys(project_root, obsolete_keys)?;
     let removed_unsupported = remove_tool_keys(
         project_root,
-        &crate::registry::UNSUPPORTED_KEYS
+        &unsupported_keys
             .iter()
             .map(|(old_key, _)| *old_key)
             .collect::<Vec<_>>(),

@@ -1,2 +1,4 @@
 [tools]
+
+# Linters
 "npm:renovate" = "latest"

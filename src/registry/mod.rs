@@ -9,7 +9,7 @@ pub use mise::{
     check_active, flint_version_changed, read_mise_tools, read_mise_tools_at_ref,
     tool_version_changed,
 };
-pub use obsolete::{OBSOLETE_KEYS, UNSUPPORTED_KEYS, find_obsolete_key, find_unsupported_key};
+pub use obsolete::{find_obsolete_key, find_unsupported_key, obsolete_keys, unsupported_keys};
 pub use resolve::binary_on_path;
 pub use types::{
     Category, Check, CheckKind, ConfigBase, ConfigFile, ConfigMatch, EditorconfigLineLengthPolicy,
@@ -34,8 +34,8 @@ pub fn linter_keys() -> std::collections::HashSet<&'static str> {
             keys.insert(tool);
         }
     }
-    keys.extend(OBSOLETE_KEYS.iter().map(|(old, _)| *old));
-    keys.extend(obsolete::UNSUPPORTED_KEYS.iter().map(|(old, _)| *old));
+    keys.extend(obsolete::obsolete_keys().into_iter().map(|(old, _)| old));
+    keys.extend(obsolete::unsupported_keys().into_iter().map(|(old, _)| old));
     keys.insert("github:grafana/flint");
     keys
 }

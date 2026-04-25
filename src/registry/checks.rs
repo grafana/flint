@@ -139,11 +139,11 @@ fn check_taplo() -> Check {
     .docs(
         "Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).\n\
             \n\
-            This check intentionally stays basic: it uses `taplo fmt --check` for \
-            verification and `taplo fmt` for `--fix`. That keeps behavior aligned \
-            with flint's existing formatter-style checks.\n\
+            This check intentionally stays basic: it uses `taplo fmt --check` for\n\
+            verification and `taplo fmt` for `--fix`. That keeps behavior aligned with\n\
+            flint's existing formatter-style checks.\n\
             \n\
-            Current caveat: Taplo's published docs currently advertise TOML 1.0.0 \
+            Current caveat: Taplo's published docs currently advertise TOML 1.0.0\n\
             support, so treat this check as TOML 1.0-oriented for now.",
     )
     .style()
@@ -365,10 +365,10 @@ fn check_lychee() -> Check {
             "Orchestrates [lychee](https://lychee.cli.rs/) for link checking. \
             Requires `lychee` in `[tools]`.\n\
             \n\
-            Default behavior: checks all links in changed files. \
-            When `check_all_local = true` in `flint.toml`, adds a second pass \
-            over local links in all files — useful when broken internal links \
-            from unchanged files also matter.\n\
+            Default behavior: checks all links in changed files. When\n\
+            `check_all_local = true` in `flint.toml`, adds a second pass over local links\n\
+            in all files — useful when broken internal links from unchanged files also\n\
+            matter.\n\
             \n\
             Configure via `flint.toml`:\n\
             \n\
@@ -387,8 +387,8 @@ fn check_renovate_deps() -> Check {
         .patterns(RENOVATE_CONFIG_PATTERNS)
         .desc("Verify Renovate dependency snapshot is up to date")
         .docs(
-            "Verifies `.github/renovate-tracked-deps.json` is up to date by running \
-            Renovate locally and comparing its output against the committed snapshot. \
+            "Verifies `.github/renovate-tracked-deps.json` is up to date by running\n\
+            Renovate locally and comparing its output against the committed snapshot.\n\
             Requires `renovate` in `[tools]`.\n\
             \n\
             With `--fix`, automatically regenerates and commits the snapshot.\n\
@@ -412,8 +412,26 @@ fn check_license_header() -> Check {
     .desc("Check source files have the required license header")
 }
 
+fn check_flint_setup() -> Check {
+    Check::special("flint-setup", "flint-setup", SpecialKind::FlintSetup)
+        .activate_unconditionally()
+        .patterns(&["mise.toml"])
+        .desc("Keep mise.toml tools sorted and lint tools grouped under # Linters")
+        .docs(
+            "Checks the repo's `mise.toml` for Flint's canonical `[tools]` ordering.\n\
+            \n\
+            This normalizes `mise.toml` directly during linting:\n\
+            - sort `[tools]` entries into Flint's canonical order\n\
+            - keep lint-managed tool entries under the `# Linters` header\n\
+            - keep runtime, SDK, and unknown tool entries above that header\n\
+            \n\
+            With `--fix`, rewrites `mise.toml` in place.",
+        )
+}
+
 pub fn builtin() -> Vec<Check> {
     vec![
+        check_flint_setup(),
         check_shellcheck(),
         check_shfmt(),
         check_rumdl(),

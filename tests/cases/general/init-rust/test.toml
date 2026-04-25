@@ -25,6 +25,7 @@ Done. Run `mise install` to install the new tools.
 [expected.files]
 ".github/config/flint.toml" = '''
 [settings]
+setup_version = 1
 # exclude = ["CHANGELOG\\.md"]
 '''
 ".github/config/.rumdl.toml" = '''
@@ -76,17 +77,15 @@ max_width = 120
 '''
 "mise.toml" = '''
 [tools]
-rust = { version = "1.0.0", components = "clippy,rustfmt" }
-
-# Linters
 actionlint = "1.0.0"
-"aqua:owenlamont/ryl" = "1.0.0"
 biome = "1.0.0"
-editorconfig-checker = "1.0.0"
-"github:grafana/flint" = "1.0.0"
-lychee = "1.0.0"
+rust = { version = "1.0.0", components = "clippy,rustfmt" }
 "pipx:codespell" = "1.0.0"
+editorconfig-checker = "1.0.0"
+lychee = "1.0.0"
 rumdl = "1.0.0"
+"aqua:owenlamont/ryl" = "1.0.0"
+"github:grafana/flint" = "1.0.0"
 
 [env]
 FLINT_CONFIG_DIR = ".github/config"

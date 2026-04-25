@@ -6,8 +6,6 @@ stdout = "  replaced \"github:mvdan/sh\" → \"shfmt\"\n"
 [expected.files]
 "mise.toml" = '''
 [tools]
-
-# Linters
 "github:koalaman/shellcheck" = "v0.11.0"
 shfmt = "v3.13.1"
 '''

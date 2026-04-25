@@ -40,6 +40,7 @@ pub enum SpecialKind {
     Links,
     RenovateDeps,
     LicenseHeader,
+    FlintSetup,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -181,12 +182,16 @@ impl Check {
             CheckKind::Special(SpecialKind::Links) => false,
             CheckKind::Special(SpecialKind::RenovateDeps) => true,
             CheckKind::Special(SpecialKind::LicenseHeader) => false,
+            CheckKind::Special(SpecialKind::FlintSetup) => true,
         }
     }
 
     /// Returns false for checks implemented entirely in-process with no external binary.
     pub fn uses_binary(&self) -> bool {
-        !matches!(self.kind, CheckKind::Special(SpecialKind::LicenseHeader))
+        !matches!(
+            self.kind,
+            CheckKind::Special(SpecialKind::LicenseHeader | SpecialKind::FlintSetup)
+        )
     }
 
     pub fn fix_behavior(&self) -> FixBehavior {

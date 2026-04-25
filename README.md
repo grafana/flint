@@ -185,7 +185,7 @@ Click a name in the table below for details. See the
 | [`codespell`](docs/linters.md#codespell)                       | Check for common spelling mistakes                                  | yes |
 | [`dotnet-format`](docs/linters.md#dotnet-format)               | Format C# code                                                      | yes |
 | [`editorconfig-checker`](docs/linters.md#editorconfig-checker) | Check files comply with EditorConfig settings                       | —   |
-| [`flint-setup`](docs/linters.md#flint-setup)                   | Keep mise.toml tools sorted and lint tools grouped under # Linters  | yes |
+| [`flint-setup`](docs/linters.md#flint-setup)                   | Keep Flint setup current and mise.toml lint tooling canonical       | yes |
 | [`gofmt`](docs/linters.md#gofmt)                               | Format Go code                                                      | yes |
 | [`golangci-lint`](docs/linters.md#golangci-lint)               | Lint Go code; uses --new-from-rev to scope analysis to changed code | —   |
 | [`google-java-format`](docs/linters.md#google-java-format)     | Format Java code                                                    | yes |

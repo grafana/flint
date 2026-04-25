@@ -63,6 +63,10 @@ struct InitArgs {
     #[arg(long, value_enum)]
     profile: Option<init::Profile>,
 
+    /// Pin flint itself through cargo at this git revision for prerelease validation.
+    #[arg(long, value_name = "REV")]
+    flint_rev: Option<String>,
+
     /// Apply changes without prompting for confirmation.
     #[arg(long, short = 'y')]
     yes: bool,
@@ -143,7 +147,12 @@ async fn main() -> Result<()> {
             }
         }
         SubCommand::Init(args) => {
-            init::run(&project_root, args.profile, args.yes)?;
+            init::run(
+                &project_root,
+                args.profile,
+                args.yes,
+                args.flint_rev.as_deref(),
+            )?;
         }
         SubCommand::Update => {
             init::update(&project_root, &config_dir)?;

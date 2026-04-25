@@ -50,8 +50,9 @@ A check runs against all matching files when:
 
 - the check is newly active because its tool was added to `mise.toml`
 - the check's tool version changed in `mise.toml`
-- the pinned `github:grafana/flint` version changed in `mise.toml`, which
-  expands all active checks
+- the pinned Flint tool changed in `mise.toml`, either released
+  `github:grafana/flint` or a cargo-backed prerelease revision, which expands
+  all active checks
 - the check's flint-managed config file changed, such as `.shellcheckrc` or
   `.yamllint.yml` in `FLINT_CONFIG_DIR`
 - another supported baseline config for the check changed, such as
@@ -120,6 +121,19 @@ Pass one or more linter names to run only those:
 flint run shellcheck shfmt        # run only shellcheck and shfmt
 flint run --fix rumdl             # fix only Markdown issues
 ```
+
+## `flint init`
+
+`flint init` pins Flint itself in `mise.toml` so every contributor uses the same
+lint binary. For unreleased consumer validation, pass an explicit git revision:
+
+```bash
+flint init -y --flint-rev <git-rev>
+```
+
+That writes a cargo-backed Flint pin and enables Cargo's git CLI fetch path. To
+return to the released Flint backend after the release is cut, run `flint init`
+again without `--flint-rev`.
 
 ## `flint update`
 

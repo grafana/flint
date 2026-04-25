@@ -169,7 +169,12 @@ fn default_category_items() -> Vec<CategoryItem> {
     ]
 }
 
-pub fn run(project_root: &Path, profile_arg: Option<Profile>, yes: bool) -> Result<()> {
+pub fn run(
+    project_root: &Path,
+    profile_arg: Option<Profile>,
+    yes: bool,
+    flint_rev: Option<&str>,
+) -> Result<()> {
     println!(
         "Tip: flint init detects languages from tracked files (`git ls-files`). \
 Add and stage your source files before running init so the detection is accurate."
@@ -336,7 +341,7 @@ Add and stage your source files before running init so the detection is accurate
             &final_upgrade,
         )?;
     }
-    let flint_pinned = ensure_flint_self_pin(project_root)?;
+    let flint_pinned = ensure_flint_self_pin(project_root, flint_rev)?;
     if flint_pinned {
         println!("  pinned flint itself — reproducible lint runs across contributors");
     }

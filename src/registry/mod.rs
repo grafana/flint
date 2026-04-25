@@ -37,6 +37,8 @@ pub fn linter_keys() -> std::collections::HashSet<&'static str> {
     keys.extend(obsolete::obsolete_keys().into_iter().map(|(old, _)| old));
     keys.extend(obsolete::unsupported_keys().into_iter().map(|(old, _)| old));
     keys.insert("github:grafana/flint");
+    keys.insert("cargo:https://github.com/grafana/flint");
+    keys.insert("cargo:https://github.com/grafana/flint.git");
     keys
 }
 

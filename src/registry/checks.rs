@@ -416,16 +416,20 @@ fn check_flint_setup() -> Check {
     Check::special("flint-setup", "flint-setup", SpecialKind::FlintSetup)
         .activate_unconditionally()
         .patterns(&["mise.toml"])
-        .desc("Keep mise.toml tools sorted and lint tools grouped under # Linters")
+        .desc("Keep Flint setup current and mise.toml lint tooling canonical")
         .docs(
-            "Checks the repo's `mise.toml` for Flint's canonical `[tools]` ordering.\n\
+            "Checks the repo's Flint-managed setup state and `mise.toml` layout.\n\
             \n\
-            This normalizes `mise.toml` directly during linting:\n\
+            This verifies and fixes Flint-managed setup:\n\
+            - apply versioned Flint setup migrations\n\
+            - replace obsolete lint tool keys with their supported successors\n\
+            - reject unsupported legacy lint tools that need repo migrations\n\
             - sort `[tools]` entries into Flint's canonical order\n\
             - keep lint-managed tool entries under the `# Linters` header\n\
             - keep runtime, SDK, and unknown tool entries above that header\n\
             \n\
-            With `--fix`, rewrites `mise.toml` in place.",
+            With `--fix`, rewrites Flint-managed config in place and advances\n\
+            `settings.setup_version`.",
         )
 }
 

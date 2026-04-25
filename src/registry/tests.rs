@@ -308,6 +308,34 @@ fn linter_keys_include_mise_and_bare_tool_names() {
     assert!(keys.contains("ryl"));
     assert!(keys.contains("github:jonwiggins/xmloxide"));
     assert!(keys.contains("xmllint"));
+    assert!(keys.contains("github:grafana/flint"));
+    assert!(keys.contains("cargo:https://github.com/grafana/flint"));
+    assert!(keys.contains("cargo:https://github.com/grafana/flint.git"));
+}
+
+#[test]
+fn flint_version_changed_detects_cargo_prerelease_rev_changes() {
+    let previous = HashMap::from([(
+        "cargo:https://github.com/grafana/flint".to_string(),
+        "rev:aaaa".to_string(),
+    )]);
+    let current = HashMap::from([(
+        "cargo:https://github.com/grafana/flint".to_string(),
+        "rev:bbbb".to_string(),
+    )]);
+
+    assert!(flint_version_changed(&previous, &current));
+}
+
+#[test]
+fn flint_version_changed_detects_release_to_cargo_backend_switch() {
+    let previous = HashMap::from([("github:grafana/flint".to_string(), "0.20.4".to_string())]);
+    let current = HashMap::from([(
+        "cargo:https://github.com/grafana/flint".to_string(),
+        "rev:bbbb".to_string(),
+    )]);
+
+    assert!(flint_version_changed(&previous, &current));
 }
 
 fn package_rule_by_group_name<'a>(

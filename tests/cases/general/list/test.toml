@@ -4,7 +4,7 @@ exit = 0
 stdout = '''
 NAME                  BINARY              STATUS         SPEED     FIX  DESCRIPTION                                                          PATTERNS
 -------------------------------------------------------------------------------------------------------------------------------------------------------
-flint-setup           flint-setup         active         fast      yes  Keep mise.toml tools sorted and lint tools grouped under # Linters   mise.toml
+flint-setup           flint-setup         active         fast      yes  Keep Flint setup current and mise.toml lint tooling canonical        mise.toml
 shellcheck            shellcheck          active         fast      no   Lint shell scripts for common mistakes                               *.sh *.bash *.bats
 shfmt                 shfmt               active         fast      yes  Format shell scripts                                                 *.sh *.bash
 rumdl                 rumdl               active         fast      yes  Lint Markdown files for style and consistency                        *.md
@@ -65,12 +65,12 @@ renovate = '''
 ruff = '''
 #!/bin/sh
 '''
-rustfmt = '''
-#!/bin/sh
-'''
 shellcheck = '''
 #!/bin/sh
 '''
 shfmt = '''
+#!/bin/sh
+'''
+rustfmt = '''
 #!/bin/sh
 '''

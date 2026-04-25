@@ -97,23 +97,27 @@ Every supported check, its config file (when applicable), and its scope. The
 
 ## `flint-setup`
 
-|             |                                                                    |
-| ----------- | ------------------------------------------------------------------ |
-| Description | Keep mise.toml tools sorted and lint tools grouped under # Linters |
-| Fix         | yes                                                                |
-| Binary      | (built-in)                                                         |
-| Scope       | [special](#scopes)                                                 |
-| Patterns    | `mise.toml`                                                        |
+|             |                                                               |
+| ----------- | ------------------------------------------------------------- |
+| Description | Keep Flint setup current and mise.toml lint tooling canonical |
+| Fix         | yes                                                           |
+| Binary      | (built-in)                                                    |
+| Scope       | [special](#scopes)                                            |
+| Patterns    | `mise.toml`                                                   |
 
-Checks the repo's `mise.toml` for Flint's canonical `[tools]` ordering.
+Checks the repo's Flint-managed setup state and `mise.toml` layout.
 
-This normalizes `mise.toml` directly during linting:
+This verifies and fixes Flint-managed setup:
 
+- apply versioned Flint setup migrations
+- replace obsolete lint tool keys with their supported successors
+- reject unsupported legacy lint tools that need repo migrations
 - sort `[tools]` entries into Flint's canonical order
 - keep lint-managed tool entries under the `# Linters` header
 - keep runtime, SDK, and unknown tool entries above that header
 
-With `--fix`, rewrites `mise.toml` in place.
+With `--fix`, rewrites Flint-managed config in place and advances
+`settings.setup_version`.
 
 ## `gofmt`
 

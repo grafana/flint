@@ -165,38 +165,127 @@ pub(crate) fn ensure_node_for_npm(project_root: &Path) -> Result<bool> {
 /// suffixes are stripped to match [`flint_preset`].
 ///
 /// Returns `true` if a flint entry was added.
-pub(crate) fn ensure_flint_self_pin(project_root: &Path) -> Result<bool> {
+pub(crate) fn ensure_flint_self_pin(project_root: &Path, flint_rev: Option<&str>) -> Result<bool> {
     const RELEASE_KEY: &str = "github:grafana/flint";
+    const CARGO_KEY: &str = "cargo:https://github.com/grafana/flint";
     let mise_path = project_root.join("mise.toml");
     let content = std::fs::read_to_string(&mise_path).unwrap_or_default();
-    if let Ok(doc) = content.parse::<toml_edit::DocumentMut>()
-        && let Some(tools) = doc.get("tools").and_then(|t| t.as_table())
-        && tools.iter().any(|(key, _)| is_flint_tool_key(key))
-    {
-        return Ok(false);
-    }
     let ver = env!("CARGO_PKG_VERSION");
     let ver = ver.split('-').next().unwrap_or(ver);
-    if pin_tool_via_mise(project_root, RELEASE_KEY, ver) {
-        return Ok(true);
-    }
     let mut doc: toml_edit::DocumentMut = if content.is_empty() {
         "[tools]\n".parse().unwrap()
     } else {
         content.parse().context("failed to parse mise.toml")?
     };
+    if doc.get("tools").is_none() {
+        doc["tools"] = toml_edit::table();
+    }
+    let keys_to_remove = doc
+        .get("tools")
+        .and_then(|t| t.as_table())
+        .map(|tools| {
+            tools
+                .iter()
+                .filter_map(|(key, _)| {
+                    (is_flint_tool_key(key)
+                        && (flint_rev.is_some() || key != RELEASE_KEY)
+                        && (flint_rev.is_none() || key != CARGO_KEY))
+                        .then_some(key.to_string())
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    let removing_flint_key = !keys_to_remove.is_empty();
+    let mut changed = false;
     let tools = doc["tools"]
         .as_table_mut()
         .context("[tools] is not a table")?;
-    tools.insert(RELEASE_KEY, toml_edit::value(ver));
-    std::fs::write(&mise_path, doc.to_string())?;
-    Ok(true)
+    for key in keys_to_remove {
+        if tools.remove(&key).is_some() {
+            changed = true;
+        }
+    }
+
+    match flint_rev {
+        Some(rev) => {
+            let rev = rev.strip_prefix("rev:").unwrap_or(rev);
+            let value = format!("rev:{rev}");
+            if tools.get(CARGO_KEY).and_then(|item| item.as_str()) != Some(value.as_str()) {
+                tools.insert(CARGO_KEY, toml_edit::value(value));
+                changed = true;
+            }
+        }
+        None => {
+            if !tools.contains_key(RELEASE_KEY) {
+                if !removing_flint_key && pin_tool_via_mise(project_root, RELEASE_KEY, ver) {
+                    return Ok(true);
+                } else {
+                    tools.insert(RELEASE_KEY, toml_edit::value(ver));
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    if flint_rev.is_some() {
+        changed |= ensure_cargo_git_fetch_with_cli(&mut doc)?;
+    } else {
+        changed |= remove_cargo_git_fetch_with_cli_if_unused(&mut doc)?;
+    }
+
+    if changed {
+        std::fs::write(&mise_path, doc.to_string())?;
+    }
+    Ok(changed)
 }
 
 fn is_flint_tool_key(key: &str) -> bool {
     key == "github:grafana/flint"
         || key.starts_with("cargo:https://github.com/grafana/flint")
         || key.starts_with("cargo:https://github.com/grafana/flint.git")
+}
+
+fn ensure_cargo_git_fetch_with_cli(doc: &mut toml_edit::DocumentMut) -> Result<bool> {
+    if doc.get("env").is_none() {
+        doc["env"] = toml_edit::table();
+    }
+    let env = doc["env"].as_table_mut().context("[env] is not a table")?;
+    if env
+        .get("CARGO_NET_GIT_FETCH_WITH_CLI")
+        .and_then(|item| item.as_str())
+        == Some("true")
+    {
+        return Ok(false);
+    }
+    env.insert("CARGO_NET_GIT_FETCH_WITH_CLI", toml_edit::value("true"));
+    Ok(true)
+}
+
+fn remove_cargo_git_fetch_with_cli_if_unused(doc: &mut toml_edit::DocumentMut) -> Result<bool> {
+    let has_cargo_git_tool = doc
+        .get("tools")
+        .and_then(|t| t.as_table())
+        .is_some_and(|tools| {
+            tools
+                .iter()
+                .any(|(key, _)| key.starts_with("cargo:https://"))
+        });
+    if has_cargo_git_tool {
+        return Ok(false);
+    }
+    let Some(env) = doc.get_mut("env").and_then(|item| item.as_table_mut()) else {
+        return Ok(false);
+    };
+    if env
+        .get("CARGO_NET_GIT_FETCH_WITH_CLI")
+        .and_then(|item| item.as_str())
+        != Some("true")
+    {
+        return Ok(false);
+    }
+    env.remove("CARGO_NET_GIT_FETCH_WITH_CLI");
+    Ok(true)
 }
 
 /// Replaces obsolete tool keys in mise.toml with their modern equivalents,
@@ -698,14 +787,38 @@ mod node_prereq_tests {
     }
 
     #[test]
-    fn flint_self_pin_skips_when_cargo_git_pin_exists() {
+    fn flint_self_pin_reverts_cargo_git_pin_to_release() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mise.toml");
-        let original = "[tools]\n\"cargo:https://github.com/grafana/flint\" = \"rev:deadbeef\"\n";
-        std::fs::write(&path, original).unwrap();
-        let added = ensure_flint_self_pin(dir.path()).unwrap();
-        assert!(!added);
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+        std::fs::write(
+            &path,
+            "[tools]\n\"cargo:https://github.com/grafana/flint\" = \"rev:deadbeef\"\n\n[env]\nCARGO_NET_GIT_FETCH_WITH_CLI = \"true\"\n",
+        )
+        .unwrap();
+        let changed = ensure_flint_self_pin(dir.path(), None).unwrap();
+        let result = std::fs::read_to_string(&path).unwrap();
+        assert!(changed);
+        assert!(result.contains("\"github:grafana/flint\""));
+        assert!(!result.contains("cargo:https://github.com/grafana/flint"));
+        assert!(!result.contains("CARGO_NET_GIT_FETCH_WITH_CLI"));
+    }
+
+    #[test]
+    fn flint_self_pin_writes_cargo_git_pin_for_rev() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        std::fs::write(
+            &path,
+            "[tools]\n\"github:grafana/flint\" = \"0.20.5\"\n\n[env]\nFLINT_CONFIG_DIR = \".github/config\"\n",
+        )
+        .unwrap();
+        let changed = ensure_flint_self_pin(dir.path(), Some("rev:deadbeef")).unwrap();
+        let result = std::fs::read_to_string(&path).unwrap();
+        assert!(changed);
+        assert!(result.contains("\"cargo:https://github.com/grafana/flint\" = \"rev:deadbeef\""));
+        assert!(!result.contains("\"github:grafana/flint\""));
+        assert!(result.contains("CARGO_NET_GIT_FETCH_WITH_CLI = \"true\""));
+        assert!(result.contains("FLINT_CONFIG_DIR = \".github/config\""));
     }
 }
 

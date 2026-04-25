@@ -104,9 +104,23 @@ pub fn flint_version_changed(
     previous_tools: &HashMap<String, String>,
     current_tools: &HashMap<String, String>,
 ) -> bool {
-    let previous = previous_tools.get("github:grafana/flint");
-    let current = current_tools.get("github:grafana/flint");
+    let previous = flint_tool_identity(previous_tools);
+    let current = flint_tool_identity(current_tools);
     previous.is_some() && current.is_some() && previous != current
+}
+
+fn flint_tool_identity(tools: &HashMap<String, String>) -> Option<String> {
+    tools
+        .iter()
+        .filter(|(key, _)| is_flint_tool_key(key))
+        .map(|(key, version)| format!("{key}={version}"))
+        .min()
+}
+
+fn is_flint_tool_key(key: &str) -> bool {
+    key == "github:grafana/flint"
+        || key == "cargo:https://github.com/grafana/flint"
+        || key == "cargo:https://github.com/grafana/flint.git"
 }
 
 fn declared_tool_version<'a>(

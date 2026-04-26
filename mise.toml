@@ -42,7 +42,7 @@ run = "cargo run -q --bin flint -- run --fix"
 [tasks."release:pr"]
 description = "Open or update the release PR"
 depends = ["release:update"]
-run = "release-plz release-pr"
+run = "release-plz release-pr --allow-dirty"
 
 [tasks.build]
 description = "Build the project"

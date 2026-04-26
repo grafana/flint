@@ -1,0 +1,14 @@
+[expected]
+args = "run --full --fix --allow-fixed shfmt"
+exit = 0
+stderr = '''
+flint: fixed: shfmt — commit before pushing
+'''
+
+[expected.files]
+"script.sh" = """
+#!/bin/sh
+if true; then
+	echo "hello"
+fi
+"""

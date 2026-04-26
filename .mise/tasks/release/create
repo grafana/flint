@@ -33,4 +33,4 @@ fi
 
 tag="$(jq -r '.releases[0].tag' "${tmp_json}")"
 
-gh workflow run release.yml -f "tag=${tag}"
+gh workflow run release-assets.yml -f "tag=${tag}"

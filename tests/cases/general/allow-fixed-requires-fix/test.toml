@@ -1,0 +1,11 @@
+[expected]
+args = "run --allow-fixed"
+exit = 2
+stderr = '''
+error: the following required arguments were not provided:
+  --fix
+
+Usage: flint run --fix --allow-fixed [LINTERS]...
+
+For more information, try '--help'.
+'''

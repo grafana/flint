@@ -4,4 +4,4 @@
 set -euo pipefail
 
 cargo run --bin sync-readme-snippets
-mise run lint:fix || true
+cargo run -q --bin flint -- run --fix --allow-fixed

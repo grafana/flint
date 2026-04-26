@@ -1,9 +1,3 @@
 [workspace]
 git_release_draft = true
 publish = false
-pr_body = """
-{% for release in releases %}{{ release.changelog }}{% endfor %}
-
-> [!IMPORTANT]
-> Close and reopen this PR to trigger CI checks.
-"""

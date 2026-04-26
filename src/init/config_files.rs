@@ -3,6 +3,8 @@ use std::io;
 use std::path::Path;
 use std::process::Command;
 
+use crate::registry::EditorconfigDirectiveStyle;
+
 /// Writes a skeleton `flint.toml` in `config_dir`. Creates the directory if needed.
 /// Returns `true` if the file was written, `false` if it already existed.
 ///
@@ -240,41 +242,54 @@ fn tracked_files_for_patterns(project_root: &Path, patterns: &[&[&str]]) -> Resu
 /// line length is now delegated through root `.editorconfig`.
 pub(super) fn remove_stale_editorconfig_checker_directives(
     project_root: &Path,
-    delegated_patterns: &[&[&str]],
+    delegated_sections: &[(&[&str], EditorconfigDirectiveStyle)],
 ) -> Result<Vec<String>> {
-    let tracked_files = tracked_files_for_patterns(project_root, delegated_patterns)?;
     let mut changed_files = vec![];
-    for rel in tracked_files {
-        let path = project_root.join(rel.as_str());
-        let Ok(content) = std::fs::read_to_string(&path) else {
-            continue;
-        };
-        let updated = strip_stale_editorconfig_checker_directives(&content);
-        if updated == content {
-            continue;
+    for (patterns, directive_style) in delegated_sections {
+        let tracked_files = tracked_files_for_patterns(project_root, &[*patterns])?;
+        for rel in tracked_files {
+            let path = project_root.join(rel.as_str());
+            let Ok(content) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            let updated = strip_stale_editorconfig_checker_directives(&content, *directive_style);
+            if updated == content {
+                continue;
+            }
+            std::fs::write(&path, updated)?;
+            changed_files.push(rel.to_string());
         }
-        std::fs::write(&path, updated)?;
-        changed_files.push(rel.to_string());
     }
+    changed_files.sort();
+    changed_files.dedup();
     Ok(changed_files)
 }
 
 pub(super) fn stale_editorconfig_checker_directive_files(
     project_root: &Path,
-    delegated_patterns: &[&[&str]],
+    delegated_sections: &[(&[&str], EditorconfigDirectiveStyle)],
 ) -> Result<Vec<String>> {
-    stale_transformed_files(
-        project_root,
-        delegated_patterns,
-        strip_stale_editorconfig_checker_directives,
-    )
+    let mut changed_files = vec![];
+    for (patterns, directive_style) in delegated_sections {
+        changed_files.extend(stale_transformed_files(
+            project_root,
+            &[*patterns],
+            |content| strip_stale_editorconfig_checker_directives(content, *directive_style),
+        )?);
+    }
+    changed_files.sort();
+    changed_files.dedup();
+    Ok(changed_files)
 }
 
-fn stale_transformed_files(
+fn stale_transformed_files<F>(
     project_root: &Path,
     patterns: &[&[&str]],
-    transform: fn(&str) -> String,
-) -> Result<Vec<String>> {
+    transform: F,
+) -> Result<Vec<String>>
+where
+    F: Fn(&str) -> String,
+{
     let tracked_files = tracked_files_for_patterns(project_root, patterns)?;
     let mut changed_files = vec![];
     for rel in tracked_files {
@@ -319,27 +334,21 @@ fn is_stale_markdownlint_md013_directive(line: &str) -> bool {
     )
 }
 
-fn strip_stale_editorconfig_checker_directives(content: &str) -> String {
+fn strip_stale_editorconfig_checker_directives(
+    content: &str,
+    directive_style: EditorconfigDirectiveStyle,
+) -> String {
     let had_trailing_newline = content.ends_with('\n');
     let mut kept = Vec::with_capacity(content.lines().count());
 
     for line in content.lines() {
         let trimmed = line.trim();
-        if matches!(
-            trimmed,
-            "<!-- editorconfig-checker-disable -->"
-                | "<!-- editorconfig-checker-enable -->"
-                | "<!-- editorconfig-checker-disable-file -->"
-        ) {
+        if is_stale_editorconfig_checker_block_directive(trimmed, directive_style) {
             continue;
         }
 
         let mut updated = line.to_string();
-        for marker in [
-            "<!-- editorconfig-checker-disable-line -->",
-            "// editorconfig-checker-disable-line",
-            "# editorconfig-checker-disable-line",
-        ] {
+        for marker in stale_editorconfig_checker_inline_markers(directive_style) {
             if let Some(idx) = updated.find(marker) {
                 updated.truncate(idx);
                 updated = updated.trim_end().to_string();
@@ -353,6 +362,30 @@ fn strip_stale_editorconfig_checker_directives(content: &str) -> String {
         updated.push('\n');
     }
     updated
+}
+
+fn is_stale_editorconfig_checker_block_directive(
+    trimmed: &str,
+    directive_style: EditorconfigDirectiveStyle,
+) -> bool {
+    match directive_style {
+        EditorconfigDirectiveStyle::Html => matches!(
+            trimmed,
+            "<!-- editorconfig-checker-disable -->"
+                | "<!-- editorconfig-checker-enable -->"
+                | "<!-- editorconfig-checker-disable-file -->"
+        ),
+        EditorconfigDirectiveStyle::Slash | EditorconfigDirectiveStyle::Hash => false,
+    }
+}
+
+fn stale_editorconfig_checker_inline_markers(
+    directive_style: EditorconfigDirectiveStyle,
+) -> &'static [&'static str] {
+    match directive_style {
+        EditorconfigDirectiveStyle::Html => &["<!-- editorconfig-checker-disable-line -->"],
+        EditorconfigDirectiveStyle::Slash | EditorconfigDirectiveStyle::Hash => &[],
+    }
 }
 
 /// Generates or updates `.editorconfig` in the project root.

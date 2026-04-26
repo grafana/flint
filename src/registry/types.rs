@@ -154,11 +154,19 @@ impl LinterConfig {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditorconfigDirectiveStyle {
+    Html,
+    Slash,
+    Hash,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EditorconfigLineLengthPolicy {
     Default,
     DisableForPatterns {
         patterns: &'static [&'static str],
         comment: &'static str,
+        directive_style: Option<EditorconfigDirectiveStyle>,
     },
 }
 
@@ -492,9 +500,13 @@ impl Check {
         mut self,
         patterns: &'static [&'static str],
         comment: &'static str,
+        directive_style: Option<EditorconfigDirectiveStyle>,
     ) -> Self {
-        self.editorconfig_line_length_policy =
-            EditorconfigLineLengthPolicy::DisableForPatterns { patterns, comment };
+        self.editorconfig_line_length_policy = EditorconfigLineLengthPolicy::DisableForPatterns {
+            patterns,
+            comment,
+            directive_style,
+        };
         self
     }
 

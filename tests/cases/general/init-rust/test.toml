@@ -10,7 +10,7 @@ Tip: flint init detects languages from tracked files (`git ls-files`). Add and s
   removed <REPO>/.markdownlint.json (replaced by .rumdl.toml)
   wrote <REPO>/.github/config/.rumdl.toml
   patched <REPO>/.editorconfig — set max_line_length = 120
-  patched <REPO>/.editorconfig — disable max_line_length for [*.md]
+  patched <REPO>/.editorconfig — disable max_line_length for [*.rs], [*.md]
   wrote <REPO>/.github/config/.yamllint.yml
   wrote <REPO>/.github/config/rustfmt.toml
   wrote <REPO>/biome.jsonc
@@ -49,6 +49,10 @@ charset = utf-8
 indent_style = space
 indent_size = 2
 max_line_length = 120
+
+[*.rs]
+# Rust line length is handled by rustfmt
+max_line_length = off
 
 [*.md]
 # Markdown line length is handled by rumdl

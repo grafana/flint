@@ -1,4 +1,4 @@
-use super::types::{Check, ConfigFile, SpecialKind};
+use super::types::{Check, ConfigFile, EditorconfigDirectiveStyle, SpecialKind};
 use crate::linters::renovate_deps::RENOVATE_CONFIG_PATTERNS;
 use crate::setup::{V1_BOOTSTRAP_SETUP_VERSION, V2_BASELINE_SETUP_VERSION};
 
@@ -110,7 +110,11 @@ fn check_rumdl() -> Check {
         .unsupported_configs(RUMDL_UNSUPPORTED_CONFIGS)
         .nonverbose_filter_prefixes(&["Success: No issues found in "])
         .formatter()
-        .editorconfig_line_length_off(&["*.md"], "Markdown line length is handled by rumdl")
+        .editorconfig_line_length_off(
+            &["*.md"],
+            "Markdown line length is handled by rumdl",
+            Some(EditorconfigDirectiveStyle::Html),
+        )
         .desc("Lint Markdown files for style and consistency")
 }
 
@@ -307,6 +311,7 @@ fn check_cargo_fmt() -> Check {
         .mise_tool("rust")
         .toolchain_components("rustfmt")
         .formatter()
+        .editorconfig_line_length_off(&["*.rs"], "Rust line length is handled by rustfmt", None)
         .desc("Format Rust code; runs on all .rs files, not just changed")
         .lang()
 }
@@ -333,6 +338,7 @@ fn check_google_java_format() -> Check {
     .editorconfig_line_length_off(
         &["*.java"],
         "Java line length is handled by google-java-format",
+        Some(EditorconfigDirectiveStyle::Slash),
     )
     .migrate_tool_keys_after(
         V1_BOOTSTRAP_SETUP_VERSION,

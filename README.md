@@ -159,8 +159,8 @@ avoid config drift.
 
 When a formatter explicitly owns line length for a file type, Flint writes that
 carve-out into the shared root `.editorconfig` so editors and
-`editorconfig-checker` stay aligned. Today this applies to Markdown via `rumdl`
-and Java via `google-java-format`.
+`editorconfig-checker` stay aligned. Today this applies to Markdown via `rumdl`,
+Rust via `rustfmt`, and Java via `google-java-format`.
 
 > [!NOTE]
 > Biome is also root-discovered on purpose. Flint treats root `biome.jsonc` as

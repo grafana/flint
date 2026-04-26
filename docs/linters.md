@@ -351,7 +351,7 @@ none of those formatters are installed, `editorconfig-checker` checks those
 files itself.
 
 **Flint writes shared `.editorconfig` carve-outs for known formatter-owned line
-length**: today that means `rumdl` for `*.md` and `google-java-format` for
-`*.java`. Those sections use `max_line_length = off` so editors and
+length**: today that means `rumdl` for `*.md`, `rustfmt` for `*.rs`, and
+`google-java-format` for `*.java`. Those sections use `max_line_length = off` so editors and
 `editorconfig-checker` share the same intent instead of relying on
 checker-specific JSON excludes.

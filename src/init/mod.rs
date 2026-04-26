@@ -10,8 +10,11 @@ mod config_files;
 mod detection;
 pub(crate) mod generation;
 mod migrations;
+mod mise_tools;
+mod renovate;
 mod scaffold;
 mod ui;
+mod v1;
 
 pub(crate) use config_files::write_setup_migration_version;
 

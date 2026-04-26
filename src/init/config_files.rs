@@ -12,7 +12,7 @@ use std::process::Command;
 pub(super) fn generate_flint_toml(
     config_dir: &Path,
     base_branch: &str,
-    setup_version: u32,
+    setup_migration_version: u32,
     has_renovate: bool,
     exclude_managers: Option<&[String]>,
 ) -> Result<bool> {
@@ -25,7 +25,9 @@ pub(super) fn generate_flint_toml(
     if base_branch != "main" {
         content.push_str(&format!("base_branch = \"{base_branch}\"\n"));
     }
-    content.push_str(&format!("setup_version = {setup_version}\n"));
+    content.push_str(&format!(
+        "setup_migration_version = {setup_migration_version}\n"
+    ));
     content.push_str("# exclude = [\"CHANGELOG\\\\.md\"]\n");
     if has_renovate {
         content.push_str("\n[checks.renovate-deps]\n");
@@ -46,7 +48,7 @@ pub(super) fn generate_flint_toml(
     Ok(true)
 }
 
-pub(crate) fn write_setup_version(
+pub(crate) fn write_setup_migration_version(
     config_dir: &Path,
     base_branch: &str,
     version: u32,
@@ -66,14 +68,17 @@ pub(crate) fn write_setup_version(
         anyhow::bail!("[settings] is not a table in {}", toml_path.display());
     };
     let current = settings
-        .get("setup_version")
+        .get("setup_migration_version")
         .and_then(|item| item.as_value())
         .and_then(|value| value.as_integer())
         .and_then(|value| u32::try_from(value).ok());
     if current == Some(version) {
         return Ok(false);
     }
-    settings.insert("setup_version", toml_edit::value(i64::from(version)));
+    settings.insert(
+        "setup_migration_version",
+        toml_edit::value(i64::from(version)),
+    );
     std::fs::write(&toml_path, doc.to_string())
         .with_context(|| format!("failed to write {}", toml_path.display()))?;
     Ok(true)
@@ -133,13 +138,7 @@ pub(super) fn remove_legacy_lint_files(
     project_root: &Path,
     config_dir: &Path,
 ) -> Result<Vec<String>> {
-    let candidates = [
-        project_root.join(".prettierignore"),
-        project_root.join(".gitleaksignore"),
-        config_dir.join("super-linter.env"),
-        project_root.join(".github/config/super-linter.env"),
-        project_root.join(".github/super-linter.env"),
-    ];
+    let candidates = legacy_lint_files(project_root, config_dir);
 
     let mut removed = vec![];
     for path in candidates {
@@ -157,25 +156,38 @@ pub(super) fn remove_legacy_lint_files(
     Ok(removed)
 }
 
+pub(super) fn existing_legacy_lint_files(project_root: &Path, config_dir: &Path) -> Vec<String> {
+    legacy_lint_files(project_root, config_dir)
+        .into_iter()
+        .filter(|path| path.exists())
+        .map(|path| {
+            path.strip_prefix(project_root)
+                .unwrap_or(&path)
+                .display()
+                .to_string()
+        })
+        .collect()
+}
+
+fn legacy_lint_files(project_root: &Path, config_dir: &Path) -> Vec<std::path::PathBuf> {
+    vec![
+        project_root.join(".prettierignore"),
+        project_root.join(".gitleaksignore"),
+        config_dir.join("super-linter.env"),
+        project_root.join(".github/config/super-linter.env"),
+        project_root.join(".github/super-linter.env"),
+    ]
+}
+
 /// Removes stale markdownlint MD013 directives from tracked Markdown files.
 /// These long-line suppressions belong to the old markdownlint stack and should
 /// disappear once rumdl owns Markdown formatting.
 pub(super) fn remove_stale_markdownlint_line_length_directives(
     project_root: &Path,
 ) -> Result<Vec<String>> {
-    let output = Command::new("git")
-        .args(["ls-files", "--", "*.md"])
-        .current_dir(project_root)
-        .output()
-        .context("failed to list tracked Markdown files")?;
-    if !output.status.success() {
-        anyhow::bail!("git ls-files failed while scanning Markdown files");
-    }
-
-    let stdout = String::from_utf8(output.stdout).context("git ls-files output was not UTF-8")?;
     let mut changed_files = vec![];
-    for rel in stdout.lines().filter(|line| !line.trim().is_empty()) {
-        let path = project_root.join(rel);
+    for rel in tracked_files_for_patterns(project_root, &[&["*.md"]])? {
+        let path = project_root.join(&rel);
         let Ok(content) = std::fs::read_to_string(&path) else {
             continue;
         };
@@ -187,6 +199,16 @@ pub(super) fn remove_stale_markdownlint_line_length_directives(
         changed_files.push(rel.to_string());
     }
     Ok(changed_files)
+}
+
+pub(super) fn stale_markdownlint_line_length_directive_files(
+    project_root: &Path,
+) -> Result<Vec<String>> {
+    stale_transformed_files(
+        project_root,
+        &[&["*.md"]],
+        strip_stale_markdownlint_md013_directives,
+    )
 }
 
 fn tracked_files_for_patterns(project_root: &Path, patterns: &[&[&str]]) -> Result<Vec<String>> {
@@ -233,6 +255,36 @@ pub(super) fn remove_stale_editorconfig_checker_directives(
         }
         std::fs::write(&path, updated)?;
         changed_files.push(rel.to_string());
+    }
+    Ok(changed_files)
+}
+
+pub(super) fn stale_editorconfig_checker_directive_files(
+    project_root: &Path,
+    delegated_patterns: &[&[&str]],
+) -> Result<Vec<String>> {
+    stale_transformed_files(
+        project_root,
+        delegated_patterns,
+        strip_stale_editorconfig_checker_directives,
+    )
+}
+
+fn stale_transformed_files(
+    project_root: &Path,
+    patterns: &[&[&str]],
+    transform: fn(&str) -> String,
+) -> Result<Vec<String>> {
+    let tracked_files = tracked_files_for_patterns(project_root, patterns)?;
+    let mut changed_files = vec![];
+    for rel in tracked_files {
+        let path = project_root.join(rel.as_str());
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        if transform(&content) != content {
+            changed_files.push(rel);
+        }
     }
     Ok(changed_files)
 }

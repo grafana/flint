@@ -13,7 +13,7 @@ mod migrations;
 mod scaffold;
 mod ui;
 
-pub(crate) use config_files::write_setup_version;
+pub(crate) use config_files::write_setup_migration_version;
 
 use config_files::{
     disable_editorconfig_line_length_for_patterns, generate_biome_config, generate_editorconfig,
@@ -28,9 +28,7 @@ use generation::{
     get_existing_config_dir, has_slow_selected, patch_renovate_extends, prompt_config_dir,
     remove_tool_keys, remove_v1_tasks,
 };
-use migrations::{
-    active_editorconfig_line_length_sections, apply_repo_migrations, apply_setup_migrations_after,
-};
+use migrations::{active_editorconfig_line_length_sections, apply_repo_migrations};
 use scaffold::{apply_env_and_tasks, generate_lint_workflow, maybe_install_hook};
 use ui::{interactive_select_linters, select_categories_arrow};
 
@@ -358,15 +356,10 @@ Add and stage your source files before running init so the detection is accurate
 
     let base_branch = detect_base_branch(project_root);
     let config_dir_path = project_root.join(&config_dir_rel);
-    let setup_version = if v1.removed_tasks.is_empty() && !v1.removed_renovate_env {
-        crate::setup::V2_BASELINE_SETUP_VERSION
-    } else {
-        crate::setup::V1_BOOTSTRAP_SETUP_VERSION
-    };
     let toml_generated = generate_flint_toml(
         &config_dir_path,
         &base_branch,
-        setup_version,
+        crate::setup::LATEST_SUPPORTED_SETUP_VERSION,
         has_renovate,
         v1.renovate_exclude_managers.as_deref(),
     )?;
@@ -457,7 +450,7 @@ Add and stage your source files before running init so the detection is accurate
     Ok(())
 }
 
-pub fn update(project_root: &Path, config_dir: &Path) -> Result<()> {
+pub(crate) fn apply_setup_migrations(project_root: &Path, config_dir: &Path) -> Result<bool> {
     let mise_path = project_root.join("mise.toml");
     let current_content = std::fs::read_to_string(&mise_path).unwrap_or_default();
     let current_tool_keys = parse_tool_keys(&current_content);
@@ -467,31 +460,24 @@ pub fn update(project_root: &Path, config_dir: &Path) -> Result<()> {
         .map(|(patterns, _)| *patterns)
         .collect::<Vec<_>>();
     let migration_summary = apply_repo_migrations(project_root, config_dir, &delegated_patterns)?;
-    if migration_summary.is_noop() {
-        println!("flint: repo lint migration is up to date");
-        return Ok(());
-    }
-
-    migration_summary.print_messages();
-
-    Ok(())
+    Ok(!migration_summary.is_noop())
 }
 
-pub(crate) fn apply_setup_migrations(
+pub(crate) fn detect_setup_migrations(
     project_root: &Path,
     config_dir: &Path,
-    setup_version: u32,
+    setup_migration_version: u32,
 ) -> Result<bool> {
-    let mise_path = project_root.join("mise.toml");
-    let current_content = std::fs::read_to_string(&mise_path).unwrap_or_default();
-    let current_tool_keys = parse_tool_keys(&current_content);
-    let delegated_sections = active_editorconfig_line_length_sections(&current_tool_keys);
-    let delegated_patterns = delegated_sections
-        .iter()
-        .map(|(patterns, _)| *patterns)
-        .collect::<Vec<_>>();
-    let migration_summary =
-        apply_setup_migrations_after(project_root, config_dir, &delegated_patterns, setup_version)?;
+    let migration_summary = migrations::detect_setup_migrations_after(
+        project_root,
+        config_dir,
+        setup_migration_version,
+    )?;
+    Ok(!migration_summary.is_noop())
+}
+
+pub(crate) fn detect_setup_drift(project_root: &Path, config_dir: &Path) -> Result<bool> {
+    let migration_summary = migrations::detect_repo_migrations(project_root, config_dir)?;
     Ok(!migration_summary.is_noop())
 }
 

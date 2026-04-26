@@ -35,7 +35,7 @@ pub(crate) fn latest_registry_tool_migration_target_version() -> Option<u32> {
     crate::registry::builtin()
         .into_iter()
         .flat_map(|check| check.tool_key_migrations.into_iter())
-        .map(|migration| migration.after_setup_version + 1)
+        .map(|migration| migration.after_setup_migration_version + 1)
         .max()
 }
 
@@ -64,7 +64,7 @@ fn registry_tool_key_migrations_after(version: u32) -> Vec<(&'static str, &'stat
                 check
                     .tool_key_migrations
                     .into_iter()
-                    .filter(move |migration| version <= migration.after_setup_version)
+                    .filter(move |migration| version <= migration.after_setup_migration_version)
                     .map(move |migration| (migration.old_key, new_key)),
             )
         })

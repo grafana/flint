@@ -117,7 +117,7 @@ This verifies and fixes Flint-managed setup:
 - keep runtime, SDK, and unknown tool entries above that header
 
 With `--fix`, rewrites Flint-managed config in place and advances
-`settings.setup_version`.
+`settings.setup_migration_version` when a migration applies.
 
 ## `gofmt`
 
@@ -350,8 +350,8 @@ all files, but automatically skips file types owned by an active formatter. If
 none of those formatters are installed, `editorconfig-checker` checks those
 files itself.
 
-**`flint init` / `flint update` writes shared `.editorconfig` carve-outs for
-known formatter-owned line length**: today that means `rumdl` for `*.md` and
-`google-java-format` for `*.java`. Those sections use `max_line_length = off`
-so editors and `editorconfig-checker` share the same intent instead of relying
-on checker-specific JSON excludes.
+**Flint writes shared `.editorconfig` carve-outs for known formatter-owned line
+length**: today that means `rumdl` for `*.md` and `google-java-format` for
+`*.java`. Those sections use `max_line_length = off` so editors and
+`editorconfig-checker` share the same intent instead of relying on
+checker-specific JSON excludes.

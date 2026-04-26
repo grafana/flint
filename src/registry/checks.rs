@@ -444,7 +444,7 @@ fn check_flint_setup() -> Check {
             - keep runtime, SDK, and unknown tool entries above that header\n\
             \n\
             With `--fix`, rewrites Flint-managed config in place and advances\n\
-            `settings.setup_version`.",
+            `settings.setup_migration_version` when a migration applies.",
         )
 }
 

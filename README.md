@@ -157,10 +157,10 @@ avoid config drift.
 > its own settings, not `.editorconfig` itself. Editorconfig discovery always
 > walks up from the file being linted and cannot be redirected via a flag.
 
-When a formatter explicitly owns line length for a file type, `flint init` /
-`flint update` prefers writing that carve-out into the shared root
-`.editorconfig` so editors and `editorconfig-checker` stay aligned. Today this
-applies to Markdown via `rumdl` and Java via `google-java-format`.
+When a formatter explicitly owns line length for a file type, Flint writes that
+carve-out into the shared root `.editorconfig` so editors and
+`editorconfig-checker` stay aligned. Today this applies to Markdown via `rumdl`
+and Java via `google-java-format`.
 
 > [!NOTE]
 > Biome is also root-discovered on purpose. Flint treats root `biome.jsonc` as

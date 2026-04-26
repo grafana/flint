@@ -87,7 +87,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn latest_supported_setup_version_matches_latest_migration_target() {
+    fn latest_supported_setup_migration_version_matches_latest_migration_target() {
         let latest_setup_migration = SETUP_MIGRATIONS
             .iter()
             .map(|migration| migration.target_version)

@@ -1,4 +1,0 @@
-[expected]
-args = "update"
-exit = 0
-stdout = "flint: repo lint migration is up to date\n"

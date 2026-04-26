@@ -4,7 +4,6 @@
 flint run [OPTIONS] [LINTERS...]
 flint init
 flint hook install
-flint update
 flint linters
 flint version
 ```
@@ -131,19 +130,23 @@ lint binary. For unreleased consumer validation, pass an explicit git revision:
 flint init -y --flint-rev <git-rev>
 ```
 
-That writes a cargo-backed Flint pin and enables Cargo's git CLI fetch path. To
-return to the released Flint backend after the release is cut, run `flint init`
-again without `--flint-rev`.
+That writes a cargo-backed Flint pin. To return to the released Flint backend
+after the release is cut, run `flint init` again without `--flint-rev`.
 
-## `flint update`
+`flint init` is also the explicit way to reconcile a repo with the latest Flint
+setup defaults. Routine lint runs use `flint-setup` and only fail when an
+actionable setup migration applies to the repo.
 
-`flint update` applies non-interactive migrations to `mise.toml`. It replaces
-obsolete tool keys with their modern equivalents while preserving the declared
-version. Run it when `flint run` reports an obsolete key error:
+To check setup drift without applying changes, run:
 
-```text
-flint: obsolete tool key in mise.toml: "github:mvdan/sh" (replaced by "shfmt")
-  Run `flint update` to apply the migration automatically.
+```bash
+flint run flint-setup
+```
+
+To apply setup migrations and canonicalize `mise.toml`, run:
+
+```bash
+flint run --fix flint-setup
 ```
 
 ## `flint linters`

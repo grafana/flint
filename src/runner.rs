@@ -67,7 +67,7 @@ enum PreparedCheck {
         name: String,
         path: PathBuf,
         config_dir: PathBuf,
-        setup_version: u32,
+        setup_migration_version: u32,
     },
 }
 
@@ -140,7 +140,7 @@ impl PreparedCheck {
             Self::FlintSetup {
                 path,
                 config_dir,
-                setup_version,
+                setup_migration_version,
                 ..
             } => {
                 let tracked_files = vec![path.clone(), config_dir.join("flint.toml")];
@@ -149,7 +149,8 @@ impl PreparedCheck {
                 } else {
                     None
                 };
-                let out = flint_setup::run(fix, project_root, &config_dir, setup_version).await;
+                let out =
+                    flint_setup::run(fix, project_root, &config_dir, setup_migration_version).await;
                 let changed =
                     before.is_some_and(|before| before != fingerprint_files(&tracked_files));
                 (out, changed)
@@ -313,7 +314,7 @@ fn prepare(
                 name,
                 path: project_root.join("mise.toml"),
                 config_dir: config_dir.to_path_buf(),
-                setup_version: cfg.settings.setup_version,
+                setup_migration_version: cfg.settings.setup_migration_version,
             }),
         },
     }

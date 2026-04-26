@@ -30,8 +30,6 @@ enum SubCommand {
     Linters(LintersArgs),
     /// Set up linters in mise.toml for this project.
     Init(InitArgs),
-    /// Apply non-interactive migrations to mise.toml (replace obsolete tool keys).
-    Update,
     /// Manage git hooks.
     Hook(HookArgs),
     /// Display the flint version.
@@ -153,9 +151,6 @@ async fn main() -> Result<()> {
                 args.yes,
                 args.flint_rev.as_deref(),
             )?;
-        }
-        SubCommand::Update => {
-            init::update(&project_root, &config_dir)?;
         }
         SubCommand::Hook(args) => match args.command {
             HookCommand::Install => hook::install(&project_root)?,

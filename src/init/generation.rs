@@ -122,7 +122,7 @@ fn pin_tool_via_mise(project_root: &Path, key: &str, version: &str) -> bool {
 /// True when `[tools]` contains at least one `npm:*` key but no `node` entry.
 /// The npm backend needs a Node.js runtime; without an explicit pin, mise falls
 /// back to system node — may be absent, wrong version, or drift across machines.
-fn needs_node_for_npm(content: &str) -> bool {
+pub(crate) fn needs_node_for_npm(content: &str) -> bool {
     let Ok(doc) = content.parse::<toml_edit::DocumentMut>() else {
         return false;
     };
@@ -437,12 +437,12 @@ fn normalize_tools_section_impl(path: &Path, verbose: bool) -> Result<bool> {
 pub(crate) fn tools_section_needs_normalization(path: &Path) -> Result<bool> {
     let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
-        Err(_) => return Ok(false),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => return Err(e).with_context(|| format!("failed to read {}", path.display())),
     };
-    let mut doc: toml_edit::DocumentMut = match content.parse() {
-        Ok(d) => d,
-        Err(_) => return Ok(false),
-    };
+    let mut doc: toml_edit::DocumentMut = content
+        .parse()
+        .with_context(|| format!("failed to parse {}", path.display()))?;
     let Some(tools) = doc.get_mut("tools").and_then(|i| i.as_table_mut()) else {
         return Ok(false);
     };
@@ -687,10 +687,6 @@ pub(super) fn prompt_config_dir(existing: Option<&str>, yes: bool) -> Result<Str
 #[cfg(test)]
 mod node_prereq_tests {
     use super::{ensure_flint_self_pin, ensure_node_for_npm, needs_node_for_npm};
-
-    // Full end-to-end ensure_node_for_npm coverage (npm-present, node-absent →
-    // node added, file modified) lives in the e2e case `general/update-adds-node`.
-    // That case drives the flint binary and exercises the real mise subprocess.
 
     #[test]
     fn needs_node_when_npm_key_without_node() {

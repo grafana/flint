@@ -374,7 +374,50 @@ fn generate_rumdl_config_replaces_legacy_json() {
     assert!(written);
     assert!(!tmp.path().join(".markdownlint.json").exists());
     let content = std::fs::read_to_string(config_dir.join(".rumdl.toml")).unwrap();
-    assert!(content.contains("[MD013]"));
+    assert!(content.contains("[global]"));
+    assert!(content.contains("disable = [\"line-length\"]"));
+}
+
+#[test]
+fn generate_rumdl_config_converts_legacy_yaml() {
+    use config_files::generate_rumdl_config;
+    let tmp = tempfile::TempDir::new().unwrap();
+    let config_dir = tmp.path().join(".github/config");
+    std::fs::write(
+        tmp.path().join(".markdownlint.yaml"),
+        r#"
+ul-style: false
+line-length: false
+no-duplicate-heading:
+  siblings_only: true
+ol-prefix:
+  style: ordered
+no-inline-html: false
+fenced-code-language: false
+no-trailing-punctuation:
+  punctuation: ".,;:"
+MD059: false
+MD041: false
+"#,
+    )
+    .unwrap();
+    let written = generate_rumdl_config(tmp.path(), &config_dir, DEFAULT_LINE_LENGTH).unwrap();
+    assert!(written);
+    assert!(!tmp.path().join(".markdownlint.yaml").exists());
+    let content = std::fs::read_to_string(config_dir.join(".rumdl.toml")).unwrap();
+    assert!(content.contains("[global]"));
+    assert!(content.contains("\"MD059\""));
+    assert!(content.contains("\"line-length\""));
+    assert!(content.contains("\"no-inline-html\""));
+    assert!(content.contains("\"MD041\""));
+    assert!(content.contains("\"ul-style\""));
+    assert!(content.contains("\"fenced-code-language\""));
+    assert!(content.contains("[no-duplicate-heading]"));
+    assert!(content.contains("siblings-only = true"));
+    assert!(content.contains("[no-trailing-punctuation]"));
+    assert!(content.contains("punctuation = \".,;:\""));
+    assert!(content.contains("[ol-prefix]"));
+    assert!(content.contains("style = \"ordered\""));
 }
 
 #[test]

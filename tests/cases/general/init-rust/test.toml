@@ -40,15 +40,8 @@ max_line_length = off
 max_line_length = off
 '''
 ".github/config/.rumdl.toml" = '''
-[MD013]
-enabled = true
-line-length = 120
-code-blocks = false
-tables = false
-
-[MD060]
-enabled = true
-style = "aligned"
+[global]
+disable = ["line-length"]
 '''
 ".github/config/.yamllint.yml" = '''
 extends: relaxed

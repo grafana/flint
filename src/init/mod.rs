@@ -28,8 +28,8 @@ use detection::{
 };
 use generation::{
     apply_changes, detect_base_branch, ensure_flint_self_pin, ensure_node_for_npm, flint_preset,
-    get_existing_config_dir, has_slow_selected, patch_renovate_extends, prompt_config_dir,
-    remove_tool_keys, remove_v1_tasks,
+    get_existing_config_dir, has_slow_selected, normalize_tools_section, patch_renovate_extends,
+    prompt_config_dir, remove_tool_keys, remove_v1_tasks,
 };
 use migrations::{
     apply_repo_migrations, selected_editorconfig_cleanup_sections,
@@ -349,6 +349,7 @@ Add and stage your source files before running init so the detection is accurate
 
     let meta_changed =
         apply_env_and_tasks(&mise_path, &config_dir_rel, has_slow, &v1.removed_tasks)?;
+    let tools_normalized = normalize_tools_section(&mise_path)?;
 
     let base_branch = detect_base_branch(project_root);
     let config_dir_path = project_root.join(&config_dir_rel);
@@ -427,6 +428,7 @@ Add and stage your source files before running init so the detection is accurate
         && v1.removed_tasks.is_empty()
         && !v1.removed_renovate_env
         && !meta_changed
+        && !tools_normalized
         && !toml_generated
         && !workflow_generated
         && !rumdl_generated

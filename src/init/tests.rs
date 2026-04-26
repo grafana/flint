@@ -188,6 +188,37 @@ protoc = "34.1"
 }
 
 #[test]
+fn normalize_tools_section_sorts_cargo_flint_pin_with_linters() {
+    let content = r#"[tools]
+rust = { version = "1.95.0", components = "clippy,rustfmt" }
+
+# Linters
+actionlint = "1.7.12"
+biome = "2.4.12"
+editorconfig-checker = "3.6.1"
+"cargo:https://github.com/grafana/flint" = "rev:deadbeef"
+taplo = "0.10.0"
+"#;
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), content).unwrap();
+    let changed = normalize_tools_section(tmp.path()).unwrap();
+    assert!(changed);
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    let biome_pos = result.find("biome =").expect("biome present");
+    let flint_pos = result
+        .find("\"cargo:https://github.com/grafana/flint\" =")
+        .expect("flint present");
+    let ec_pos = result
+        .find("editorconfig-checker =")
+        .expect("editorconfig-checker present");
+    let taplo_pos = result.find("taplo =").expect("taplo present");
+    assert!(
+        biome_pos < flint_pos && flint_pos < ec_pos && ec_pos < taplo_pos,
+        "cargo flint pin should sort with the linter block:\n{result}"
+    );
+}
+
+#[test]
 fn apply_changes_upgrade_preserves_version() {
     let content = "[tools]\nrust = \"1.80.0\"\n";
     let tmp = tempfile::NamedTempFile::new().unwrap();

@@ -39,10 +39,6 @@ run = "cargo run -q --bin flint -- run"
 description = "Auto-fix lint issues"
 run = "cargo run -q --bin flint -- run --fix"
 
-[tasks.release]
-description = "Create git tags and GitHub releases when a release PR was merged"
-run = "mise run release:create"
-
 [tasks."release:pr"]
 description = "Open or update the release PR"
 depends = ["release:update"]

@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
 #MISE description="Create git tags and GitHub releases when a release PR was merged"
+#USAGE arg "[args]" var=#true help="Additional arguments passed to release-plz release"
 
 set -euo pipefail
-
-if [ -z "${MISE_PROJECT_ROOT:-}" ]; then
-	echo "MISE_PROJECT_ROOT environment variable is not set. Exiting."
-	exit 1
-fi
-
-cd "${MISE_PROJECT_ROOT}"
 
 if [ -z "${GITHUB_TOKEN:-}" ]; then
 	echo "GITHUB_TOKEN environment variable is not set. Exiting."
@@ -18,7 +12,13 @@ fi
 tmp_json="$(mktemp)"
 trap 'rm -f "${tmp_json}"' EXIT
 
-release-plz release -o json "$@" >"${tmp_json}"
+release_args=()
+if [ -n "${usage_args:-}" ]; then
+	# Mise provides variadic args as a shell-escaped string.
+	eval "release_args=(${usage_args})"
+fi
+
+release-plz release -o json "${release_args[@]}" >"${tmp_json}"
 
 jq -e '.releases and (.releases | type == "array")' "${tmp_json}" >/dev/null
 

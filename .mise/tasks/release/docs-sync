@@ -3,12 +3,5 @@
 
 set -euo pipefail
 
-if [ -z "${MISE_PROJECT_ROOT:-}" ]; then
-	echo "MISE_PROJECT_ROOT environment variable is not set. Exiting."
-	exit 1
-fi
-
-cd "${MISE_PROJECT_ROOT}"
-
 cargo run --bin sync-readme-snippets
 mise run lint:fix || true

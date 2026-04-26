@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+#MISE description="Update release-plz state locally"
+#USAGE arg "[args]" var=#true help="Additional arguments passed to release-plz update"
+
+set -euo pipefail
+
+update_args=()
+if [ -n "${usage_args:-}" ]; then
+	# Mise provides variadic args as a shell-escaped string.
+	eval "update_args=(${usage_args})"
+fi
+
+release-plz update "${update_args[@]}"
+mise run release:docs-sync

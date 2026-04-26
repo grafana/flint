@@ -130,7 +130,7 @@ fn find_unsupported_key_detects_prettier_stack() {
         find_unsupported_key(&tools),
         Some((
             "npm:prettier",
-            "replace with rumdl and yaml-lint, then remove prettier from the lint toolchain",
+            "replace with rumdl and ryl, then remove prettier from the lint toolchain",
         ))
     );
 }
@@ -162,9 +162,42 @@ fn version_ranges_must_not_be_mixed_with_unranged_entries() {
     }
 }
 
+fn install_key_suffix(key: &str) -> &str {
+    key.rsplit([':', '/']).next().unwrap_or(key)
+}
+
+/// Guardrail: non-special, non-toolchain checks should use the install-key
+/// suffix as their public name, with `-fmt` allowed for formatter variants.
+#[test]
+fn names_follow_install_key_suffix_convention() {
+    let violations: Vec<String> = builtin()
+        .into_iter()
+        .filter(|check| check.uses_binary())
+        .filter(|check| !check.is_toolchain())
+        .filter(|check| check.kind.special_kind().is_none())
+        .filter_map(|check| {
+            let key = check.install_key()?;
+            let suffix = install_key_suffix(key);
+            let expected_fmt = format!("{suffix}-fmt");
+            (check.name != suffix && check.name != expected_fmt).then(|| {
+                format!(
+                    "{} should match install key suffix {} or formatter variant {}",
+                    check.name, suffix, expected_fmt
+                )
+            })
+        })
+        .collect();
+
+    assert!(
+        violations.is_empty(),
+        "registry check names drifted from install key suffixes:\n{}",
+        violations.join("\n")
+    );
+}
+
 /// Guardrail: two different fixer tools should not claim the same declared file
 /// pattern. Overlap between checks from the same underlying tool is still
-/// allowed for now (e.g. `biome` + `biome-format`, `ruff` + `ruff-format`)
+/// allowed for now (e.g. `biome` + `biome-fmt`, `ruff` + `ruff-fmt`)
 /// because those pairs are intentionally split into lint and format modes.
 #[test]
 fn competing_fixers_must_not_share_declared_patterns() {

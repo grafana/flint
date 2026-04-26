@@ -72,12 +72,13 @@ const RUFF_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
 ///
 /// A check's `name` is the last path segment of its mise tool key (after `:` or `/`):
 /// - `editorconfig-checker` → name `editorconfig-checker` (not the binary `ec`)
-/// - `aqua:owenlamont/ryl` → name `yaml-lint`
+/// - `aqua:owenlamont/ryl` → name `ryl`
 /// - `ktlint` → name `ktlint`
 ///
-/// Exception: when the mise tool key is a language toolchain shared across multiple
-/// binaries (e.g. `rust`, `go`, `dotnet`), use the binary name instead — the toolchain
-/// name would be ambiguous (`rust` can't name both `cargo-fmt` and `cargo-clippy`).
+/// Exceptions:
+/// - formatter variants may use a `-fmt` suffix (e.g. `ruff-fmt`)
+/// - language toolchains shared across multiple binaries use the command name instead
+///   (e.g. `cargo-fmt`, `cargo-clippy`) because `rust` would be ambiguous
 fn check_shellcheck() -> Check {
     Check::file(
         "shellcheck",
@@ -119,8 +120,7 @@ fn check_rumdl() -> Check {
 }
 
 fn check_yaml_lint() -> Check {
-    Check::files("yaml-lint", "ryl {FILES}", &["*.yml", "*.yaml"])
-        .bin("ryl")
+    Check::files("ryl", "ryl {FILES}", &["*.yml", "*.yaml"])
         .fix("ryl --fix {FILES}")
         .linter_config(".yamllint.yml", "-c")
         .baseline_config(ConfigFile::config_dir(".yamllint.yml"))
@@ -188,7 +188,8 @@ fn check_hadolint() -> Check {
 }
 
 fn check_xmllint() -> Check {
-    Check::files("xmllint", "xmllint --noout {FILES}", &["*.xml"])
+    Check::files("xmloxide", "xmllint --noout {FILES}", &["*.xml"])
+        .bin("xmllint")
         .mise_tool("github:jonwiggins/xmloxide")
         .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["cargo:xmloxide"])
         .desc("Validate XML files are well-formed")
@@ -245,7 +246,7 @@ fn check_ruff() -> Check {
 }
 
 fn check_ruff_format() -> Check {
-    Check::file("ruff-format", "ruff format --check {FILE}", &["*.py"])
+    Check::file("ruff-fmt", "ruff format --check {FILE}", &["*.py"])
         .bin("ruff")
         .fix("ruff format {FILE}")
         .linter_config("ruff.toml", "--config")
@@ -273,7 +274,7 @@ fn check_biome() -> Check {
 
 fn check_biome_format() -> Check {
     Check::file(
-        "biome-format",
+        "biome-fmt",
         "biome format {FILE}",
         &["*.json", "*.jsonc", "*.js", "*.ts", "*.jsx", "*.tsx"],
     )
@@ -369,7 +370,7 @@ fn check_ktlint() -> Check {
 
 fn check_dotnet_format() -> Check {
     Check::files(
-        "dotnet-format",
+        "dotnet-fmt",
         "dotnet format --verify-no-changes --include {RELFILES}",
         &["*.cs"],
     )

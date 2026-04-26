@@ -563,7 +563,7 @@ fn editorconfig_section_header(patterns: &[&str]) -> String {
     }
 }
 
-/// Generates `.yamllint.yml` in the flint config dir when yaml-lint is being set up.
+/// Generates `.yamllint.yml` in the flint config dir when ryl is being set up.
 pub(super) fn generate_yamllint_config(config_dir: &Path, line_length: u16) -> Result<bool> {
     let target = config_dir.join(".yamllint.yml");
     if target.exists() {

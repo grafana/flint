@@ -1,6 +1,5 @@
 [settings]
 exclude = ["CHANGELOG.md", "super-linter-versions/**", "tests/cases/**"]
-setup_version = 2
 setup_migration_version = 2
 
 [checks.renovate-deps]

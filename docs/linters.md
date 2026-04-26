@@ -32,7 +32,7 @@ Every supported check, its config file (when applicable), and its scope. The
 | Scope       | [file](#scopes)                        |
 | Patterns    | `*.json *.jsonc *.js *.ts *.jsx *.tsx` |
 
-## `biome-format`
+## `biome-fmt`
 
 |             |                                        |
 | ----------- | -------------------------------------- |
@@ -74,7 +74,7 @@ Every supported check, its config file (when applicable), and its scope. The
 | Patterns    | `*`                                |
 | Config      | `.codespellrc`                     |
 
-## `dotnet-format`
+## `dotnet-fmt`
 
 |             |                  |
 | ----------- | ---------------- |
@@ -240,7 +240,7 @@ exclude_managers = ["github-actions", "github-runners"]
 | Patterns    | `*.py`           |
 | Config      | `ruff.toml`      |
 
-## `ruff-format`
+## `ruff-fmt`
 
 |             |                    |
 | ----------- | ------------------ |
@@ -261,6 +261,17 @@ exclude_managers = ["github-actions", "github-runners"]
 | Scope       | [file](#scopes)                               |
 | Patterns    | `*.md`                                        |
 | Config      | `.rumdl.toml`                                 |
+
+## `ryl`
+
+|             |                                           |
+| ----------- | ----------------------------------------- |
+| Description | Lint YAML files for style and consistency |
+| Fix         | yes                                       |
+| Binary      | `ryl`                                     |
+| Scope       | [files](#scopes)                          |
+| Patterns    | `*.yml *.yaml`                            |
+| Config      | `.yamllint.yml`                           |
 
 ## `shellcheck`
 
@@ -303,7 +314,7 @@ flint's existing formatter-style checks.
 Current caveat: Taplo's published docs currently advertise TOML 1.0.0
 support, so treat this check as TOML 1.0-oriented for now.
 
-## `xmllint`
+## `xmloxide`
 
 |             |                                    |
 | ----------- | ---------------------------------- |
@@ -312,17 +323,6 @@ support, so treat this check as TOML 1.0-oriented for now.
 | Binary      | `xmllint`                          |
 | Scope       | [files](#scopes)                   |
 | Patterns    | `*.xml`                            |
-
-## `yaml-lint`
-
-|             |                                           |
-| ----------- | ----------------------------------------- |
-| Description | Lint YAML files for style and consistency |
-| Fix         | yes                                       |
-| Binary      | `ryl`                                     |
-| Scope       | [files](#scopes)                          |
-| Patterns    | `*.yml *.yaml`                            |
-| Config      | `.yamllint.yml`                           |
 
 <!-- linter-details-end -->
 

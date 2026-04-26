@@ -1,0 +1,11 @@
+[expected]
+args = "run --full ruff-fmt"
+exit = 1
+stderr = '''
+[ruff-fmt]
+Would reformat: main.py
+1 file would be reformatted
+
+flint: 1 check failed (ruff-fmt)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''

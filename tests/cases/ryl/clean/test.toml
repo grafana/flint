@@ -1,0 +1,9 @@
+[expected]
+args = "run --full ryl"
+exit = 0
+
+[fake_bins]
+ryl = '''
+#!/bin/sh
+exit 0
+'''

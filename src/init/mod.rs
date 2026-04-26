@@ -180,7 +180,7 @@ Add and stage your source files before running init so the detection is accurate
 
     // If init will generate `.github/workflows/lint.yml`, treat both the workflow-
     // specific patterns and generic YAML patterns as present so actionlint and
-    // yaml-lint get selected in the same run. Without this, init would be
+    // ryl get selected in the same run. Without this, init would be
     // non-idempotent: the second run would see the newly-generated workflow and
     // add extra linters then.
     if !project_root.join(".github/workflows/lint.yml").exists() {
@@ -299,7 +299,7 @@ Add and stage your source files before running init so the detection is accurate
         g.checks
             .iter()
             .zip(&g.check_selected)
-            .any(|(c, &sel)| sel && c.name == "yaml-lint")
+            .any(|(c, &sel)| sel && c.name == "ryl")
     });
     let has_taplo = groups.iter().any(|g| {
         g.checks
@@ -311,7 +311,7 @@ Add and stage your source files before running init so the detection is accurate
         g.checks
             .iter()
             .zip(&g.check_selected)
-            .any(|(c, &sel)| sel && (c.name == "biome" || c.name == "biome-format"))
+            .any(|(c, &sel)| sel && (c.name == "biome" || c.name == "biome-fmt"))
     });
     let has_cargo_fmt = groups.iter().any(|g| {
         g.checks

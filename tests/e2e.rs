@@ -298,14 +298,14 @@ exit 1
         std::env::var("PATH").unwrap_or_default()
     );
     let fix_out = flint_with_env(
-        &["run", "--full", "--fix", "rumdl", "biome-format"],
+        &["run", "--full", "--fix", "rumdl", "biome-fmt"],
         repo.path(),
         &[("PATH", &fake_path)],
     );
     assert_eq!(fix_out.status.code(), Some(1));
     let fix_stderr = String::from_utf8_lossy(&fix_out.stderr);
     assert!(
-        fix_stderr.contains("flint: fixed: biome-format — commit before pushing"),
+        fix_stderr.contains("flint: fixed: biome-fmt — commit before pushing"),
         "unexpected fix stderr:\n{fix_stderr}"
     );
 

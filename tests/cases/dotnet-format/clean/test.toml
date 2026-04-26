@@ -1,8 +1,0 @@
-[expected]
-args = "run --full dotnet-format"
-exit = 0
-
-
-[env]
-DOTNET_CLI_HOME = "/tmp/dotnet-home"
-DOTNET_NOLOGO = "1"

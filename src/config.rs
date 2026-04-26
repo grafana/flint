@@ -85,8 +85,8 @@ impl Default for LicenseHeaderConfig {
 /// Builds env-var prefix → figment key-path mappings for every check in the registry.
 /// e.g. "lychee"        → ("lychee_",        "checks.lychee.")
 ///      "renovate-deps" → ("renovate_deps_",  "checks.renovate_deps.")
-///      "ruff-format"   → ("ruff_format_",    "checks.ruff_format.")
-/// Sorted longest-prefix-first so "ruff_format_" is matched before "ruff_".
+///      "ruff-fmt"      → ("ruff_fmt_",       "checks.ruff_fmt.")
+/// Sorted longest-prefix-first so "ruff_fmt_" is matched before "ruff_".
 fn check_env_sections() -> Vec<(String, String)> {
     let mut sections: Vec<(String, String)> = registry::builtin()
         .into_iter()

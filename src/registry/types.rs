@@ -408,7 +408,7 @@ impl Check {
     // --- Modifiers ---
 
     /// Override `bin_name` when the binary name differs from the check name
-    /// (e.g. `ruff-format` invokes `ruff`).
+    /// (e.g. `ruff-fmt` invokes `ruff`).
     pub fn bin(mut self, bin_name: &'static str) -> Self {
         self.bin_name = bin_name;
         self

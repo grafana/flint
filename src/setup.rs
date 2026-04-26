@@ -25,7 +25,7 @@ const UNSUPPORTED_KEYS_TO_SETUP_VERSION_2: &[(&str, &str)] = &[
     ),
     (
         "npm:prettier",
-        "replace with rumdl and yaml-lint, then remove prettier from the lint toolchain",
+        "replace with rumdl and ryl, then remove prettier from the lint toolchain",
     ),
 ];
 

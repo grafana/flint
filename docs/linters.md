@@ -18,7 +18,7 @@ Every supported check, its config file (when applicable), and its scope. The
 | Description | Lint GitHub Actions workflow files                 |
 | Fix         | no                                                 |
 | Binary      | `actionlint`                                       |
-| Scope       | [file](#scopes)                                    |
+| Scope       | [file](#scope-file)                                |
 | Patterns    | `.github/workflows/*.yml .github/workflows/*.yaml` |
 | Config      | `actionlint.yml`                                   |
 
@@ -29,7 +29,7 @@ Every supported check, its config file (when applicable), and its scope. The
 | Description | Lint JS/TS/JSON files                  |
 | Fix         | yes                                    |
 | Binary      | `biome`                                |
-| Scope       | [file](#scopes)                        |
+| Scope       | [file](#scope-file)                    |
 | Patterns    | `*.json *.jsonc *.js *.ts *.jsx *.tsx` |
 
 ## `biome-format`
@@ -39,7 +39,7 @@ Every supported check, its config file (when applicable), and its scope. The
 | Description | Format JS/TS/JSON files                |
 | Fix         | yes                                    |
 | Binary      | `biome`                                |
-| Scope       | [file](#scopes)                        |
+| Scope       | [file](#scope-file)                    |
 | Patterns    | `*.json *.jsonc *.js *.ts *.jsx *.tsx` |
 
 ## `cargo-clippy`
@@ -49,7 +49,7 @@ Every supported check, its config file (when applicable), and its scope. The
 | Description | Lint Rust code; runs on all .rs files, not just changed |
 | Fix         | yes                                                     |
 | Binary      | `cargo-clippy`                                          |
-| Scope       | [project](#scopes)                                      |
+| Scope       | [project](#scope-project)                               |
 | Patterns    | `*.rs`                                                  |
 
 ## `cargo-fmt`
@@ -59,7 +59,7 @@ Every supported check, its config file (when applicable), and its scope. The
 | Description | Format Rust code; runs on all .rs files, not just changed |
 | Fix         | yes                                                       |
 | Binary      | `rustfmt`                                                 |
-| Scope       | [project](#scopes)                                        |
+| Scope       | [project](#scope-project)                                 |
 | Patterns    | `*.rs`                                                    |
 | Config      | `rustfmt.toml`                                            |
 
@@ -70,19 +70,19 @@ Every supported check, its config file (when applicable), and its scope. The
 | Description | Check for common spelling mistakes |
 | Fix         | yes                                |
 | Binary      | `codespell`                        |
-| Scope       | [files](#scopes)                   |
+| Scope       | [files](#scope-files)              |
 | Patterns    | `*`                                |
 | Config      | `.codespellrc`                     |
 
 ## `dotnet-format`
 
-|             |                  |
-| ----------- | ---------------- |
-| Description | Format C# code   |
-| Fix         | yes              |
-| Binary      | `dotnet`         |
-| Scope       | [files](#scopes) |
-| Patterns    | `*.cs`           |
+|             |                       |
+| ----------- | --------------------- |
+| Description | Format C# code        |
+| Fix         | yes                   |
+| Binary      | `dotnet`              |
+| Scope       | [files](#scope-files) |
+| Patterns    | `*.cs`                |
 
 ## `editorconfig-checker`
 
@@ -91,7 +91,7 @@ Every supported check, its config file (when applicable), and its scope. The
 | Description | Check files comply with EditorConfig settings |
 | Fix         | no                                            |
 | Binary      | `ec`                                          |
-| Scope       | [files](#scopes)                              |
+| Scope       | [files](#scope-files)                         |
 | Patterns    | `*`                                           |
 | Config      | `.editorconfig-checker.json`                  |
 
@@ -102,7 +102,7 @@ Every supported check, its config file (when applicable), and its scope. The
 | Description | Keep Flint setup current and mise.toml lint tooling canonical |
 | Fix         | yes                                                           |
 | Binary      | (built-in)                                                    |
-| Scope       | [special](#scopes)                                            |
+| Scope       | [special](#scope-special)                                     |
 | Patterns    | `mise.toml`                                                   |
 
 Checks the repo's Flint-managed setup state and `mise.toml` layout.
@@ -121,13 +121,13 @@ With `--fix`, rewrites Flint-managed config in place and advances
 
 ## `gofmt`
 
-|             |                 |
-| ----------- | --------------- |
-| Description | Format Go code  |
-| Fix         | yes             |
-| Binary      | `gofmt`         |
-| Scope       | [file](#scopes) |
-| Patterns    | `*.go`          |
+|             |                     |
+| ----------- | ------------------- |
+| Description | Format Go code      |
+| Fix         | yes                 |
+| Binary      | `gofmt`             |
+| Scope       | [file](#scope-file) |
+| Patterns    | `*.go`              |
 
 ## `golangci-lint`
 
@@ -136,19 +136,19 @@ With `--fix`, rewrites Flint-managed config in place and advances
 | Description | Lint Go code; uses --new-from-rev to scope analysis to changed code |
 | Fix         | no                                                                  |
 | Binary      | `golangci-lint`                                                     |
-| Scope       | [project](#scopes)                                                  |
+| Scope       | [project](#scope-project)                                           |
 | Patterns    | `*.go`                                                              |
 | Config      | `.golangci.yml`                                                     |
 
 ## `google-java-format`
 
-|             |                      |
-| ----------- | -------------------- |
-| Description | Format Java code     |
-| Fix         | yes                  |
-| Binary      | `google-java-format` |
-| Scope       | [files](#scopes)     |
-| Patterns    | `*.java`             |
+|             |                       |
+| ----------- | --------------------- |
+| Description | Format Java code      |
+| Fix         | yes                   |
+| Binary      | `google-java-format`  |
+| Scope       | [files](#scope-files) |
+| Patterns    | `*.java`              |
 
 ## `hadolint`
 
@@ -157,7 +157,7 @@ With `--fix`, rewrites Flint-managed config in place and advances
 | Description | Lint Dockerfiles                       |
 | Fix         | no                                     |
 | Binary      | `hadolint`                             |
-| Scope       | [file](#scopes)                        |
+| Scope       | [file](#scope-file)                    |
 | Patterns    | `Dockerfile Dockerfile.* *.dockerfile` |
 | Config      | `.hadolint.yaml`                       |
 
@@ -168,7 +168,7 @@ With `--fix`, rewrites Flint-managed config in place and advances
 | Description | Lint and format Kotlin code |
 | Fix         | yes                         |
 | Binary      | `ktlint`                    |
-| Scope       | [files](#scopes)            |
+| Scope       | [files](#scope-files)       |
 | Patterns    | `*.kt *.kts`                |
 
 ## `license-header`
@@ -178,7 +178,7 @@ With `--fix`, rewrites Flint-managed config in place and advances
 | Description | Check source files have the required license header |
 | Fix         | no                                                  |
 | Binary      | (built-in)                                          |
-| Scope       | [special](#scopes)                                  |
+| Scope       | [special](#scope-special)                           |
 
 ## `lychee`
 
@@ -187,7 +187,7 @@ With `--fix`, rewrites Flint-managed config in place and advances
 | Description | Check for broken links             |
 | Fix         | no                                 |
 | Binary      | `lychee`                           |
-| Scope       | [special](#scopes)                 |
+| Scope       | [special](#scope-special)          |
 | Config      | via `[checks.links]` in flint.toml |
 
 Orchestrates [lychee](https://lychee.cli.rs/) for link checking. Requires `lychee` in `[tools]`.
@@ -212,7 +212,7 @@ check_all_local = true
 | Description | Verify Renovate dependency snapshot is up to date                                                                          |
 | Fix         | yes                                                                                                                        |
 | Binary      | `renovate`                                                                                                                 |
-| Scope       | [special](#scopes)                                                                                                         |
+| Scope       | [special](#scope-special)                                                                                                  |
 | Patterns    | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
 | Run policy  | adaptive — runs in `--fast-only` only when relevant                                                                        |
 
@@ -231,25 +231,25 @@ exclude_managers = ["github-actions", "github-runners"]
 
 ## `ruff`
 
-|             |                  |
-| ----------- | ---------------- |
-| Description | Lint Python code |
-| Fix         | yes              |
-| Binary      | `ruff`           |
-| Scope       | [file](#scopes)  |
-| Patterns    | `*.py`           |
-| Config      | `ruff.toml`      |
+|             |                     |
+| ----------- | ------------------- |
+| Description | Lint Python code    |
+| Fix         | yes                 |
+| Binary      | `ruff`              |
+| Scope       | [file](#scope-file) |
+| Patterns    | `*.py`              |
+| Config      | `ruff.toml`         |
 
 ## `ruff-format`
 
-|             |                    |
-| ----------- | ------------------ |
-| Description | Format Python code |
-| Fix         | yes                |
-| Binary      | `ruff`             |
-| Scope       | [file](#scopes)    |
-| Patterns    | `*.py`             |
-| Config      | `ruff.toml`        |
+|             |                     |
+| ----------- | ------------------- |
+| Description | Format Python code  |
+| Fix         | yes                 |
+| Binary      | `ruff`              |
+| Scope       | [file](#scope-file) |
+| Patterns    | `*.py`              |
+| Config      | `ruff.toml`         |
 
 ## `rumdl`
 
@@ -258,7 +258,7 @@ exclude_managers = ["github-actions", "github-runners"]
 | Description | Lint Markdown files for style and consistency |
 | Fix         | yes                                           |
 | Binary      | `rumdl`                                       |
-| Scope       | [file](#scopes)                               |
+| Scope       | [file](#scope-file)                           |
 | Patterns    | `*.md`                                        |
 | Config      | `.rumdl.toml`                                 |
 
@@ -269,7 +269,7 @@ exclude_managers = ["github-actions", "github-runners"]
 | Description | Lint YAML files for style and consistency |
 | Fix         | yes                                       |
 | Binary      | `ryl`                                     |
-| Scope       | [files](#scopes)                          |
+| Scope       | [files](#scope-files)                     |
 | Patterns    | `*.yml *.yaml`                            |
 | Config      | `.yamllint.yml`                           |
 
@@ -280,7 +280,7 @@ exclude_managers = ["github-actions", "github-runners"]
 | Description | Lint shell scripts for common mistakes |
 | Fix         | no                                     |
 | Binary      | `shellcheck`                           |
-| Scope       | [file](#scopes)                        |
+| Scope       | [file](#scope-file)                    |
 | Patterns    | `*.sh *.bash *.bats`                   |
 | Config      | `.shellcheckrc`                        |
 
@@ -291,19 +291,19 @@ exclude_managers = ["github-actions", "github-runners"]
 | Description | Format shell scripts |
 | Fix         | yes                  |
 | Binary      | `shfmt`              |
-| Scope       | [file](#scopes)      |
+| Scope       | [file](#scope-file)  |
 | Patterns    | `*.sh *.bash`        |
 
 ## `taplo`
 
-|             |                   |
-| ----------- | ----------------- |
-| Description | Format TOML files |
-| Fix         | yes               |
-| Binary      | `taplo`           |
-| Scope       | [file](#scopes)   |
-| Patterns    | `*.toml`          |
-| Config      | `.taplo.toml`     |
+|             |                     |
+| ----------- | ------------------- |
+| Description | Format TOML files   |
+| Fix         | yes                 |
+| Binary      | `taplo`             |
+| Scope       | [file](#scope-file) |
+| Patterns    | `*.toml`            |
+| Config      | `.taplo.toml`       |
 
 Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).
 
@@ -321,21 +321,33 @@ support, so treat this check as TOML 1.0-oriented for now.
 | Description | Validate XML files are well-formed |
 | Fix         | no                                 |
 | Binary      | `xmllint`                          |
-| Scope       | [files](#scopes)                   |
+| Scope       | [files](#scope-files)              |
 | Patterns    | `*.xml`                            |
 
 <!-- linter-details-end -->
 
 ## Scopes
 
-- `file` — invoked once per matched file
-- `files` — invoked once with all matched files as args; only changed files are
+### `file` {#scope-file}
+
+Invoked once per matched file.
+
+### `files` {#scope-files}
+
+Invoked once with all matched files as args; only changed files are
   passed
-- `project` — invoked once with no file args; for checks with patterns set
-  (e.g. `cargo-clippy`), skipped entirely if no matching files changed, but
-  runs on the whole project when it does run. `golangci-lint` is the
-  exception — it uses
+
+### `project` {#scope-project}
+
+Invoked once with no file args; for checks with patterns set (e.g.
+`cargo-clippy`), skipped entirely if no matching files changed, but runs on the
+whole project when it does run. `golangci-lint` is the exception — it uses
   `--new-from-rev` to scope analysis to changed code even within the project run.
+
+### `special` {#scope-special}
+
+Implemented in-process rather than via a command template. These checks may run
+without file arguments or use custom orchestration logic.
 
 Checks use one of three run policies:
 

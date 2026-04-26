@@ -5,6 +5,7 @@ FLINT_CONFIG_DIR = ".github/config"
 dotnet = "10.0.201"
 go = "1.26.2"
 node = "24.15.0"
+release-plz = "0.3.157"
 rust = { version = "1.95.0", components = "clippy,rustfmt" }
 
 # Linters
@@ -32,11 +33,20 @@ file = "tasks/setup/update-super-linter-versions.sh"
 
 [tasks.lint]
 description = "Run all lints"
-run = "cargo run -q -- run"
+run = "cargo run -q --bin flint -- run"
 
 [tasks."lint:fix"]
 description = "Auto-fix lint issues"
-run = "cargo run -q -- run --fix"
+run = "cargo run -q --bin flint -- run --fix"
+
+[tasks.release]
+description = "Create git tags and GitHub releases when a release PR was merged"
+run = "mise run release:create"
+
+[tasks."release:pr"]
+description = "Open or update the release PR"
+depends = ["release:update"]
+run = "release-plz release-pr"
 
 [tasks.build]
 description = "Build the project"

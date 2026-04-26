@@ -4,6 +4,16 @@
       "mise"
     ]
   },
+  ".github/workflows/release-assets.yml": {
+    "regex": [
+      "mise"
+    ]
+  },
+  ".github/workflows/release-plz.yml": {
+    "regex": [
+      "mise"
+    ]
+  },
   ".github/workflows/release.yml": {
     "regex": [
       "mise"
@@ -12,11 +22,6 @@
   ".github/workflows/test.yml": {
     "regex": [
       "mise"
-    ]
-  },
-  "README.md": {
-    "regex": [
-      "grafana/flint"
     ]
   },
   "mise.toml": {
@@ -37,6 +42,7 @@
       "node",
       "npm:renovate",
       "pipx:codespell",
+      "release-plz",
       "ruff",
       "rumdl",
       "rust",

@@ -50,9 +50,9 @@ enable during the prompt, or trim the generated tool list afterward if you run
 
 Flint reads your `[tools]` section to discover which linters to run — declaring
 a tool is the opt-in. No separate configuration needed to activate a check: if
-ShellCheck's Flint-managed tool key is in `[tools]`, flint runs shellcheck; if
-it isn't, that check is skipped. `mise install` puts all declared tools on PATH;
-flint picks up whatever is there.
+ShellCheck's Flint-managed tool key is present in `[tools]`, flint runs
+shellcheck; otherwise that check is skipped. `mise install` puts all declared
+tools on PATH; flint picks up whatever is there.
 
 Add the linting tools your project needs alongside the `flint` binary itself:
 
@@ -62,17 +62,17 @@ Add the linting tools your project needs alongside the `flint` binary itself:
 
 # Add whichever linters apply to your repo:
 "github:koalaman/shellcheck" = "0.11.0"
-shfmt                   = "3.13.1"
+shfmt                   = "v3.13.1"
 actionlint              = "1.7.10"
 rumdl                   = "0.1.78"
 ruff                    = "0.15.11"
 "aqua:owenlamont/ryl"   = "0.6.0"
 taplo                   = "0.10.0"
 biome                   = "2.4.12"
-rust                    = "1.87.0"    # activates cargo-fmt + cargo-clippy
-go                      = "1.24.0"    # activates gofmt
-lychee                  = "0.18.0"    # activates links check
-"npm:renovate"          = "39.0.0"    # activates renovate-deps check
+rust                    = "1.95.0"    # activates cargo-fmt + cargo-clippy
+go                      = "1.26.2"    # activates gofmt
+lychee                  = "0.22.0"    # activates links check
+"npm:renovate"          = "43.136.3"  # activates renovate-deps check
 ```
 
 Then wire up lint tasks:

@@ -767,10 +767,20 @@ fn normalize_timing(s: &str) -> String {
     // Flint check header lines: "[name] 123ms" or "[name] 1.2s"
     let re = Regex::new(r"(?m)^(\[[^\]]+\]) \d+(?:\.\d+)?(?:ms|s)$").unwrap();
     let s = re.replace_all(s, "$1 Xms");
+    // Lychee summary line: "🔍 1 Total (in 1s) ✅ 0 OK 🚫 1 Error"
+    let re_lychee = Regex::new(r"(?m)^(🔍 \d+ Total \(in )\d+(?:\.\d+)?s(\) .*)$").unwrap();
+    let s = re_lychee.replace_all(&s, "${1}Xs${2}");
     // Biome summary line: "Checked N file(s) in 1234µs. No fixes applied."
     let re2 = Regex::new(r"Checked \d+ files? in \d+(?:\.\d+)?(?:µs|ms|s)\.").unwrap();
     re2.replace_all(&s, "Checked N file(s) in Xµs.")
         .into_owned()
+}
+
+#[test]
+fn normalize_timing_normalizes_lychee_summary_seconds() {
+    let input = "🔍 1 Total (in 1s) ✅ 0 OK 🚫 1 Error\n";
+    let normalized = normalize_timing(input);
+    assert_eq!(normalized, "🔍 1 Total (in Xs) ✅ 0 OK 🚫 1 Error\n");
 }
 
 /// Replaces tool version banners with a stable `<VERSION>` placeholder so

@@ -70,6 +70,9 @@ type(optional scope): description
 Common types: `feat`, `fix`, `chore`, `docs`, `refactor`,
 `test`, `ci`
 
+Do not prefix PR titles with `[codex]`.
+Match the PR title type to the primary user-facing change.
+
 **Release impact:** This repository uses
 [release-please](https://github.com/googleapis/release-please).
 Only `feat:` and `fix:` trigger new releases, and breaking

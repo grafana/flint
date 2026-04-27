@@ -124,7 +124,11 @@ fn test_case_groups_match_registered_checks() {
 
     let actual: BTreeSet<String> = std::fs::read_dir(&cases_dir)
         .unwrap_or_else(|e| panic!("failed to read {}: {e}", cases_dir.display()))
-        .filter_map(|entry| entry.ok())
+        .map(|entry| {
+            entry.unwrap_or_else(|e| {
+                panic!("failed to read entry in {}: {e}", cases_dir.display())
+            })
+        })
         .filter(|entry| entry.path().is_dir())
         .map(|entry| entry.file_name().to_string_lossy().into_owned())
         .collect();

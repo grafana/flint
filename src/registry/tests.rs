@@ -162,27 +162,56 @@ fn version_ranges_must_not_be_mixed_with_unranged_entries() {
     }
 }
 
-fn install_key_suffix(key: &str) -> &str {
-    key.rsplit([':', '/']).next().unwrap_or(key)
+fn normalized_command_prefix(check: &Check) -> Option<String> {
+    let command = match &check.kind {
+        crate::registry::CheckKind::Template {
+            check_cmd,
+            full_cmd,
+            ..
+        } => {
+            if !full_cmd.is_empty() {
+                *full_cmd
+            } else {
+                *check_cmd
+            }
+        }
+        crate::registry::CheckKind::Special(_) => return None,
+    };
+
+    let mut words = vec![];
+    for token in command.split_whitespace() {
+        if token.starts_with('-') || token.contains('{') {
+            break;
+        }
+        words.push(token);
+        if words.len() == 2 {
+            break;
+        }
+    }
+
+    (!words.is_empty()).then(|| words.join("-"))
 }
 
-/// Guardrail: non-special, non-toolchain checks should use the install-key
-/// suffix as their public name, with `-fmt` allowed for formatter variants.
+/// Guardrail: check names should usually match the binary users recognize in
+/// logs, config, and docs. For subcommand-style tools, a hyphenated native
+/// command prefix such as `cargo-fmt` or `dotnet-format` is also acceptable.
 #[test]
-fn names_follow_install_key_suffix_convention() {
+fn names_prefer_binary_or_native_command() {
+    const ALLOWED_ALIASES: &[(&str, &str)] = &[("editorconfig-checker", "ec")];
+
     let violations: Vec<String> = builtin()
         .into_iter()
         .filter(|check| check.uses_binary())
-        .filter(|check| !check.is_toolchain())
         .filter(|check| check.kind.special_kind().is_none())
         .filter_map(|check| {
-            let key = check.install_key()?;
-            let suffix = install_key_suffix(key);
-            let expected_fmt = format!("{suffix}-fmt");
-            (check.name != suffix && check.name != expected_fmt).then(|| {
+            let allowed = ALLOWED_ALIASES
+                .iter()
+                .any(|(name, bin)| check.name == *name && check.bin_name == *bin);
+            let matches_command = normalized_command_prefix(&check).as_deref() == Some(check.name);
+            (check.name != check.bin_name && !matches_command && !allowed).then(|| {
                 format!(
-                    "{} should match install key suffix {} or formatter variant {}",
-                    check.name, suffix, expected_fmt
+                    "{} should match binary {} or native command prefix",
+                    check.name, check.bin_name
                 )
             })
         })
@@ -190,14 +219,14 @@ fn names_follow_install_key_suffix_convention() {
 
     assert!(
         violations.is_empty(),
-        "registry check names drifted from install key suffixes:\n{}",
+        "registry check names drifted from the binary/native-command convention:\n{}",
         violations.join("\n")
     );
 }
 
 /// Guardrail: two different fixer tools should not claim the same declared file
 /// pattern. Overlap between checks from the same underlying tool is still
-/// allowed for now (e.g. `biome` + `biome-fmt`, `ruff` + `ruff-fmt`)
+/// allowed for now (e.g. `biome` + `biome-format`, `ruff` + `ruff-format`)
 /// because those pairs are intentionally split into lint and format modes.
 #[test]
 fn competing_fixers_must_not_share_declared_patterns() {

@@ -70,15 +70,14 @@ const RUFF_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
 ///
 /// # Naming convention
 ///
-/// A check's `name` is the last path segment of its mise tool key (after `:` or `/`):
-/// - `editorconfig-checker` → name `editorconfig-checker` (not the binary `ec`)
-/// - `aqua:owenlamont/ryl` → name `ryl`
-/// - `ktlint` → name `ktlint`
+/// Prefer the user-facing binary or native command name:
+/// - `shellcheck` → `shellcheck`
+/// - `aqua:owenlamont/ryl` → `ryl`
+/// - `github:jonwiggins/xmloxide` → `xmllint`
 ///
-/// Exceptions:
-/// - formatter variants may use a `-fmt` suffix (e.g. `ruff-fmt`)
-/// - language toolchains shared across multiple binaries use the command name instead
-///   (e.g. `cargo-fmt`, `cargo-clippy`) because `rust` would be ambiguous
+/// Exceptions are explicit and should stay rare:
+/// - clearer package-facing names such as `editorconfig-checker` over `ec`
+/// - native subcommands such as `cargo-fmt`, `ruff-format`, and `dotnet-format`
 fn check_shellcheck() -> Check {
     Check::file(
         "shellcheck",
@@ -188,8 +187,7 @@ fn check_hadolint() -> Check {
 }
 
 fn check_xmllint() -> Check {
-    Check::files("xmloxide", "xmllint --noout {FILES}", &["*.xml"])
-        .bin("xmllint")
+    Check::files("xmllint", "xmllint --noout {FILES}", &["*.xml"])
         .mise_tool("github:jonwiggins/xmloxide")
         .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["cargo:xmloxide"])
         .desc("Validate XML files are well-formed")
@@ -246,7 +244,7 @@ fn check_ruff() -> Check {
 }
 
 fn check_ruff_format() -> Check {
-    Check::file("ruff-fmt", "ruff format --check {FILE}", &["*.py"])
+    Check::file("ruff-format", "ruff format --check {FILE}", &["*.py"])
         .bin("ruff")
         .fix("ruff format {FILE}")
         .linter_config("ruff.toml", "--config")
@@ -274,7 +272,7 @@ fn check_biome() -> Check {
 
 fn check_biome_format() -> Check {
     Check::file(
-        "biome-fmt",
+        "biome-format",
         "biome format {FILE}",
         &["*.json", "*.jsonc", "*.js", "*.ts", "*.jsx", "*.tsx"],
     )
@@ -370,7 +368,7 @@ fn check_ktlint() -> Check {
 
 fn check_dotnet_format() -> Check {
     Check::files(
-        "dotnet-fmt",
+        "dotnet-format",
         "dotnet format --verify-no-changes --include {RELFILES}",
         &["*.cs"],
     )

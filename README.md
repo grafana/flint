@@ -179,11 +179,11 @@ Click a name in the table below for details. See the
 | -------------------------------------------------------------- | ------------------------------------------------------------------- | --- |
 | [`actionlint`](docs/linters.md#actionlint)                     | Lint GitHub Actions workflow files                                  | —   |
 | [`biome`](docs/linters.md#biome)                               | Lint JS/TS/JSON files                                               | yes |
-| [`biome-fmt`](docs/linters.md#biome-fmt)                       | Format JS/TS/JSON files                                             | yes |
+| [`biome-format`](docs/linters.md#biome-format)                 | Format JS/TS/JSON files                                             | yes |
 | [`cargo-clippy`](docs/linters.md#cargo-clippy)                 | Lint Rust code; runs on all .rs files, not just changed             | yes |
 | [`cargo-fmt`](docs/linters.md#cargo-fmt)                       | Format Rust code; runs on all .rs files, not just changed           | yes |
 | [`codespell`](docs/linters.md#codespell)                       | Check for common spelling mistakes                                  | yes |
-| [`dotnet-fmt`](docs/linters.md#dotnet-fmt)                     | Format C# code                                                      | yes |
+| [`dotnet-format`](docs/linters.md#dotnet-format)               | Format C# code                                                      | yes |
 | [`editorconfig-checker`](docs/linters.md#editorconfig-checker) | Check files comply with EditorConfig settings                       | —   |
 | [`flint-setup`](docs/linters.md#flint-setup)                   | Keep Flint setup current and mise.toml lint tooling canonical       | yes |
 | [`gofmt`](docs/linters.md#gofmt)                               | Format Go code                                                      | yes |
@@ -195,13 +195,13 @@ Click a name in the table below for details. See the
 | [`lychee`](docs/linters.md#lychee)                             | Check for broken links                                              | —   |
 | [`renovate-deps`](docs/linters.md#renovate-deps)               | Verify Renovate dependency snapshot is up to date                   | yes |
 | [`ruff`](docs/linters.md#ruff)                                 | Lint Python code                                                    | yes |
-| [`ruff-fmt`](docs/linters.md#ruff-fmt)                         | Format Python code                                                  | yes |
+| [`ruff-format`](docs/linters.md#ruff-format)                   | Format Python code                                                  | yes |
 | [`rumdl`](docs/linters.md#rumdl)                               | Lint Markdown files for style and consistency                       | yes |
 | [`ryl`](docs/linters.md#ryl)                                   | Lint YAML files for style and consistency                           | yes |
 | [`shellcheck`](docs/linters.md#shellcheck)                     | Lint shell scripts for common mistakes                              | —   |
 | [`shfmt`](docs/linters.md#shfmt)                               | Format shell scripts                                                | yes |
 | [`taplo`](docs/linters.md#taplo)                               | Format TOML files                                                   | yes |
-| [`xmloxide`](docs/linters.md#xmloxide)                         | Validate XML files are well-formed                                  | —   |
+| [`xmllint`](docs/linters.md#xmllint)                           | Validate XML files are well-formed                                  | —   |
 
 <!-- registry-table-end -->
 

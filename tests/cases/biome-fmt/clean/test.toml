@@ -1,3 +1,0 @@
-[expected]
-args = "run --full biome-fmt"
-exit = 0

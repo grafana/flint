@@ -32,7 +32,7 @@ Every supported check, its config file (when applicable), and its scope. The
 | Scope       | [file](#scopes)                        |
 | Patterns    | `*.json *.jsonc *.js *.ts *.jsx *.tsx` |
 
-## `biome-fmt`
+## `biome-format`
 
 |             |                                        |
 | ----------- | -------------------------------------- |
@@ -74,7 +74,7 @@ Every supported check, its config file (when applicable), and its scope. The
 | Patterns    | `*`                                |
 | Config      | `.codespellrc`                     |
 
-## `dotnet-fmt`
+## `dotnet-format`
 
 |             |                  |
 | ----------- | ---------------- |
@@ -240,7 +240,7 @@ exclude_managers = ["github-actions", "github-runners"]
 | Patterns    | `*.py`           |
 | Config      | `ruff.toml`      |
 
-## `ruff-fmt`
+## `ruff-format`
 
 |             |                    |
 | ----------- | ------------------ |
@@ -314,7 +314,7 @@ flint's existing formatter-style checks.
 Current caveat: Taplo's published docs currently advertise TOML 1.0.0
 support, so treat this check as TOML 1.0-oriented for now.
 
-## `xmloxide`
+## `xmllint`
 
 |             |                                    |
 | ----------- | ---------------------------------- |

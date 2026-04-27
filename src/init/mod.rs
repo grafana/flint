@@ -311,7 +311,7 @@ Add and stage your source files before running init so the detection is accurate
         g.checks
             .iter()
             .zip(&g.check_selected)
-            .any(|(c, &sel)| sel && (c.name == "biome" || c.name == "biome-fmt"))
+            .any(|(c, &sel)| sel && (c.name == "biome" || c.name == "biome-format"))
     });
     let has_cargo_fmt = groups.iter().any(|g| {
         g.checks

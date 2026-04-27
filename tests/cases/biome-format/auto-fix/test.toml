@@ -1,8 +1,8 @@
 [expected]
-args = "run --full --fix biome-fmt"
+args = "run --full --fix biome-format"
 exit = 1
 stderr = '''
-flint: fixed: biome-fmt — commit before pushing
+flint: fixed: biome-format — commit before pushing
 '''
 
 [expected.files]

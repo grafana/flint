@@ -1,8 +1,8 @@
 [expected]
-args = "run --full --fix dotnet-fmt"
+args = "run --full --fix dotnet-format"
 exit = 1
 stderr = '''
-flint: fixed: dotnet-fmt — commit before pushing
+flint: fixed: dotnet-format — commit before pushing
 '''
 
 [expected.files]

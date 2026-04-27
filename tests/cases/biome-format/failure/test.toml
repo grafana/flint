@@ -1,8 +1,8 @@
 [expected]
-args = "run --full biome-fmt"
+args = "run --full biome-format"
 exit = 1
 stderr = '''
-[biome-fmt]
+[biome-format]
 Checked N file(s) in Xµs. No fixes applied.
 Found 1 error.
 data.json format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -18,6 +18,6 @@ format ━━━━━━━━━━━━━━━━━━━━━━━━�
   
 
 
-flint: 1 check failed (biome-fmt)
+flint: 1 check failed (biome-format)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
 '''

@@ -1,5 +1,5 @@
 [expected]
-args = "run --full dotnet-fmt"
+args = "run --full dotnet-format"
 exit = 0
 
 

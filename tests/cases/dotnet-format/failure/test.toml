@@ -1,14 +1,14 @@
 [expected]
-args = "run --full dotnet-fmt"
+args = "run --full dotnet-format"
 exit = 1
 stderr = '''
-[dotnet-fmt]
+[dotnet-format]
 <REPO>/Program.cs(3,1): error WHITESPACE: Fix whitespace formatting. Insert '\s\s\s\s'. [<REPO>/App.csproj]
 <REPO>/Program.cs(4,1): error WHITESPACE: Fix whitespace formatting. Insert '\s\s\s\s'. [<REPO>/App.csproj]
 <REPO>/Program.cs(5,1): error WHITESPACE: Fix whitespace formatting. Insert '\s\s\s\s\s\s\s\s'. [<REPO>/App.csproj]
 <REPO>/Program.cs(6,1): error WHITESPACE: Fix whitespace formatting. Insert '\s\s\s\s'. [<REPO>/App.csproj]
 
-flint: 1 check failed (dotnet-fmt)
+flint: 1 check failed (dotnet-format)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
 '''
 

@@ -1,3 +1,0 @@
-[expected]
-args = "run --full xmloxide"
-exit = 0

@@ -4,7 +4,6 @@
 flint run [OPTIONS] [LINTERS...]
 flint init
 flint hook install
-flint update
 flint linters
 flint version
 ```
@@ -50,8 +49,9 @@ A check runs against all matching files when:
 
 - the check is newly active because its tool was added to `mise.toml`
 - the check's tool version changed in `mise.toml`
-- the pinned `github:grafana/flint` version changed in `mise.toml`, which
-  expands all active checks
+- the pinned Flint tool changed in `mise.toml`, either released
+  `github:grafana/flint` or a cargo-backed prerelease revision, which expands
+  all active checks
 - the check's flint-managed config file changed, such as `.shellcheckrc` or
   `.yamllint.yml` in `FLINT_CONFIG_DIR`
 - another supported baseline config for the check changed, such as
@@ -121,15 +121,32 @@ flint run shellcheck shfmt        # run only shellcheck and shfmt
 flint run --fix rumdl             # fix only Markdown issues
 ```
 
-## `flint update`
+## `flint init`
 
-`flint update` applies non-interactive migrations to `mise.toml`. It replaces
-obsolete tool keys with their modern equivalents while preserving the declared
-version. Run it when `flint run` reports an obsolete key error:
+`flint init` pins Flint itself in `mise.toml` so every contributor uses the same
+lint binary. For unreleased consumer validation, pass an explicit git revision:
 
-```text
-flint: obsolete tool key in mise.toml: "github:mvdan/sh" (replaced by "shfmt")
-  Run `flint update` to apply the migration automatically.
+```bash
+flint init -y --flint-rev <git-rev>
+```
+
+That writes a cargo-backed Flint pin. To return to the released Flint backend
+after the release is cut, run `flint init` again without `--flint-rev`.
+
+`flint init` is also the explicit way to reconcile a repo with the latest Flint
+setup defaults. Routine lint runs use `flint-setup` and only fail when an
+actionable setup migration applies to the repo.
+
+To check setup drift without applying changes, run:
+
+```bash
+flint run flint-setup
+```
+
+To apply setup migrations and canonicalize `mise.toml`, run:
+
+```bash
+flint run --fix flint-setup
 ```
 
 ## `flint linters`

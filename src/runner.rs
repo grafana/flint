@@ -7,7 +7,7 @@ use tokio::task::JoinSet;
 
 use crate::config::{Config, LicenseHeaderConfig, LycheeConfig, RenovateDepsConfig, Settings};
 use crate::files::FileList;
-use crate::linters::{LinterOutput, license_header, lychee, renovate_deps};
+use crate::linters::{LinterOutput, flint_setup, license_header, lychee, renovate_deps};
 use crate::registry::{Check, CheckKind, LinterConfig, Scope, SpecialKind};
 
 #[derive(Clone, Copy)]
@@ -63,6 +63,12 @@ enum PreparedCheck {
         cfg: LicenseHeaderConfig,
         files: Vec<PathBuf>,
     },
+    FlintSetup {
+        name: String,
+        path: PathBuf,
+        config_dir: PathBuf,
+        setup_migration_version: u32,
+    },
 }
 
 impl PreparedCheck {
@@ -71,7 +77,8 @@ impl PreparedCheck {
             Self::Invocations { name, .. }
             | Self::Links { name, .. }
             | Self::RenovateDeps { name, .. }
-            | Self::LicenseHeader { name, .. } => name,
+            | Self::LicenseHeader { name, .. }
+            | Self::FlintSetup { name, .. } => name,
         }
     }
 
@@ -129,6 +136,24 @@ impl PreparedCheck {
             }
             Self::LicenseHeader { cfg, files, .. } => {
                 (license_header::run(&cfg, project_root, &files).await, false)
+            }
+            Self::FlintSetup {
+                path,
+                config_dir,
+                setup_migration_version,
+                ..
+            } => {
+                let tracked_files = vec![path.clone(), config_dir.join("flint.toml")];
+                let before = if fix {
+                    Some(fingerprint_files(&tracked_files))
+                } else {
+                    None
+                };
+                let out =
+                    flint_setup::run(fix, project_root, &config_dir, setup_migration_version).await;
+                let changed =
+                    before.is_some_and(|before| before != fingerprint_files(&tracked_files));
+                (out, changed)
             }
         };
         CheckResult {
@@ -248,41 +273,50 @@ fn prepare(
                 stderr_filter_prefixes: check.stderr_filter_prefixes,
             })
         }
-        CheckKind::Special(SpecialKind::Links) => Some(PreparedCheck::Links {
-            name,
-            cfg: cfg.checks.lychee.clone(),
-            settings: cfg.settings.clone(),
-            file_list: file_list.clone(),
-            config_dir: config_dir.to_path_buf(),
-        }),
-        CheckKind::Special(SpecialKind::RenovateDeps) => Some(PreparedCheck::RenovateDeps {
-            name,
-            cfg: cfg.checks.renovate_deps.clone(),
-        }),
-        CheckKind::Special(SpecialKind::LicenseHeader) => {
-            if cfg.checks.license_header.text.is_empty() {
-                return None;
-            }
-            let patterns: Vec<&str> = cfg
-                .checks
-                .license_header
-                .patterns
-                .iter()
-                .map(String::as_str)
-                .collect();
-            let files: Vec<PathBuf> = match_files(&file_list.files, &patterns, &[], project_root)
-                .into_iter()
-                .cloned()
-                .collect();
-            if files.is_empty() {
-                return None;
-            }
-            Some(PreparedCheck::LicenseHeader {
+        CheckKind::Special(special) => match special.kind() {
+            SpecialKind::Links => Some(PreparedCheck::Links {
                 name,
-                cfg: cfg.checks.license_header.clone(),
-                files,
-            })
-        }
+                cfg: cfg.checks.lychee.clone(),
+                settings: cfg.settings.clone(),
+                file_list: file_list.clone(),
+                config_dir: config_dir.to_path_buf(),
+            }),
+            SpecialKind::RenovateDeps => Some(PreparedCheck::RenovateDeps {
+                name,
+                cfg: cfg.checks.renovate_deps.clone(),
+            }),
+            SpecialKind::LicenseHeader => {
+                if cfg.checks.license_header.text.is_empty() {
+                    return None;
+                }
+                let patterns: Vec<&str> = cfg
+                    .checks
+                    .license_header
+                    .patterns
+                    .iter()
+                    .map(String::as_str)
+                    .collect();
+                let files: Vec<PathBuf> =
+                    match_files(&file_list.files, &patterns, &[], project_root)
+                        .into_iter()
+                        .cloned()
+                        .collect();
+                if files.is_empty() {
+                    return None;
+                }
+                Some(PreparedCheck::LicenseHeader {
+                    name,
+                    cfg: cfg.checks.license_header.clone(),
+                    files,
+                })
+            }
+            SpecialKind::FlintSetup => Some(PreparedCheck::FlintSetup {
+                name,
+                path: project_root.join("mise.toml"),
+                config_dir: config_dir.to_path_buf(),
+                setup_migration_version: cfg.settings.setup_migration_version,
+            }),
+        },
     }
 }
 
@@ -960,6 +994,7 @@ mod tests {
             stderr_filter_prefixes: &[],
             baseline_config: None,
             unsupported_configs: &[],
+            tool_key_migrations: vec![],
             is_formatter: false,
             defers_to_formatters: false,
             editorconfig_line_length_policy: crate::registry::EditorconfigLineLengthPolicy::Default,

@@ -1,8 +1,8 @@
 [expected]
-args = "run --full --fix yaml-lint"
+args = "run --full --fix ryl"
 exit = 1
 stderr = '''
-flint: fixed: yaml-lint — commit before pushing
+flint: fixed: ryl — commit before pushing
 '''
 
 [expected.files]

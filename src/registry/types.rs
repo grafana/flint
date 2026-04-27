@@ -9,6 +9,16 @@ pub enum Scope {
     Project,
 }
 
+impl Scope {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::File => "file",
+            Self::Files => "files",
+            Self::Project => "project",
+        }
+    }
+}
+
 /// Which init profile a check belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Category {
@@ -40,6 +50,34 @@ pub enum SpecialKind {
     Links,
     RenovateDeps,
     LicenseHeader,
+    FlintSetup,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SpecialCheck {
+    kind: SpecialKind,
+    has_fix: bool,
+}
+
+impl SpecialCheck {
+    fn new(kind: SpecialKind, has_fix: bool) -> Self {
+        Self { kind, has_fix }
+    }
+
+    pub fn kind(self) -> SpecialKind {
+        self.kind
+    }
+
+    pub fn has_fix(self) -> bool {
+        self.has_fix
+    }
+
+    pub fn uses_binary(self) -> bool {
+        !matches!(
+            self.kind,
+            SpecialKind::LicenseHeader | SpecialKind::FlintSetup
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -62,7 +100,27 @@ pub enum CheckKind {
         full_fix_cmd: &'static str,
         scope: Scope,
     },
-    Special(SpecialKind),
+    Special(SpecialCheck),
+}
+
+impl CheckKind {
+    pub fn scope_name(&self) -> &'static str {
+        match self {
+            Self::Template { scope, .. } => scope.name(),
+            Self::Special(_) => "special",
+        }
+    }
+
+    pub fn special_kind(&self) -> Option<SpecialKind> {
+        match self {
+            Self::Template { .. } => None,
+            Self::Special(special) => Some(special.kind()),
+        }
+    }
+
+    pub fn is_special_kind(&self, kind: SpecialKind) -> bool {
+        self.special_kind() == Some(kind)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -96,12 +154,26 @@ impl LinterConfig {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditorconfigDirectiveStyle {
+    Html,
+    Slash,
+    Hash,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EditorconfigLineLengthPolicy {
     Default,
     DisableForPatterns {
         patterns: &'static [&'static str],
         comment: &'static str,
+        directive_style: Option<EditorconfigDirectiveStyle>,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ToolKeyMigration {
+    pub after_setup_migration_version: u32,
+    pub old_key: &'static str,
 }
 
 #[derive(Debug, Clone)]
@@ -144,6 +216,8 @@ pub struct Check {
     /// Known upstream config locations that flint does not support for this
     /// check. Their presence is a hard failure to avoid silent config drift.
     pub unsupported_configs: &'static [ConfigFile],
+    /// Old mise tool keys that should migrate to this check's current install key.
+    pub tool_key_migrations: Vec<ToolKeyMigration>,
     /// This check is a formatter — it owns certain file types for formatting purposes.
     pub is_formatter: bool,
     /// Skip files owned by active formatters (used by ec to avoid double-checking).
@@ -178,15 +252,16 @@ impl Check {
     pub fn has_fix(&self) -> bool {
         match &self.kind {
             CheckKind::Template { fix_cmd, .. } => !fix_cmd.is_empty(),
-            CheckKind::Special(SpecialKind::Links) => false,
-            CheckKind::Special(SpecialKind::RenovateDeps) => true,
-            CheckKind::Special(SpecialKind::LicenseHeader) => false,
+            CheckKind::Special(special) => special.has_fix(),
         }
     }
 
     /// Returns false for checks implemented entirely in-process with no external binary.
     pub fn uses_binary(&self) -> bool {
-        !matches!(self.kind, CheckKind::Special(SpecialKind::LicenseHeader))
+        match &self.kind {
+            CheckKind::Template { .. } => true,
+            CheckKind::Special(special) => special.uses_binary(),
+        }
     }
 
     pub fn fix_behavior(&self) -> FixBehavior {
@@ -208,6 +283,15 @@ impl Check {
     /// toolchains without components.
     pub fn components(&self) -> Option<&'static str> {
         self.toolchain.flatten()
+    }
+
+    /// Returns the canonical mise.toml tool key to write when installing this
+    /// check, or `None` if no mise entry is needed.
+    pub fn install_key(&self) -> Option<&'static str> {
+        if !self.uses_binary() || self.activate_unconditionally {
+            return None;
+        }
+        Some(self.mise_tool_name.unwrap_or(self.bin_name))
     }
 
     // --- Constructors ---
@@ -258,6 +342,7 @@ impl Check {
             stderr_filter_prefixes: &[],
             baseline_config: None,
             unsupported_configs: &[],
+            tool_key_migrations: vec![],
             is_formatter: false,
             defers_to_formatters: false,
             editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
@@ -280,7 +365,17 @@ impl Check {
     }
 
     /// Special check with custom logic (not a simple command template).
-    pub fn special(name: &'static str, bin_name: &'static str, kind: SpecialKind) -> Self {
+    pub fn special(name: &'static str, kind: SpecialKind, has_fix: bool) -> Self {
+        Self::special_with_bin(name, "", kind, has_fix)
+    }
+
+    /// Special check with custom logic backed by an external binary.
+    pub fn special_with_bin(
+        name: &'static str,
+        bin_name: &'static str,
+        kind: SpecialKind,
+        has_fix: bool,
+    ) -> Self {
         Check {
             name,
             bin_name,
@@ -294,6 +389,7 @@ impl Check {
             stderr_filter_prefixes: &[],
             baseline_config: None,
             unsupported_configs: &[],
+            tool_key_migrations: vec![],
             is_formatter: false,
             defers_to_formatters: false,
             editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
@@ -303,7 +399,7 @@ impl Check {
             toolchain: None,
             windows_java_jar: false,
             fix_behavior: FixBehavior::Definitive,
-            kind: CheckKind::Special(kind),
+            kind: CheckKind::Special(SpecialCheck::new(kind, has_fix)),
             desc: "",
             docs: "",
         }
@@ -404,9 +500,13 @@ impl Check {
         mut self,
         patterns: &'static [&'static str],
         comment: &'static str,
+        directive_style: Option<EditorconfigDirectiveStyle>,
     ) -> Self {
-        self.editorconfig_line_length_policy =
-            EditorconfigLineLengthPolicy::DisableForPatterns { patterns, comment };
+        self.editorconfig_line_length_policy = EditorconfigLineLengthPolicy::DisableForPatterns {
+            patterns,
+            comment,
+            directive_style,
+        };
         self
     }
 
@@ -508,6 +608,22 @@ impl Check {
 
     pub fn unsupported_configs(mut self, files: &'static [ConfigFile]) -> Self {
         self.unsupported_configs = files;
+        self
+    }
+
+    /// Old mise tool keys that should migrate to this check's current install
+    /// key when the repo setup migration version is at or before
+    /// `after_setup_migration_version`.
+    pub fn migrate_tool_keys_after(
+        mut self,
+        after_setup_migration_version: u32,
+        old_keys: &'static [&'static str],
+    ) -> Self {
+        self.tool_key_migrations
+            .extend(old_keys.iter().map(|old_key| ToolKeyMigration {
+                after_setup_migration_version,
+                old_key,
+            }));
         self
     }
 }

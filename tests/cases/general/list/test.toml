@@ -4,10 +4,11 @@ exit = 0
 stdout = '''
 NAME                  BINARY              STATUS         SPEED     FIX  DESCRIPTION                                                          PATTERNS
 -------------------------------------------------------------------------------------------------------------------------------------------------------
+flint-setup           (built-in)          active         fast      yes  Keep Flint setup current and mise.toml lint tooling canonical        mise.toml
 shellcheck            shellcheck          active         fast      no   Lint shell scripts for common mistakes                               *.sh *.bash *.bats
 shfmt                 shfmt               active         fast      yes  Format shell scripts                                                 *.sh *.bash
 rumdl                 rumdl               active         fast      yes  Lint Markdown files for style and consistency                        *.md
-yaml-lint             ryl                 active         fast      yes  Lint YAML files for style and consistency                            *.yml *.yaml
+ryl                   ryl                 active         fast      yes  Lint YAML files for style and consistency                            *.yml *.yaml
 taplo                 taplo               active         fast      yes  Format TOML files                                                    *.toml
 actionlint            actionlint          active         fast      no   Lint GitHub Actions workflow files                                   .github/workflows/*.yml .github/workflows/*.yaml
 hadolint              hadolint            missing        fast      no   Lint Dockerfiles                                                     Dockerfile Dockerfile.* *.dockerfile
@@ -25,9 +26,9 @@ gofmt                 gofmt               missing        fast      yes  Format G
 google-java-format    google-java-format  missing        fast      yes  Format Java code                                                     *.java
 ktlint                ktlint              missing        fast      yes  Lint and format Kotlin code                                          *.kt *.kts
 dotnet-format         dotnet              missing        fast      yes  Format C# code                                                       *.cs
-lychee                lychee              active         fast      no   Check for broken links                                             
+lychee                lychee              active         fast      no   Check for broken links
 renovate-deps         renovate            active         adaptive  yes  Verify Renovate dependency snapshot is up to date                    renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5
-license-header        license-header      not configured  fast      no   Check source files have the required license header                
+license-header        (built-in)          not configured  fast      no   Check source files have the required license header
 '''
 
 [fake_bins]
@@ -49,27 +50,27 @@ ec = '''
 lychee = '''
 #!/bin/sh
 '''
-rumdl = '''
-#!/bin/sh
-'''
-ryl = '''
-#!/bin/sh
-'''
-taplo = '''
-#!/bin/sh
-'''
 renovate = '''
 #!/bin/sh
 '''
 ruff = '''
 #!/bin/sh
 '''
+rumdl = '''
+#!/bin/sh
+'''
 rustfmt = '''
+#!/bin/sh
+'''
+ryl = '''
 #!/bin/sh
 '''
 shellcheck = '''
 #!/bin/sh
 '''
 shfmt = '''
+#!/bin/sh
+'''
+taplo = '''
 #!/bin/sh
 '''

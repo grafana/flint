@@ -1,2 +1,2 @@
 [tools]
-shellcheck = "latest"
+"github:koalaman/shellcheck" = "latest"

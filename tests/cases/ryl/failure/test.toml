@@ -1,11 +1,11 @@
 [expected]
-args = "run --full yaml-lint"
+args = "run --full ryl"
 exit = 1
 stderr = '''
-[yaml-lint]
+[ryl]
 config.yml:2: bad spacing
 
-flint: 1 check failed (yaml-lint)
+flint: 1 check failed (ryl)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
 '''
 

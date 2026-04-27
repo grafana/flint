@@ -2,13 +2,16 @@ use anyhow::Result;
 use std::collections::HashSet;
 use std::path::Path;
 
-use crate::registry::{EditorconfigLineLengthPolicy, builtin};
+use crate::registry::{Check, EditorconfigDirectiveStyle, EditorconfigLineLengthPolicy, builtin};
 
 use super::config_files::{
-    remove_legacy_lint_files, remove_stale_editorconfig_checker_directives,
-    remove_stale_markdownlint_line_length_directives,
+    existing_legacy_lint_files, remove_legacy_lint_files,
+    remove_stale_editorconfig_checker_directives, remove_stale_markdownlint_line_length_directives,
+    stale_editorconfig_checker_directive_files, stale_markdownlint_line_length_directive_files,
 };
+use super::detection::parse_tool_keys;
 use super::generation;
+use super::generation::needs_node_for_npm;
 use super::{ensure_node_for_npm, install_key, remove_tool_keys};
 
 pub(super) struct RepoMigrationSummary {
@@ -18,6 +21,12 @@ pub(super) struct RepoMigrationSummary {
     legacy_files_removed: Vec<String>,
     stale_md013_comments_removed: Vec<String>,
     stale_editorconfig_checker_comments_removed: Vec<String>,
+}
+
+struct MigrationInputs {
+    tool_keys: HashSet<String>,
+    delegated_sections: Vec<(&'static [&'static str], EditorconfigDirectiveStyle)>,
+    mise_content: String,
 }
 
 impl RepoMigrationSummary {
@@ -52,9 +61,33 @@ impl RepoMigrationSummary {
     }
 }
 
-pub(super) fn active_editorconfig_line_length_sections(
+pub(crate) fn apply_setup_migrations(project_root: &Path, config_dir: &Path) -> Result<bool> {
+    let mise_path = project_root.join("mise.toml");
+    let current_content = std::fs::read_to_string(&mise_path).unwrap_or_default();
+    let current_tool_keys = parse_tool_keys(&current_content);
+    let delegated_sections = active_editorconfig_cleanup_sections(&current_tool_keys);
+    let migration_summary = apply_repo_migrations(project_root, config_dir, &delegated_sections)?;
+    Ok(!migration_summary.is_noop())
+}
+
+pub(crate) fn detect_setup_migrations(
+    project_root: &Path,
+    config_dir: &Path,
+    setup_migration_version: u32,
+) -> Result<bool> {
+    let migration_summary =
+        detect_setup_migrations_after(project_root, config_dir, setup_migration_version)?;
+    Ok(!migration_summary.is_noop())
+}
+
+pub(crate) fn detect_setup_drift(project_root: &Path, config_dir: &Path) -> Result<bool> {
+    let migration_summary = detect_repo_migrations(project_root, config_dir)?;
+    Ok(!migration_summary.is_noop())
+}
+
+pub(super) fn active_editorconfig_cleanup_sections(
     tool_keys: &HashSet<String>,
-) -> Vec<(&'static [&'static str], &'static str)> {
+) -> Vec<(&'static [&'static str], EditorconfigDirectiveStyle)> {
     let mut seen = HashSet::new();
     let mut out = vec![];
     for check in builtin() {
@@ -64,14 +97,65 @@ pub(super) fn active_editorconfig_line_length_sections(
         if !tool_keys.contains(key) {
             continue;
         }
-        let EditorconfigLineLengthPolicy::DisableForPatterns { patterns, comment } =
-            check.editorconfig_line_length_policy
+        let EditorconfigLineLengthPolicy::DisableForPatterns {
+            patterns,
+            directive_style,
+            ..
+        } = check.editorconfig_line_length_policy
         else {
+            continue;
+        };
+        let Some(EditorconfigDirectiveStyle::Html) = directive_style else {
             continue;
         };
         let dedupe_key = patterns.join(",");
         if seen.insert(dedupe_key) {
+            out.push((patterns, EditorconfigDirectiveStyle::Html));
+        }
+    }
+    out
+}
+
+pub(super) fn selected_editorconfig_line_length_sections(
+    checks: &[&Check],
+) -> Vec<(&'static [&'static str], &'static str)> {
+    let mut seen = HashSet::new();
+    let mut out = vec![];
+    for check in checks {
+        let EditorconfigLineLengthPolicy::DisableForPatterns {
+            patterns, comment, ..
+        } = check.editorconfig_line_length_policy
+        else {
+            continue;
+        };
+        let key = patterns.join(",");
+        if seen.insert(key) {
             out.push((patterns, comment));
+        }
+    }
+    out
+}
+
+pub(super) fn selected_editorconfig_cleanup_sections(
+    checks: &[&Check],
+) -> Vec<(&'static [&'static str], EditorconfigDirectiveStyle)> {
+    let mut seen = HashSet::new();
+    let mut out = vec![];
+    for check in checks {
+        let EditorconfigLineLengthPolicy::DisableForPatterns {
+            patterns,
+            directive_style,
+            ..
+        } = check.editorconfig_line_length_policy
+        else {
+            continue;
+        };
+        let Some(EditorconfigDirectiveStyle::Html) = directive_style else {
+            continue;
+        };
+        let key = patterns.join(",");
+        if seen.insert(key) {
+            out.push((patterns, EditorconfigDirectiveStyle::Html));
         }
     }
     out
@@ -80,28 +164,136 @@ pub(super) fn active_editorconfig_line_length_sections(
 pub(super) fn apply_repo_migrations(
     project_root: &Path,
     config_dir: &Path,
-    delegated_patterns: &[&'static [&'static str]],
+    delegated_sections: &[(&'static [&'static str], EditorconfigDirectiveStyle)],
 ) -> Result<RepoMigrationSummary> {
-    let replaced_obsolete =
-        generation::replace_obsolete_keys(project_root, crate::registry::OBSOLETE_KEYS)?;
+    let obsolete_keys = crate::registry::obsolete_keys();
+    let unsupported_keys = crate::registry::unsupported_keys();
+    apply_repo_migrations_with_keys(
+        project_root,
+        config_dir,
+        delegated_sections,
+        &obsolete_keys,
+        &unsupported_keys,
+    )
+}
+
+pub(crate) fn detect_repo_migrations(
+    project_root: &Path,
+    config_dir: &Path,
+) -> Result<RepoMigrationSummary> {
+    let inputs = migration_inputs(project_root)?;
+    let obsolete_keys = crate::registry::obsolete_keys();
+    let unsupported_keys = crate::registry::unsupported_keys();
+    detect_repo_migrations_with_keys(
+        project_root,
+        config_dir,
+        &inputs.delegated_sections,
+        &obsolete_keys,
+        &unsupported_keys,
+        &inputs.tool_keys,
+        &inputs.mise_content,
+    )
+}
+
+pub(crate) fn detect_setup_migrations_after(
+    project_root: &Path,
+    config_dir: &Path,
+    setup_migration_version: u32,
+) -> Result<RepoMigrationSummary> {
+    let inputs = migration_inputs(project_root)?;
+    let obsolete_keys = crate::registry::obsolete_keys_after(setup_migration_version);
+    let unsupported_keys = crate::setup::unsupported_keys_after(setup_migration_version);
+    detect_repo_migrations_with_keys(
+        project_root,
+        config_dir,
+        &inputs.delegated_sections,
+        &obsolete_keys,
+        &unsupported_keys,
+        &inputs.tool_keys,
+        &inputs.mise_content,
+    )
+}
+
+fn migration_inputs(project_root: &Path) -> Result<MigrationInputs> {
+    let mise_path = project_root.join("mise.toml");
+    let current_content = std::fs::read_to_string(&mise_path).unwrap_or_default();
+    let current_tool_keys = parse_tool_keys(&current_content);
+    let delegated_sections = active_editorconfig_cleanup_sections(&current_tool_keys);
+    Ok(MigrationInputs {
+        tool_keys: current_tool_keys,
+        delegated_sections,
+        mise_content: current_content,
+    })
+}
+
+fn detect_repo_migrations_with_keys(
+    project_root: &Path,
+    config_dir: &Path,
+    delegated_sections: &[(&'static [&'static str], EditorconfigDirectiveStyle)],
+    obsolete_keys: &[(&'static str, &'static str)],
+    unsupported_keys: &[(&'static str, &'static str)],
+    tool_keys: &HashSet<String>,
+    mise_content: &str,
+) -> Result<RepoMigrationSummary> {
+    let replaced_obsolete = obsolete_keys
+        .iter()
+        .filter(|(old_key, _)| tool_keys.contains(*old_key))
+        .map(|(old_key, new_key)| ((*old_key).to_string(), (*new_key).to_string()))
+        .collect();
+    let removed_unsupported = unsupported_keys
+        .iter()
+        .filter(|(old_key, _)| tool_keys.contains(*old_key))
+        .map(|(old_key, _)| (*old_key).to_string())
+        .collect();
+    let node_added = needs_node_for_npm(mise_content);
+    let legacy_files_removed = existing_legacy_lint_files(project_root, config_dir);
+    let stale_md013_comments_removed = if delegated_patterns_include(delegated_sections, "*.md") {
+        stale_markdownlint_line_length_directive_files(project_root)?
+    } else {
+        vec![]
+    };
+    let stale_editorconfig_checker_comments_removed = if delegated_sections.is_empty() {
+        vec![]
+    } else {
+        stale_editorconfig_checker_directive_files(project_root, delegated_sections)?
+    };
+
+    Ok(RepoMigrationSummary {
+        replaced_obsolete,
+        removed_unsupported,
+        node_added,
+        legacy_files_removed,
+        stale_md013_comments_removed,
+        stale_editorconfig_checker_comments_removed,
+    })
+}
+
+fn apply_repo_migrations_with_keys(
+    project_root: &Path,
+    config_dir: &Path,
+    delegated_sections: &[(&'static [&'static str], EditorconfigDirectiveStyle)],
+    obsolete_keys: &[(&'static str, &'static str)],
+    unsupported_keys: &[(&'static str, &'static str)],
+) -> Result<RepoMigrationSummary> {
+    let replaced_obsolete = generation::replace_obsolete_keys(project_root, obsolete_keys)?;
     let removed_unsupported = remove_tool_keys(
         project_root,
-        &crate::registry::UNSUPPORTED_KEYS
+        &unsupported_keys
             .iter()
             .map(|(old_key, _)| *old_key)
             .collect::<Vec<_>>(),
     )?;
     let node_added = ensure_node_for_npm(project_root)?;
     let legacy_files_removed = remove_legacy_lint_files(project_root, config_dir)?;
-    let stale_md013_comments_removed = if delegated_patterns_include(delegated_patterns, "*.md") {
+    let stale_md013_comments_removed = if delegated_patterns_include(delegated_sections, "*.md") {
         remove_stale_markdownlint_line_length_directives(project_root)?
     } else {
         vec![]
     };
-    let stale_editorconfig_checker_comments_removed = if delegated_patterns.is_empty() {
+    let stale_editorconfig_checker_comments_removed = if delegated_sections.is_empty() {
         vec![]
     } else {
-        remove_stale_editorconfig_checker_directives(project_root, delegated_patterns)?
+        remove_stale_editorconfig_checker_directives(project_root, delegated_sections)?
     };
 
     Ok(RepoMigrationSummary {
@@ -115,10 +307,10 @@ pub(super) fn apply_repo_migrations(
 }
 
 fn delegated_patterns_include(
-    delegated_patterns: &[&'static [&'static str]],
+    delegated_sections: &[(&'static [&'static str], EditorconfigDirectiveStyle)],
     needle: &str,
 ) -> bool {
-    delegated_patterns
+    delegated_sections
         .iter()
-        .any(|patterns| patterns.contains(&needle))
+        .any(|(patterns, _)| patterns.contains(&needle))
 }

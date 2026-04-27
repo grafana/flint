@@ -9,7 +9,7 @@ Issues found in 1 input. Find details below.
 [README.md]:
 [ERROR] file://<REPO>/nonexistent.md | Cannot find file: File not found. Check if file exists and path is correct
 
-🔍 1 Total (in 0s) ✅ 0 OK 🚫 1 Error
+🔍 1 Total (in Xs) ✅ 0 OK 🚫 1 Error
 
 flint: 1 check failed (lychee)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.

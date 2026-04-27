@@ -48,6 +48,55 @@ fn find_obsolete_key_detects_legacy_ruff_backend() {
 }
 
 #[test]
+fn shellcheck_alias_does_not_make_github_backend_obsolete() {
+    let tools = HashMap::from([
+        (
+            "github:koalaman/shellcheck".to_string(),
+            "0.11.0".to_string(),
+        ),
+        ("shellcheck".to_string(), "0.11.0".to_string()),
+    ]);
+
+    assert_eq!(find_obsolete_key(&tools), None);
+}
+
+#[test]
+fn check_owned_tool_migrations_apply_after_v2_baseline() {
+    let obsolete = obsolete_keys_after(crate::setup::V2_BASELINE_SETUP_VERSION);
+
+    assert!(obsolete.contains(&("cargo:yaml-lint", "aqua:owenlamont/ryl")));
+    assert!(obsolete.contains(&("github:owenlamont/ryl", "aqua:owenlamont/ryl")));
+    assert!(obsolete.contains(&("pipx:ruff", "ruff")));
+    assert!(obsolete.contains(&("github:astral-sh/ruff", "ruff")));
+    assert!(obsolete.contains(&("shellcheck", "github:koalaman/shellcheck")));
+    assert!(obsolete.contains(&("cargo:xmloxide", "github:jonwiggins/xmloxide")));
+    assert!(obsolete_keys_after(crate::setup::LATEST_SUPPORTED_SETUP_VERSION).is_empty());
+}
+
+#[test]
+fn registry_tool_key_migrations_are_unique_and_have_targets() {
+    let mut seen = std::collections::HashSet::new();
+
+    for check in builtin() {
+        if check.tool_key_migrations.is_empty() {
+            continue;
+        }
+        assert!(
+            check.install_key().is_some(),
+            "{} declares tool-key migrations but has no install key",
+            check.name
+        );
+        for migration in &check.tool_key_migrations {
+            assert!(
+                seen.insert(migration.old_key),
+                "duplicate registry tool-key migration: {}",
+                migration.old_key
+            );
+        }
+    }
+}
+
+#[test]
 fn find_unsupported_key_detects_markdownlint_stack() {
     let mut tools = HashMap::new();
     tools.insert("npm:markdownlint-cli2".to_string(), "0.18.1".to_string());
@@ -81,7 +130,7 @@ fn find_unsupported_key_detects_prettier_stack() {
         find_unsupported_key(&tools),
         Some((
             "npm:prettier",
-            "replace with rumdl and yaml-lint, then remove prettier from the lint toolchain",
+            "replace with rumdl and ryl, then remove prettier from the lint toolchain",
         ))
     );
 }
@@ -111,6 +160,68 @@ fn version_ranges_must_not_be_mixed_with_unranged_entries() {
             }
         }
     }
+}
+
+fn normalized_command_prefix(check: &Check) -> Option<String> {
+    let command = match &check.kind {
+        crate::registry::CheckKind::Template {
+            check_cmd,
+            full_cmd,
+            ..
+        } => {
+            if !full_cmd.is_empty() {
+                *full_cmd
+            } else {
+                *check_cmd
+            }
+        }
+        crate::registry::CheckKind::Special(_) => return None,
+    };
+
+    let mut words = vec![];
+    for token in command.split_whitespace() {
+        if token.starts_with('-') || token.contains('{') {
+            break;
+        }
+        words.push(token);
+        if words.len() == 2 {
+            break;
+        }
+    }
+
+    (!words.is_empty()).then(|| words.join("-"))
+}
+
+/// Guardrail: check names should usually match the binary users recognize in
+/// logs, config, and docs. For subcommand-style tools, a hyphenated native
+/// command prefix such as `cargo-fmt` or `dotnet-format` is also acceptable.
+#[test]
+fn names_prefer_binary_or_native_command() {
+    const ALLOWED_ALIASES: &[(&str, &str)] = &[("editorconfig-checker", "ec")];
+
+    let violations: Vec<String> = builtin()
+        .into_iter()
+        .filter(|check| check.uses_binary())
+        .filter(|check| check.kind.special_kind().is_none())
+        .filter_map(|check| {
+            let allowed = ALLOWED_ALIASES
+                .iter()
+                .any(|(name, bin)| check.name == *name && check.bin_name == *bin);
+            let matches_command = normalized_command_prefix(&check).as_deref() == Some(check.name);
+            (check.name != check.bin_name && !matches_command && !allowed).then(|| {
+                format!(
+                    "{} should match binary {} or native command prefix",
+                    check.name, check.bin_name
+                )
+            })
+        })
+        .collect();
+
+    assert!(
+        violations.is_empty(),
+        "registry check names drifted from the binary/native-command convention:\n{}",
+        violations.join("\n")
+    );
 }
 
 #[test]
@@ -226,6 +337,24 @@ fn all_registry_binaries_found() {
 }
 
 #[test]
+fn editorconfig_checker_json_is_optional_not_generated_baseline() {
+    let registry = builtin();
+    let check = registry
+        .iter()
+        .find(|check| check.name == "editorconfig-checker")
+        .expect("editorconfig-checker exists");
+
+    assert!(
+        check.linter_config.is_some(),
+        "existing .editorconfig-checker.json should still be passed to ec"
+    );
+    assert!(
+        check.baseline_config.is_none(),
+        ".editorconfig-checker.json should not be treated as generated baseline config"
+    );
+}
+
+#[test]
 fn default_renovate_preset_covers_all_linter_tools_weekly() {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let default_json_path = manifest_dir.join("default.json");
@@ -335,6 +464,34 @@ fn linter_keys_include_mise_and_bare_tool_names() {
     assert!(keys.contains("ryl"));
     assert!(keys.contains("github:jonwiggins/xmloxide"));
     assert!(keys.contains("xmllint"));
+    assert!(keys.contains("github:grafana/flint"));
+    assert!(keys.contains("cargo:https://github.com/grafana/flint"));
+    assert!(keys.contains("cargo:https://github.com/grafana/flint.git"));
+}
+
+#[test]
+fn flint_version_changed_detects_cargo_prerelease_rev_changes() {
+    let previous = HashMap::from([(
+        "cargo:https://github.com/grafana/flint".to_string(),
+        "rev:aaaa".to_string(),
+    )]);
+    let current = HashMap::from([(
+        "cargo:https://github.com/grafana/flint".to_string(),
+        "rev:bbbb".to_string(),
+    )]);
+
+    assert!(flint_version_changed(&previous, &current));
+}
+
+#[test]
+fn flint_version_changed_detects_release_to_cargo_backend_switch() {
+    let previous = HashMap::from([("github:grafana/flint".to_string(), "0.20.4".to_string())]);
+    let current = HashMap::from([(
+        "cargo:https://github.com/grafana/flint".to_string(),
+        "rev:bbbb".to_string(),
+    )]);
+
+    assert!(flint_version_changed(&previous, &current));
 }
 
 fn package_rule_by_group_name<'a>(
@@ -575,14 +732,7 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     };
     rows.push(("Binary", binary));
 
-    let scope = match &check.kind {
-        CheckKind::Template { scope, .. } => match scope {
-            Scope::File => "file",
-            Scope::Files => "files",
-            Scope::Project => "project",
-        },
-        CheckKind::Special(_) => "special",
-    };
+    let scope = check.kind.scope_name();
     rows.push(("Scope", format!("[{scope}](#scopes)")));
 
     if !check.patterns.is_empty() {
@@ -592,7 +742,7 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     match check.linter_config.as_ref() {
         Some(config) => rows.push(("Config", format!("`{}`", config.display_name()))),
         None => {
-            if matches!(&check.kind, CheckKind::Special(SpecialKind::Links)) {
+            if check.kind.is_special_kind(SpecialKind::Links) {
                 rows.push(("Config", "via `[checks.links]` in flint.toml".to_string()));
             }
         }

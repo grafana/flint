@@ -5,6 +5,7 @@ mod init;
 mod linters;
 mod registry;
 mod runner;
+mod setup;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
@@ -29,8 +30,6 @@ enum SubCommand {
     Linters(LintersArgs),
     /// Set up linters in mise.toml for this project.
     Init(InitArgs),
-    /// Apply non-interactive migrations to mise.toml (replace obsolete tool keys).
-    Update,
     /// Manage git hooks.
     Hook(HookArgs),
     /// Display the flint version.
@@ -61,6 +60,10 @@ struct InitArgs {
     /// Profile to configure: lang, default, or comprehensive.
     #[arg(long, value_enum)]
     profile: Option<init::Profile>,
+
+    /// Pin flint itself through cargo at this git revision for prerelease validation.
+    #[arg(long, value_name = "REV")]
+    flint_rev: Option<String>,
 
     /// Apply changes without prompting for confirmation.
     #[arg(long, short = 'y')]
@@ -142,10 +145,12 @@ async fn main() -> Result<()> {
             }
         }
         SubCommand::Init(args) => {
-            init::run(&project_root, args.profile, args.yes)?;
-        }
-        SubCommand::Update => {
-            init::update(&project_root, &config_dir)?;
+            init::run(
+                &project_root,
+                args.profile,
+                args.yes,
+                args.flint_rev.as_deref(),
+            )?;
         }
         SubCommand::Hook(args) => match args.command {
             HookCommand::Install => hook::install(&project_root)?,
@@ -197,16 +202,21 @@ async fn run(
     // --fast-only policy (skipped when linters are named explicitly, relevance-gated for
     // adaptive checks). mise guarantees declared tools are on PATH, so no PATH check needed.
     let mise_tools = registry::read_mise_tools(project_root);
-    if let Some((old, new)) = registry::find_obsolete_key(&mise_tools) {
-        eprintln!("flint: obsolete tool key in mise.toml: {old:?} (replaced by {new:?})");
-        eprintln!("  Run `flint update` to apply the migration automatically.");
-        std::process::exit(1);
-    }
-    if let Some((old, hint)) = registry::find_unsupported_key(&mise_tools) {
-        eprintln!("flint: unsupported legacy lint tool in mise.toml: {old:?}");
-        eprintln!("  Migration required: {hint}.");
-        eprintln!("  Run `flint init` to upgrade the lint toolchain.");
-        std::process::exit(1);
+    let flint_setup_selected = checks
+        .iter()
+        .any(|c| c.kind.is_special_kind(SpecialKind::FlintSetup));
+    if !flint_setup_selected {
+        if let Some((old, new)) = registry::find_obsolete_key(&mise_tools) {
+            eprintln!("flint: obsolete tool key in mise.toml: {old:?} (replaced by {new:?})");
+            eprintln!("  Run `flint run --fix flint-setup` to apply the migration automatically.");
+            std::process::exit(1);
+        }
+        if let Some((old, hint)) = registry::find_unsupported_key(&mise_tools) {
+            eprintln!("flint: unsupported legacy lint tool in mise.toml: {old:?}");
+            eprintln!("  Migration required: {hint}.");
+            eprintln!("  Run `flint init` to upgrade the lint toolchain.");
+            std::process::exit(1);
+        }
     }
     let active: Vec<&registry::Check> = {
         let mut out = vec![];
@@ -219,7 +229,7 @@ async fn run(
                         RunPolicy::Fast => true,
                         RunPolicy::Slow => false,
                         RunPolicy::Adaptive => match &c.kind {
-                            CheckKind::Special(SpecialKind::RenovateDeps) => {
+                            kind if kind.is_special_kind(SpecialKind::RenovateDeps) => {
                                 linters::renovate_deps::is_relevant(&file_list, project_root)
                             }
                             _ => true,
@@ -239,6 +249,55 @@ async fn run(
         }
         out
     };
+
+    let setup_check = active.iter().copied().find(|check| is_flint_setup(check));
+    if let Some(check) = setup_check {
+        let setup_results = run_checks(
+            &[check],
+            &file_list,
+            None,
+            &HashSet::new(),
+            RunOptions {
+                fix: args.fix,
+                verbose: args.verbose,
+                short: args.short,
+                time: args.time,
+            },
+            RunContext {
+                active_checks: &active,
+                project_root,
+                cfg: &cfg,
+                config_dir,
+            },
+        )
+        .await?;
+        let setup_result = setup_results
+            .into_iter()
+            .next()
+            .expect("flint-setup preflight produced a result");
+        if args.fix {
+            finish_fix_outcomes(vec![classify_single_pass_fix(setup_result)]);
+        } else if !setup_result.ok {
+            let failed = [setup_result.name.as_str()];
+            if args.short {
+                eprintln!("flint: 1 check failed — flint run --fix {}", failed[0]);
+            } else {
+                eprintln!("\nflint: 1 check failed ({})", failed[0]);
+                eprintln!(
+                    "💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify."
+                );
+            }
+            std::process::exit(1);
+        }
+    }
+    let active: Vec<&registry::Check> = active
+        .into_iter()
+        .filter(|check| !is_flint_setup(check))
+        .collect();
+
+    if active.is_empty() {
+        return Ok(());
+    }
 
     if let Some((check, config)) = active.iter().find_map(|check| {
         unsupported_config(check, project_root, config_dir).map(|config| (*check, config))
@@ -404,51 +463,7 @@ async fn run(
             }
         }
 
-        // Emit linter output for checks that need manual review so the caller
-        // has the failure details without a second flint invocation.
-        for r in outcomes.iter().filter_map(FixOutcome::result) {
-            eprintln!("[{}]", r.name);
-            if !r.stdout.is_empty() {
-                eprint!("{}", String::from_utf8_lossy(&r.stdout));
-            }
-            if !r.stderr.is_empty() {
-                eprint!("{}", String::from_utf8_lossy(&r.stderr));
-            }
-        }
-
-        let mut fixed = vec![];
-        let mut partial = vec![];
-        let mut review = vec![];
-        for outcome in outcomes {
-            match outcome {
-                FixOutcome::Clean => {}
-                FixOutcome::Fixed(name) => fixed.push(name),
-                FixOutcome::Partial(result) => partial.push(result.name),
-                FixOutcome::Review(result) => review.push(result.name),
-            }
-        }
-        fixed.sort();
-        partial.sort();
-        review.sort();
-        let mut segments = vec![];
-        if !fixed.is_empty() {
-            // Exit 1 even when fixes were applied: in a pre-push context the
-            // fixed files are uncommitted. The caller must commit them first.
-            segments.push(format!(
-                "fixed: {} — commit before pushing",
-                fixed.join(", ")
-            ));
-        }
-        if !partial.is_empty() {
-            segments.push(format!("partial: {}", partial.join(", ")));
-        }
-        if !review.is_empty() {
-            segments.push(format!("review: {}", review.join(", ")));
-        }
-        if !segments.is_empty() {
-            eprintln!("flint: {}", segments.join(" | "));
-            std::process::exit(1);
-        }
+        finish_fix_outcomes(outcomes);
         return Ok(());
     }
 
@@ -530,6 +545,54 @@ impl FixOutcome {
     }
 }
 
+fn finish_fix_outcomes(outcomes: Vec<FixOutcome>) {
+    // Emit linter output for checks that need manual review so the caller has
+    // the failure details without a second flint invocation.
+    for r in outcomes.iter().filter_map(FixOutcome::result) {
+        eprintln!("[{}]", r.name);
+        if !r.stdout.is_empty() {
+            eprint!("{}", String::from_utf8_lossy(&r.stdout));
+        }
+        if !r.stderr.is_empty() {
+            eprint!("{}", String::from_utf8_lossy(&r.stderr));
+        }
+    }
+
+    let mut fixed = vec![];
+    let mut partial = vec![];
+    let mut review = vec![];
+    for outcome in outcomes {
+        match outcome {
+            FixOutcome::Clean => {}
+            FixOutcome::Fixed(name) => fixed.push(name),
+            FixOutcome::Partial(result) => partial.push(result.name),
+            FixOutcome::Review(result) => review.push(result.name),
+        }
+    }
+    fixed.sort();
+    partial.sort();
+    review.sort();
+    let mut segments = vec![];
+    if !fixed.is_empty() {
+        // Exit 1 even when fixes were applied: in a pre-push context the fixed
+        // files are uncommitted. The caller must commit them first.
+        segments.push(format!(
+            "fixed: {} — commit before pushing",
+            fixed.join(", ")
+        ));
+    }
+    if !partial.is_empty() {
+        segments.push(format!("partial: {}", partial.join(", ")));
+    }
+    if !review.is_empty() {
+        segments.push(format!("review: {}", review.join(", ")));
+    }
+    if !segments.is_empty() {
+        eprintln!("flint: {}", segments.join(" | "));
+        std::process::exit(1);
+    }
+}
+
 fn classify_single_pass_fix(result: CheckResult) -> FixOutcome {
     if result.ok {
         if result.changed {
@@ -542,6 +605,10 @@ fn classify_single_pass_fix(result: CheckResult) -> FixOutcome {
     } else {
         FixOutcome::Review(result)
     }
+}
+
+fn is_flint_setup(check: &registry::Check) -> bool {
+    check.kind.is_special_kind(SpecialKind::FlintSetup)
 }
 
 async fn run_checks(
@@ -623,8 +690,7 @@ fn baseline_check_names(
                 || registry::tool_version_changed(check, &previous_tools, current_tools)
                 || flint_toml.as_ref().is_some_and(|change| {
                     change.settings_changed
-                        || (matches!(check.kind, CheckKind::Special(_))
-                            && change.check_changed(check.name))
+                        || (check.kind.special_kind().is_some() && change.check_changed(check.name))
                 })
                 || check.baseline_config.as_ref().is_some_and(|config| {
                     changed.contains(&config_file_rel_path(project_root, config_dir, config))
@@ -796,14 +862,7 @@ fn print_linters_json(registry: &[registry::Check]) {
 }
 
 pub fn linter_json(check: &registry::Check) -> serde_json::Value {
-    let scope = match &check.kind {
-        CheckKind::Template { scope, .. } => match scope {
-            Scope::File => "file",
-            Scope::Files => "files",
-            Scope::Project => "project",
-        },
-        CheckKind::Special(_) => "special",
-    };
+    let scope = check.kind.scope_name();
     let patterns: Vec<&str> = check.patterns.to_vec();
     let config_file = check
         .linter_config
@@ -864,7 +923,8 @@ fn print_linters(
         .max(4);
     let bin_w = registry
         .iter()
-        .map(|c| c.bin_name.len())
+        .map(display_binary)
+        .map(str::len)
         .max()
         .unwrap_or(6)
         .max(6);
@@ -908,24 +968,24 @@ fn print_linters(
         let speed = run_policy_label(check.run_policy);
         let fix = if check.has_fix() { "yes" } else { "no" };
         let patterns_str = check.patterns.join(" ");
+        let binary = display_binary(check);
         if patterns_str.is_empty() {
             println!(
-                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {:<desc_w$}",
+                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {}",
                 check.name,
-                check.bin_name,
+                binary,
                 status,
                 speed,
                 fix,
                 check.desc,
                 name_w = name_w,
                 bin_w = bin_w,
-                desc_w = desc_w,
             );
         } else {
             println!(
                 "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {:<desc_w$}  {}",
                 check.name,
-                check.bin_name,
+                binary,
                 status,
                 speed,
                 fix,
@@ -936,5 +996,13 @@ fn print_linters(
                 desc_w = desc_w,
             );
         }
+    }
+}
+
+fn display_binary(check: &registry::Check) -> &'static str {
+    if check.uses_binary() {
+        check.bin_name
+    } else {
+        "(built-in)"
     }
 }

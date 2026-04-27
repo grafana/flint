@@ -1,0 +1,7 @@
+[expected]
+args = "run golangci-lint"
+exit = 1
+stderr = '''
+flint: unsupported golangci-lint config file found: .golangci.yaml
+  Flint only supports FLINT_CONFIG_DIR/.golangci.yml for golangci-lint. Move the config to the supported location or remove the alternate file.
+'''

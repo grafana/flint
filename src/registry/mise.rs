@@ -8,7 +8,7 @@ use super::types::Check;
 ///
 /// Also registers normalized aliases for backend-prefixed tools so that checks
 /// can match by their bare package/binary name. For example:
-/// - `"cargo:yaml-lint"` → also registers `"yaml-lint"`
+/// - `"aqua:owenlamont/ryl"` → also registers `"ryl"`
 /// - `"github:google/google-java-format"` → also registers `"google-java-format"`
 ///
 /// The original key is always preserved; aliases only fill in missing entries.
@@ -117,8 +117,8 @@ fn declared_tool_version<'a>(
         return None;
     }
     let lookup_key = check.mise_tool_name.unwrap_or(check.bin_name);
-    // When mise_tool_name is set (e.g. "cargo:yaml-lint"), also accept
-    // the bare bin_name ("yaml-lint") so repos using either form work.
+    // When mise_tool_name is set (e.g. "aqua:owenlamont/ryl"), also accept
+    // the bare bin_name where that matches the installed binary.
     mise_tools
         .get(lookup_key)
         .or_else(|| check.mise_tool_name.and(mise_tools.get(check.bin_name)))

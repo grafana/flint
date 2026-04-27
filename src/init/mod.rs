@@ -4,17 +4,19 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
 
-use crate::registry::{Category, Check, builtin};
+use crate::registry::{Category, Check, EditorconfigLineLengthPolicy, builtin};
 
 mod config_files;
 mod detection;
 pub(crate) mod generation;
+mod migrations;
 mod scaffold;
 mod ui;
 
 use config_files::{
-    exclude_formatter_owned_files_from_editorconfig_checker, generate_biome_config,
-    generate_editorconfig, generate_flint_toml, generate_rumdl_config, generate_yamllint_config,
+    disable_editorconfig_line_length_for_patterns, generate_biome_config, generate_editorconfig,
+    generate_flint_toml, generate_rumdl_config, generate_rustfmt_config, generate_taplo_config,
+    generate_yamllint_config,
 };
 use detection::{
     build_linter_groups, detect_obsolete_keys, detect_present_patterns, parse_tool_keys,
@@ -22,8 +24,9 @@ use detection::{
 use generation::{
     apply_changes, detect_base_branch, ensure_flint_self_pin, ensure_node_for_npm, flint_preset,
     get_existing_config_dir, has_slow_selected, normalize_tools_section, patch_renovate_extends,
-    prompt_config_dir, remove_v1_tasks,
+    prompt_config_dir, remove_tool_keys, remove_v1_tasks,
 };
+use migrations::{active_editorconfig_line_length_sections, apply_repo_migrations};
 use scaffold::{apply_env_and_tasks, generate_lint_workflow, maybe_install_hook};
 use ui::{interactive_select_linters, select_categories_arrow};
 
@@ -52,6 +55,30 @@ fn profile_to_categories(profile: Profile) -> HashSet<Category> {
         ]
         .into(),
     }
+}
+
+fn selected_editorconfig_line_length_sections(
+    groups: &[LinterGroup<'_>],
+) -> Vec<(&'static [&'static str], &'static str)> {
+    let mut seen = HashSet::new();
+    let mut out = vec![];
+    for group in groups {
+        for (check, selected) in group.checks.iter().zip(&group.check_selected) {
+            if !selected {
+                continue;
+            }
+            let EditorconfigLineLengthPolicy::DisableForPatterns { patterns, comment } =
+                check.editorconfig_line_length_policy
+            else {
+                continue;
+            };
+            let key = patterns.join(",");
+            if seen.insert(key) {
+                out.push((patterns, comment));
+            }
+        }
+    }
+    out
 }
 
 /// Desired tools for a profile: maps each mise tool key to its optional components string.
@@ -183,6 +210,10 @@ Add and stage your source files before running init so the detection is accurate
     let current_content = std::fs::read_to_string(&mise_path).unwrap_or_default();
     let current_tool_keys = parse_tool_keys(&current_content);
     let known_keys: HashSet<&str> = registry.iter().filter_map(install_key).collect();
+    let unsupported_keys: Vec<&str> = crate::registry::UNSUPPORTED_KEYS
+        .iter()
+        .filter_map(|(old_key, _)| current_tool_keys.contains(*old_key).then_some(*old_key))
+        .collect();
 
     // Step 2: build one group per install key, covering all checks whose files are
     // present in the repo or which are already installed.
@@ -210,6 +241,9 @@ Add and stage your source files before running init so the detection is accurate
     let obsolete = detect_obsolete_keys(&current_tool_keys);
     for (old_key, replacement) in &obsolete {
         println!("  removing obsolete linter {old_key} (replaced by {replacement})");
+    }
+    for old_key in &unsupported_keys {
+        println!("  removing unsupported legacy linter {old_key}");
     }
 
     // Derive changes from final selection state.
@@ -241,6 +275,9 @@ Add and stage your source files before running init so the detection is accurate
     for (old_key, _) in &obsolete {
         final_remove.push(old_key.to_string());
     }
+    for old_key in &unsupported_keys {
+        final_remove.push((*old_key).to_string());
+    }
 
     let has_slow = has_slow_selected(&groups);
     let has_renovate = groups.iter().any(|g| {
@@ -261,11 +298,23 @@ Add and stage your source files before running init so the detection is accurate
             .zip(&g.check_selected)
             .any(|(c, &sel)| sel && c.name == "yaml-lint")
     });
+    let has_taplo = groups.iter().any(|g| {
+        g.checks
+            .iter()
+            .zip(&g.check_selected)
+            .any(|(c, &sel)| sel && c.name == "taplo")
+    });
     let has_biome = groups.iter().any(|g| {
         g.checks
             .iter()
             .zip(&g.check_selected)
             .any(|(c, &sel)| sel && (c.name == "biome" || c.name == "biome-format"))
+    });
+    let has_cargo_fmt = groups.iter().any(|g| {
+        g.checks
+            .iter()
+            .zip(&g.check_selected)
+            .any(|(c, &sel)| sel && c.name == "cargo-fmt")
     });
 
     // Prompt for the flint config dir (skipped if already set in mise.toml or --yes).
@@ -282,10 +331,6 @@ Add and stage your source files before running init so the detection is accurate
             &final_remove,
             &final_upgrade,
         )?;
-    }
-    let node_added = ensure_node_for_npm(project_root)?;
-    if node_added {
-        println!("  added node (LTS) — required by npm: backend tools");
     }
     let flint_pinned = ensure_flint_self_pin(project_root)?;
     if flint_pinned {
@@ -320,28 +365,37 @@ Add and stage your source files before running init so the detection is accurate
     } else {
         false
     };
+    let editorconfig_line_length_sections = selected_editorconfig_line_length_sections(&groups);
+    let delegated_patterns = editorconfig_line_length_sections
+        .iter()
+        .map(|(patterns, _)| *patterns)
+        .collect::<Vec<_>>();
+    let migration_summary =
+        apply_repo_migrations(project_root, &config_dir_path, &delegated_patterns)?;
+    migration_summary.print_messages();
     let editorconfig_generated = generate_editorconfig(project_root, line_length)?;
-    let editorconfig_formatter_excluded = if has_rumdl || has_yaml_lint {
-        exclude_formatter_owned_files_from_editorconfig_checker(project_root, &config_dir_path)?
-    } else {
-        false
-    };
-    if editorconfig_formatter_excluded {
-        let formatter_owned_message = match (has_rumdl, has_yaml_lint) {
-            (true, true) => "Markdown and YAML are now owned by their linters",
-            (true, false) => "Markdown is now owned by its linter",
-            (false, true) => "YAML is now owned by its linter",
-            (false, false) => unreachable!(
-                "editorconfig formatter exclusions were applied without formatter-owned file types"
-            ),
-        };
+    let editorconfig_line_length_disabled = disable_editorconfig_line_length_for_patterns(
+        project_root,
+        &editorconfig_line_length_sections,
+    )?;
+    if !editorconfig_line_length_disabled.is_empty() {
         println!(
-            "  patched editorconfig-checker config — {}",
-            formatter_owned_message
+            "  patched <REPO>/.editorconfig — disable max_line_length for {}",
+            editorconfig_line_length_disabled.join(", ")
         );
     }
     let yamllint_generated = if has_yaml_lint {
         generate_yamllint_config(&config_dir_path, line_length)?
+    } else {
+        false
+    };
+    let taplo_generated = if has_taplo {
+        generate_taplo_config(&config_dir_path, line_length)?
+    } else {
+        false
+    };
+    let rustfmt_generated = if has_cargo_fmt {
+        generate_rustfmt_config(&config_dir_path, line_length)?
     } else {
         false
     };
@@ -364,7 +418,7 @@ Add and stage your source files before running init so the detection is accurate
         .unwrap_or(false);
 
     if !tools_changed
-        && !node_added
+        && migration_summary.is_noop()
         && !flint_pinned
         && !tools_normalized
         && v1.removed_tasks.is_empty()
@@ -374,8 +428,10 @@ Add and stage your source files before running init so the detection is accurate
         && !workflow_generated
         && !rumdl_generated
         && !editorconfig_generated
-        && !editorconfig_formatter_excluded
+        && editorconfig_line_length_disabled.is_empty()
         && !yamllint_generated
+        && !taplo_generated
+        && !rustfmt_generated
         && !biome_generated
         && !renovate_patched
     {
@@ -386,6 +442,28 @@ Add and stage your source files before running init so the detection is accurate
     maybe_install_hook(project_root, yes)?;
 
     println!("Done. Run `mise install` to install the new tools.");
+    Ok(())
+}
+
+pub fn update(project_root: &Path, config_dir: &Path) -> Result<()> {
+    let mise_path = project_root.join("mise.toml");
+    let current_content = std::fs::read_to_string(&mise_path).unwrap_or_default();
+    let current_tool_keys = parse_tool_keys(&current_content);
+    let delegated_sections = active_editorconfig_line_length_sections(&current_tool_keys);
+    let delegated_patterns = delegated_sections
+        .iter()
+        .map(|(patterns, _)| *patterns)
+        .collect::<Vec<_>>();
+    let migration_summary = apply_repo_migrations(project_root, config_dir, &delegated_patterns)?;
+    let tools_normalized = normalize_tools_section(&mise_path)?;
+
+    if migration_summary.is_noop() && !tools_normalized {
+        println!("flint: repo lint migration is up to date");
+        return Ok(());
+    }
+
+    migration_summary.print_messages();
+
     Ok(())
 }
 
@@ -400,7 +478,7 @@ fn find_renovate_config(project_root: &Path) -> Option<std::path::PathBuf> {
 /// via `flint init`, or `None` if no mise entry is needed (built-in or
 /// unconditionally active checks).
 ///
-/// Preference order: `mise_install_key` → `mise_tool_name` → `bin_name`.
+/// Preference order: `mise_tool_name` → `bin_name`.
 pub fn install_key(check: &Check) -> Option<&'static str> {
     if !check.uses_binary() || check.activate_unconditionally {
         return None;
@@ -467,7 +545,7 @@ mod tests {
         use detection::detect_obsolete_keys;
         let mut keys = HashSet::new();
         keys.insert("github:mvdan/sh".to_string());
-        keys.insert("shellcheck".to_string());
+        keys.insert("github:koalaman/shellcheck".to_string());
         let found = detect_obsolete_keys(&keys);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].0, "github:mvdan/sh");
@@ -479,7 +557,7 @@ mod tests {
         use detection::detect_obsolete_keys;
         let mut keys = HashSet::new();
         keys.insert("rumdl".to_string());
-        keys.insert("shellcheck".to_string());
+        keys.insert("github:koalaman/shellcheck".to_string());
         let found = detect_obsolete_keys(&keys);
         assert!(found.is_empty());
     }
@@ -568,7 +646,7 @@ bats = "1.13.0"
 java = "temurin-25.0.2+10.0.LTS"
 node = "24.15.0"
 "npm:renovate" = "43.0.0"
-shellcheck = "0.11.0"
+"github:koalaman/shellcheck" = "0.11.0"
 "#;
         let tmp = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(tmp.path(), content).unwrap();
@@ -597,7 +675,7 @@ shellcheck = "0.11.0"
 node = "24.15.0"
 
 # Linters
-shellcheck = "0.11.0"
+"github:koalaman/shellcheck" = "0.11.0"
 "#;
         let tmp = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(tmp.path(), content).unwrap();
@@ -606,6 +684,41 @@ shellcheck = "0.11.0"
         assert!(result.contains("# Runtime comment"));
         assert!(result.contains("# Linters"));
         assert_eq!(result.matches("# Linters").count(), 1);
+    }
+
+    #[test]
+    fn normalize_tools_section_keeps_unknown_tools_above_linters_header() {
+        let content = r#"[tools]
+
+# Linters
+custom-tool = "1.0.0"
+java = "temurin-25.0.3+9.0.LTS"
+node = "24.15.0"
+protoc = "34.1"
+"github:koalaman/shellcheck" = "0.11.0"
+"#;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), content).unwrap();
+        let changed = normalize_tools_section(tmp.path()).unwrap();
+        assert!(changed);
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        let custom_pos = result.find("custom-tool =").expect("custom tool present");
+        let java_pos = result.find("java =").expect("java present");
+        let node_pos = result.find("node =").expect("node present");
+        let protoc_pos = result.find("protoc =").expect("protoc present");
+        let header_pos = result.find("# Linters").expect("header present");
+        let shellcheck_pos = result
+            .find("\"github:koalaman/shellcheck\" =")
+            .expect("shellcheck present");
+        assert!(
+            custom_pos < header_pos
+                && java_pos < header_pos
+                && node_pos < header_pos
+                && protoc_pos < header_pos
+                && header_pos < shellcheck_pos,
+            "only explicitly managed linter keys belong below the header:\n{result}"
+        );
+        assert_eq!(result.matches("# Linters").count(), 1, "single header");
     }
 
     #[test]
@@ -632,12 +745,12 @@ shellcheck = "0.11.0"
     fn parse_tool_keys_reads_simple_toml() {
         let content = r#"
 [tools]
-shellcheck = "v0.11.0"
+"github:koalaman/shellcheck" = "v0.11.0"
 rumdl = "0.1.0"
 rust = { version = "1.0", components = "clippy" }
 "#;
         let keys = parse_tool_keys(content);
-        assert!(keys.contains("shellcheck"));
+        assert!(keys.contains("github:koalaman/shellcheck"));
         assert!(keys.contains("rumdl"));
         assert!(keys.contains("rust"));
         assert!(!keys.contains("nonexistent"));
@@ -744,6 +857,8 @@ rust = { version = "1.0", components = "clippy" }
         let content = std::fs::read_to_string(config_dir.join(".rumdl.toml")).unwrap();
         assert!(content.contains("line-length = 120"));
         assert!(content.contains("code-blocks = false"));
+        assert!(content.contains("[MD060]"));
+        assert!(content.contains("style = \"aligned\""));
         assert!(!content.contains("[global]"));
     }
 
@@ -771,6 +886,81 @@ rust = { version = "1.0", components = "clippy" }
         assert!(!tmp.path().join(".markdownlint.json").exists());
         let content = std::fs::read_to_string(config_dir.join(".rumdl.toml")).unwrap();
         assert!(content.contains("[MD013]"));
+    }
+
+    #[test]
+    fn remove_legacy_lint_files_removes_v1_artifacts() {
+        use config_files::remove_legacy_lint_files;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(tmp.path().join(".prettierignore"), "docs/themes/**\n").unwrap();
+        std::fs::write(tmp.path().join(".gitleaksignore"), "secret\n").unwrap();
+        std::fs::write(config_dir.join("super-linter.env"), "LOG_LEVEL=ERROR\n").unwrap();
+
+        let removed = remove_legacy_lint_files(tmp.path(), &config_dir).unwrap();
+        assert_eq!(removed.len(), 3);
+        assert!(!tmp.path().join(".prettierignore").exists());
+        assert!(!tmp.path().join(".gitleaksignore").exists());
+        assert!(!config_dir.join("super-linter.env").exists());
+    }
+
+    #[test]
+    fn remove_stale_markdownlint_line_length_directives_strips_md013_only() {
+        use config_files::remove_stale_markdownlint_line_length_directives;
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::process::Command::new("git")
+            .args(["init", "-b", "main"])
+            .current_dir(tmp.path())
+            .output()
+            .unwrap();
+        std::fs::write(
+            tmp.path().join("README.md"),
+            "# Title\n\n<!-- markdownlint-disable MD013 -->\nlong line\n<!-- markdownlint-enable MD013 -->\n<!-- markdownlint-disable MD033 -->\nhtml\n<!-- markdownlint-enable MD033 -->\n",
+        )
+        .unwrap();
+        std::process::Command::new("git")
+            .args(["add", "README.md"])
+            .current_dir(tmp.path())
+            .output()
+            .unwrap();
+
+        let changed = remove_stale_markdownlint_line_length_directives(tmp.path()).unwrap();
+        assert_eq!(changed, vec!["README.md".to_string()]);
+        let updated = std::fs::read_to_string(tmp.path().join("README.md")).unwrap();
+        assert!(!updated.contains("markdownlint-disable MD013"));
+        assert!(!updated.contains("markdownlint-enable MD013"));
+        assert!(updated.contains("markdownlint-disable MD033"));
+        assert!(updated.contains("markdownlint-enable MD033"));
+    }
+
+    #[test]
+    fn remove_stale_editorconfig_checker_directives_strips_delegated_markdown_comments() {
+        use config_files::remove_stale_editorconfig_checker_directives;
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::process::Command::new("git")
+            .args(["init", "-b", "main"])
+            .current_dir(tmp.path())
+            .output()
+            .unwrap();
+        std::fs::write(
+            tmp.path().join("README.md"),
+            "# Title\n\n<!-- editorconfig-checker-disable -->\n- [Link](https://example.com) <!-- editorconfig-checker-disable-line -->\n<!-- editorconfig-checker-enable -->\n",
+        )
+        .unwrap();
+        std::process::Command::new("git")
+            .args(["add", "README.md"])
+            .current_dir(tmp.path())
+            .output()
+            .unwrap();
+
+        let changed =
+            remove_stale_editorconfig_checker_directives(tmp.path(), &[&["*.md"]]).unwrap();
+        assert_eq!(changed, vec!["README.md".to_string()]);
+        let updated = std::fs::read_to_string(tmp.path().join("README.md")).unwrap();
+        assert!(!updated.contains("editorconfig-checker-disable"));
+        assert!(!updated.contains("editorconfig-checker-enable"));
+        assert!(updated.contains("- [Link](https://example.com)"));
     }
 
     #[test]
@@ -817,45 +1007,41 @@ rust = { version = "1.0", components = "clippy" }
     }
 
     #[test]
-    fn exclude_formatter_owned_files_from_editorconfig_checker_updates_config_dir_file() {
-        use config_files::exclude_formatter_owned_files_from_editorconfig_checker;
+    fn disable_editorconfig_line_length_for_patterns_updates_editorconfig() {
+        use config_files::disable_editorconfig_line_length_for_patterns;
         let tmp = tempfile::TempDir::new().unwrap();
-        let config_dir = tmp.path().join(".github/config");
-        std::fs::create_dir_all(&config_dir).unwrap();
         std::fs::write(
-            config_dir.join(".editorconfig-checker.json"),
-            "{\n  \"Exclude\": [\".*\\\\.java$\"]\n}\n",
+            tmp.path().join(".editorconfig"),
+            "root = true\n\n[*]\nmax_line_length = 120\n",
         )
         .unwrap();
-
-        let changed =
-            exclude_formatter_owned_files_from_editorconfig_checker(tmp.path(), &config_dir)
-                .unwrap();
-        assert!(changed);
-        let content =
-            std::fs::read_to_string(config_dir.join(".editorconfig-checker.json")).unwrap();
-        assert!(content.contains(".*\\\\.java$"));
-        assert!(content.contains(".*\\\\.md$"));
-        assert!(content.contains(".*\\\\.yml$"));
-        assert!(content.contains(".*\\\\.yaml$"));
+        let changed = disable_editorconfig_line_length_for_patterns(
+            tmp.path(),
+            &[(&["*.md"], "Markdown line length is handled by rumdl")],
+        )
+        .unwrap();
+        assert_eq!(changed, vec!["[*.md]".to_string()]);
+        let content = std::fs::read_to_string(tmp.path().join(".editorconfig")).unwrap();
+        assert!(content.contains("[*.md]"));
+        assert!(content.contains("# Markdown line length is handled by rumdl"));
+        assert!(content.contains("max_line_length = off"));
     }
 
     #[test]
-    fn exclude_formatter_owned_files_from_editorconfig_checker_is_idempotent() {
-        use config_files::exclude_formatter_owned_files_from_editorconfig_checker;
+    fn disable_editorconfig_line_length_for_patterns_is_idempotent() {
+        use config_files::disable_editorconfig_line_length_for_patterns;
         let tmp = tempfile::TempDir::new().unwrap();
-        let config_dir = tmp.path().join(".github/config");
-        std::fs::create_dir_all(&config_dir).unwrap();
         std::fs::write(
-            config_dir.join(".editorconfig-checker.json"),
-            "{\n  \"Exclude\": [\".*\\\\.md$\", \".*\\\\.yml$\", \".*\\\\.yaml$\"]\n}\n",
+            tmp.path().join(".editorconfig"),
+            "root = true\n\n[*]\nmax_line_length = 120\n\n[*.md]\n# Markdown line length is handled by rumdl\nmax_line_length = off\n",
         )
         .unwrap();
-
-        let changed =
-            exclude_formatter_owned_files_from_editorconfig_checker(tmp.path(), &config_dir)
-                .unwrap();
-        assert!(!changed);
+        let changed = disable_editorconfig_line_length_for_patterns(
+            tmp.path(),
+            &[(&["*.md"], "Markdown line length is handled by rumdl")],
+        )
+        .unwrap();
+        assert!(changed.is_empty());
     }
 
     #[test]
@@ -868,8 +1054,72 @@ rust = { version = "1.0", components = "clippy" }
         let content = std::fs::read_to_string(config_dir.join(".yamllint.yml")).unwrap();
         assert!(content.contains("extends: relaxed"));
         assert!(content.contains("document-start: disable"));
-        assert!(content.contains("line-length: disable"));
-        assert!(content.contains("indentation: enable"));
+        assert!(content.contains("line-length:"));
+        assert!(content.contains("max: 120"));
+        assert!(content.contains("indentation:"));
+        assert!(content.contains("spaces: 2"));
+    }
+
+    #[test]
+    fn generate_taplo_config_writes_file() {
+        use config_files::generate_taplo_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        let written = generate_taplo_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
+        assert!(written);
+        let content = std::fs::read_to_string(config_dir.join(".taplo.toml")).unwrap();
+        assert!(content.contains("[formatting]"));
+        assert!(content.contains("column_width = 120"));
+        assert!(content.contains("indent_string = \"  \""));
+    }
+
+    #[test]
+    fn generate_taplo_config_skips_existing_supported_file() {
+        use config_files::generate_taplo_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(config_dir.join(".taplo.toml"), "existing").unwrap();
+        let written = generate_taplo_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
+        assert!(!written);
+        let content = std::fs::read_to_string(config_dir.join(".taplo.toml")).unwrap();
+        assert_eq!(content, "existing");
+    }
+
+    #[test]
+    fn generate_taplo_config_skips_existing_legacy_name() {
+        use config_files::generate_taplo_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(config_dir.join("taplo.toml"), "existing").unwrap();
+        let written = generate_taplo_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
+        assert!(!written);
+        assert!(!config_dir.join(".taplo.toml").exists());
+    }
+
+    #[test]
+    fn generate_rustfmt_config_writes_file() {
+        use config_files::generate_rustfmt_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        let written = generate_rustfmt_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
+        assert!(written);
+        let content = std::fs::read_to_string(config_dir.join("rustfmt.toml")).unwrap();
+        assert_eq!(content, "max_width = 120\n");
+    }
+
+    #[test]
+    fn generate_rustfmt_config_skips_existing_file() {
+        use config_files::generate_rustfmt_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(config_dir.join("rustfmt.toml"), "existing").unwrap();
+        let written = generate_rustfmt_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
+        assert!(!written);
+        let content = std::fs::read_to_string(config_dir.join("rustfmt.toml")).unwrap();
+        assert_eq!(content, "existing");
     }
 
     #[test]
@@ -878,20 +1128,9 @@ rust = { version = "1.0", components = "clippy" }
         let tmp = tempfile::TempDir::new().unwrap();
         let written = generate_biome_config(tmp.path()).unwrap();
         assert!(written);
-        let content = std::fs::read_to_string(tmp.path().join("biome.json")).unwrap();
+        let content = std::fs::read_to_string(tmp.path().join("biome.jsonc")).unwrap();
         assert!(content.contains("\"indentStyle\": \"space\""));
         assert!(content.contains("\"indentWidth\": 2"));
-    }
-
-    #[test]
-    fn generate_biome_config_skips_existing_json() {
-        use config_files::generate_biome_config;
-        let tmp = tempfile::TempDir::new().unwrap();
-        std::fs::write(tmp.path().join("biome.json"), "existing").unwrap();
-        let written = generate_biome_config(tmp.path()).unwrap();
-        assert!(!written);
-        let content = std::fs::read_to_string(tmp.path().join("biome.json")).unwrap();
-        assert_eq!(content, "existing");
     }
 
     #[test]
@@ -901,7 +1140,20 @@ rust = { version = "1.0", components = "clippy" }
         std::fs::write(tmp.path().join("biome.jsonc"), "existing").unwrap();
         let written = generate_biome_config(tmp.path()).unwrap();
         assert!(!written);
+        let content = std::fs::read_to_string(tmp.path().join("biome.jsonc")).unwrap();
+        assert_eq!(content, "existing");
+    }
+
+    #[test]
+    fn generate_biome_config_migrates_legacy_supported_json_name() {
+        use config_files::generate_biome_config;
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(tmp.path().join("biome.json"), "existing").unwrap();
+        let written = generate_biome_config(tmp.path()).unwrap();
+        assert!(written);
         assert!(!tmp.path().join("biome.json").exists());
+        let content = std::fs::read_to_string(tmp.path().join("biome.jsonc")).unwrap();
+        assert_eq!(content, "existing");
     }
 
     #[test]

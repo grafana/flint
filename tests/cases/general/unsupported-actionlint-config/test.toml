@@ -1,0 +1,7 @@
+[expected]
+args = "run actionlint"
+exit = 1
+stderr = '''
+flint: unsupported actionlint config file found: .github/actionlint.yml
+  Flint only supports FLINT_CONFIG_DIR/actionlint.yml for actionlint. Move the config to the supported location or remove the alternate file.
+'''

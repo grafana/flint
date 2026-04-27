@@ -2,7 +2,6 @@ name: CI
 on: push
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, custom]
     steps:
-      - uses: actions/checkout@v4
       - run: echo "hello"

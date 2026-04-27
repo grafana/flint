@@ -1,0 +1,8 @@
+extends: relaxed
+
+rules:
+  document-start: disable
+  line-length:
+    max: 130
+  indentation:
+    spaces: 2

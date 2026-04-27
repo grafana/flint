@@ -1,3 +1,3 @@
 # Project
 
-This is the documentation for the project.
+This is teh documentation for teh project.

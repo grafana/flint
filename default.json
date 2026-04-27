@@ -4,7 +4,7 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Update _VERSION variables in mise.toml",
+      "description": "DEPRECATED: update _VERSION variables in mise.toml (consumer preset compatibility only)",
       "managerFilePatterns": ["/^mise\\.toml$/"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+?)(?: depName=(?<depName>.+?))?(?: packageName=(?<packageName>.+?))?(?: versioning=(?<versioning>[a-z-]+?))?\\s.+?_VERSION=\"?(?<currentValue>[^@\"]+?)(?:@(?<currentDigest>sha256:[a-f0-9]+))?\"?\\s"
@@ -38,23 +38,22 @@
     {
       "matchPackageNames": [
         "actionlint",
+        "aqua:owenlamont/ryl",
         "biome",
-        "cargo:yaml-lint",
-        "github:tamasfe/taplo",
-        "cargo:xmloxide",
         "editorconfig-checker",
         "github:google/google-java-format",
+        "github:jonwiggins/xmloxide",
         "github:koalaman/shellcheck",
-        "github:pinterest/ktlint",
         "golangci-lint",
         "hadolint",
+        "ktlint",
         "lychee",
         "npm:renovate",
         "pipx:codespell",
-        "pipx:ruff",
+        "ruff",
         "rumdl",
-        "shellcheck",
-        "shfmt"
+        "shfmt",
+        "taplo"
       ],
       "groupName": "linters",
       "description": "Only update flint-managed linters once a week",

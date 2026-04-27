@@ -1,4 +1,3 @@
-<!-- editorconfig-checker-disable -->
 <!-- markdownlint-disable MD033 MD041 -->
 <p align="center">
   <img src="assets/icon.svg" width="128" height="128" alt="flint logo">
@@ -11,11 +10,12 @@
   <a href="https://github.com/grafana/flint/releases"><img src="https://img.shields.io/github/v/release/grafana/flint" alt="GitHub Release"></a>
 </p>
 <!-- markdownlint-enable MD033 MD041 -->
-<!-- editorconfig-checker-enable -->
 
 Linter runner built for speed and consistency:
 
-- **Fast** — native execution (no Docker), parallel, diff-aware (changed files only), opt-in (undeclared tools don't run), small binary cached by mise
+- **Fast** — native execution (no Docker), parallel, diff-aware
+  (changed files only), opt-in (undeclared tools don't run), small binary
+  cached by mise
 - **Local == CI** — one binary, one config, identical behavior
 - **AI-friendly** — fix silently, surface only what needs review
 - **Cross-platform** — Linux, macOS, Windows
@@ -36,7 +36,7 @@ Add `flint` to your repo's `mise.toml`:
 
 ```toml
 [tools]
-"github:grafana/flint" = "0.20.3"
+"github:grafana/flint" = "0.20.4"
 ```
 
 Bootstrap a repo with `flint init` (scaffolds config). Install a
@@ -58,14 +58,16 @@ Add the linting tools your project needs alongside the `flint` binary itself:
 
 ```toml
 [tools]
-"github:grafana/flint" = "0.20.3"
+"github:grafana/flint" = "0.20.4"
 
 # Add whichever linters apply to your repo:
 shellcheck              = "v0.11.0"
 "github:mvdan/sh"       = "v3.13.1"  # activates shfmt
 actionlint              = "1.7.10"
 rumdl                   = "0.1.78"
-"cargo:yaml-lint"       = "0.1.0"
+ruff                    = "0.15.11"
+"aqua:owenlamont/ryl"   = "0.6.0"
+taplo                   = "0.10.0"
 biome                   = "2.4.12"
 rust                    = "1.87.0"    # activates cargo-fmt + cargo-clippy
 go                      = "1.24.0"    # activates gofmt
@@ -116,19 +118,20 @@ See the [CLI reference](docs/cli.md) for commands and flags.
 
 ### Config (`flint.toml`)
 
-Optional. Place in the repo root (or in `FLINT_CONFIG_DIR` — see below). All settings have defaults.
+Optional. Place in the repo root (or in `FLINT_CONFIG_DIR` — see below).
+All settings have defaults.
 
 ```toml
 [settings]
-# base_branch = "dev"                           # branch to diff against; defaults to "main"
-exclude = ["CHANGELOG.md", "vendor/**"]         # glob patterns — exclude matching files
+# base_branch = "dev"                   # branch to diff against; defaults to "main"
+exclude = ["CHANGELOG.md", "vendor/**"] # glob patterns — exclude matching files
 
 [checks.links]
-config = ".github/config/lychee.toml"           # lychee config path
-check_all_local = true                          # second pass: local links in all files
+config = ".github/config/lychee.toml" # lychee config path
+check_all_local = true                # second pass: local links in all files
 
 [checks.renovate-deps]
-exclude_managers = ["github-actions", "cargo"]  # skip these Renovate managers
+exclude_managers = ["github-actions", "cargo"] # skip these Renovate managers
 ```
 
 ### `FLINT_CONFIG_DIR`
@@ -141,22 +144,34 @@ Set this env var to consolidate config files in one directory (e.g. `.github/con
 FLINT_CONFIG_DIR = ".github/config"
 ```
 
-When set, `flint.toml` is loaded from that directory, and each linter that supports
-an explicit config file path via a CLI flag will have it injected automatically when
-the corresponding file exists there (see the "Config file" column in the table below).
-Files that are absent are silently skipped — existing project-root configs remain in
-effect.
+When set, `flint.toml` is loaded from that directory, and each linter that
+supports an explicit config path via a CLI flag will have it injected
+automatically when the corresponding file exists there (see the "Config file"
+column in the table below).
+Files that are absent are silently skipped. Some tools still rely on project-root
+discovery semantics, and some alternate upstream config locations are rejected to
+avoid config drift.
 
-**Note:** `editorconfig-checker`'s config file (`.editorconfig-checker.json`) controls its own settings,
-not `.editorconfig` itself — editorconfig discovery always walks up from the file
-being linted and cannot be redirected via a flag.
+> [!NOTE]
+> `editorconfig-checker`'s config file (`.editorconfig-checker.json`) controls
+> its own settings, not `.editorconfig` itself. Editorconfig discovery always
+> walks up from the file being linted and cannot be redirected via a flag.
+
+When a formatter explicitly owns line length for a file type, `flint init` /
+`flint update` prefers writing that carve-out into the shared root
+`.editorconfig` so editors and `editorconfig-checker` stay aligned. Today this
+applies to Markdown via `rumdl` and Java via `google-java-format`.
+
+> [!NOTE]
+> Biome is also root-discovered on purpose. Flint treats root `biome.jsonc` as
+> the canonical Biome config rather than managing it through
+> `FLINT_CONFIG_DIR`.
 
 ### Built-in linter registry
 
 Click a name in the table below for details. See the
 [linter reference](docs/linters.md) for scope semantics and per-linter notes.
 
-<!-- editorconfig-checker-disable -->
 <!-- registry-table-start -->
 <!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
 
@@ -188,7 +203,6 @@ Click a name in the table below for details. See the
 | [`yaml-lint`](docs/linters.md#yaml-lint)                       | Lint YAML files for style and consistency                           | yes |
 
 <!-- registry-table-end -->
-<!-- editorconfig-checker-enable -->
 
 ## Versioning
 

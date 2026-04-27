@@ -1,2 +1,2 @@
 [tools]
-"cargo:yaml-lint" = "latest"
+"aqua:owenlamont/ryl" = "0.6.0"

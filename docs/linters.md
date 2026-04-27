@@ -3,10 +3,12 @@
 Every supported check, its config file (when applicable), and its scope. The
 [summary table lives in the README](../README.md#built-in-linter-registry).
 
-**Note:** Biome's config flag (`--config-path`) takes a directory, not a file path —
-config injection for `biome` and `biome-format` is not yet implemented.
+> [!NOTE]
+> Biome is the exception to `FLINT_CONFIG_DIR`: its real CLI does not work
+> reliably with a nested managed config, so flint treats root `biome.jsonc` as
+> the canonical Biome config. Flint is opinionated here: use JSONC, not
+> `biome.json`.
 
-<!-- editorconfig-checker-disable -->
 <!-- markdownlint-disable MD013 -->
 <!-- linter-details-start -->
 <!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
@@ -60,6 +62,7 @@ config injection for `biome` and `biome-format` is not yet implemented.
 | Binary      | `rustfmt`                                                 |
 | Scope       | [project](#scopes)                                        |
 | Patterns    | `*.rs`                                                    |
+| Config      | `rustfmt.toml`                                            |
 
 ## `codespell`
 
@@ -261,6 +264,7 @@ exclude_managers = ["github-actions", "github-runners"]
 | Binary      | `taplo`           |
 | Scope       | [file](#scopes)   |
 | Patterns    | `*.toml`          |
+| Config      | `.taplo.toml`     |
 
 Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).
 
@@ -284,14 +288,13 @@ Current caveat: Taplo's published docs currently advertise TOML 1.0.0 support, s
 | ----------- | ----------------------------------------- |
 | Description | Lint YAML files for style and consistency |
 | Fix         | yes                                       |
-| Binary      | `yaml-lint`                               |
+| Binary      | `ryl`                                     |
 | Scope       | [files](#scopes)                          |
 | Patterns    | `*.yml *.yaml`                            |
 | Config      | `.yamllint.yml`                           |
 
 <!-- linter-details-end -->
 <!-- markdownlint-enable MD013 -->
-<!-- editorconfig-checker-enable -->
 
 ## Scopes
 
@@ -313,12 +316,12 @@ Checks use one of three run policies:
 Use `--fast-only` for local/pre-push feedback and the full set in CI.
 
 **`editorconfig-checker` defers to formatters**: `editorconfig-checker` runs on
-all files, but
-automatically skips file types owned by an active line-length-enforcing
-formatter. When `cargo-fmt`, `ruff-format`, `biome-format`, `rumdl`, or
-`yaml-lint`
-are active, their file types are excluded from `editorconfig-checker` — those
-formatters
-already enforce line length and would conflict with `editorconfig-checker`'s
-`max_line_length` editorconfig check. If none of those formatters are
-installed, `editorconfig-checker` checks those files itself.
+all files, but automatically skips file types owned by an active formatter. If
+none of those formatters are installed, `editorconfig-checker` checks those
+files itself.
+
+**`flint init` / `flint update` writes shared `.editorconfig` carve-outs for
+known formatter-owned line length**: today that means `rumdl` for `*.md` and
+`google-java-format` for `*.java`. Those sections use `max_line_length = off`
+so editors and `editorconfig-checker` share the same intent instead of relying
+on checker-specific JSON excludes.

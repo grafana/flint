@@ -17,7 +17,8 @@ discovers linters from your `mise.toml` and runs them against changed files.
 After installing flint (`mise install`), run `flint init`. It automatically:
 
 - removes v1 HTTP task entries from `[tasks]`
-- removes `RENOVATE_TRACKED_DEPS_EXCLUDE` from `[env]` and migrates the manager list to `flint.toml` (when a v1 renovate-deps task is present)
+- removes `RENOVATE_TRACKED_DEPS_EXCLUDE` from `[env]` and migrates the
+  manager list to `flint.toml` when a v1 renovate-deps task is present
 - replaces `npm:markdownlint-cli` with `npm:markdownlint-cli2` in `[tools]`
 - adds the missing linters to `[tools]` based on your tracked files
 - adds `[env] FLINT_CONFIG_DIR` and standard `lint` / `lint:fix` tasks
@@ -29,6 +30,10 @@ Then run `mise install` to install the new tools.
 
 Finally, run `flint run --fix renovate-deps` to regenerate
 `renovate-tracked-deps.json` with all the new tools included.
+
+If your repo already uses flint v2, `flint update` also rewrites obsolete
+tool backends in `mise.toml` when there is a direct replacement. For example,
+it migrates `cargo:yaml-lint` to `aqua:owenlamont/ryl`.
 
 ### 3. Verify active linters
 

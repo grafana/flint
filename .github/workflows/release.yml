@@ -30,35 +30,35 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-24.04
-            mise_version: v2026.4.18
-            mise_sha256: 6ae2d5f0f23a2f2149bc5d9bf264fe0922a1da843f1903e453516c462b23cc1f
+            mise_version: v2026.4.19
+            mise_sha256: 6b58ff5f1e1ce98ed2b7e5372c344ea48182c460e5b6df12d9e0def35aad4438
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04
             build-tool: cross
-            mise_version: v2026.4.18
-            mise_sha256: 6ae2d5f0f23a2f2149bc5d9bf264fe0922a1da843f1903e453516c462b23cc1f
+            mise_version: v2026.4.19
+            mise_sha256: 6b58ff5f1e1ce98ed2b7e5372c344ea48182c460e5b6df12d9e0def35aad4438
           - target: x86_64-apple-darwin
             runner: macos-15-intel
-            mise_version: v2026.4.18
-            mise_sha256: 9b1b31514a39eb3ed763404228c80bd344ac58244bb9f49c87225219b52fcad8
+            mise_version: v2026.4.19
+            mise_sha256: b2c54dfa94ee6dbe36f18f53b1bb93ad5787f4f4cac546fb832daf736f05edac
           - target: aarch64-apple-darwin
             runner: macos-latest
-            mise_version: v2026.4.18
-            mise_sha256: 2aea25721f57ec9f3fe04ea8d634a80b3d82d7e5c0e0acf4b3c63a3062b146f6
+            mise_version: v2026.4.19
+            mise_sha256: 87ce4f73f9e0cc0f5b040903cfa771a8cc46a6e554d0bfdbbea373000144b762
           - target: x86_64-pc-windows-msvc
             runner: windows-latest
-            mise_version: v2026.4.18
-            mise_sha256: 3d02ac38e6cfcda6fe506d8cf4832daf3b8a228a9df13ef0f0260529991cca3e
+            mise_version: v2026.4.19
+            mise_sha256: 2666a300762a1eafa5280d0d55348172ae9985d3c700cbdb6a5888878b66407d
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
           persist-credentials: false
 
       - name: Setup mise
-        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151  # v4.0.1
         with:
           version: ${{ matrix.mise_version }}
           sha256: ${{ matrix.mise_sha256 }}
@@ -67,7 +67,7 @@ jobs:
 
       - name: Install cross
         if: matrix.build-tool == 'cross'
-        uses: taiki-e/install-action@5f57d6cb7cd20b14a8a27f522884c4bc8a187458 # v2
+        uses: taiki-e/install-action@787505cde8a44ea468a00478fe52baf23b15bccd # v2
         with:
           tool: cross
 
@@ -99,7 +99,7 @@ jobs:
           echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32  # v4
         with:
           subject-path: ${{ env.ARCHIVE }}
 

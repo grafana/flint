@@ -1,0 +1,7 @@
+[expected]
+args = "run taplo"
+exit = 1
+stderr = '''
+flint: unsupported taplo config file found: taplo.toml
+  Flint only supports FLINT_CONFIG_DIR/.taplo.toml for taplo. Move the config to the supported location or remove the alternate file.
+'''

@@ -64,8 +64,6 @@ radar.
 Add whichever tasks you need as HTTP remote tasks in your `mise.toml`,
 pinned to the commit SHA of a release tag with a version comment:
 
-<!-- editorconfig-checker-disable -->
-
 ```toml
 # Pick the tasks you need from flint (https://github.com/grafana/flint)
 [tasks."lint:super-linter"]
@@ -78,8 +76,6 @@ file = "https://raw.githubusercontent.com/grafana/flint/8a39d96e17327c54974623b2
 description = "Verify renovate-tracked-deps.json is up to date"
 file = "https://raw.githubusercontent.com/grafana/flint/8a39d96e17327c54974623b252eb5260d67ed68a/tasks/lint/renovate-deps.py" # v0.9.1
 ```
-
-<!-- editorconfig-checker-enable -->
 
 The SHA pin ensures the URL is immutable (tag-based URLs can change
 if a tag is force-pushed), and the `# v0.3.0` comment tells Renovate
@@ -206,14 +202,10 @@ be at standard project-root locations (not `.github/linters/`).
 
 **Environment variables:**
 
-<!-- editorconfig-checker-disable -->
-
 | Variable                | Default                           | Required | Description                                                                                   |
 | ----------------------- | --------------------------------- | -------- | --------------------------------------------------------------------------------------------- |
 | `SUPER_LINTER_VERSION`  | —                                 | yes      | Super-Linter image tag (e.g. `slim-v8.4.0@sha256:...` for slim, `v8.4.0@sha256:...` for full) |
 | `SUPER_LINTER_ENV_FILE` | `.github/config/super-linter.env` | no       | Path to the Super-Linter env file                                                             |
-
-<!-- editorconfig-checker-enable -->
 
 ### `lint:links`
 
@@ -231,8 +223,6 @@ version is available.
 
 **Flags:**
 
-<!-- editorconfig-checker-disable -->
-
 | Flag                   | Description                                                                          |
 | ---------------------- | ------------------------------------------------------------------------------------ |
 | `--full`               | Check all links (local + remote) in all files (single run)                           |
@@ -240,8 +230,6 @@ version is available.
 | `--head <ref>`         | Head commit to compare against (default: `$GITHUB_HEAD_SHA` or `HEAD`)               |
 | `--lychee-args <args>` | Extra arguments to pass to lychee                                                    |
 | `<file>...`            | Files to check (default: `.`; only used with `--full`)                               |
-
-<!-- editorconfig-checker-enable -->
 
 When running in default mode, if a config change is detected
 (matching `LYCHEE_CONFIG_CHANGE_PATTERN` or lychee-related changes
@@ -321,15 +309,11 @@ rather than merging with them.
 
 **Environment variables:**
 
-<!-- editorconfig-checker-disable -->
-
 | Variable                       | Default                                                  | Description                                                                    |
 | ------------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `LYCHEE_CONFIG`                | `.github/config/lychee.toml`                             | Path to the lychee config file                                                 |
 | `LYCHEE_CONFIG_CHANGE_PATTERN` | `^(\.github/config/lychee\.toml\|\.mise/tasks/lint/.*)$` | Files whose change triggers a full link check (`mise.toml` checked separately) |
 | `LYCHEE_SKIP_GITHUB_REMAPS`    | unset                                                    | Set to `true` to disable all GitHub URL remaps                                 |
-
-<!-- editorconfig-checker-enable -->
 
 **Examples:**
 
@@ -359,13 +343,9 @@ Renovate is tracking and compares them against a committed snapshot.
 
 **Environment variables:**
 
-<!-- editorconfig-checker-disable -->
-
 | Variable                        | Default | Description                                                                         |
 | ------------------------------- | ------- | ----------------------------------------------------------------------------------- |
 | `RENOVATE_TRACKED_DEPS_EXCLUDE` | unset   | Comma-separated Renovate managers to exclude (e.g. `github-actions,github-runners`) |
-
-<!-- editorconfig-checker-enable -->
 
 #### Why this exists
 

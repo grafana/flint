@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.20.5](https://github.com/grafana/flint/compare/v0.20.4...v0.20.5) - 2026-04-27
+
+### Added
+
+- add flint setup preflight migrations ([#233](https://github.com/grafana/flint/pull/233))
+- support managed linter configs and aqua-backed tool keys ([#228](https://github.com/grafana/flint/pull/228))
+- switch xmloxide to github backend ([#229](https://github.com/grafana/flint/pull/229))
+- add taplo formatter check ([#224](https://github.com/grafana/flint/pull/224))
+- *(init)* configure line length during init ([#218](https://github.com/grafana/flint/pull/218))
+
+### Fixed
+
+- support renovate v43.136.3 ([#223](https://github.com/grafana/flint/pull/223))
+- switch yaml-lint to ryl ([#226](https://github.com/grafana/flint/pull/226))
+- *(ruff)* install via github releases ([#227](https://github.com/grafana/flint/pull/227))
+- resolve init rollout regressions ([#220](https://github.com/grafana/flint/pull/220))
+
+### Other
+
+- *(deps)* update dependency npm:renovate to v43.141.1 ([#221](https://github.com/grafana/flint/pull/221))
+- guard fixture case groups ([#238](https://github.com/grafana/flint/pull/238))
+- *(deps)* update dependency grafana/flint to v0.20.4 ([#235](https://github.com/grafana/flint/pull/235))
+- *(deps)* lock file maintenance ([#237](https://github.com/grafana/flint/pull/237))
+- *(deps)* update dependency mise to v2026.4.19 ([#236](https://github.com/grafana/flint/pull/236))
+- *(deps)* update rust crate json5 to v1 ([#232](https://github.com/grafana/flint/pull/232))
+- *(deps)* update taiki-e/install-action digest to 787505c ([#219](https://github.com/grafana/flint/pull/219))
+- *(deps)* update dependency grafana/flint to v0.20.3 ([#225](https://github.com/grafana/flint/pull/225))
+
 ## [0.20.4](https://github.com/grafana/flint/compare/v0.20.3...v0.20.4) - 2026-04-23
 
 ### Added

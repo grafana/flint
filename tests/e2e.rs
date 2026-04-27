@@ -258,6 +258,10 @@ fi
 
 if [ "$cmd" = "format" ] && [ "${1:-}" = "--write" ]; then
   file="$2"
+  if [ "$(basename "$file")" != "biome.jsonc" ]; then
+    echo "unexpected biome target: $file" >&2
+    exit 1
+  fi
   cat >"$file" <<'EOF'
 {
   // Keep JSON formatting aligned with the repo's two-space style.
@@ -268,15 +272,6 @@ if [ "$cmd" = "format" ] && [ "${1:-}" = "--write" ]; then
 }
 EOF
   exit 0
-fi
-
-if [ "$cmd" = "format" ]; then
-  file="$1"
-  if grep -q '"indentWidth": 2$' "$file" && grep -q '^  }$' "$file"; then
-    exit 0
-  fi
-  echo "formatting differs" >&2
-  exit 1
 fi
 
 echo "unsupported biome invocation: $cmd $*" >&2

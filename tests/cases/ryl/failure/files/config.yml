@@ -1,3 +1,1 @@
-name: "test"
-value:     42
-items: ["a","b"]
+foo: [1,2,

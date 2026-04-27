@@ -5,22 +5,24 @@ use std::process::Command;
 
 use super::detection::parse_tool_keys;
 
-/// Runs `mise use --pin <key>@<version>` in the project directory to add a tool
-/// with a pinned version (mise resolves `latest`/`lts` to a concrete version at
-/// write time). Returns `true` if the key was written to the config (checked by
-/// re-reading the file), ignoring non-zero exit codes that arise from post-write
-/// steps like shim rebuilds failing in restricted environments.
-fn pin_tool_via_mise(project_root: &Path, key: &str, version: &str) -> bool {
-    let mise_path = project_root.join("mise.toml");
-    let before = std::fs::read_to_string(&mise_path).unwrap_or_default();
-
+fn run_mise_use(project_root: &Path, key: &str, version: &str) {
     let _ = Command::new("mise")
         .args(["use", "--pin", &format!("{key}@{version}")])
         .current_dir(project_root)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status();
+}
 
+fn pin_tool_via_mise_with(
+    project_root: &Path,
+    key: &str,
+    version: &str,
+    mut runner: impl FnMut(&Path, &str, &str),
+) -> bool {
+    let mise_path = project_root.join("mise.toml");
+    let before = std::fs::read_to_string(&mise_path).unwrap_or_default();
+    runner(project_root, key, version);
     let after = std::fs::read_to_string(&mise_path).unwrap_or_default();
     after != before && parse_tool_keys(&after).contains(key)
 }
@@ -47,12 +49,19 @@ pub(crate) fn needs_node_for_npm(content: &str) -> bool {
 ///
 /// Returns `true` if a `node` entry was added.
 pub(crate) fn ensure_node_for_npm(project_root: &Path) -> Result<bool> {
+    ensure_node_for_npm_with(project_root, run_mise_use)
+}
+
+fn ensure_node_for_npm_with(
+    project_root: &Path,
+    runner: impl FnMut(&Path, &str, &str),
+) -> Result<bool> {
     let mise_path = project_root.join("mise.toml");
     let content = std::fs::read_to_string(&mise_path).unwrap_or_default();
     if !needs_node_for_npm(&content) {
         return Ok(false);
     }
-    if pin_tool_via_mise(project_root, "node", "lts") {
+    if pin_tool_via_mise_with(project_root, "node", "lts", runner) {
         return Ok(true);
     }
     let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse mise.toml")?;
@@ -71,6 +80,14 @@ pub(crate) fn ensure_node_for_npm(project_root: &Path) -> Result<bool> {
 ///
 /// Returns `true` if a flint entry was added.
 pub(crate) fn ensure_flint_self_pin(project_root: &Path, flint_rev: Option<&str>) -> Result<bool> {
+    ensure_flint_self_pin_with(project_root, flint_rev, run_mise_use)
+}
+
+fn ensure_flint_self_pin_with(
+    project_root: &Path,
+    flint_rev: Option<&str>,
+    runner: impl FnMut(&Path, &str, &str),
+) -> Result<bool> {
     const RELEASE_KEY: &str = "github:grafana/flint";
     const CARGO_KEY: &str = "cargo:https://github.com/grafana/flint";
     let mise_path = project_root.join("mise.toml");
@@ -121,7 +138,9 @@ pub(crate) fn ensure_flint_self_pin(project_root: &Path, flint_rev: Option<&str>
         }
         None => {
             if !tools.contains_key(RELEASE_KEY) {
-                if !removing_flint_key && pin_tool_via_mise(project_root, RELEASE_KEY, ver) {
+                if !removing_flint_key
+                    && pin_tool_via_mise_with(project_root, RELEASE_KEY, ver, runner)
+                {
                     return Ok(true);
                 } else {
                     tools.insert(RELEASE_KEY, toml_edit::value(ver));
@@ -224,11 +243,29 @@ pub(super) fn apply_changes(
     to_remove: &[String],
     to_upgrade: &[(String, String)],
 ) -> Result<()> {
+    apply_changes_with(
+        path,
+        current_content,
+        to_add,
+        to_remove,
+        to_upgrade,
+        run_mise_use,
+    )
+}
+
+fn apply_changes_with(
+    path: &Path,
+    current_content: &str,
+    to_add: &[(String, Option<String>)],
+    to_remove: &[String],
+    to_upgrade: &[(String, String)],
+    mut runner: impl FnMut(&Path, &str, &str),
+) -> Result<()> {
     let project_root = path.parent().unwrap_or(path);
 
     let mut pinned_via_mise: std::collections::HashSet<String> = std::collections::HashSet::new();
     for (key, _) in to_add {
-        if pin_tool_via_mise(project_root, key, "latest") {
+        if pin_tool_via_mise_with(project_root, key, "latest", &mut runner) {
             pinned_via_mise.insert(key.clone());
         } else {
             eprintln!("  warning: could not pin {key} via mise — writing \"latest\"");
@@ -428,7 +465,8 @@ fn sort_and_group_tools(tools: &mut toml_edit::Table, original: &str) {
 #[cfg(test)]
 mod tests {
     use super::{
-        ensure_flint_self_pin, ensure_node_for_npm, needs_node_for_npm, remove_tool_keys,
+        apply_changes_with, ensure_flint_self_pin, ensure_flint_self_pin_with, ensure_node_for_npm,
+        ensure_node_for_npm_with, needs_node_for_npm, pin_tool_via_mise_with, remove_tool_keys,
         replace_obsolete_keys,
     };
 
@@ -455,6 +493,46 @@ mod tests {
 
         assert!(!added);
         assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+    }
+
+    #[test]
+    fn pin_tool_via_mise_detects_successful_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        std::fs::write(&path, "[tools]\n").unwrap();
+
+        let pinned = pin_tool_via_mise_with(dir.path(), "node", "lts", |project_root, key, _| {
+            std::fs::write(
+                project_root.join("mise.toml"),
+                format!("[tools]\n{key} = \"24.0.0\"\n"),
+            )
+            .unwrap();
+        });
+
+        assert!(pinned);
+    }
+
+    #[test]
+    fn ensure_node_for_npm_uses_resolved_pin_from_mise_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        std::fs::write(&path, "[tools]\n\"npm:renovate\" = \"43.129.0\"\n").unwrap();
+
+        let added = ensure_node_for_npm_with(dir.path(), |project_root, key, version| {
+            assert_eq!(key, "node");
+            assert_eq!(version, "lts");
+            std::fs::write(
+                project_root.join("mise.toml"),
+                "[tools]\nnode = \"24.0.0\"\n\"npm:renovate\" = \"43.129.0\"\n",
+            )
+            .unwrap();
+        })
+        .unwrap();
+
+        assert!(added);
+        let result = std::fs::read_to_string(&path).unwrap();
+        assert!(result.contains("node = \"24.0.0\""));
+        assert!(result.contains("\"npm:renovate\" = \"43.129.0\""));
     }
 
     #[test]
@@ -496,6 +574,33 @@ mod tests {
     }
 
     #[test]
+    fn flint_self_pin_prefers_resolved_mise_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        std::fs::write(&path, "[tools]\nrust = \"1.95.0\"\n").unwrap();
+
+        let changed = ensure_flint_self_pin_with(dir.path(), None, |project_root, key, version| {
+            assert_eq!(key, "github:grafana/flint");
+            assert_eq!(version, env!("CARGO_PKG_VERSION"));
+            let version = env!("CARGO_PKG_VERSION");
+            std::fs::write(
+                project_root.join("mise.toml"),
+                format!("[tools]\nrust = \"1.95.0\"\n\"github:grafana/flint\" = \"{version}\"\n"),
+            )
+            .unwrap();
+        })
+        .unwrap();
+
+        assert!(changed);
+        let result = std::fs::read_to_string(&path).unwrap();
+        assert!(result.contains(&format!(
+            "\"github:grafana/flint\" = \"{}\"",
+            env!("CARGO_PKG_VERSION")
+        )));
+        assert!(!result.contains(&format!("version = \"{}\"", env!("CARGO_PKG_VERSION"))));
+    }
+
+    #[test]
     fn replaces_old_key_preserving_version() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mise.toml");
@@ -532,5 +637,34 @@ mod tests {
         assert_eq!(removed, vec!["npm:prettier".to_string()]);
         assert!(!result.contains("npm:prettier"));
         assert!(result.contains("npm:markdownlint-cli2"));
+    }
+
+    #[test]
+    fn apply_changes_preserves_resolved_versions_from_mise_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        let current = "[tools]\n";
+
+        apply_changes_with(
+            &path,
+            current,
+            &[("rust".to_string(), Some("clippy,rustfmt".to_string()))],
+            &[],
+            &[],
+            |project_root, key, version| {
+                assert_eq!(key, "rust");
+                assert_eq!(version, "latest");
+                std::fs::write(
+                    project_root.join("mise.toml"),
+                    "[tools]\nrust = \"1.95.0\"\n",
+                )
+                .unwrap();
+            },
+        )
+        .unwrap();
+
+        let result = std::fs::read_to_string(&path).unwrap();
+        assert!(result.contains("version = \"1.95.0\""));
+        assert!(result.contains("components = \"clippy,rustfmt\""));
     }
 }

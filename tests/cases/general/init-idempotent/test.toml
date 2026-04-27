@@ -6,10 +6,3 @@ Tip: flint init detects languages from tracked files (`git ls-files`). Add and s
 
 No changes to apply.
 '''
-
-[fake_bins]
-mise = '''
-#!/bin/sh
-# Fake mise: idempotent — never modifies mise.toml since everything is already pinned.
-exit 0
-'''

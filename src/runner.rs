@@ -57,6 +57,7 @@ enum PreparedCheck {
     RenovateDeps {
         name: String,
         cfg: RenovateDepsConfig,
+        tracked_files: Vec<PathBuf>,
     },
     LicenseHeader {
         name: String,
@@ -131,8 +132,18 @@ impl PreparedCheck {
                 lychee::run(&cfg, &settings, &file_list, project_root, &config_dir).await,
                 false,
             ),
-            Self::RenovateDeps { cfg, .. } => {
-                (renovate_deps::run(&cfg, fix, project_root).await, false)
+            Self::RenovateDeps {
+                cfg, tracked_files, ..
+            } => {
+                let before = if fix && !tracked_files.is_empty() {
+                    Some(fingerprint_files(&tracked_files))
+                } else {
+                    None
+                };
+                let out = renovate_deps::run(&cfg, fix, project_root).await;
+                let changed =
+                    before.is_some_and(|before| before != fingerprint_files(&tracked_files));
+                (out, changed)
             }
             Self::LicenseHeader { cfg, files, .. } => {
                 (license_header::run(&cfg, project_root, &files).await, false)
@@ -284,6 +295,10 @@ fn prepare(
             SpecialKind::RenovateDeps => Some(PreparedCheck::RenovateDeps {
                 name,
                 cfg: cfg.checks.renovate_deps.clone(),
+                tracked_files: renovate_deps::COMMITTED_PATHS
+                    .iter()
+                    .map(|path| project_root.join(path))
+                    .collect(),
             }),
             SpecialKind::LicenseHeader => {
                 if cfg.checks.license_header.text.is_empty() {

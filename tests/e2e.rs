@@ -10,6 +10,11 @@ fn flint_with_env(args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Output {
     cmd.args(args)
         .env("MISE_PROJECT_ROOT", cwd)
         .env_remove("FLINT_CONFIG_DIR")
+        // Keep test output stable regardless of whether the outer runner is CI.
+        .env_remove("CI")
+        .env_remove("GITHUB_ACTIONS")
+        .env_remove("GITHUB_ACTION")
+        .env_remove("GITHUB_WORKFLOW")
         .current_dir(cwd);
     for (k, v) in env {
         cmd.env(k, v);

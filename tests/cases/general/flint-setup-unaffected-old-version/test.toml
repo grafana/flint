@@ -1,0 +1,3 @@
+[expected]
+args = "run flint-setup"
+exit = 0

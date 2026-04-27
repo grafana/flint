@@ -21,6 +21,7 @@ pub struct Config {
 pub struct Settings {
     pub base_branch: String,
     pub exclude: Vec<String>,
+    pub setup_migration_version: u32,
 }
 
 impl Default for Settings {
@@ -28,6 +29,7 @@ impl Default for Settings {
         Self {
             base_branch: "main".to_string(),
             exclude: vec![],
+            setup_migration_version: crate::setup::V2_BASELINE_SETUP_VERSION,
         }
     }
 }
@@ -84,7 +86,7 @@ impl Default for LicenseHeaderConfig {
 /// e.g. "lychee"        → ("lychee_",        "checks.lychee.")
 ///      "renovate-deps" → ("renovate_deps_",  "checks.renovate_deps.")
 ///      "ruff-format"   → ("ruff_format_",    "checks.ruff_format.")
-/// Sorted longest-prefix-first so "ruff_format_" is matched before "ruff_".
+/// Sorted longest-prefix-first so "ruff_fmt_" is matched before "ruff_".
 fn check_env_sections() -> Vec<(String, String)> {
     let mut sections: Vec<(String, String)> = registry::builtin()
         .into_iter()
@@ -120,4 +122,22 @@ pub fn load(config_dir: &Path) -> Result<Config> {
         }))
         .extract()?;
     Ok(cfg)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_setup_migration_version_defaults_to_v2_baseline() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(tmp.path().join("flint.toml"), "[settings]\n").unwrap();
+
+        let cfg = load(tmp.path()).unwrap();
+
+        assert_eq!(
+            cfg.settings.setup_migration_version,
+            crate::setup::V2_BASELINE_SETUP_VERSION
+        );
+    }
 }

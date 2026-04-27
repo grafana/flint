@@ -1,3 +1,5 @@
 [tools]
+
+# Linters
 editorconfig-checker = "latest"
 shfmt = "v3.12.0"

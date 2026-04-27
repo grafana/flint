@@ -50,9 +50,9 @@ enable during the prompt, or trim the generated tool list afterward if you run
 
 Flint reads your `[tools]` section to discover which linters to run — declaring
 a tool is the opt-in. No separate configuration needed to activate a check: if
-`shellcheck` is in `[tools]`, flint runs shellcheck; if it isn't, that check is
-skipped. `mise install` puts all declared tools on PATH; flint picks up whatever
-is there.
+ShellCheck's Flint-managed tool key is in `[tools]`, flint runs shellcheck; if
+it isn't, that check is skipped. `mise install` puts all declared tools on PATH;
+flint picks up whatever is there.
 
 Add the linting tools your project needs alongside the `flint` binary itself:
 
@@ -61,8 +61,8 @@ Add the linting tools your project needs alongside the `flint` binary itself:
 "github:grafana/flint" = "0.20.4"
 
 # Add whichever linters apply to your repo:
-shellcheck              = "v0.11.0"
-"github:mvdan/sh"       = "v3.13.1"  # activates shfmt
+"github:koalaman/shellcheck" = "0.11.0"
+shfmt                   = "3.13.1"
 actionlint              = "1.7.10"
 rumdl                   = "0.1.78"
 ruff                    = "0.15.11"
@@ -157,10 +157,10 @@ avoid config drift.
 > its own settings, not `.editorconfig` itself. Editorconfig discovery always
 > walks up from the file being linted and cannot be redirected via a flag.
 
-When a formatter explicitly owns line length for a file type, `flint init` /
-`flint update` prefers writing that carve-out into the shared root
-`.editorconfig` so editors and `editorconfig-checker` stay aligned. Today this
-applies to Markdown via `rumdl` and Java via `google-java-format`.
+When a formatter explicitly owns line length for a file type, Flint writes that
+carve-out into the shared root `.editorconfig` so editors and
+`editorconfig-checker` stay aligned. Today this applies to Markdown via `rumdl`,
+Rust via `rustfmt`, and Java via `google-java-format`.
 
 > [!NOTE]
 > Biome is also root-discovered on purpose. Flint treats root `biome.jsonc` as
@@ -185,6 +185,7 @@ Click a name in the table below for details. See the
 | [`codespell`](docs/linters.md#codespell)                       | Check for common spelling mistakes                                  | yes |
 | [`dotnet-format`](docs/linters.md#dotnet-format)               | Format C# code                                                      | yes |
 | [`editorconfig-checker`](docs/linters.md#editorconfig-checker) | Check files comply with EditorConfig settings                       | —   |
+| [`flint-setup`](docs/linters.md#flint-setup)                   | Keep Flint setup current and mise.toml lint tooling canonical       | yes |
 | [`gofmt`](docs/linters.md#gofmt)                               | Format Go code                                                      | yes |
 | [`golangci-lint`](docs/linters.md#golangci-lint)               | Lint Go code; uses --new-from-rev to scope analysis to changed code | —   |
 | [`google-java-format`](docs/linters.md#google-java-format)     | Format Java code                                                    | yes |
@@ -196,11 +197,11 @@ Click a name in the table below for details. See the
 | [`ruff`](docs/linters.md#ruff)                                 | Lint Python code                                                    | yes |
 | [`ruff-format`](docs/linters.md#ruff-format)                   | Format Python code                                                  | yes |
 | [`rumdl`](docs/linters.md#rumdl)                               | Lint Markdown files for style and consistency                       | yes |
+| [`ryl`](docs/linters.md#ryl)                                   | Lint YAML files for style and consistency                           | yes |
 | [`shellcheck`](docs/linters.md#shellcheck)                     | Lint shell scripts for common mistakes                              | —   |
 | [`shfmt`](docs/linters.md#shfmt)                               | Format shell scripts                                                | yes |
 | [`taplo`](docs/linters.md#taplo)                               | Format TOML files                                                   | yes |
 | [`xmllint`](docs/linters.md#xmllint)                           | Validate XML files are well-formed                                  | —   |
-| [`yaml-lint`](docs/linters.md#yaml-lint)                       | Lint YAML files for style and consistency                           | yes |
 
 <!-- registry-table-end -->
 

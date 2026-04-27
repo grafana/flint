@@ -9,7 +9,6 @@ Every supported check, its config file (when applicable), and its scope. The
 > the canonical Biome config. Flint is opinionated here: use JSONC, not
 > `biome.json`.
 
-<!-- markdownlint-disable MD013 -->
 <!-- linter-details-start -->
 <!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
 ## `actionlint`
@@ -96,6 +95,30 @@ Every supported check, its config file (when applicable), and its scope. The
 | Patterns    | `*`                                           |
 | Config      | `.editorconfig-checker.json`                  |
 
+## `flint-setup`
+
+|             |                                                               |
+| ----------- | ------------------------------------------------------------- |
+| Description | Keep Flint setup current and mise.toml lint tooling canonical |
+| Fix         | yes                                                           |
+| Binary      | (built-in)                                                    |
+| Scope       | [special](#scopes)                                            |
+| Patterns    | `mise.toml`                                                   |
+
+Checks the repo's Flint-managed setup state and `mise.toml` layout.
+
+This verifies and fixes Flint-managed setup:
+
+- apply versioned Flint setup migrations
+- replace obsolete lint tool keys with their supported successors
+- reject unsupported legacy lint tools that need repo migrations
+- sort `[tools]` entries into Flint's canonical order
+- keep lint-managed tool entries under the `# Linters` header
+- keep runtime, SDK, and unknown tool entries above that header
+
+With `--fix`, rewrites Flint-managed config in place and advances
+`settings.setup_migration_version` when a migration applies.
+
 ## `gofmt`
 
 |             |                 |
@@ -169,7 +192,10 @@ Every supported check, its config file (when applicable), and its scope. The
 
 Orchestrates [lychee](https://lychee.cli.rs/) for link checking. Requires `lychee` in `[tools]`.
 
-Default behavior: checks all links in changed files. When `check_all_local = true` in `flint.toml`, adds a second pass over local links in all files — useful when broken internal links from unchanged files also matter.
+Default behavior: checks all links in changed files. When
+`check_all_local = true` in `flint.toml`, adds a second pass over local links
+in all files — useful when broken internal links from unchanged files also
+matter.
 
 Configure via `flint.toml`:
 
@@ -190,7 +216,9 @@ check_all_local = true
 | Patterns    | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
 | Run policy  | adaptive — runs in `--fast-only` only when relevant                                                                        |
 
-Verifies `.github/renovate-tracked-deps.json` is up to date by running Renovate locally and comparing its output against the committed snapshot. Requires `renovate` in `[tools]`.
+Verifies `.github/renovate-tracked-deps.json` is up to date by running
+Renovate locally and comparing its output against the committed snapshot.
+Requires `renovate` in `[tools]`.
 
 With `--fix`, automatically regenerates and commits the snapshot.
 
@@ -234,6 +262,17 @@ exclude_managers = ["github-actions", "github-runners"]
 | Patterns    | `*.md`                                        |
 | Config      | `.rumdl.toml`                                 |
 
+## `ryl`
+
+|             |                                           |
+| ----------- | ----------------------------------------- |
+| Description | Lint YAML files for style and consistency |
+| Fix         | yes                                       |
+| Binary      | `ryl`                                     |
+| Scope       | [files](#scopes)                          |
+| Patterns    | `*.yml *.yaml`                            |
+| Config      | `.yamllint.yml`                           |
+
 ## `shellcheck`
 
 |             |                                        |
@@ -268,9 +307,12 @@ exclude_managers = ["github-actions", "github-runners"]
 
 Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).
 
-This check intentionally stays basic: it uses `taplo fmt --check` for verification and `taplo fmt` for `--fix`. That keeps behavior aligned with flint's existing formatter-style checks.
+This check intentionally stays basic: it uses `taplo fmt --check` for
+verification and `taplo fmt` for `--fix`. That keeps behavior aligned with
+flint's existing formatter-style checks.
 
-Current caveat: Taplo's published docs currently advertise TOML 1.0.0 support, so treat this check as TOML 1.0-oriented for now.
+Current caveat: Taplo's published docs currently advertise TOML 1.0.0
+support, so treat this check as TOML 1.0-oriented for now.
 
 ## `xmllint`
 
@@ -282,19 +324,7 @@ Current caveat: Taplo's published docs currently advertise TOML 1.0.0 support, s
 | Scope       | [files](#scopes)                   |
 | Patterns    | `*.xml`                            |
 
-## `yaml-lint`
-
-|             |                                           |
-| ----------- | ----------------------------------------- |
-| Description | Lint YAML files for style and consistency |
-| Fix         | yes                                       |
-| Binary      | `ryl`                                     |
-| Scope       | [files](#scopes)                          |
-| Patterns    | `*.yml *.yaml`                            |
-| Config      | `.yamllint.yml`                           |
-
 <!-- linter-details-end -->
-<!-- markdownlint-enable MD013 -->
 
 ## Scopes
 
@@ -320,8 +350,8 @@ all files, but automatically skips file types owned by an active formatter. If
 none of those formatters are installed, `editorconfig-checker` checks those
 files itself.
 
-**`flint init` / `flint update` writes shared `.editorconfig` carve-outs for
-known formatter-owned line length**: today that means `rumdl` for `*.md` and
-`google-java-format` for `*.java`. Those sections use `max_line_length = off`
-so editors and `editorconfig-checker` share the same intent instead of relying
-on checker-specific JSON excludes.
+**Flint writes shared `.editorconfig` carve-outs for known formatter-owned line
+length**: today that means `rumdl` for `*.md`, `rustfmt` for `*.rs`, and
+`google-java-format` for `*.java`. Those sections use `max_line_length = off` so editors and
+`editorconfig-checker` share the same intent instead of relying on
+checker-specific JSON excludes.

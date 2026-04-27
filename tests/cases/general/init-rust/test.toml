@@ -5,12 +5,13 @@ stdout = '''
 Tip: flint init detects languages from tracked files (`git ls-files`). Add and stage your source files before running init so the detection is accurate.
 
   pinned flint itself — reproducible lint runs across contributors
+  normalized [tools] in <REPO>/mise.toml
   wrote <REPO>/.github/config/flint.toml
   wrote <REPO>/.github/workflows/lint.yml
   removed <REPO>/.markdownlint.json (replaced by .rumdl.toml)
   wrote <REPO>/.github/config/.rumdl.toml
   patched <REPO>/.editorconfig — set max_line_length = 120
-  patched <REPO>/.editorconfig — disable max_line_length for [*.md]
+  patched <REPO>/.editorconfig — disable max_line_length for [*.rs], [*.md]
   wrote <REPO>/.github/config/.yamllint.yml
   wrote <REPO>/.github/config/rustfmt.toml
   wrote <REPO>/biome.jsonc
@@ -18,26 +19,7 @@ installed pre-commit hook (.git/hooks/pre-commit)
 Done. Run `mise install` to install the new tools.
 '''
 
-# .github/workflows/lint.yml content is NOT asserted here:
-# renovate bumps the mise-action version + sha256 pin, which would flake this
-# snapshot on every bump. Rust-specific workflow content is covered by the
-# `generate_lint_workflow_with_rust` unit test in src/init/mod.rs.
 [expected.files]
-".github/config/flint.toml" = '''
-[settings]
-# exclude = ["CHANGELOG\\.md"]
-'''
-".github/config/.rumdl.toml" = '''
-[MD013]
-enabled = true
-line-length = 120
-code-blocks = false
-tables = false
-
-[MD060]
-enabled = true
-style = "aligned"
-'''
 ".editorconfig" = '''
 root = true
 
@@ -49,9 +31,17 @@ indent_style = space
 indent_size = 2
 max_line_length = 120
 
+[*.rs]
+# Rust line length is handled by rustfmt
+max_line_length = off
+
 [*.md]
 # Markdown line length is handled by rumdl
 max_line_length = off
+'''
+".github/config/.rumdl.toml" = '''
+[global]
+disable = ["line-length"]
 '''
 ".github/config/.yamllint.yml" = '''
 extends: relaxed
@@ -62,6 +52,11 @@ rules:
     max: 120
   indentation:
     spaces: 2
+'''
+".github/config/flint.toml" = '''
+[settings]
+setup_migration_version = 2
+# exclude = ["CHANGELOG\\.md"]
 '''
 ".github/config/rustfmt.toml" = '''
 max_width = 120

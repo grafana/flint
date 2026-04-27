@@ -1,3 +1,4 @@
 [tools]
-rumdl = "0.1.78"
+
+# Linters
 "github:koalaman/shellcheck" = "v0.11.0"

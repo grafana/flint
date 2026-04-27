@@ -1,5 +1,6 @@
-use super::types::{Check, ConfigFile, SpecialKind};
+use super::types::{Check, ConfigFile, EditorconfigDirectiveStyle, SpecialKind};
 use crate::linters::renovate_deps::RENOVATE_CONFIG_PATTERNS;
+use crate::setup::{V1_BOOTSTRAP_SETUP_VERSION, V2_BASELINE_SETUP_VERSION};
 
 const TOOL_RUMDL: &[&str] = &["tool", "rumdl"];
 const TOOL_CODESPELL: &[&str] = &["tool", "codespell"];
@@ -69,14 +70,14 @@ const RUFF_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
 ///
 /// # Naming convention
 ///
-/// A check's `name` is the last path segment of its mise tool key (after `:` or `/`):
-/// - `editorconfig-checker` → name `editorconfig-checker` (not the binary `ec`)
-/// - `aqua:owenlamont/ryl` → name `yaml-lint`
-/// - `ktlint` → name `ktlint`
+/// Prefer the user-facing binary or native command name:
+/// - `shellcheck` → `shellcheck`
+/// - `aqua:owenlamont/ryl` → `ryl`
+/// - `github:jonwiggins/xmloxide` → `xmllint`
 ///
-/// Exception: when the mise tool key is a language toolchain shared across multiple
-/// binaries (e.g. `rust`, `go`, `dotnet`), use the binary name instead — the toolchain
-/// name would be ambiguous (`rust` can't name both `cargo-fmt` and `cargo-clippy`).
+/// Exceptions are explicit and should stay rare:
+/// - clearer package-facing names such as `editorconfig-checker` over `ec`
+/// - native subcommands such as `cargo-fmt`, `ruff-format`, and `dotnet-format`
 fn check_shellcheck() -> Check {
     Check::file(
         "shellcheck",
@@ -87,6 +88,7 @@ fn check_shellcheck() -> Check {
     .linter_config(".shellcheckrc", "--rcfile")
     .baseline_config(ConfigFile::config_dir(".shellcheckrc"))
     .unsupported_configs(SHELLCHECK_UNSUPPORTED_CONFIGS)
+    .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["shellcheck"])
     .desc("Lint shell scripts for common mistakes")
     .style()
 }
@@ -95,6 +97,7 @@ fn check_shfmt() -> Check {
     Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"])
         .fix("shfmt -w {FILE}")
         .formatter()
+        .migrate_tool_keys_after(V1_BOOTSTRAP_SETUP_VERSION, &["github:mvdan/sh"])
         .desc("Format shell scripts")
         .style()
 }
@@ -107,13 +110,16 @@ fn check_rumdl() -> Check {
         .unsupported_configs(RUMDL_UNSUPPORTED_CONFIGS)
         .nonverbose_filter_prefixes(&["Success: No issues found in "])
         .formatter()
-        .editorconfig_line_length_off(&["*.md"], "Markdown line length is handled by rumdl")
+        .editorconfig_line_length_off(
+            &["*.md"],
+            "Markdown line length is handled by rumdl",
+            Some(EditorconfigDirectiveStyle::Html),
+        )
         .desc("Lint Markdown files for style and consistency")
 }
 
 fn check_yaml_lint() -> Check {
-    Check::files("yaml-lint", "ryl {FILES}", &["*.yml", "*.yaml"])
-        .bin("ryl")
+    Check::files("ryl", "ryl {FILES}", &["*.yml", "*.yaml"])
         .fix("ryl --fix {FILES}")
         .linter_config(".yamllint.yml", "-c")
         .baseline_config(ConfigFile::config_dir(".yamllint.yml"))
@@ -121,6 +127,10 @@ fn check_yaml_lint() -> Check {
         .formatter()
         .desc("Lint YAML files for style and consistency")
         .mise_tool("aqua:owenlamont/ryl")
+        .migrate_tool_keys_after(
+            V2_BASELINE_SETUP_VERSION,
+            &["cargo:yaml-lint", "github:owenlamont/ryl"],
+        )
 }
 
 fn check_taplo() -> Check {
@@ -135,15 +145,16 @@ fn check_taplo() -> Check {
     .unsupported_configs(TAPLO_UNSUPPORTED_CONFIGS)
     .stderr_filter_prefixes(&[" INFO taplo:"])
     .formatter()
+    .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["github:tamasfe/taplo"])
     .desc("Format TOML files")
     .docs(
         "Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).\n\
             \n\
-            This check intentionally stays basic: it uses `taplo fmt --check` for \
-            verification and `taplo fmt` for `--fix`. That keeps behavior aligned \
-            with flint's existing formatter-style checks.\n\
+            This check intentionally stays basic: it uses `taplo fmt --check` for\n\
+            verification and `taplo fmt` for `--fix`. That keeps behavior aligned with\n\
+            flint's existing formatter-style checks.\n\
             \n\
-            Current caveat: Taplo's published docs currently advertise TOML 1.0.0 \
+            Current caveat: Taplo's published docs currently advertise TOML 1.0.0\n\
             support, so treat this check as TOML 1.0-oriented for now.",
     )
     .style()
@@ -178,6 +189,7 @@ fn check_hadolint() -> Check {
 fn check_xmllint() -> Check {
     Check::files("xmllint", "xmllint --noout {FILES}", &["*.xml"])
         .mise_tool("github:jonwiggins/xmloxide")
+        .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["cargo:xmloxide"])
         .desc("Validate XML files are well-formed")
 }
 
@@ -200,7 +212,6 @@ fn check_editorconfig_checker() -> Check {
         .mise_tool("editorconfig-checker")
         .defer_to_formatters()
         .linter_config(".editorconfig-checker.json", "-config")
-        .baseline_config(ConfigFile::config_dir(".editorconfig-checker.json"))
         .unsupported_configs(EDITORCONFIG_CHECKER_UNSUPPORTED_CONFIGS)
         .desc("Check files comply with EditorConfig settings")
 }
@@ -224,6 +235,10 @@ fn check_ruff() -> Check {
         .linter_config("ruff.toml", "--config")
         .baseline_config(RUFF_BASELINE_CONFIG)
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
+        .migrate_tool_keys_after(
+            V2_BASELINE_SETUP_VERSION,
+            &["pipx:ruff", "github:astral-sh/ruff"],
+        )
         .desc("Lint Python code")
         .lang()
 }
@@ -250,6 +265,7 @@ fn check_biome() -> Check {
     .fix("biome check --fix {FILE}")
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
+    .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["npm:@biomejs/biome"])
     .desc("Lint JS/TS/JSON files")
     .lang()
 }
@@ -294,6 +310,7 @@ fn check_cargo_fmt() -> Check {
         .mise_tool("rust")
         .toolchain_components("rustfmt")
         .formatter()
+        .editorconfig_line_length_off(&["*.rs"], "Rust line length is handled by rustfmt", None)
         .desc("Format Rust code; runs on all .rs files, not just changed")
         .lang()
 }
@@ -320,6 +337,11 @@ fn check_google_java_format() -> Check {
     .editorconfig_line_length_off(
         &["*.java"],
         "Java line length is handled by google-java-format",
+        Some(EditorconfigDirectiveStyle::Slash),
+    )
+    .migrate_tool_keys_after(
+        V1_BOOTSTRAP_SETUP_VERSION,
+        &["ubi:google/google-java-format"],
     )
     .desc("Format Java code")
     .lang()
@@ -338,6 +360,8 @@ fn check_ktlint() -> Check {
     )
     .windows_java_jar()
     .formatter()
+    .migrate_tool_keys_after(V1_BOOTSTRAP_SETUP_VERSION, &["ubi:pinterest/ktlint"])
+    .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["github:pinterest/ktlint"])
     .desc("Lint and format Kotlin code")
     .lang()
 }
@@ -359,16 +383,16 @@ fn check_dotnet_format() -> Check {
 }
 
 fn check_lychee() -> Check {
-    Check::special("lychee", "lychee", SpecialKind::Links)
+    Check::special_with_bin("lychee", "lychee", SpecialKind::Links, false)
         .desc("Check for broken links")
         .docs(
             "Orchestrates [lychee](https://lychee.cli.rs/) for link checking. \
             Requires `lychee` in `[tools]`.\n\
             \n\
-            Default behavior: checks all links in changed files. \
-            When `check_all_local = true` in `flint.toml`, adds a second pass \
-            over local links in all files — useful when broken internal links \
-            from unchanged files also matter.\n\
+            Default behavior: checks all links in changed files. When\n\
+            `check_all_local = true` in `flint.toml`, adds a second pass over local links\n\
+            in all files — useful when broken internal links from unchanged files also\n\
+            matter.\n\
             \n\
             Configure via `flint.toml`:\n\
             \n\
@@ -381,14 +405,14 @@ fn check_lychee() -> Check {
 }
 
 fn check_renovate_deps() -> Check {
-    Check::special("renovate-deps", "renovate", SpecialKind::RenovateDeps)
+    Check::special_with_bin("renovate-deps", "renovate", SpecialKind::RenovateDeps, true)
         .adaptive()
         .mise_tool("npm:renovate")
         .patterns(RENOVATE_CONFIG_PATTERNS)
         .desc("Verify Renovate dependency snapshot is up to date")
         .docs(
-            "Verifies `.github/renovate-tracked-deps.json` is up to date by running \
-            Renovate locally and comparing its output against the committed snapshot. \
+            "Verifies `.github/renovate-tracked-deps.json` is up to date by running\n\
+            Renovate locally and comparing its output against the committed snapshot.\n\
             Requires `renovate` in `[tools]`.\n\
             \n\
             With `--fix`, automatically regenerates and commits the snapshot.\n\
@@ -403,17 +427,35 @@ fn check_renovate_deps() -> Check {
 }
 
 fn check_license_header() -> Check {
-    Check::special(
-        "license-header",
-        "license-header",
-        SpecialKind::LicenseHeader,
-    )
-    .activate_unconditionally()
-    .desc("Check source files have the required license header")
+    Check::special("license-header", SpecialKind::LicenseHeader, false)
+        .activate_unconditionally()
+        .desc("Check source files have the required license header")
+}
+
+fn check_flint_setup() -> Check {
+    Check::special("flint-setup", SpecialKind::FlintSetup, true)
+        .activate_unconditionally()
+        .patterns(&["mise.toml"])
+        .desc("Keep Flint setup current and mise.toml lint tooling canonical")
+        .docs(
+            "Checks the repo's Flint-managed setup state and `mise.toml` layout.\n\
+            \n\
+            This verifies and fixes Flint-managed setup:\n\
+            - apply versioned Flint setup migrations\n\
+            - replace obsolete lint tool keys with their supported successors\n\
+            - reject unsupported legacy lint tools that need repo migrations\n\
+            - sort `[tools]` entries into Flint's canonical order\n\
+            - keep lint-managed tool entries under the `# Linters` header\n\
+            - keep runtime, SDK, and unknown tool entries above that header\n\
+            \n\
+            With `--fix`, rewrites Flint-managed config in place and advances\n\
+            `settings.setup_migration_version` when a migration applies.",
+        )
 }
 
 pub fn builtin() -> Vec<Check> {
     vec![
+        check_flint_setup(),
         check_shellcheck(),
         check_shfmt(),
         check_rumdl(),

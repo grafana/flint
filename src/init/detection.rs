@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 
-use crate::registry::{Category, Check, OBSOLETE_KEYS};
+use crate::registry::{Category, Check, obsolete_keys};
 
 use super::{LinterGroup, install_key};
 
@@ -93,15 +93,17 @@ pub(super) fn get_entry_components(content: &str, key: &str) -> Option<String> {
     }
 }
 
-/// Returns the subset of `OBSOLETE_KEYS` whose old key is present in `current_tool_keys`.
+/// Returns the subset of obsolete setup-migration keys whose old key is
+/// present in `current_tool_keys`.
 pub(super) fn detect_obsolete_keys(
     current_tool_keys: &HashSet<String>,
 ) -> Vec<(&'static str, &'static str)> {
-    OBSOLETE_KEYS
-        .iter()
+    let mut found = obsolete_keys()
+        .into_iter()
         .filter(|(old, _)| current_tool_keys.contains(*old))
-        .copied()
-        .collect()
+        .collect::<Vec<_>>();
+    found.sort_by_key(|(old, _)| *old);
+    found
 }
 
 /// Builds one `LinterGroup` per install key, covering all checks whose file patterns

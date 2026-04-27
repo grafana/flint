@@ -1,4 +1,0 @@
-[expected]
-args = "update"
-exit = 0
-stdout = "  normalized [tools] in <REPO>/mise.toml\n"

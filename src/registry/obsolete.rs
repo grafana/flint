@@ -1,69 +1,80 @@
 use std::collections::HashMap;
 
-/// Mise tool keys that are no longer supported by flint and should be removed
-/// during `flint init`. Each entry is `(old_key, replacement_key)` where
-/// `replacement_key` is the modern equivalent that the registry now uses.
-pub const OBSOLETE_KEYS: &[(&str, &str)] = &[
-    // ubi: was deprecated in mise; the github: backend is the modern replacement.
-    // Repos that adopted flint before this change may still have ubi: keys.
-    (
-        "ubi:google/google-java-format",
-        "github:google/google-java-format",
-    ),
-    ("ubi:pinterest/ktlint", "ktlint"),
-    // ryl is available from aqua-registry, but current mise releases still require
-    // the explicit aqua-prefixed key instead of exposing a bare `ryl` tool.
-    ("cargo:yaml-lint", "aqua:owenlamont/ryl"),
-    ("github:owenlamont/ryl", "aqua:owenlamont/ryl"),
-    // Ruff is available as a bare aqua-backed tool key.
-    ("pipx:ruff", "ruff"),
-    ("github:astral-sh/ruff", "ruff"),
-    // github:mvdan/sh is superseded by bare shfmt; mise resolves it via aqua:mvdan/sh,
-    // and the aqua registry now ships Windows support for shfmt.
-    ("github:mvdan/sh", "shfmt"),
-    ("github:tamasfe/taplo", "taplo"),
-    // npm-installed biome is superseded by the standalone biome binary.
-    ("npm:@biomejs/biome", "biome"),
-    // xmloxide now publishes GitHub releases consumable via mise's github: backend.
-    ("cargo:xmloxide", "github:jonwiggins/xmloxide"),
-    ("github:pinterest/ktlint", "ktlint"),
-];
+pub fn obsolete_keys() -> Vec<(&'static str, &'static str)> {
+    let mut keys = crate::setup::obsolete_keys();
+    keys.extend(registry_tool_key_migrations());
+    keys
+}
 
-/// Mise tool keys that flint no longer supports and cannot auto-rewrite 1:1.
-/// These require a docs/config migration rather than a backend swap.
-pub const UNSUPPORTED_KEYS: &[(&str, &str)] = &[
-    (
-        "npm:markdownlint-cli",
-        "replace with rumdl and remove markdownlint-era config",
-    ),
-    (
-        "npm:markdownlint-cli2",
-        "replace with rumdl and remove markdownlint-era config",
-    ),
-    (
-        "npm:prettier",
-        "replace with rumdl and yaml-lint, then remove prettier from the lint toolchain",
-    ),
-];
+pub fn unsupported_keys() -> Vec<(&'static str, &'static str)> {
+    crate::setup::unsupported_keys()
+}
 
-/// Checks whether any obsolete tool keys are present in `mise_tools`.
-/// Returns the first violation found as `(obsolete_key, replacement_key)`.
+pub fn obsolete_keys_after(version: u32) -> Vec<(&'static str, &'static str)> {
+    let mut keys = crate::setup::obsolete_keys_after(version);
+    keys.extend(registry_tool_key_migrations_after(version));
+    keys
+}
+
 pub fn find_obsolete_key(
     mise_tools: &HashMap<String, String>,
 ) -> Option<(&'static str, &'static str)> {
-    OBSOLETE_KEYS
-        .iter()
-        .find(|(old, _)| mise_tools.contains_key(*old))
-        .copied()
+    obsolete_keys()
+        .into_iter()
+        .find(|(old, _)| obsolete_key_present(mise_tools, old))
 }
 
-/// Checks whether any unsupported legacy tool keys are present in `mise_tools`.
-/// Returns the first violation found as `(unsupported_key, migration_hint)`.
 pub fn find_unsupported_key(
     mise_tools: &HashMap<String, String>,
 ) -> Option<(&'static str, &'static str)> {
-    UNSUPPORTED_KEYS
-        .iter()
-        .find(|(old, _)| mise_tools.contains_key(*old))
-        .copied()
+    crate::setup::find_unsupported_key(mise_tools)
+}
+
+#[cfg(test)]
+pub(crate) fn latest_registry_tool_migration_target_version() -> Option<u32> {
+    crate::registry::builtin()
+        .into_iter()
+        .flat_map(|check| check.tool_key_migrations.into_iter())
+        .map(|migration| migration.after_setup_migration_version + 1)
+        .max()
+}
+
+fn registry_tool_key_migrations() -> Vec<(&'static str, &'static str)> {
+    crate::registry::builtin()
+        .into_iter()
+        .filter_map(|check| {
+            let new_key = check.install_key()?;
+            Some(
+                check
+                    .tool_key_migrations
+                    .into_iter()
+                    .map(move |migration| (migration.old_key, new_key)),
+            )
+        })
+        .flatten()
+        .collect()
+}
+
+fn registry_tool_key_migrations_after(version: u32) -> Vec<(&'static str, &'static str)> {
+    crate::registry::builtin()
+        .into_iter()
+        .filter_map(|check| {
+            let new_key = check.install_key()?;
+            Some(
+                check
+                    .tool_key_migrations
+                    .into_iter()
+                    .filter(move |migration| version <= migration.after_setup_migration_version)
+                    .map(move |migration| (migration.old_key, new_key)),
+            )
+        })
+        .flatten()
+        .collect()
+}
+
+fn obsolete_key_present(mise_tools: &HashMap<String, String>, old: &str) -> bool {
+    if old == "shellcheck" && mise_tools.contains_key("github:koalaman/shellcheck") {
+        return false;
+    }
+    mise_tools.contains_key(old)
 }

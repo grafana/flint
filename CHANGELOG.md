@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.20.5](https://github.com/grafana/flint/compare/v0.20.4...v0.20.5) - 2026-04-27
+## [0.21.0](https://github.com/grafana/flint/compare/v0.20.4...v0.21.0) - 2026-04-27
 
 ### Added
 

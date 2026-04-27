@@ -1,0 +1,7 @@
+extends: relaxed
+
+rules:
+  commas:
+    min-spaces-after: 1
+    max-spaces-after: 1
+    level: warning

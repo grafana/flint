@@ -3,15 +3,13 @@ args = "run --full ryl"
 exit = 1
 stderr = '''
 [ryl]
-config.yml:2: bad spacing
+<REPO>/config.yml
+  2:1       error    syntax error: while parsing a node, did not find expected node content (syntax)
+
 
 flint: 1 check failed (ryl)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
 '''
 
-[fake_bins]
-ryl = '''
-#!/bin/sh
-printf '%s\n' 'config.yml:2: bad spacing'
-exit 1
-'''
+[env]
+FLINT_CONFIG_DIR = ".github/config"

@@ -914,6 +914,23 @@ fn print_linters(
     mise_tools: &HashMap<String, String>,
     cfg: &config::Config,
 ) {
+    print!(
+        "{}",
+        render_linters_table(registry, mise_tools, cfg, registry::binary_on_path)
+    );
+}
+
+fn render_linters_table<F>(
+    registry: &[registry::Check],
+    mise_tools: &HashMap<String, String>,
+    cfg: &config::Config,
+    binary_on_path: F,
+) -> String
+where
+    F: Fn(&str) -> bool,
+{
+    use std::fmt::Write;
+
     // Column widths.
     let name_w = registry
         .iter()
@@ -935,7 +952,9 @@ fn print_linters(
         .unwrap_or(11)
         .max(11);
 
-    println!(
+    let mut out = String::new();
+    writeln!(
+        out,
         "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {:<desc_w$}  PATTERNS",
         "NAME",
         "BINARY",
@@ -946,31 +965,19 @@ fn print_linters(
         name_w = name_w,
         bin_w = bin_w,
         desc_w = desc_w,
-    );
-    println!("{}", "-".repeat(name_w + bin_w + desc_w + 46));
+    )
+    .unwrap();
+    writeln!(out, "{}", "-".repeat(name_w + bin_w + desc_w + 46)).unwrap();
 
     for check in registry {
-        let status = if registry::check_active(check, mise_tools) {
-            if !check.uses_binary() || registry::binary_on_path(check.bin_name) {
-                if check.name == "license-header" && cfg.checks.license_header.text.is_empty() {
-                    "not configured"
-                } else {
-                    "active"
-                }
-            } else {
-                "no binary"
-            }
-        } else if mise_tools.contains_key(check.bin_name) {
-            "wrong version"
-        } else {
-            "missing"
-        };
+        let status = linter_status(check, mise_tools, cfg, &binary_on_path);
         let speed = run_policy_label(check.run_policy);
         let fix = if check.has_fix() { "yes" } else { "no" };
         let patterns_str = check.patterns.join(" ");
         let binary = display_binary(check);
         if patterns_str.is_empty() {
-            println!(
+            writeln!(
+                out,
                 "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {}",
                 check.name,
                 binary,
@@ -980,9 +987,11 @@ fn print_linters(
                 check.desc,
                 name_w = name_w,
                 bin_w = bin_w,
-            );
+            )
+            .unwrap();
         } else {
-            println!(
+            writeln!(
+                out,
                 "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {:<desc_w$}  {}",
                 check.name,
                 binary,
@@ -994,8 +1003,37 @@ fn print_linters(
                 name_w = name_w,
                 bin_w = bin_w,
                 desc_w = desc_w,
-            );
+            )
+            .unwrap();
         }
+    }
+
+    out
+}
+
+fn linter_status<F>(
+    check: &registry::Check,
+    mise_tools: &HashMap<String, String>,
+    cfg: &config::Config,
+    binary_on_path: F,
+) -> &'static str
+where
+    F: Fn(&str) -> bool,
+{
+    if registry::check_active(check, mise_tools) {
+        if !check.uses_binary() || binary_on_path(check.bin_name) {
+            if check.name == "license-header" && cfg.checks.license_header.text.is_empty() {
+                "not configured"
+            } else {
+                "active"
+            }
+        } else {
+            "no binary"
+        }
+    } else if mise_tools.contains_key(check.bin_name) {
+        "wrong version"
+    } else {
+        "missing"
     }
 }
 
@@ -1004,5 +1042,130 @@ fn display_binary(check: &registry::Check) -> &'static str {
         check.bin_name
     } else {
         "(built-in)"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{display_binary, linter_status, render_linters_table};
+    use crate::{config, registry};
+
+    fn mise_tools_from(content: &str) -> std::collections::HashMap<String, String> {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("mise.toml"), content).expect("write mise.toml");
+        registry::read_mise_tools(dir.path())
+    }
+
+    #[test]
+    fn linters_table_matches_fixture_without_fake_bins() {
+        let mise_tools = mise_tools_from(
+            r#"[tools]
+biome = "2.3.14"
+"aqua:owenlamont/ryl" = "0.6.0"
+taplo = "0.10.0"
+lychee = "0.22.0"
+"npm:renovate" = "43.92.1"
+"github:koalaman/shellcheck" = "v0.11.0"
+shfmt = "v3.13.1"
+actionlint = "1.7.10"
+editorconfig-checker = "v3.6.1"
+ruff = "0.15.0"
+"pipx:codespell" = "2.4.1"
+rumdl = "0.1.78"
+rust = { version = "1.94.1", components = "clippy,rustfmt" }
+"#,
+        );
+        let cfg = config::Config::default();
+        let installed = [
+            "actionlint",
+            "biome",
+            "cargo-clippy",
+            "codespell",
+            "ec",
+            "lychee",
+            "renovate",
+            "ruff",
+            "rumdl",
+            "rustfmt",
+            "ryl",
+            "shellcheck",
+            "shfmt",
+            "taplo",
+        ];
+
+        let table = render_linters_table(&registry::builtin(), &mise_tools, &cfg, |bin| {
+            installed.contains(&bin)
+        });
+
+        assert_eq!(
+            table,
+            r#"NAME                  BINARY              STATUS         SPEED     FIX  DESCRIPTION                                                          PATTERNS
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+flint-setup           (built-in)          active         fast      yes  Keep Flint setup current and mise.toml lint tooling canonical        mise.toml
+shellcheck            shellcheck          active         fast      no   Lint shell scripts for common mistakes                               *.sh *.bash *.bats
+shfmt                 shfmt               active         fast      yes  Format shell scripts                                                 *.sh *.bash
+rumdl                 rumdl               active         fast      yes  Lint Markdown files for style and consistency                        *.md
+ryl                   ryl                 active         fast      yes  Lint YAML files for style and consistency                            *.yml *.yaml
+taplo                 taplo               active         fast      yes  Format TOML files                                                    *.toml
+actionlint            actionlint          active         fast      no   Lint GitHub Actions workflow files                                   .github/workflows/*.yml .github/workflows/*.yaml
+hadolint              hadolint            missing        fast      no   Lint Dockerfiles                                                     Dockerfile Dockerfile.* *.dockerfile
+xmllint               xmllint             missing        fast      no   Validate XML files are well-formed                                   *.xml
+codespell             codespell           active         fast      yes  Check for common spelling mistakes                                   *
+editorconfig-checker  ec                  active         fast      no   Check files comply with EditorConfig settings                        *
+golangci-lint         golangci-lint       missing        fast      no   Lint Go code; uses --new-from-rev to scope analysis to changed code  *.go
+ruff                  ruff                active         fast      yes  Lint Python code                                                     *.py
+ruff-format           ruff                active         fast      yes  Format Python code                                                   *.py
+biome                 biome               active         fast      yes  Lint JS/TS/JSON files                                                *.json *.jsonc *.js *.ts *.jsx *.tsx
+biome-format          biome               active         fast      yes  Format JS/TS/JSON files                                              *.json *.jsonc *.js *.ts *.jsx *.tsx
+cargo-clippy          cargo-clippy        active         fast      yes  Lint Rust code; runs on all .rs files, not just changed              *.rs
+cargo-fmt             rustfmt             active         fast      yes  Format Rust code; runs on all .rs files, not just changed            *.rs
+gofmt                 gofmt               missing        fast      yes  Format Go code                                                       *.go
+google-java-format    google-java-format  missing        fast      yes  Format Java code                                                     *.java
+ktlint                ktlint              missing        fast      yes  Lint and format Kotlin code                                          *.kt *.kts
+dotnet-format         dotnet              missing        fast      yes  Format C# code                                                       *.cs
+lychee                lychee              active         fast      no   Check for broken links
+renovate-deps         renovate            active         adaptive  yes  Verify Renovate dependency snapshot is up to date                    renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5
+license-header        (built-in)          not configured  fast      no   Check source files have the required license header
+"#
+        );
+    }
+
+    #[test]
+    fn linter_status_reports_no_binary_and_not_configured() {
+        let cfg = config::Config::default();
+        let shellcheck = registry::builtin()
+            .into_iter()
+            .find(|check| check.name == "shellcheck")
+            .expect("shellcheck check");
+
+        let active_without_binary =
+            mise_tools_from("[tools]\n\"github:koalaman/shellcheck\" = \"v0.11.0\"\n");
+        assert_eq!(
+            linter_status(&shellcheck, &active_without_binary, &cfg, |_| false),
+            "no binary"
+        );
+
+        let license_header = registry::builtin()
+            .into_iter()
+            .find(|check| check.name == "license-header")
+            .expect("license-header check");
+        assert_eq!(
+            linter_status(
+                &license_header,
+                &std::collections::HashMap::new(),
+                &cfg,
+                |_| true
+            ),
+            "not configured"
+        );
+    }
+
+    #[test]
+    fn display_binary_marks_builtins() {
+        let license_header = registry::builtin()
+            .into_iter()
+            .find(|check| check.name == "license-header")
+            .expect("license-header check");
+        assert_eq!(display_binary(&license_header), "(built-in)");
     }
 }

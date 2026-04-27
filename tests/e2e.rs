@@ -10,6 +10,11 @@ fn flint_with_env(args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Output {
     cmd.args(args)
         .env("MISE_PROJECT_ROOT", cwd)
         .env_remove("FLINT_CONFIG_DIR")
+        // Keep test output stable regardless of whether the outer runner is CI.
+        .env_remove("CI")
+        .env_remove("GITHUB_ACTIONS")
+        .env_remove("GITHUB_ACTION")
+        .env_remove("GITHUB_WORKFLOW")
         .current_dir(cwd);
     for (k, v) in env {
         cmd.env(k, v);
@@ -258,6 +263,10 @@ fi
 
 if [ "$cmd" = "format" ] && [ "${1:-}" = "--write" ]; then
   file="$2"
+  if [ "$(basename "$file")" != "biome.jsonc" ]; then
+    echo "unexpected biome target: $file" >&2
+    exit 1
+  fi
   cat >"$file" <<'EOF'
 {
   // Keep JSON formatting aligned with the repo's two-space style.
@@ -268,15 +277,6 @@ if [ "$cmd" = "format" ] && [ "${1:-}" = "--write" ]; then
 }
 EOF
   exit 0
-fi
-
-if [ "$cmd" = "format" ]; then
-  file="$1"
-  if grep -q '"indentWidth": 2$' "$file" && grep -q '^  }$' "$file"; then
-    exit 0
-  fi
-  echo "formatting differs" >&2
-  exit 1
 fi
 
 echo "unsupported biome invocation: $cmd $*" >&2
@@ -585,14 +585,16 @@ fn run_case(case: &Path, name: &str, update: bool) {
     let repo_canonical_str = canonical_repo_path(repo.path());
     let normalize =
         |s: String| -> String { normalize_output(s, repo_str.as_ref(), &repo_canonical_str) };
-    let stderr =
-        normalize_rust_compile_summaries(&normalize_tool_versions(&normalize_timing(&strip_ansi(
-            &normalize(String::from_utf8_lossy(&out.stderr).into_owned()),
-        ))));
-    let stdout =
-        normalize_rust_compile_summaries(&normalize_tool_versions(&normalize_timing(&strip_ansi(
-            &normalize(String::from_utf8_lossy(&out.stdout).into_owned()),
-        ))));
+    let stderr = normalize_rust_compile_summaries(&normalize_tool_versions(
+        &normalize_mise_warnings(&normalize_timing(&strip_ansi(&normalize(
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+        )))),
+    ));
+    let stdout = normalize_rust_compile_summaries(&normalize_tool_versions(
+        &normalize_mise_warnings(&normalize_timing(&strip_ansi(&normalize(
+            String::from_utf8_lossy(&out.stdout).into_owned(),
+        )))),
+    ));
 
     if update {
         write_test_toml(
@@ -774,6 +776,16 @@ fn normalize_timing(s: &str) -> String {
     let re2 = Regex::new(r"Checked \d+ files? in \d+(?:\.\d+)?(?:µs|ms|s)\.").unwrap();
     re2.replace_all(&s, "Checked N file(s) in Xµs.")
         .into_owned()
+}
+
+/// Removes environment-dependent `mise use --pin` fallback warnings from test output.
+/// Some platforms/environments cannot resolve every tool pin, and these warnings are
+/// not relevant to the fixture assertions that exercise Flint's file-generation logic.
+fn normalize_mise_warnings(s: &str) -> String {
+    use regex::Regex;
+    let re =
+        Regex::new(r#"(?m)^  warning: could not pin .+ via mise — writing "latest"\n?"#).unwrap();
+    re.replace_all(s, "").into_owned()
 }
 
 #[test]

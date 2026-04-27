@@ -1091,6 +1091,36 @@ mod tests {
     }
 
     #[test]
+    fn build_invocations_injects_ryl_config_after_binary() {
+        let check = Check::files("ryl", "ryl {FILES}", &["*.yml", "*.yaml"])
+            .fix("ryl --fix {FILES}")
+            .linter_config(".yamllint.yml", "-c");
+        let fl = file_list(&["config.yml"]);
+        let config_dir = tempfile::tempdir().unwrap();
+        let cfg_path = config_dir.path().join(".yamllint.yml");
+        std::fs::write(&cfg_path, "extends: relaxed\n").unwrap();
+
+        let inv = build_invocations(
+            &check,
+            &fl,
+            false,
+            Path::new("/repo"),
+            &[],
+            config_dir.path(),
+        );
+
+        assert_eq!(
+            inv,
+            vec![vec![
+                "ryl".to_string(),
+                "-c".to_string(),
+                cfg_path.to_string_lossy().into_owned(),
+                "/repo/config.yml".to_string(),
+            ]]
+        );
+    }
+
+    #[test]
     fn appends_rust_component_note_for_missing_clippy() {
         let mut stderr = b"error: 'cargo-clippy' is not installed for the toolchain '1.94.1-x86_64-unknown-linux-gnu'.\n".to_vec();
 

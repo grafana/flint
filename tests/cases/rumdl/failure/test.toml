@@ -1,17 +1,11 @@
 [expected]
 args = "run --full rumdl"
 exit = 1
-stderr = '''
-[rumdl]
-README.md:3:26: trailing spaces
-
-flint: 1 check failed (rumdl)
-💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
-'''
-
-[fake_bins]
-rumdl = '''
-#!/bin/sh
-printf '%s\n' 'README.md:3:26: trailing spaces'
-exit 1
-'''
+stderr_contains = [
+  "[rumdl]",
+  "README.md:3:26: [MD009] 3 trailing spaces found [*]",
+  "Issues: Found 1 issues in 1 file",
+  "Run `rumdl fmt` to automatically fix 1 of the 1 issues",
+  "flint: 1 check failed (rumdl)",
+  "💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.",
+]

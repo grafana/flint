@@ -1,0 +1,6 @@
+extends: relaxed
+
+rules:
+  document-start: disable
+  commas:
+    level: error

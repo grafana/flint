@@ -1,0 +1,21 @@
+[expected]
+args = "run --full --fix ryl"
+exit = 1
+stderr = '''
+[ryl]
+<REPO>/config.yml
+  2:11      error    too many spaces after colon  (colons)
+
+Found 2 problems (1 fixed, 1 remaining).
+flint: partial: ryl
+'''
+
+[env]
+FLINT_CONFIG_DIR = ".github/config"
+
+[expected.files]
+"config.yml" = """
+name: "test"
+value:     42
+items: ["a", "b"]
+"""

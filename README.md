@@ -11,17 +11,27 @@
 </p>
 <!-- markdownlint-enable MD033 MD041 -->
 
-Linter runner built for speed and consistency:
+Linter runner built for speed, consistency, and low setup friction:
 
 - **Fast** — native execution (no Docker), parallel, diff-aware
   (changed files only), opt-in (undeclared tools don't run), small binary
   cached by mise
 - **Local == CI** — one binary, one config, identical behavior
+- **Sensible defaults** — `flint init` scaffolds a working setup quickly, and most
+  repos can stick with the generated defaults
+- **Opinionated config** — Flint chooses canonical config filenames per linter,
+  while still letting you keep them in a directory such as `.github/config`
 - **AI-friendly** — fix silently, surface only what needs review
+- **Separated ownership** — dedicated linters and formatters own their file
+  types to avoid overlapping rules and editor-config conflicts
+- **Predictable and updatable linter versions** — lint behavior stays stable
+  until the repo intentionally updates pinned linter versions, for example via
+  Renovate updates to `mise.toml`
 - **Cross-platform** — Linux, macOS, Windows
 - **Autofix** — `--fix` fixes what's fixable; reports what still needs review
 
-Read the [background and principles](docs/why.md).
+Read the [background and principles](docs/why.md) and
+[alternatives/comparisons](docs/alternatives.md).
 
 > [!TIP]
 > **Legacy v1** (bash task scripts): see [README-V1.md](README-V1.md).
@@ -146,11 +156,12 @@ FLINT_CONFIG_DIR = ".github/config"
 
 When set, `flint.toml` is loaded from that directory, and each linter that
 supports an explicit config path via a CLI flag will have it injected
-automatically when the corresponding file exists there (see the "Config file"
-column in the table below).
+automatically when the corresponding canonical Flint-managed file exists there
+(see the "Config file" column in the table below).
 Files that are absent are silently skipped. Some tools still rely on project-root
 discovery semantics, and some alternate upstream config locations are rejected to
-avoid config drift.
+avoid config drift. In practice, Flint is opinionated about which config filename
+each linter should use, but flexible about the directory those files live in.
 
 > [!NOTE]
 > `editorconfig-checker`'s config file (`.editorconfig-checker.json`) controls

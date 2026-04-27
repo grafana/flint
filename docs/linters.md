@@ -3,9 +3,13 @@
 Every supported check, its config file (when applicable), and its scope. The
 [summary table lives in the README](../README.md#built-in-linter-registry).
 
+Flint is intentionally opinionated about config shape: when a linter supports an
+explicit config flag, Flint manages one canonical filename for it. Repos can
+still choose the config directory via `FLINT_CONFIG_DIR` where supported.
+
 > [!NOTE]
 > Biome is the exception to `FLINT_CONFIG_DIR`: its real CLI does not work
-> reliably with a nested managed config, so flint treats root `biome.jsonc` as
+> reliably with a nested managed config, so Flint treats root `biome.jsonc` as
 > the canonical Biome config. Flint is opinionated here: use JSONC, not
 > `biome.json`.
 
@@ -334,15 +338,14 @@ Invoked once per matched file.
 
 ### Scope: `files`
 
-Invoked once with all matched files as args; only changed files are
-  passed
+Invoked once with all matched files as args; only changed files are passed.
 
 ### Scope: `project`
 
 Invoked once with no file args; for checks with patterns set (e.g.
 `cargo-clippy`), skipped entirely if no matching files changed, but runs on the
 whole project when it does run. `golangci-lint` is the exception — it uses
-  `--new-from-rev` to scope analysis to changed code even within the project run.
+`--new-from-rev` to scope analysis to changed code even within the project run.
 
 ### Scope: `special`
 
@@ -364,6 +367,6 @@ files itself.
 
 **Flint writes shared `.editorconfig` carve-outs for known formatter-owned line
 length**: today that means `rumdl` for `*.md`, `rustfmt` for `*.rs`, and
-`google-java-format` for `*.java`. Those sections use `max_line_length = off` so editors and
-`editorconfig-checker` share the same intent instead of relying on
-checker-specific JSON excludes.
+`google-java-format` for `*.java`. Those sections use
+`max_line_length = off` so editors and `editorconfig-checker` share the same
+intent instead of relying on checker-specific JSON excludes.

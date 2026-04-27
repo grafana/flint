@@ -585,14 +585,16 @@ fn run_case(case: &Path, name: &str, update: bool) {
     let repo_canonical_str = canonical_repo_path(repo.path());
     let normalize =
         |s: String| -> String { normalize_output(s, repo_str.as_ref(), &repo_canonical_str) };
-    let stderr =
-        normalize_rust_compile_summaries(&normalize_tool_versions(&normalize_timing(&strip_ansi(
-            &normalize(String::from_utf8_lossy(&out.stderr).into_owned()),
-        ))));
-    let stdout =
-        normalize_rust_compile_summaries(&normalize_tool_versions(&normalize_timing(&strip_ansi(
-            &normalize(String::from_utf8_lossy(&out.stdout).into_owned()),
-        ))));
+    let stderr = normalize_rust_compile_summaries(&normalize_tool_versions(
+        &normalize_mise_warnings(&normalize_timing(&strip_ansi(&normalize(
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+        )))),
+    ));
+    let stdout = normalize_rust_compile_summaries(&normalize_tool_versions(
+        &normalize_mise_warnings(&normalize_timing(&strip_ansi(&normalize(
+            String::from_utf8_lossy(&out.stdout).into_owned(),
+        )))),
+    ));
 
     if update {
         write_test_toml(
@@ -774,6 +776,16 @@ fn normalize_timing(s: &str) -> String {
     let re2 = Regex::new(r"Checked \d+ files? in \d+(?:\.\d+)?(?:µs|ms|s)\.").unwrap();
     re2.replace_all(&s, "Checked N file(s) in Xµs.")
         .into_owned()
+}
+
+/// Removes environment-dependent `mise use --pin` fallback warnings from test output.
+/// Some platforms/environments cannot resolve every tool pin, and these warnings are
+/// not relevant to the fixture assertions that exercise Flint's file-generation logic.
+fn normalize_mise_warnings(s: &str) -> String {
+    use regex::Regex;
+    let re =
+        Regex::new(r#"(?m)^  warning: could not pin .+ via mise — writing "latest"\n?"#).unwrap();
+    re.replace_all(s, "").into_owned()
 }
 
 #[test]

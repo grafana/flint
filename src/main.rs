@@ -254,6 +254,7 @@ async fn run(
         out
     };
 
+    let mut setup_fix_outcome = None;
     let setup_check = active.iter().copied().find(|check| is_flint_setup(check));
     if let Some(check) = setup_check {
         let setup_results = run_checks(
@@ -280,10 +281,15 @@ async fn run(
             .next()
             .expect("flint-setup preflight produced a result");
         if args.fix {
-            finish_fix_outcomes(
-                vec![classify_single_pass_fix(setup_result)],
-                args.allow_fixed,
-            );
+            let setup_outcome = classify_single_pass_fix(setup_result);
+            if matches!(
+                setup_outcome,
+                FixOutcome::Partial(_) | FixOutcome::Review(_)
+            ) {
+                finish_fix_outcomes(vec![setup_outcome], args.allow_fixed);
+            } else {
+                setup_fix_outcome = Some(setup_outcome);
+            }
         } else if !setup_result.ok {
             let failed = [setup_result.name.as_str()];
             if args.short {
@@ -303,6 +309,9 @@ async fn run(
         .collect();
 
     if active.is_empty() {
+        if let Some(outcome) = setup_fix_outcome {
+            finish_fix_outcomes(vec![outcome], args.allow_fixed);
+        }
         return Ok(());
     }
 
@@ -359,7 +368,7 @@ async fn run(
                 .copied()
                 .partition(|c| supports_single_pass_fix(c));
 
-        let mut outcomes = vec![];
+        let mut outcomes = setup_fix_outcome.into_iter().collect::<Vec<_>>();
 
         if !legacy_checks.is_empty() {
             let check_results = run_checks(

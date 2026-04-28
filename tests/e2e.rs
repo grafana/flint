@@ -164,6 +164,8 @@ fn cases() {
     }
 }
 
+// Unix-only: this e2e test creates a fake linter as a POSIX shell script and
+// marks it executable with Unix permissions.
 #[cfg(unix)]
 #[test]
 fn renovate_deps_fast_only_runs_for_deleted_tracked_file() {
@@ -269,6 +271,8 @@ printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"mise":[{"package
     );
 }
 
+// Unix-only: this e2e test creates fake linters as POSIX shell scripts and
+// marks them executable with Unix permissions.
 #[cfg(unix)]
 #[test]
 fn markdown_tool_ignores_biome_owned_jsonc() {
@@ -441,6 +445,8 @@ exit 1
     );
 }
 
+// Unix-only: this e2e test creates a fake linter as a POSIX shell script and
+// marks it executable with Unix permissions.
 #[cfg(unix)]
 #[test]
 fn rumdl_fix_hides_success_noise_when_another_file_fails() {

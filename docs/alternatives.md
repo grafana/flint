@@ -27,10 +27,15 @@ flint is the reference point for the comparisons on this page: a native lint
 runner that discovers active tools from the repo, scopes most checks to changed
 files, and keeps the local and CI path aligned.
 
+It is also intentionally opinionated about ownership boundaries. Checks stay
+separate instead of being fused into one meta-tool, and overlapping file types
+have a clear default owner so repos are not forced to keep deciding which
+linter or formatter should govern each domain.
+
 | Dimension                                 | Rating               | Why                                                                                                                                                                            |
 | ----------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Speed                                     | high                 | flint runs native tools directly, avoids container startup, and scopes most checks to changed files by default.                                                                |
-| Setup effort                              | low                  | `flint init` scaffolds the baseline setup, and most repos only need to choose which tools to enable.                                                                           |
+| Setup effort                              | low                  | `flint init` scaffolds the baseline setup, and most repos only need to choose which tools to enable rather than repeatedly deciding how to compose overlapping tools.          |
 | Cross-platform                            | yes                  | flint supports Linux, macOS, and Windows.                                                                                                                                      |
 | Cross-language                            | yes                  | It orchestrates multiple language-specific tools behind one runner.                                                                                                            |
 | Autofix support                           | yes, where supported | `flint run --fix` uses each tool's fixer when one exists and reports what still needs review.                                                                                  |
@@ -48,16 +53,20 @@ versioning and install lifecycle.
 For repos that are already mise-first, that is extra setup and drift surface
 without much benefit.
 
-| Dimension                                 | Rating | Why                                                                                                                                                   |
-| ----------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Speed                                     | medium | Hook startup is usually acceptable, but the extra hook layer and environment management add overhead compared with running native tools directly.     |
-| Setup effort                              | medium | You need to add and maintain `.pre-commit-config.yaml` and its hook definitions in addition to the repo's normal tool setup.                          |
-| Cross-platform                            | yes    | pre-commit itself is cross-platform.                                                                                                                  |
-| Cross-language                            | yes    | It supports many languages through its hook ecosystem.                                                                                                |
-| Autofix support                           | mixed  | Some hooks fix in place, some only report, and behavior depends on the chosen hooks.                                                                  |
-| Delta / diff-aware                        | mixed  | Hook-based runs are often scoped to staged files, but broader CI parity and baseline behavior depend on how each hook is configured.                  |
-| Predictable and updatable linter versions | mixed  | Hook revisions can be pinned, but version management lives in separate hook configuration instead of flowing through Renovate updates to `mise.toml`. |
-| Local == CI                               | mixed  | Teams often use pre-commit locally but a different command or environment in CI.                                                                      |
+It can also push ownership decisions back onto each repo. Teams still need to
+decide which hooks to compose for overlapping domains, and that composition
+lives in hook wiring rather than in a single built-in policy.
+
+| Dimension                                 | Rating | Why                                                                                                                                                                                                     |
+| ----------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Speed                                     | medium | Hook startup is usually acceptable, but the extra hook layer and environment management add overhead compared with running native tools directly.                                                       |
+| Setup effort                              | medium | You need to add and maintain `.pre-commit-config.yaml` and its hook definitions in addition to the repo's normal tool setup, including repo-level decisions about how overlapping hooks should compose. |
+| Cross-platform                            | yes    | pre-commit itself is cross-platform.                                                                                                                                                                    |
+| Cross-language                            | yes    | It supports many languages through its hook ecosystem.                                                                                                                                                  |
+| Autofix support                           | mixed  | Some hooks fix in place, some only report, and behavior depends on the chosen hooks.                                                                                                                    |
+| Delta / diff-aware                        | mixed  | Hook-based runs are often scoped to staged files, but broader CI parity and baseline behavior depend on how each hook is configured.                                                                    |
+| Predictable and updatable linter versions | mixed  | Hook revisions can be pinned, but version management lives in separate hook configuration instead of flowing through Renovate updates to `mise.toml`.                                                   |
+| Local == CI                               | mixed  | Teams often use pre-commit locally but a different command or environment in CI.                                                                                                                        |
 
 ## Husky
 
@@ -85,6 +94,10 @@ Spotless runs `google-java-format` as a Maven build phase, which means format
 failures block compilation and test runs. flint keeps formatting as a separate
 lint step, scoped to changed files, which is a better fit for fast feedback.
 
+That separation matters beyond speed: formatting remains one explicit check
+instead of being entangled with compile or test phases, so repos can reason
+about ownership and failures more cleanly.
+
 To migrate: remove `spotless-maven-plugin` from `pom.xml` (and any
 `spotless.skip` properties), add `"github:google/google-java-format"` to
 `[tools]` in `mise.toml`, and run `flint run --fix` once to confirm the repo is
@@ -107,6 +120,10 @@ Container-based linters such as super-linter and MegaLinter ship their own tool
 versions, independent of what the repo pins in `mise.toml`. That breaks the
 "declare once, use everywhere" model. Container startup also adds latency to
 every run.
+
+They also tend to bundle many checks behind one larger wrapper. That can be
+convenient, but it is a worse fit when repos want cleanly separated checks and
+explicit style ownership instead of a broad kitchen-sink layer.
 
 | Dimension                                 | Rating          | Why                                                                                                                                                   |
 | ----------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -36,7 +36,7 @@ Add `flint` to your repo's `mise.toml`:
 
 ```toml
 [tools]
-"github:grafana/flint" = "0.20.4"
+"github:grafana/flint" = "0.21.0"
 ```
 
 Bootstrap a repo with `flint init` (scaffolds config). Install a
@@ -58,21 +58,21 @@ Add the linting tools your project needs alongside the `flint` binary itself:
 
 ```toml
 [tools]
-"github:grafana/flint" = "0.20.4"
+"github:grafana/flint" = "0.21.0"
 
 # Add whichever linters apply to your repo:
 "github:koalaman/shellcheck" = "0.11.0"
 shfmt                   = "v3.13.1"
 actionlint              = "1.7.10"
 rumdl                   = "0.1.78"
-ruff                    = "0.15.11"
+ruff                    = "0.15.12"
 "aqua:owenlamont/ryl"   = "0.6.0"
 taplo                   = "0.10.0"
 biome                   = "2.4.12"
 rust                    = "1.95.0"    # activates cargo-fmt + cargo-clippy
 go                      = "1.26.2"    # activates gofmt
 lychee                  = "0.22.0"    # activates links check
-"npm:renovate"          = "43.136.3"  # activates renovate-deps check
+"npm:renovate"          = "43.141.5"  # activates renovate-deps check
 ```
 
 Then wire up lint tasks:

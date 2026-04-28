@@ -588,12 +588,10 @@ fn generate_yamllint_config_writes_file() {
     let written = generate_yamllint_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
     assert!(written);
     let content = std::fs::read_to_string(config_dir.join(".yamllint.yml")).unwrap();
-    assert!(content.contains("extends: relaxed"));
-    assert!(content.contains("document-start: disable"));
-    assert!(content.contains("line-length:"));
-    assert!(content.contains("max: 120"));
-    assert!(content.contains("indentation:"));
-    assert!(content.contains("spaces: 2"));
+    assert_eq!(
+        content,
+        "extends: relaxed\n\nrules:\n  document-start: disable\n  line-length:\n    max: 120\n  indentation: enable\n"
+    );
 }
 
 #[test]

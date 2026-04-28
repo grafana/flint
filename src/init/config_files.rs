@@ -779,8 +779,7 @@ pub(super) fn generate_yamllint_config(config_dir: &Path, line_length: u16) -> R
         "  document-start: disable",
         "  line-length:",
         &format!("    max: {line_length}"),
-        "  indentation:",
-        "    spaces: 2",
+        "  indentation: enable",
         "",
     ]
     .join("\n");

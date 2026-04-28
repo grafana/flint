@@ -4,5 +4,4 @@ rules:
   document-start: disable
   line-length:
     max: 100
-  indentation:
-    spaces: 2
+  indentation: enable

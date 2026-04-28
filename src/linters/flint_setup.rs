@@ -66,7 +66,6 @@ pub async fn run(
     let flint_toml = config_dir.join("flint.toml");
     let mut errors = vec![];
     let mut versioned_migrations_pending = false;
-    let mut setup_drift_reported = false;
 
     if flint_toml.exists() && setup_migration_version > crate::setup::LATEST_SUPPORTED_SETUP_VERSION
     {
@@ -82,19 +81,10 @@ pub async fn run(
         ) {
             Ok(true) => {
                 versioned_migrations_pending = true;
-                setup_drift_reported = true;
                 errors.push(format!(
                     "Flint setup migrations after version {setup_migration_version} apply to this repo."
                 ));
             }
-            Ok(false) => {}
-            Err(e) => return LinterOutput::err(format!("flint: flint-setup: {e}\n")),
-        }
-    }
-
-    if !setup_drift_reported {
-        match crate::init::detect_setup_drift(project_root, config_dir) {
-            Ok(true) => errors.push("Flint setup drift applies to this repo.".to_string()),
             Ok(false) => {}
             Err(e) => return LinterOutput::err(format!("flint: flint-setup: {e}\n")),
         }
@@ -242,16 +232,21 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn current_setup_migration_version_still_reports_actionable_drift() {
+    async fn current_setup_migration_version_ignores_broad_cleanup_drift() {
         let tmp = tempfile::TempDir::new().unwrap();
         std::fs::write(
             tmp.path().join("mise.toml"),
-            "[tools]\n\"npm:renovate\" = \"latest\"\n",
+            "[tools]\n\n# Linters\nrumdl = \"0.1.78\"\n",
         )
         .unwrap();
         std::fs::write(
             tmp.path().join("flint.toml"),
             "[settings]\nsetup_migration_version = 2\n",
+        )
+        .unwrap();
+        std::fs::write(
+            tmp.path().join("README.md"),
+            "<!-- markdownlint-disable MD013 -->\n# Title\n",
         )
         .unwrap();
 
@@ -263,12 +258,33 @@ mod tests {
         )
         .await;
 
-        assert!(!out.ok);
-        assert!(
-            String::from_utf8(out.stderr)
-                .unwrap()
-                .contains("Flint setup drift applies to this repo")
-        );
+        assert!(out.ok, "{}", String::from_utf8_lossy(&out.stderr));
+    }
+
+    #[tokio::test]
+    async fn fix_mode_does_not_apply_broad_repo_cleanup() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let readme = "<!-- markdownlint-disable MD013 -->\n# Title\n";
+        std::fs::write(
+            tmp.path().join("mise.toml"),
+            "[tools]\nrumdl = \"0.1.78\"\nnode = \"24.0.0\"\n",
+        )
+        .unwrap();
+        std::fs::write(tmp.path().join("README.md"), readme).unwrap();
+
+        let out = run(
+            true,
+            tmp.path(),
+            tmp.path(),
+            crate::setup::LATEST_SUPPORTED_SETUP_VERSION,
+        )
+        .await;
+        let content = std::fs::read_to_string(tmp.path().join("mise.toml")).unwrap();
+        let readme_after = std::fs::read_to_string(tmp.path().join("README.md")).unwrap();
+
+        assert!(out.ok, "{}", String::from_utf8_lossy(&out.stderr));
+        assert!(content.contains("# Linters"));
+        assert_eq!(readme_after, readme);
     }
 
     #[tokio::test]

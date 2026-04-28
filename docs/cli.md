@@ -137,7 +137,7 @@ after the release is cut, run `flint init` again without `--flint-rev`.
 setup defaults. Routine lint runs use `flint-setup` and only fail when an
 actionable setup migration applies to the repo.
 
-To check setup drift without applying changes, run:
+To check setup migrations and `mise.toml` layout without applying changes, run:
 
 ```bash
 flint run flint-setup

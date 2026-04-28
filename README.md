@@ -110,13 +110,17 @@ run = "flint run --fix"
 
 - name: Lint
   env:
+    GITHUB_REPOSITORY: ${{ github.repository }}
+    GITHUB_BASE_REF: ${{ github.base_ref }}
+    GITHUB_HEAD_REF: ${{ github.head_ref }}
+    PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
     GITHUB_TOKEN: ${{ github.token }}
-    GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
   run: mise run lint
 ```
 
-`GITHUB_HEAD_SHA` tells flint which commit is the PR head when running in CI.
-`fetch-depth: 0` is required for merge-base detection.
+The GitHub environment variables let flint remap base-branch links to the PR
+branch when link checking. `fetch-depth: 0` is required for merge-base
+detection.
 
 ---
 

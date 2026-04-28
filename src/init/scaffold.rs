@@ -55,8 +55,11 @@ jobs:
 {rust_steps}
       - name: Lint
         env:
+          GITHUB_REPOSITORY: ${{{{ github.repository }}}}
+          GITHUB_BASE_REF: ${{{{ github.base_ref }}}}
+          GITHUB_HEAD_REF: ${{{{ github.head_ref }}}}
+          PR_HEAD_REPO: ${{{{ github.event.pull_request.head.repo.full_name || github.repository }}}}
           GITHUB_TOKEN: ${{{{ github.token }}}}
-          GITHUB_HEAD_SHA: ${{{{ github.event.pull_request.head.sha }}}}
         run: mise run lint
 "#
     );

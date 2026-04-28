@@ -792,6 +792,13 @@ fn generate_lint_workflow_writes_file() {
     assert!(content.contains("fetch-depth: 0"));
     assert!(content.contains("persist-credentials: false"));
     assert!(content.contains("mise-action"));
+    assert!(content.contains("GITHUB_REPOSITORY: ${{ github.repository }}"));
+    assert!(content.contains("GITHUB_BASE_REF: ${{ github.base_ref }}"));
+    assert!(content.contains("GITHUB_HEAD_REF: ${{ github.head_ref }}"));
+    assert!(content.contains(
+        "PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}"
+    ));
+    assert!(!content.contains("GITHUB_HEAD_SHA"));
     assert!(content.contains("github.token"));
     assert!(!content.contains("rust-cache"));
     assert!(!content.contains("rustup component"));

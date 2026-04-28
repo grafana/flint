@@ -6,6 +6,14 @@ use crate::config::{Config, LycheeConfig, Settings};
 use crate::files::FileList;
 use crate::linters::LinterOutput;
 
+const GITHUB_TOKEN_ENV: &str = "GITHUB_TOKEN";
+const PR_LINK_REMAP_ENV_VARS: &[&str] = &[
+    "GITHUB_REPOSITORY",
+    "GITHUB_BASE_REF",
+    "GITHUB_HEAD_REF",
+    "PR_HEAD_REPO",
+];
+
 pub async fn run(
     cfg: &LycheeConfig,
     settings: &Settings,
@@ -13,6 +21,18 @@ pub async fn run(
     project_root: &Path,
     config_dir: &Path,
 ) -> LinterOutput {
+    match validate_runtime_env(file_list) {
+        Ok(Some(warning)) => eprintln!("{warning}"),
+        Ok(None) => {}
+        Err(stderr) => {
+            return LinterOutput {
+                ok: false,
+                stdout: Vec::new(),
+                stderr: stderr.into_bytes(),
+            };
+        }
+    }
+
     let lychee_cfg_raw = cfg.config.as_deref().unwrap_or("lychee.toml");
     let lychee_cfg = if Path::new(lychee_cfg_raw).is_relative() {
         config_dir
@@ -127,6 +147,122 @@ pub async fn run(
         stdout: combined_stdout,
         stderr: combined_stderr,
     }
+}
+
+fn validate_runtime_env(file_list: &FileList) -> Result<Option<String>, String> {
+    validate_runtime_env_from(file_list.full, github_remaps_enabled(), |name| {
+        std::env::var(name).ok()
+    })
+}
+
+fn validate_runtime_env_from<F>(
+    full: bool,
+    github_remaps_enabled: bool,
+    env: F,
+) -> Result<Option<String>, String>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let is_ci = is_ci_env(&env);
+    let has_github_token = env_non_empty(&env, GITHUB_TOKEN_ENV);
+
+    let mut missing = Vec::new();
+    if is_ci && !has_github_token {
+        missing.push(GITHUB_TOKEN_ENV);
+    }
+
+    if is_ci && github_remaps_enabled && !full && is_github_pr_event(&env) {
+        missing.extend(
+            PR_LINK_REMAP_ENV_VARS
+                .iter()
+                .copied()
+                .filter(|name| !env_non_empty(&env, name)),
+        );
+    }
+
+    if !missing.is_empty() {
+        return Err(missing_ci_env_message(&missing));
+    }
+
+    if !is_ci && !has_github_token {
+        return Ok(Some(format!(
+            "flint: warning: {GITHUB_TOKEN_ENV} is not set; GitHub links may be rate limited"
+        )));
+    }
+
+    Ok(None)
+}
+
+fn github_remaps_enabled() -> bool {
+    std::env::var("LYCHEE_SKIP_GITHUB_REMAPS").as_deref() != Ok("true")
+}
+
+fn is_ci_env<F>(env: &F) -> bool
+where
+    F: Fn(&str) -> Option<String>,
+{
+    ["CI", "GITHUB_ACTIONS", "GITHUB_ACTION", "GITHUB_WORKFLOW"]
+        .iter()
+        .any(|name| env_truthy(env, name))
+}
+
+fn is_github_pr_event<F>(env: &F) -> bool
+where
+    F: Fn(&str) -> Option<String>,
+{
+    env("GITHUB_EVENT_NAME")
+        .map(|event| matches!(event.as_str(), "pull_request" | "pull_request_target"))
+        .unwrap_or_else(|| {
+            env_non_empty(env, "GITHUB_BASE_REF")
+                || env_non_empty(env, "GITHUB_HEAD_REF")
+                || env_non_empty(env, "PR_HEAD_REPO")
+        })
+}
+
+fn env_truthy<F>(env: &F, name: &str) -> bool
+where
+    F: Fn(&str) -> Option<String>,
+{
+    env(name)
+        .map(|value| {
+            let value = value.trim();
+            !value.is_empty() && value != "0" && !value.eq_ignore_ascii_case("false")
+        })
+        .unwrap_or(false)
+}
+
+fn env_non_empty<F>(env: &F, name: &str) -> bool
+where
+    F: Fn(&str) -> Option<String>,
+{
+    env(name)
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+}
+
+fn missing_ci_env_message(missing: &[&str]) -> String {
+    let noun = if missing.len() == 1 {
+        "variable"
+    } else {
+        "variables"
+    };
+    let mut message = format!(
+        "flint: links: missing required CI environment {noun}: {}\n",
+        missing.join(", ")
+    );
+    if missing.contains(&GITHUB_TOKEN_ENV) {
+        message
+            .push_str("  Set GITHUB_TOKEN so lychee can authenticate GitHub link checks in CI.\n");
+    }
+    if missing
+        .iter()
+        .any(|name| PR_LINK_REMAP_ENV_VARS.contains(name))
+    {
+        message.push_str(
+            "  PR link remaps in CI require GitHub PR metadata; set PR_HEAD_REPO to github.event.pull_request.head.repo.full_name.\n",
+        );
+    }
+    message
 }
 
 fn lychee_checkable_files(project_root: &Path, settings: &Settings) -> anyhow::Result<Vec<String>> {
@@ -415,6 +551,86 @@ fn is_link_checkable(path: &Path) -> bool {
 mod tests {
     use super::*;
     use crate::config::Settings;
+    use std::collections::HashMap;
+
+    fn validate_env(
+        full: bool,
+        github_remaps_enabled: bool,
+        vars: &[(&str, &str)],
+    ) -> Result<Option<String>, String> {
+        let vars: HashMap<String, String> = vars
+            .iter()
+            .map(|(name, value)| (name.to_string(), value.to_string()))
+            .collect();
+        validate_runtime_env_from(full, github_remaps_enabled, |name| vars.get(name).cloned())
+    }
+
+    #[test]
+    fn ci_requires_github_token_even_in_full_mode() {
+        let err = validate_env(true, true, &[("CI", "true")]).unwrap_err();
+
+        assert!(err.contains("GITHUB_TOKEN"), "unexpected error:\n{err}");
+    }
+
+    #[test]
+    fn ci_pr_diff_requires_link_remap_env_vars() {
+        let err = validate_env(
+            false,
+            true,
+            &[
+                ("CI", "true"),
+                ("GITHUB_EVENT_NAME", "pull_request"),
+                ("GITHUB_TOKEN", "token"),
+            ],
+        )
+        .unwrap_err();
+
+        for name in [
+            "GITHUB_REPOSITORY",
+            "GITHUB_BASE_REF",
+            "GITHUB_HEAD_REF",
+            "PR_HEAD_REPO",
+        ] {
+            assert!(err.contains(name), "missing {name} in error:\n{err}");
+        }
+    }
+
+    #[test]
+    fn ci_full_mode_does_not_require_link_remap_env_vars() {
+        let result = validate_env(
+            true,
+            true,
+            &[
+                ("CI", "true"),
+                ("GITHUB_EVENT_NAME", "pull_request"),
+                ("GITHUB_TOKEN", "token"),
+            ],
+        );
+
+        assert!(result.is_ok(), "unexpected validation error: {result:?}");
+    }
+
+    #[test]
+    fn ci_pr_diff_allows_missing_link_remap_env_vars_when_remaps_are_disabled() {
+        let result = validate_env(
+            false,
+            false,
+            &[
+                ("CI", "true"),
+                ("GITHUB_EVENT_NAME", "pull_request"),
+                ("GITHUB_TOKEN", "token"),
+            ],
+        );
+
+        assert!(result.is_ok(), "unexpected validation error: {result:?}");
+    }
+
+    #[test]
+    fn non_ci_missing_github_token_warns_without_failing() {
+        let warning = validate_env(false, true, &[]).unwrap().unwrap();
+
+        assert!(warning.contains("GITHUB_TOKEN"));
+    }
 
     #[test]
     fn parse_github_repo_https() {

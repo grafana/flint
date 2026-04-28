@@ -394,6 +394,13 @@ fn check_lychee() -> Check {
             in all files — useful when broken internal links from unchanged files also\n\
             matter.\n\
             \n\
+            On CI, `GITHUB_TOKEN` is required for authenticated GitHub link checks.\n\
+            On GitHub Actions PR runs in changed-file mode, link remaps also require\n\
+            `GITHUB_REPOSITORY`, `GITHUB_BASE_REF`, `GITHUB_HEAD_REF`, and `PR_HEAD_REPO`.\n\
+            GitHub Actions provides the first three; set `PR_HEAD_REPO` from\n\
+            `github.event.pull_request.head.repo.full_name`. `--full` does not require\n\
+            the PR remap metadata.\n\
+            \n\
             Configure via `flint.toml`:\n\
             \n\
             ```toml\n\

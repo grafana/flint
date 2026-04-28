@@ -2,10 +2,10 @@
 args = "run --full lychee"
 exit = 0
 
-
 [env]
+CI = "true"
+GITHUB_EVENT_NAME = "pull_request"
 GITHUB_TOKEN = "token"
-LYCHEE_SKIP_GITHUB_REMAPS = "true"
 
 [fake_bins]
 lychee = '''

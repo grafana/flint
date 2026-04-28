@@ -16,4 +16,19 @@ flint: 1 check failed (lychee)
 '''
 
 [env]
+GITHUB_TOKEN = "token"
 LYCHEE_SKIP_GITHUB_REMAPS = "true"
+
+[fake_bins]
+lychee = '''
+#!/bin/sh
+cat >&2 <<'EOF'
+Issues found in 1 input. Find details below.
+
+[README.md]:
+[ERROR] file://<REPO>/nonexistent.md | Cannot find file: File not found. Check if file exists and path is correct
+
+🔍 1 Total (in Xs) ✅ 0 OK 🚫 1 Error
+EOF
+exit 1
+'''

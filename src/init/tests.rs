@@ -798,6 +798,7 @@ fn generate_lint_workflow_writes_file() {
     ));
     assert!(!content.contains("GITHUB_HEAD_SHA"));
     assert!(content.contains("github.token"));
+    assert!(content.contains("pull_request.head.repo.full_name"));
     assert!(!content.contains("rust-cache"));
     assert!(!content.contains("rustup component"));
 }

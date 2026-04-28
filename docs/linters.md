@@ -201,6 +201,13 @@ Default behavior: checks all links in changed files. When
 in all files — useful when broken internal links from unchanged files also
 matter.
 
+On CI, `GITHUB_TOKEN` is required for authenticated GitHub link checks.
+On GitHub Actions PR runs in changed-file mode, link remaps also require
+`GITHUB_REPOSITORY`, `GITHUB_BASE_REF`, `GITHUB_HEAD_REF`, and `PR_HEAD_REPO`.
+GitHub Actions provides the first three; set `PR_HEAD_REPO` from
+`github.event.pull_request.head.repo.full_name`. `--full` does not require
+the PR remap metadata.
+
 Configure via `flint.toml`:
 
 ```toml

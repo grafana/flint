@@ -118,8 +118,9 @@ run = "flint run --fix"
   run: mise run lint
 ```
 
-The GitHub environment variables let flint remap base-branch links to the PR
-branch when link checking. `fetch-depth: 0` is required for merge-base
+`GITHUB_TOKEN` is required in CI so link checks can authenticate GitHub
+requests. The GitHub environment variables let flint remap base-branch links to
+the PR branch when link checking. `fetch-depth: 0` is required for merge-base
 detection.
 
 ---

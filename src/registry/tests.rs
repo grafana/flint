@@ -3,6 +3,9 @@ use std::path::Path;
 
 use super::*;
 
+#[path = "../readme_snippets.rs"]
+mod readme_snippets;
+
 #[test]
 fn find_obsolete_key_returns_none_for_clean_tools() {
     let mut tools = HashMap::new();
@@ -585,7 +588,7 @@ fn readme_quickstart_tools_snippets_stay_current() {
     let mise = std::fs::read_to_string(&mise_path).expect("mise.toml must be readable");
 
     let install_block =
-        extract_fenced_block_after(&readme, "Add `flint` to your repo's `mise.toml`:", "toml");
+        extract_fenced_block_after(&readme, readme_snippets::INSTALL_MARKER, "toml");
     let install_toml: toml::Value =
         toml::from_str(install_block).expect("README install block must be valid TOML");
     let install_tools = install_toml["tools"]
@@ -599,11 +602,8 @@ fn readme_quickstart_tools_snippets_stay_current() {
         "README install snippet must pin the current flint release"
     );
 
-    let quickstart_block = extract_fenced_block_after(
-        &readme,
-        "Add the linting tools your project needs alongside the `flint` binary itself:",
-        "toml",
-    );
+    let quickstart_block =
+        extract_fenced_block_after(&readme, readme_snippets::QUICKSTART_MARKER, "toml");
     let quickstart_toml: toml::Value =
         toml::from_str(quickstart_block).expect("README quickstart block must be valid TOML");
     let quickstart_tools = quickstart_toml["tools"]
@@ -615,22 +615,7 @@ fn readme_quickstart_tools_snippets_stay_current() {
         .as_table()
         .expect("repo mise.toml must contain [tools]");
 
-    let quickstart_keys = [
-        "github:koalaman/shellcheck",
-        "shfmt",
-        "actionlint",
-        "rumdl",
-        "ruff",
-        "aqua:owenlamont/ryl",
-        "taplo",
-        "biome",
-        "rust",
-        "go",
-        "lychee",
-        "npm:renovate",
-    ];
-
-    let expected = toml_tool_versions_from_table(repo_tools, &quickstart_keys)
+    let expected = toml_tool_versions_from_table(repo_tools, readme_snippets::QUICKSTART_KEYS)
         .into_iter()
         .chain(std::iter::once((
             "github:grafana/flint".to_string(),

@@ -1,27 +1,12 @@
+#[path = "../readme_snippets.rs"]
+mod readme_snippets;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 use toml::Value;
-
-const INSTALL_MARKER: &str = "Add `flint` to your repo's `mise.toml`:";
-const QUICKSTART_MARKER: &str =
-    "Add the linting tools your project needs alongside the `flint` binary itself:";
-const QUICKSTART_KEYS: &[&str] = &[
-    "github:koalaman/shellcheck",
-    "shfmt",
-    "actionlint",
-    "rumdl",
-    "ruff",
-    "aqua:owenlamont/ryl",
-    "taplo",
-    "biome",
-    "rust",
-    "go",
-    "lychee",
-    "npm:renovate",
-];
 
 fn main() -> Result<()> {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -39,10 +24,20 @@ fn main() -> Result<()> {
         "[tools]\n\"github:grafana/flint\" = \"{}\"",
         env!("CARGO_PKG_VERSION")
     );
-    replace_fenced_block(&mut readme, INSTALL_MARKER, "toml", &install_block)?;
+    replace_fenced_block(
+        &mut readme,
+        readme_snippets::INSTALL_MARKER,
+        "toml",
+        &install_block,
+    )?;
 
     let quickstart_block = render_quickstart_tools(tools)?;
-    replace_fenced_block(&mut readme, QUICKSTART_MARKER, "toml", &quickstart_block)?;
+    replace_fenced_block(
+        &mut readme,
+        readme_snippets::QUICKSTART_MARKER,
+        "toml",
+        &quickstart_block,
+    )?;
 
     fs::write(&readme_path, readme).context("write README.md")?;
     Ok(())
@@ -71,7 +66,7 @@ fn tool_versions(table: &toml::Table, keys: &[&str]) -> Result<BTreeMap<String, 
 }
 
 fn render_quickstart_tools(table: &toml::Table) -> Result<String> {
-    let versions = tool_versions(table, QUICKSTART_KEYS)?;
+    let versions = tool_versions(table, readme_snippets::QUICKSTART_KEYS)?;
     Ok(format!(
         "[tools]\n\
 \"github:grafana/flint\" = \"{flint}\"\n\

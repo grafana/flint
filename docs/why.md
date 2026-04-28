@@ -1,75 +1,86 @@
-# Why / Principles
+# Why Flint
 
-## Why
+Flint exists to make repository linting fast, predictable, and easy to keep
+consistent between local development, hooks, CI, and agentic workflows.
 
-The bash task scripts (v1) have two problems:
+It uses the tools the repo has chosen to install, runs only the checks that
+are actually opted in, and keeps behavior aligned across every place the repo
+is linted.
 
-**Local ≠ CI**: `--native` runs a subset of linters; CI runs full super-linter
-in Docker. Different tools, different behavior. Passing locally does not mean
-passing in CI.
+For comparisons with other lint runners and hook managers, see
+[Alternatives / Comparisons](alternatives.md).
 
-**Bash has limits**: the registry pattern was already at the edge of what bash
-does cleanly. Adding built-in checks (links, renovate) would make it worse.
+## Fast
 
-### Why not pre-commit?
+This is the primary goal; everything else serves it.
 
-pre-commit adds a parallel tool management system on top of mise. Consuming repos
-already declare their tools in `mise.toml` — pre-commit would require maintaining
-a second inventory of the same tools in `.pre-commit-config.yaml`, with its own
-versioning and install lifecycle. That's friction without benefit for repos that
-are already mise-first.
+- Native execution only: no Docker startup overhead
+- Parallel runs in check mode
+- Small binary, cached by mise
+- Diff-aware by default: changed files only unless `--full` is requested
+- Opt-in activation: undeclared tools are skipped entirely
+- Slow checks can be skipped via `--fast-only`
 
-### Why not Husky?
+## Local same as CI
 
-Husky manages git hooks for Node.js projects and requires `npm install` to activate.
-Repos that aren't Node-first still need a `package.json` and a dev dependency just to
-run hooks. `flint hook install` writes a single shell script directly to `.git/hooks/`
-with no install step and no language runtime dependency.
+One binary, one config model, identical behavior. There is no "native mode
+subset" distinction. If it passes locally, it passes in CI.
 
-### Why not Spotless (or other Maven formatter plugins)?
+## Predictable and updatable linter versions
 
-Spotless runs `google-java-format` as a Maven build phase, which means format
-failures block compilation and test runs — that's the wrong place for a style
-check. flint's `google-java-format` check runs as a separate lint step, only on
-changed files, and is fast.
+Flint runs pinned linter versions chosen by the repo, so lint behavior does not
+suddenly change just because an upstream release landed. When a repo wants a
+new `lychee`, `ruff`, or `shellcheck`, it updates that version explicitly and
+reviews the result as a normal change. In practice that also works well with
+tools like dependabot and Renovate, because the pinned versions live in
+`mise.toml`.
 
-To migrate: remove `spotless-maven-plugin` from your `pom.xml` (and any
-`spotless.skip` properties), add `"github:google/google-java-format"` to
-`[tools]` in `mise.toml`, and run `flint run --fix` once to confirm the repo is
-clean.
+## Easy setup, sane defaults
 
-### Why not MegaLinter / super-linter?
+`flint init` bootstraps a repo quickly, the active checks come from
+`mise.toml`, and most repos do not need much custom configuration beyond
+choosing tools.
 
-Container-based linters (super-linter, MegaLinter) ship their own tool versions,
-independent of what the repo pins in `mise.toml`. This breaks the "declare once,
-use everywhere" promise of mise. Container startup also adds latency to every run.
+## Opinionated where it matters
 
-## Principles
+Flint prefers one canonical config shape per linter to avoid discovery drift,
+while still letting repos choose a config directory with `FLINT_CONFIG_DIR`
+when the tool supports explicit config injection.
 
-1. **Fast** — the primary goal; everything else serves it:
-   - Native execution only (no Docker); linters run in parallel (Rust binary, short startup)
-   - Small binary, cached by mise — fast install, near-zero overhead between runs
-   - Diff-aware: only changed files are linted by default; `--full` to check everything
-   - Opt-in via `mise.toml`: undeclared tools are skipped entirely
-   - Checks can be tagged slow in the registry and skipped via `--fast-only`
+## Separated ownership
 
-2. **Local same as CI** — one binary, one config, identical behavior.
-   No "native mode subset" distinction. If it passes locally, it passes in CI.
+Linters and formatters are distinct checks, and overlapping file types have a
+clear style owner. `editorconfig-checker` defers where formatter ownership
+should win, which avoids contradictory output.
 
-3. **AI-friendly** — `--fix` fixes what's fixable silently, prints output
-   only for issues needing review, and exits with a structured summary:
+Examples:
 
-   ```text
-   [shellcheck]
-   ...
-   flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
-   ```
+- Markdown style is owned by `rumdl`, not split between multiple Markdown tools
+- JS/TS/JSON formatting is owned by Biome, with root `biome.jsonc` as the
+  canonical config
+- `editorconfig-checker` defers to active formatters for file types where the
+  formatter should be authoritative
 
-   Only unfixable issues surface for review — no reasoning step required.
+## AI-friendly
 
-4. **Cross-platform** — runs on Linux, macOS, and Windows. The built-in
-   registry accounts for platform differences (e.g. binary names, path quoting).
+`--fix` fixes what's fixable silently, prints output only for issues needing
+review, and exits with a structured summary:
 
-5. **Autofix where possible** — `--fix` checks first, fixes what's fixable,
-   reports what needs review. Fix mode runs serially to avoid concurrent writes.
-   Pass specific linter names to limit which fixers run (`flint run --fix rumdl shfmt`).
+```text
+[shellcheck]
+...
+flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
+```
+
+Only unfixable issues surface for review; no reasoning step is required.
+
+## Cross-platform
+
+Flint runs on Linux, macOS, and Windows. The built-in registry accounts for
+platform differences such as binary names and path quoting.
+
+## Autofix where possible
+
+`--fix` checks first, fixes what's fixable, and reports what needs review. Fix
+mode runs serially to avoid concurrent writes. Pass specific linter names to
+limit which fixers run, for example `flint run --fix rumdl shfmt`.

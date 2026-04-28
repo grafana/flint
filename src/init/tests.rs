@@ -596,6 +596,28 @@ fn disable_editorconfig_line_length_for_patterns_updates_editorconfig() {
 }
 
 #[test]
+fn disable_editorconfig_line_length_for_patterns_overrides_existing_section_line_length() {
+    use config_files::disable_editorconfig_line_length_for_patterns;
+    let tmp = tempfile::TempDir::new().unwrap();
+    std::fs::write(
+        tmp.path().join(".editorconfig"),
+        "root = true\n\n[*]\nmax_line_length = 120\n\n[*.rs]\nindent_size = 4\nmax_line_length = 100\ntrim_trailing_whitespace = false\n",
+    )
+    .unwrap();
+    let changed = disable_editorconfig_line_length_for_patterns(
+        tmp.path(),
+        &[(&["*.rs"], "Rust line length is handled by rustfmt")],
+    )
+    .unwrap();
+    assert_eq!(changed, vec!["[*.rs]".to_string()]);
+    let content = std::fs::read_to_string(tmp.path().join(".editorconfig")).unwrap();
+    assert!(content.contains(
+        "[*.rs]\nindent_size = 4\n# Rust line length is handled by rustfmt\nmax_line_length = off\ntrim_trailing_whitespace = false\n"
+    ));
+    assert!(!content.contains("max_line_length = 100"));
+}
+
+#[test]
 fn disable_editorconfig_line_length_for_patterns_is_idempotent() {
     use config_files::disable_editorconfig_line_length_for_patterns;
     let tmp = tempfile::TempDir::new().unwrap();

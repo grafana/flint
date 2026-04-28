@@ -450,19 +450,46 @@ pub(super) fn disable_editorconfig_line_length_for_patterns(
                 })
                 .unwrap_or(lines.len());
             let section_lines = &lines[section_start + 1..section_end];
-            if section_lines
+            let existing_line_lengths: Vec<usize> = section_lines
                 .iter()
-                .any(|line| line.trim_start().starts_with("max_line_length"))
-            {
+                .enumerate()
+                .filter_map(|(idx, line)| {
+                    is_editorconfig_max_line_length(line).then_some(section_start + 1 + idx)
+                })
+                .collect();
+            let has_comment = section_lines.iter().any(|line| line.trim() == comment_line);
+            let Some(mut line_idx) = existing_line_lengths.first().copied() else {
+                let mut insert = vec![];
+                if !has_comment {
+                    insert.push(comment_line);
+                }
+                insert.push("max_line_length = off".to_string());
+                lines.splice(section_end..section_end, insert);
+                changed_sections.push(header);
                 continue;
+            };
+
+            let mut changed = false;
+            let mut section_end = section_end;
+            if !has_comment {
+                lines.insert(line_idx, comment_line);
+                line_idx += 1;
+                section_end += 1;
+                changed = true;
             }
-            let mut insert = vec![];
-            if !section_lines.iter().any(|line| line.trim() == comment_line) {
-                insert.push(comment_line);
+            if lines[line_idx].trim() != "max_line_length = off" {
+                lines[line_idx] = "max_line_length = off".to_string();
+                changed = true;
             }
-            insert.push("max_line_length = off".to_string());
-            lines.splice(section_end..section_end, insert);
-            changed_sections.push(header);
+            for idx in (line_idx + 1..section_end).rev() {
+                if is_editorconfig_max_line_length(&lines[idx]) {
+                    lines.remove(idx);
+                    changed = true;
+                }
+            }
+            if changed {
+                changed_sections.push(header);
+            }
             continue;
         }
 
@@ -493,4 +520,112 @@ fn editorconfig_section_header(patterns: &[&str]) -> String {
     } else {
         format!("[{{{}}}]", patterns.join(","))
     }
+}
+fn is_editorconfig_max_line_length(line: &str) -> bool {
+    line.trim_start()
+        .split_once('=')
+        .is_some_and(|(key, _)| key.trim() == "max_line_length")
+}
+
+/// Generates `.yamllint.yml` in the flint config dir when ryl is being set up.
+pub(super) fn generate_yamllint_config(config_dir: &Path, line_length: u16) -> Result<bool> {
+    let target = config_dir.join(".yamllint.yml");
+    if target.exists() {
+        return Ok(false);
+    }
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let content = [
+        "extends: relaxed",
+        "",
+        "rules:",
+        "  document-start: disable",
+        "  line-length:",
+        &format!("    max: {line_length}"),
+        "  indentation:",
+        "    spaces: 2",
+        "",
+    ]
+    .join("\n");
+    std::fs::write(&target, content)?;
+    println!("  wrote {}", target.display());
+    Ok(true)
+}
+
+/// Generates `.taplo.toml` in the flint config dir when taplo is being set up.
+pub(super) fn generate_taplo_config(config_dir: &Path, line_length: u16) -> Result<bool> {
+    const SUPPORTED_CONFIG_NAMES: &[&str] = &[".taplo.toml"];
+    const LEGACY_CONFIG_NAMES: &[&str] = &["taplo.toml"];
+    if SUPPORTED_CONFIG_NAMES
+        .iter()
+        .map(|name| config_dir.join(name))
+        .any(|path| path.exists())
+        || LEGACY_CONFIG_NAMES
+            .iter()
+            .map(|name| config_dir.join(name))
+            .any(|path| path.exists())
+    {
+        return Ok(false);
+    }
+    let target = config_dir.join(".taplo.toml");
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let content = [
+        "[formatting]".to_string(),
+        format!("column_width = {line_length}"),
+        "indent_string = \"  \"".to_string(),
+    ]
+    .join("\n")
+        + "\n";
+    std::fs::write(&target, content)?;
+    println!("  wrote {}", target.display());
+    Ok(true)
+}
+
+/// Generates `rustfmt.toml` in the flint config dir when cargo-fmt is being set up.
+pub(super) fn generate_rustfmt_config(config_dir: &Path, line_length: u16) -> Result<bool> {
+    let target = config_dir.join("rustfmt.toml");
+    if target.exists() {
+        return Ok(false);
+    }
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let content = format!("max_width = {line_length}\n");
+    std::fs::write(&target, content)?;
+    println!("  wrote {}", target.display());
+    Ok(true)
+}
+
+/// Generates root `biome.jsonc` when biome is being set up and no
+/// existing supported config is present.
+///
+/// Flint writes explicit space indentation to avoid Biome's default tab
+/// formatting surprising consumers during rollout.
+pub(super) fn generate_biome_config(project_root: &Path) -> Result<bool> {
+    let target = project_root.join("biome.jsonc");
+    if target.exists() {
+        return Ok(false);
+    }
+    let legacy = project_root.join("biome.json");
+    if legacy.exists() {
+        std::fs::rename(&legacy, &target)?;
+        println!("  moved {} -> {}", legacy.display(), target.display());
+        return Ok(true);
+    }
+    let content = [
+        "{",
+        "  \"formatter\": {",
+        "    \"indentStyle\": \"space\",",
+        "    \"indentWidth\": 2",
+        "  }",
+        "}",
+        "",
+    ]
+    .join("\n");
+    std::fs::write(&target, content)?;
+    println!("  wrote {}", target.display());
+    Ok(true)
 }

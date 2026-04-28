@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#MISE description="Refresh release-managed docs snippets"
+
+set -euo pipefail
+
+cargo run --bin sync-readme-snippets
+cargo run -q --bin flint -- run --fix --allow-fixed

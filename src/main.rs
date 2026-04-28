@@ -15,7 +15,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
-#[command(name = "flint", about = "flint — fast lint")]
+#[command(name = "flint", bin_name = "flint", about = "flint — fast lint")]
 #[command(subcommand_required = true, arg_required_else_help = true)]
 struct Cli {
     #[command(subcommand)]
@@ -77,6 +77,11 @@ struct RunArgs {
     /// Only 0 vs non-0 is stable for callers.
     #[arg(long, env = "FLINT_FIX")]
     fix: bool,
+
+    /// In --fix mode, exit 0 when all reported issues were fixed successfully.
+    /// Still exits non-zero when any check is partial or needs review.
+    #[arg(long, requires = "fix")]
+    allow_fixed: bool,
 
     /// Lint all files instead of only changed files.
     #[arg(long, env = "FLINT_FULL")]
@@ -276,7 +281,10 @@ async fn run(
             .next()
             .expect("flint-setup preflight produced a result");
         if args.fix {
-            finish_fix_outcomes(vec![classify_single_pass_fix(setup_result)]);
+            finish_fix_outcomes(
+                vec![classify_single_pass_fix(setup_result)],
+                args.allow_fixed,
+            );
         } else if !setup_result.ok {
             let failed = [setup_result.name.as_str()];
             if args.short {
@@ -463,7 +471,7 @@ async fn run(
             }
         }
 
-        finish_fix_outcomes(outcomes);
+        finish_fix_outcomes(outcomes, args.allow_fixed);
         return Ok(());
     }
 
@@ -545,7 +553,7 @@ impl FixOutcome {
     }
 }
 
-fn finish_fix_outcomes(outcomes: Vec<FixOutcome>) {
+fn finish_fix_outcomes(outcomes: Vec<FixOutcome>, allow_fixed: bool) {
     // Emit linter output for checks that need manual review so the caller has
     // the failure details without a second flint invocation.
     for r in outcomes.iter().filter_map(FixOutcome::result) {
@@ -589,7 +597,9 @@ fn finish_fix_outcomes(outcomes: Vec<FixOutcome>) {
     }
     if !segments.is_empty() {
         eprintln!("flint: {}", segments.join(" | "));
-        std::process::exit(1);
+        if !allow_fixed || !partial.is_empty() || !review.is_empty() {
+            std::process::exit(1);
+        }
     }
 }
 

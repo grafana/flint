@@ -3,6 +3,9 @@ use std::path::Path;
 
 use super::*;
 
+#[path = "../readme_snippets.rs"]
+mod readme_snippets;
+
 #[test]
 fn find_obsolete_key_returns_none_for_clean_tools() {
     let mut tools = HashMap::new();
@@ -533,6 +536,118 @@ fn sorted_package_names(rule: &serde_json::Value) -> Vec<&str> {
     names
 }
 
+fn extract_fenced_block_after<'a>(haystack: &'a str, marker: &str, lang: &str) -> &'a str {
+    let start = haystack
+        .find(marker)
+        .unwrap_or_else(|| panic!("missing marker {marker:?}"));
+    let after_marker = &haystack[start + marker.len()..];
+    let fence = format!("```{lang}\n");
+    let block_start = after_marker
+        .find(&fence)
+        .unwrap_or_else(|| panic!("missing {lang} fenced block after {marker:?}"))
+        + fence.len();
+    let rest = &after_marker[block_start..];
+    let block_end = rest
+        .find("\n```")
+        .unwrap_or_else(|| panic!("missing closing fence after {marker:?}"));
+    &rest[..block_end]
+}
+
+fn toml_tool_versions_from_table(
+    table: &toml::Table,
+    keys: &[&str],
+) -> std::collections::BTreeMap<String, String> {
+    keys.iter()
+        .map(|key| {
+            let value = table
+                .get(*key)
+                .unwrap_or_else(|| panic!("missing tool key {key:?}"));
+            let version = value
+                .as_str()
+                .map(ToOwned::to_owned)
+                .or_else(|| {
+                    value
+                        .as_table()
+                        .and_then(|t| t.get("version"))
+                        .and_then(toml::Value::as_str)
+                        .map(ToOwned::to_owned)
+                })
+                .unwrap_or_else(|| panic!("tool key {key:?} must have a string version"));
+            ((*key).to_string(), version)
+        })
+        .collect()
+}
+
+#[test]
+fn readme_quickstart_tools_snippets_stay_current() {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let readme_path = manifest_dir.join("README.md");
+    let mise_path = manifest_dir.join("mise.toml");
+
+    let readme = std::fs::read_to_string(&readme_path).expect("README.md must be readable");
+    let mise = std::fs::read_to_string(&mise_path).expect("mise.toml must be readable");
+
+    let install_block =
+        extract_fenced_block_after(&readme, readme_snippets::INSTALL_MARKER, "toml");
+    let install_toml: toml::Value =
+        toml::from_str(install_block).expect("README install block must be valid TOML");
+    let install_tools = install_toml["tools"]
+        .as_table()
+        .expect("README install block must contain [tools]");
+    assert_eq!(
+        install_tools
+            .get("github:grafana/flint")
+            .and_then(toml::Value::as_str),
+        Some(env!("CARGO_PKG_VERSION")),
+        "README install snippet must pin the current flint release"
+    );
+
+    let quickstart_block =
+        extract_fenced_block_after(&readme, readme_snippets::QUICKSTART_MARKER, "toml");
+    let quickstart_toml: toml::Value =
+        toml::from_str(quickstart_block).expect("README quickstart block must be valid TOML");
+    let quickstart_tools = quickstart_toml["tools"]
+        .as_table()
+        .expect("README quickstart block must contain [tools]");
+
+    let repo_mise: toml::Value = toml::from_str(&mise).expect("mise.toml must be valid TOML");
+    let repo_tools = repo_mise["tools"]
+        .as_table()
+        .expect("repo mise.toml must contain [tools]");
+
+    let expected = toml_tool_versions_from_table(repo_tools, readme_snippets::QUICKSTART_KEYS)
+        .into_iter()
+        .chain(std::iter::once((
+            "github:grafana/flint".to_string(),
+            env!("CARGO_PKG_VERSION").to_string(),
+        )))
+        .collect::<std::collections::BTreeMap<_, _>>();
+
+    let actual = toml_tool_versions_from_table(
+        quickstart_tools,
+        &[
+            "github:grafana/flint",
+            "github:koalaman/shellcheck",
+            "shfmt",
+            "actionlint",
+            "rumdl",
+            "ruff",
+            "aqua:owenlamont/ryl",
+            "taplo",
+            "biome",
+            "rust",
+            "go",
+            "lychee",
+            "npm:renovate",
+        ],
+    );
+
+    assert_eq!(
+        actual, expected,
+        "README quickstart [tools] snippet drifted from current repo tool versions"
+    );
+}
+
 /// Verifies README summary table and docs/linters.md detail sections stay
 /// in sync with the registry. The summary table lives in README.md between
 /// `registry-table-*` markers; the per-linter detail sections live in
@@ -733,7 +848,7 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     rows.push(("Binary", binary));
 
     let scope = check.kind.scope_name();
-    rows.push(("Scope", format!("[{scope}](#scopes)")));
+    rows.push(("Scope", format!("[{scope}](#scope-{scope})")));
 
     if !check.patterns.is_empty() {
         rows.push(("Patterns", format!("`{}`", check.patterns.join(" "))));

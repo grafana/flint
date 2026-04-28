@@ -1,5 +1,5 @@
 ---
-name: Release-plz
+name: Release Management
 
 on:
   push:
@@ -12,8 +12,8 @@ jobs:
   release:
     # Runs on every push to main. If the release PR was just merged (i.e. Cargo.toml
     # version was bumped), creates a git tag and a draft GitHub release, then triggers
-    # release.yml to build platform binaries and publish the release.
-    name: Release
+    # release-assets.yml to build platform binaries and publish the release.
+    name: Create Release
     runs-on: ubuntu-24.04
     if: ${{ github.repository == 'grafana/flint' }}
     permissions:
@@ -24,26 +24,22 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: release-plz/action@1528104d2ca23787631a1c1f022abb64b34c1e11  # v0.5
-        id: release-plz
+      - name: Setup mise
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151  # v4.0.1
         with:
-          command: release
+          version: v2026.4.18
+          sha256: 6ae2d5f0f23a2f2149bc5d9bf264fe0922a1da843f1903e453516c462b23cc1f
+      - name: Create release metadata
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Trigger binary release
-        if: ${{ steps.release-plz.outputs.releases_created == 'true' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: >
-          gh workflow run release.yml
-          -f tag=${{ fromJSON(steps.release-plz.outputs.releases)[0].tag }}
+        run: mise run release:create
 
   release-pr:
     # Runs on every push to main. Keeps an open PR that bumps Cargo.toml version
     # and updates CHANGELOG.md based on conventional commits since the last release.
     # Merging this PR triggers the release job above.
     # Depends on release so the new git tag exists before we compute the next version.
-    name: Release PR
+    name: Update Release PR
     needs: [release]
     runs-on: ubuntu-24.04
     if: ${{ github.repository == 'grafana/flint' }}
@@ -58,8 +54,12 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: release-plz/action@1528104d2ca23787631a1c1f022abb64b34c1e11  # v0.5
+      - name: Setup mise
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151  # v4.0.1
         with:
-          command: release-pr
+          version: v2026.4.18
+          sha256: 6ae2d5f0f23a2f2149bc5d9bf264fe0922a1da843f1903e453516c462b23cc1f
+      - name: Update release PR
+        run: mise run release:pr
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

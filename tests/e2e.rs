@@ -166,6 +166,111 @@ fn cases() {
 
 #[cfg(unix)]
 #[test]
+fn renovate_deps_fast_only_runs_for_deleted_tracked_file() {
+    let repo = git_repo();
+
+    std::fs::create_dir_all(repo.path().join(".github")).unwrap();
+    std::fs::write(
+        repo.path().join("mise.toml"),
+        r#"[tools]
+node = "22.0.0"
+
+# Linters
+"npm:renovate" = "43.136.3"
+"#,
+    )
+    .unwrap();
+    std::fs::write(repo.path().join(".github/renovate.json5"), "{}\n").unwrap();
+    std::fs::write(repo.path().join("package.json"), "{}\n").unwrap();
+    std::fs::write(
+        repo.path().join(".github/renovate-tracked-deps.json"),
+        r#"{
+  "package.json": {
+    "npm": [
+      "express"
+    ]
+  }
+}
+"#,
+    )
+    .unwrap();
+
+    let out = Command::new("git")
+        .args(["add", "-A"])
+        .current_dir(repo.path())
+        .output()
+        .expect("failed to spawn git add");
+    assert!(
+        out.status.success(),
+        "git add failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let out = Command::new("git")
+        .args(["commit", "-q", "-m", "init"])
+        .current_dir(repo.path())
+        .output()
+        .expect("failed to spawn git commit");
+    assert!(
+        out.status.success(),
+        "git commit failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = Command::new("git")
+        .args(["rm", "-q", "package.json"])
+        .current_dir(repo.path())
+        .output()
+        .expect("failed to spawn git rm");
+    assert!(
+        out.status.success(),
+        "git rm failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let fake_bin_dir = tempfile::tempdir().expect("fake_bin tempdir");
+    let renovate = fake_bin_dir.path().join("renovate");
+    std::fs::write(
+        &renovate,
+        r#"#!/bin/sh
+set -eu
+
+touch .renovate-ran
+printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"mise":[{"packageFile":"mise.toml","deps":[{"depName":"npm:renovate"}]}]}}'
+"#,
+    )
+    .unwrap();
+
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&renovate, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let fake_path = format!(
+        "{}:{}",
+        fake_bin_dir.path().display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let out = flint_with_env(
+        &["run", "--fast-only"],
+        repo.path(),
+        &[("PATH", &fake_path)],
+    );
+
+    assert!(
+        repo.path().join(".renovate-ran").exists(),
+        "renovate-deps was skipped; stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "expected stale renovate snapshot failure; stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn markdown_tool_ignores_biome_owned_jsonc() {
     let repo = git_repo();
 

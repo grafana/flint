@@ -127,15 +127,7 @@ pub(crate) fn is_relevant(file_list: &FileList, project_root: &Path) -> bool {
         return true;
     }
 
-    let changed: HashSet<String> = file_list
-        .files
-        .iter()
-        .filter_map(|path| {
-            path.strip_prefix(project_root)
-                .ok()
-                .map(|rel| rel.to_string_lossy().into_owned())
-        })
-        .collect();
+    let changed = changed_rel_paths(file_list, project_root);
 
     if changed.is_empty() {
         return false;
@@ -171,6 +163,34 @@ pub(crate) fn is_relevant(file_list: &FileList, project_root: &Path) -> bool {
     };
 
     committed.keys().any(|path| changed.contains(path))
+}
+
+fn changed_rel_paths(file_list: &FileList, project_root: &Path) -> HashSet<String> {
+    if !file_list.changed_paths.is_empty() {
+        return file_list
+            .changed_paths
+            .iter()
+            .map(|path| {
+                let path = Path::new(path);
+                path.strip_prefix(project_root).unwrap_or(path)
+            })
+            .map(normalize_path)
+            .collect();
+    }
+
+    file_list
+        .files
+        .iter()
+        .filter_map(|path| path.strip_prefix(project_root).ok())
+        .map(normalize_path)
+        .collect()
+}
+
+fn normalize_path(path: &Path) -> String {
+    path.components()
+        .map(|component| component.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 pub(crate) fn adaptive_relevance(ctx: &dyn AdaptiveRelevanceContext) -> bool {
@@ -1069,6 +1089,26 @@ mod tests {
             &file_list(&[dir.path().join("package.json").to_str().unwrap()], false),
             dir.path()
         ));
+    }
+
+    #[test]
+    fn relevant_when_tracked_manifest_was_deleted() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join(".github")).unwrap();
+        write_snapshot(
+            &dir.path().join(".github/renovate-tracked-deps.json"),
+            &dep_map(&[("package.json", &[("npm", &["express"])])]),
+        )
+        .unwrap();
+
+        let file_list = FileList {
+            files: vec![],
+            changed_paths: vec!["package.json".to_string()],
+            merge_base: Some("base".to_string()),
+            full: false,
+        };
+
+        assert!(is_relevant(&file_list, dir.path()));
     }
 
     #[test]

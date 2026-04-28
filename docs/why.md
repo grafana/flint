@@ -1,6 +1,6 @@
 # Why Flint
 
-flint exists to make repository linting fast, predictable, and easy to keep
+Flint exists to make repository linting fast, predictable, and easy to keep
 consistent between local development, hooks, CI, and agentic workflows.
 
 It uses the tools the repo has chosen to install, runs only the checks that
@@ -32,7 +32,8 @@ Flint runs pinned linter versions chosen by the repo, so lint behavior does not
 suddenly change just because an upstream release landed. When a repo wants a
 new `lychee`, `ruff`, or `shellcheck`, it updates that version explicitly and
 reviews the result as a normal change. In practice that also works well with
-Renovate, because the pinned versions live in `mise.toml`.
+tools like dependabot and Renovate, because the pinned versions live in
+`mise.toml`.
 
 ## Easy setup, sane defaults
 

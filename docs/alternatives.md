@@ -1,6 +1,6 @@
 # Alternatives / Comparisons
 
-This page captures the "why not X?" comparisons that would otherwise clutter
+This page captures the _"why not X?"_ comparisons that would otherwise clutter
 the main [why/principles page](why.md).
 
 ## Overview
@@ -16,14 +16,14 @@ Ratings are relative and intentionally coarse. The sections below explain the
 | Spotless / build plugins  | medium                | medium in matching ecosystems | ecosystem-bound | low to medium  | yes, formatter-focused | usually no         | usually yes in that ecosystem             | usually yes in that build |
 | MegaLinter / super-linter | low to medium         | medium                        | yes             | yes            | mixed                  | limited / mixed    | mixed                                     | mixed                     |
 
-Use these sections as relative comparisons against flint on a few recurring
+Use these sections as relative comparisons against Flint on a few recurring
 dimensions: speed, setup effort, cross-platform support, cross-language scope,
 autofix support, delta/diff awareness, predictable and updatable linter
 versions, and how closely local behavior matches CI.
 
-## flint
+## Flint
 
-flint is the reference point for the comparisons on this page: a native lint
+Flint is the reference point for the comparisons on this page: a native lint
 runner that discovers active tools from the repo, scopes most checks to changed
 files, and keeps the local and CI path aligned.
 
@@ -34,9 +34,9 @@ linter or formatter should govern each domain.
 
 | Dimension                                 | Rating               | Why                                                                                                                                                                            |
 | ----------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Speed                                     | high                 | flint runs native tools directly, avoids container startup, and scopes most checks to changed files by default.                                                                |
+| Speed                                     | high                 | Flint runs native tools directly, avoids container startup, and scopes most checks to changed files by default.                                                                |
 | Setup effort                              | low                  | `flint init` scaffolds the baseline setup, and most repos only need to choose which tools to enable rather than repeatedly deciding how to compose overlapping tools.          |
-| Cross-platform                            | yes                  | flint supports Linux, macOS, and Windows.                                                                                                                                      |
+| Cross-platform                            | yes                  | Flint supports Linux, macOS, and Windows.                                                                                                                                      |
 | Cross-language                            | yes                  | It orchestrates multiple language-specific tools behind one runner.                                                                                                            |
 | Autofix support                           | yes, where supported | `flint run --fix` uses each tool's fixer when one exists and reports what still needs review.                                                                                  |
 | Delta / diff-aware                        | yes                  | Changed-file execution is the default model, with baseline expansion only when coverage changes require it.                                                                    |

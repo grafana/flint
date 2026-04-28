@@ -332,22 +332,22 @@ support, so treat this check as TOML 1.0-oriented for now.
 
 ## Scopes
 
-### Scope: `file`
+### Scope: file
 
 Invoked once per matched file.
 
-### Scope: `files`
+### Scope: files
 
 Invoked once with all matched files as args; only changed files are passed.
 
-### Scope: `project`
+### Scope: project
 
 Invoked once with no file args; for checks with patterns set (e.g.
 `cargo-clippy`), skipped entirely if no matching files changed, but runs on the
 whole project when it does run. `golangci-lint` is the exception — it uses
 `--new-from-rev` to scope analysis to changed code even within the project run.
 
-### Scope: `special`
+### Scope: special
 
 Implemented in-process rather than via a command template. These checks may run
 without file arguments or use custom orchestration logic.

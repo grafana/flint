@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.1](https://github.com/grafana/flint/compare/v0.21.0...v0.21.1) - 2026-04-28
+
+### Other
+
+- *(deps)* update taiki-e/install-action digest to 481c34c ([#231](https://github.com/grafana/flint/pull/231))
+- *(deps)* update dependency ruff to v0.15.12 ([#245](https://github.com/grafana/flint/pull/245))
+- *(deps)* update dependency npm:renovate to v43.141.5 ([#244](https://github.com/grafana/flint/pull/244))
+
 ## [0.21.0](https://github.com/grafana/flint/compare/v0.20.4...v0.21.0) - 2026-04-27
 
 ### Added

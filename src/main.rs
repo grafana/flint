@@ -237,9 +237,9 @@ async fn run(
                     match c.run_policy {
                         RunPolicy::Fast => true,
                         RunPolicy::Slow => false,
-                        RunPolicy::Adaptive => c
-                            .adaptive_relevance
-                            .is_none_or(|hook| hook(&relevance_ctx)),
+                        RunPolicy::Adaptive => {
+                            c.adaptive_relevance.is_none_or(|hook| hook(&relevance_ctx))
+                        }
                     }
                 };
                 if include {

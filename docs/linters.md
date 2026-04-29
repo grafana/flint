@@ -235,10 +235,9 @@ In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN`
 so Renovate can authenticate GitHub requests. If `GITHUB_COM_TOKEN` is
 unset, flint forwards `GITHUB_TOKEN` to Renovate as `GITHUB_COM_TOKEN`.
 
-`flint init` creates or patches this section when `renovate-deps` is
-selected, so you normally do not need to add these fields by hand. It
-also migrates legacy `RENOVATE_TRACKED_DEPS_EXCLUDE` values into
-`exclude_managers`.
+When `flint init` writes a new `flint.toml`, it includes this section if
+`renovate-deps` is selected. During v1 setup migration it also carries
+legacy `RENOVATE_TRACKED_DEPS_EXCLUDE` values into `exclude_managers`.
 
 With `--fix`, automatically regenerates and commits the snapshot.
 

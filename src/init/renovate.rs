@@ -1,29 +1,22 @@
 use anyhow::{Context, Result};
 use std::path::Path;
 
-/// Ensures `flint.toml` has the Renovate check config that init owns.
+/// Carries legacy v1 Renovate manager excludes into `flint.toml`.
 /// Returns `true` when the file was changed.
-pub(super) fn ensure_renovate_deps_config(
-    toml_path: &Path,
-    exclude_managers: Option<&[String]>,
-) -> Result<bool> {
+pub(super) fn migrate_renovate_deps_config(toml_path: &Path, managers: &[String]) -> Result<bool> {
     let content = std::fs::read_to_string(toml_path)
         .with_context(|| format!("failed to read {}", toml_path.display()))?;
     let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse flint.toml")?;
     let Some(checks) = doc.get("checks").and_then(|item| item.as_table()) else {
-        return append_renovate_deps_config(toml_path, &content, exclude_managers);
+        return append_renovate_deps_config(toml_path, &content, managers);
     };
     let Some(table_key) = ["renovate-deps", "renovate_deps"]
         .into_iter()
         .find(|key| checks.contains_key(key))
     else {
-        return append_renovate_deps_config(toml_path, &content, exclude_managers);
+        return append_renovate_deps_config(toml_path, &content, managers);
     };
 
-    let managers = exclude_managers.unwrap_or_default();
-    if managers.is_empty() {
-        return Ok(false);
-    }
     let renovate = doc
         .get_mut("checks")
         .and_then(|item| item.as_table_mut())
@@ -51,19 +44,14 @@ pub(super) fn ensure_renovate_deps_config(
 fn append_renovate_deps_config(
     toml_path: &Path,
     content: &str,
-    exclude_managers: Option<&[String]>,
+    managers: &[String],
 ) -> Result<bool> {
     let mut next = String::from(content);
     if !next.ends_with('\n') {
         next.push('\n');
     }
     next.push_str("\n[checks.renovate-deps]\n");
-    match exclude_managers {
-        Some(managers) if !managers.is_empty() => {
-            next.push_str(&format!("exclude_managers = {}\n", string_array(managers)));
-        }
-        _ => next.push_str("# exclude_managers = []\n"),
-    }
+    next.push_str(&format!("exclude_managers = {}\n", string_array(managers)));
     std::fs::write(toml_path, next)
         .with_context(|| format!("failed to write {}", toml_path.display()))?;
     println!(

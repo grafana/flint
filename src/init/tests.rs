@@ -763,7 +763,7 @@ fn generate_flint_toml_with_renovate_managers() {
 }
 
 #[test]
-fn generate_flint_toml_patches_existing_with_renovate_placeholder() {
+fn generate_flint_toml_keeps_existing_without_migrated_renovate_managers() {
     let tmp = tempfile::TempDir::new().unwrap();
     std::fs::write(tmp.path().join("flint.toml"), "[settings]\n").unwrap();
     let written = generate_flint_toml(
@@ -774,10 +774,9 @@ fn generate_flint_toml_patches_existing_with_renovate_placeholder() {
         None,
     )
     .unwrap();
-    assert!(written);
+    assert!(!written);
     let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
-    assert!(content.contains("[checks.renovate-deps]"));
-    assert!(content.contains("# exclude_managers = []"));
+    assert_eq!(content, "[settings]\n");
 }
 
 #[test]

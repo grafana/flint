@@ -6,7 +6,7 @@ use std::process::Command;
 
 use crate::registry::EditorconfigDirectiveStyle;
 
-use super::renovate::ensure_renovate_deps_config;
+use super::renovate::migrate_renovate_deps_config;
 
 /// Writes a skeleton `flint.toml` in `config_dir`. Creates the directory if needed.
 /// Returns `true` if the file was written, `false` if it already existed.
@@ -23,8 +23,10 @@ pub(super) fn generate_flint_toml(
 ) -> Result<bool> {
     let toml_path = config_dir.join("flint.toml");
     if toml_path.exists() {
-        if has_renovate {
-            return ensure_renovate_deps_config(&toml_path, exclude_managers);
+        if let Some(managers) = exclude_managers
+            && !managers.is_empty()
+        {
+            return migrate_renovate_deps_config(&toml_path, managers);
         }
         return Ok(false);
     }

@@ -12,7 +12,6 @@ pub(crate) mod generation;
 pub(crate) mod hooks;
 mod migrations;
 mod mise_tools;
-mod renovate;
 mod scaffold;
 mod ui;
 mod v1;

@@ -1,3 +1,4 @@
+use anyhow::Context;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -6,7 +7,7 @@ use crate::config::RenovateDepsConfig;
 use crate::files::FileList;
 use crate::linters::LinterOutput;
 use crate::linters::env;
-use crate::registry::AdaptiveRelevanceContext;
+use crate::registry::{AdaptiveRelevanceContext, InitHookContext};
 
 const COMMITTED_FILE: &str = "renovate-tracked-deps.json";
 pub(crate) const COMMITTED_PATHS: &[&str] = &[COMMITTED_FILE, ".github/renovate-tracked-deps.json"];
@@ -36,6 +37,21 @@ pub async fn run(cfg: &RenovateDepsConfig, fix: bool, project_root: &Path) -> Li
         Ok(out) => out,
         Err(e) => LinterOutput::err(format!("flint: renovate-deps: {e}\n")),
     }
+}
+
+pub(crate) fn init(ctx: &dyn InitHookContext) -> anyhow::Result<bool> {
+    let toml_path = ctx.config_dir().join("flint.toml");
+    let config_changed = if let Some(managers) = ctx.renovate_exclude_managers()
+        && !managers.is_empty()
+    {
+        configure_renovate_deps_config(&toml_path, Some(managers))?
+    } else if ctx.flint_toml_generated() {
+        configure_renovate_deps_config(&toml_path, None)?
+    } else {
+        false
+    };
+    let preset_changed = patch_renovate_preset(ctx.project_root())?;
+    Ok(config_changed || preset_changed)
 }
 
 fn validate_runtime_env() -> Result<Option<String>, String> {
@@ -116,6 +132,196 @@ pub(crate) fn is_relevant(file_list: &FileList, project_root: &Path) -> bool {
 
 pub(crate) fn adaptive_relevance(ctx: &dyn AdaptiveRelevanceContext) -> bool {
     is_relevant(ctx.file_list(), ctx.project_root())
+}
+
+/// Ensures `flint.toml` has the Renovate check config requested by init.
+/// Returns `true` when the file was changed.
+fn configure_renovate_deps_config(
+    toml_path: &Path,
+    exclude_managers: Option<&[String]>,
+) -> anyhow::Result<bool> {
+    let content = std::fs::read_to_string(toml_path)
+        .with_context(|| format!("failed to read {}", toml_path.display()))?;
+    let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse flint.toml")?;
+    let Some(checks) = doc.get("checks").and_then(|item| item.as_table()) else {
+        return append_renovate_deps_config(toml_path, &content, exclude_managers);
+    };
+    let Some(table_key) = ["renovate-deps", "renovate_deps"]
+        .into_iter()
+        .find(|key| checks.contains_key(key))
+    else {
+        return append_renovate_deps_config(toml_path, &content, exclude_managers);
+    };
+
+    let Some(managers) = exclude_managers.filter(|managers| !managers.is_empty()) else {
+        return Ok(false);
+    };
+    let renovate = doc
+        .get_mut("checks")
+        .and_then(|item| item.as_table_mut())
+        .and_then(|checks| checks.get_mut(table_key))
+        .and_then(|item| item.as_table_mut())
+        .with_context(|| {
+            format!(
+                "[checks.{table_key}] is not a table in {}",
+                toml_path.display()
+            )
+        })?;
+    if renovate.contains_key("exclude_managers") {
+        return Ok(false);
+    }
+    renovate.insert("exclude_managers", toml_edit::value(string_array(managers)));
+    std::fs::write(toml_path, doc.to_string())
+        .with_context(|| format!("failed to write {}", toml_path.display()))?;
+    println!(
+        "  patched {} — added checks.renovate-deps.exclude_managers",
+        toml_path.display()
+    );
+    Ok(true)
+}
+
+fn append_renovate_deps_config(
+    toml_path: &Path,
+    content: &str,
+    exclude_managers: Option<&[String]>,
+) -> anyhow::Result<bool> {
+    let mut next = String::from(content);
+    if !next.ends_with('\n') {
+        next.push('\n');
+    }
+    next.push_str("\n[checks.renovate-deps]\n");
+    match exclude_managers {
+        Some(managers) if !managers.is_empty() => {
+            next.push_str(&format!("exclude_managers = {}\n", string_array(managers)));
+        }
+        _ => next.push_str("# exclude_managers = []\n"),
+    }
+    std::fs::write(toml_path, next)
+        .with_context(|| format!("failed to write {}", toml_path.display()))?;
+    println!(
+        "  patched {} — added checks.renovate-deps",
+        toml_path.display()
+    );
+    Ok(true)
+}
+
+fn string_array(values: &[String]) -> toml_edit::Array {
+    let mut array = toml_edit::Array::default();
+    for value in values {
+        array.push(value.as_str());
+    }
+    array
+}
+
+fn patch_renovate_preset(project_root: &Path) -> anyhow::Result<bool> {
+    let Some(path) = find_renovate_config(project_root) else {
+        return Ok(false);
+    };
+    let changed = patch_renovate_extends(&path)?;
+    if changed {
+        let rel = path.strip_prefix(project_root).unwrap_or(&path);
+        println!("  patched {} — added {}", rel.display(), flint_preset());
+    }
+    Ok(changed)
+}
+
+fn find_renovate_config(project_root: &Path) -> Option<PathBuf> {
+    RENOVATE_CONFIG_PATTERNS
+        .iter()
+        .map(|path| project_root.join(path))
+        .find(|path| path.exists())
+}
+
+/// Returns the renovate preset entry to inject, e.g. `github>grafana/flint#v0.9.2`.
+/// Pre-release suffixes are stripped so dev builds produce a valid tag reference.
+fn flint_preset() -> String {
+    let ver = env!("CARGO_PKG_VERSION");
+    let ver = ver.split('-').next().unwrap_or(ver);
+    format!("github>grafana/flint#v{ver}")
+}
+
+/// Adds the flint renovate preset to the `extends` array in a renovate config file.
+/// Works for both JSON and JSON5. If an unpinned or differently-pinned flint entry
+/// already exists, it is replaced in-place rather than duplicated.
+/// Returns `true` if the file was changed.
+fn patch_renovate_extends(path: &Path) -> anyhow::Result<bool> {
+    let entry = flint_preset();
+    let content = std::fs::read_to_string(path)?;
+
+    if content.contains(&entry) {
+        return Ok(false);
+    }
+
+    // If an existing flint entry (any pin) is present, replace it in-place.
+    const FLINT_ENTRY_PREFIX: &str = "\"github>grafana/flint";
+    let new_content = if let Some(pos) = content.find(FLINT_ENTRY_PREFIX) {
+        let after_open = pos + 1; // skip leading "
+        let close = content[after_open..]
+            .find('"')
+            .context("unclosed quote in existing flint preset entry")?;
+        let end = after_open + close + 1; // position after closing "
+        format!("{}\"{}\"{}", &content[..pos], entry, &content[end..])
+    } else {
+        add_to_extends(&content, &entry)
+            .with_context(|| format!("failed to patch extends in {}", path.display()))?
+    };
+
+    std::fs::write(path, new_content)?;
+    Ok(true)
+}
+
+/// Text-based insertion of `entry` into the `extends` array.
+/// Works for both JSON (`"extends": [`) and JSON5 (`extends: [`).
+fn add_to_extends(content: &str, entry: &str) -> anyhow::Result<String> {
+    let re = regex::Regex::new(r#"(?:"extends"|extends)\s*:\s*\["#).unwrap();
+
+    if let Some(m) = re.find(content) {
+        let bracket_pos = m.end() - 1; // index of '['
+        let inside_start = bracket_pos + 1;
+
+        let close_offset = content[inside_start..]
+            .find(']')
+            .context("extends array has no closing ]")?;
+        let close_pos = inside_start + close_offset;
+        let inside = &content[inside_start..close_pos];
+
+        if inside.contains('\n') {
+            // Multiline: detect indent from first non-empty line, insert at top
+            let indent = inside
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .map(|line| " ".repeat(line.len() - line.trim_start().len()))
+                .unwrap_or_else(|| "  ".to_string());
+            Ok(format!(
+                "{}\n{}\"{}\"{}{}",
+                &content[..inside_start],
+                indent,
+                entry,
+                ",",
+                &content[inside_start..]
+            ))
+        } else {
+            // Single-line (empty or not): prepend entry
+            let sep = if inside.trim().is_empty() { "" } else { ", " };
+            Ok(format!(
+                "{}\"{}\"{}{}",
+                &content[..inside_start],
+                entry,
+                sep,
+                &content[inside_start..]
+            ))
+        }
+    } else {
+        // No extends key — add after the opening {
+        let open = content
+            .find('{')
+            .context("no opening { in renovate config")?;
+        let (before, after) = content.split_at(open + 1);
+        Ok(format!(
+            "{}\n  \"extends\": [\"{}\"],{}",
+            before, entry, after
+        ))
+    }
 }
 
 async fn run_inner(
@@ -405,6 +611,132 @@ mod tests {
             .map(|(name, value)| (name.to_string(), value.to_string()))
             .collect();
         validate_runtime_env_from(|name| vars.get(name).cloned())
+    }
+
+    fn write_tmp(content: &str) -> tempfile::NamedTempFile {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), content).unwrap();
+        file
+    }
+
+    #[test]
+    fn configure_renovate_deps_appends_placeholder() {
+        let tmp = write_tmp("[settings]\n");
+        let changed = configure_renovate_deps_config(tmp.path(), None).unwrap();
+        assert!(changed);
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(result.contains("[checks.renovate-deps]"));
+        assert!(result.contains("# exclude_managers = []"));
+    }
+
+    #[test]
+    fn configure_renovate_deps_appends_migrated_managers() {
+        let tmp = write_tmp("[settings]\n");
+        let managers = vec!["github-actions".to_string(), "cargo".to_string()];
+        let changed = configure_renovate_deps_config(tmp.path(), Some(&managers)).unwrap();
+        assert!(changed);
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(
+            result.contains("exclude_managers = [\"github-actions\", \"cargo\"]"),
+            "managers written uncommented: {result}"
+        );
+        assert!(!result.contains("# exclude_managers"));
+    }
+
+    #[test]
+    fn configure_renovate_deps_keeps_existing_managers() {
+        let tmp = write_tmp("[checks.renovate-deps]\nexclude_managers = [\"npm\"]\n");
+        let managers = vec!["github-actions".to_string(), "cargo".to_string()];
+        let changed = configure_renovate_deps_config(tmp.path(), Some(&managers)).unwrap();
+        assert!(!changed);
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(result.contains("exclude_managers = [\"npm\"]"));
+        assert!(!result.contains("github-actions"));
+    }
+
+    #[test]
+    fn replaces_unpinned_flint_entry_in_place() {
+        let input = r#"{ extends: ["config:recommended", "github>grafana/flint"] }"#;
+        let tmp = write_tmp(input);
+        let changed = patch_renovate_extends(tmp.path()).unwrap();
+        assert!(changed);
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(
+            result.contains("github>grafana/flint#v"),
+            "pinned entry written: {result}"
+        );
+        assert_eq!(
+            result.matches("grafana/flint").count(),
+            1,
+            "no duplicate: {result}"
+        );
+        assert!(
+            !result.contains("\"github>grafana/flint\""),
+            "unpinned removed: {result}"
+        );
+    }
+
+    #[test]
+    fn replaces_differently_pinned_flint_entry() {
+        let input = r#"{ extends: ["config:recommended", "github>grafana/flint#v0.5.0"] }"#;
+        let tmp = write_tmp(input);
+        let changed = patch_renovate_extends(tmp.path()).unwrap();
+        assert!(changed);
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(!result.contains("v0.5.0"), "old pin removed: {result}");
+        assert_eq!(
+            result.matches("grafana/flint").count(),
+            1,
+            "no duplicate: {result}"
+        );
+    }
+
+    #[test]
+    fn no_op_when_already_pinned_to_current_version() {
+        let entry = flint_preset();
+        let input = format!(r#"{{ extends: ["config:recommended", "{entry}"] }}"#);
+        let tmp = write_tmp(&input);
+        let changed = patch_renovate_extends(tmp.path()).unwrap();
+        assert!(!changed);
+    }
+
+    #[test]
+    fn adds_to_single_line_extends() {
+        let input = r#"{ "extends": ["config:recommended"], "other": 1 }"#;
+        let result = add_to_extends(input, "github>grafana/flint#v0.9.2").unwrap();
+        assert!(result.contains(r#"["github>grafana/flint#v0.9.2", "config:recommended"]"#));
+    }
+
+    #[test]
+    fn adds_to_json5_unquoted_key() {
+        let input = "{\n  extends: [\"config:recommended\"],\n}\n";
+        let result = add_to_extends(input, "github>grafana/flint#v0.9.2").unwrap();
+        assert!(result.contains(r#""github>grafana/flint#v0.9.2", "config:recommended""#));
+    }
+
+    #[test]
+    fn adds_to_multiline_extends() {
+        let input = "{\n  extends: [\n    \"config:recommended\",\n    \"other\"\n  ]\n}\n";
+        let result = add_to_extends(input, "github>grafana/flint#v0.9.2").unwrap();
+        assert!(result.contains("\"github>grafana/flint#v0.9.2\","));
+        let flint_pos = result.find("grafana/flint").unwrap();
+        let existing_pos = result.find("config:recommended").unwrap();
+        assert!(flint_pos < existing_pos);
+    }
+
+    #[test]
+    fn adds_extends_when_absent() {
+        let input = "{\n  \"branchPrefix\": \"renovate/\"\n}\n";
+        let result = add_to_extends(input, "github>grafana/flint#v0.9.2").unwrap();
+        assert!(result.contains("\"extends\""));
+        assert!(result.contains("github>grafana/flint#v0.9.2"));
+    }
+
+    #[test]
+    fn adds_to_empty_extends_array() {
+        let input = r#"{ "extends": [] }"#;
+        let result = add_to_extends(input, "github>grafana/flint#v0.9.2").unwrap();
+        assert!(result.contains(r#"["github>grafana/flint#v0.9.2"]"#));
     }
 
     #[test]

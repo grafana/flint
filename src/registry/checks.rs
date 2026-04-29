@@ -437,7 +437,7 @@ fn check_renovate_deps() -> Check {
         .adaptive_relevance(renovate_deps::adaptive_relevance)
         .mise_tool("npm:renovate")
         .patterns(RENOVATE_CONFIG_PATTERNS)
-        .init_hook(hooks::renovate_deps::run)
+        .init_hook(renovate_deps::init)
         .desc("Verify Renovate dependency snapshot is up to date")
         .docs(
             "Verifies `.github/renovate-tracked-deps.json` is up to date by running\n\

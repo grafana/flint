@@ -201,9 +201,7 @@ Default behavior: checks all links in changed files. When
 in all files — useful when broken internal links from unchanged files also
 matter.
 
-`GITHUB_TOKEN` is needed by some checks that query GitHub, but not every
-check. For `lychee`, CI runs require it so GitHub link checks can
-authenticate.
+In CI, `lychee` requires `GITHUB_TOKEN` so GitHub link checks can authenticate.
 On GitHub Actions PR runs in changed-file mode, link remaps also require
 `GITHUB_REPOSITORY`, `GITHUB_BASE_REF`, `GITHUB_HEAD_REF`, and `PR_HEAD_REPO`.
 GitHub Actions provides the first three; set `PR_HEAD_REPO` from

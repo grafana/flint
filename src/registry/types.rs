@@ -203,8 +203,11 @@ pub trait Linter: Sync + std::fmt::Debug {
     fn special_has_fix(&self) -> bool {
         false
     }
+    fn special_bin_name(&self) -> Option<&'static str> {
+        None
+    }
     fn special_uses_binary(&self) -> bool {
-        true
+        self.special_bin_name().is_some()
     }
 }
 
@@ -213,7 +216,7 @@ pub struct StaticLinter {
     init_hook: Option<InitHookFn>,
     special_kind: Option<SpecialKind>,
     special_has_fix: bool,
-    special_uses_binary: bool,
+    special_bin_name: Option<&'static str>,
 }
 
 impl StaticLinter {
@@ -223,7 +226,7 @@ impl StaticLinter {
             init_hook: Some(init_hook),
             special_kind: None,
             special_has_fix: false,
-            special_uses_binary: true,
+            special_bin_name: None,
         }
     }
 
@@ -231,22 +234,36 @@ impl StaticLinter {
         name: &'static str,
         special_kind: SpecialKind,
         special_has_fix: bool,
-        special_uses_binary: bool,
     ) -> Self {
         Self {
             name,
             init_hook: None,
             special_kind: Some(special_kind),
             special_has_fix,
-            special_uses_binary,
+            special_bin_name: None,
         }
     }
 
-    pub const fn special_with_init_hook(
+    pub const fn special_with_bin(
         name: &'static str,
+        bin_name: &'static str,
         special_kind: SpecialKind,
         special_has_fix: bool,
-        special_uses_binary: bool,
+    ) -> Self {
+        Self {
+            name,
+            init_hook: None,
+            special_kind: Some(special_kind),
+            special_has_fix,
+            special_bin_name: Some(bin_name),
+        }
+    }
+
+    pub const fn special_with_bin_and_init_hook(
+        name: &'static str,
+        bin_name: &'static str,
+        special_kind: SpecialKind,
+        special_has_fix: bool,
         init_hook: InitHookFn,
     ) -> Self {
         Self {
@@ -254,7 +271,7 @@ impl StaticLinter {
             init_hook: Some(init_hook),
             special_kind: Some(special_kind),
             special_has_fix,
-            special_uses_binary,
+            special_bin_name: Some(bin_name),
         }
     }
 }
@@ -276,8 +293,8 @@ impl Linter for StaticLinter {
         self.special_has_fix
     }
 
-    fn special_uses_binary(&self) -> bool {
-        self.special_uses_binary
+    fn special_bin_name(&self) -> Option<&'static str> {
+        self.special_bin_name
     }
 }
 
@@ -527,14 +544,9 @@ impl Check {
 
     /// Special check with custom logic (not a simple command template).
     pub fn special(linter: &'static dyn Linter) -> Self {
-        Self::special_with_bin(linter, "")
-    }
-
-    /// Special check with custom logic backed by an external binary.
-    pub fn special_with_bin(linter: &'static dyn Linter, bin_name: &'static str) -> Self {
         Check {
             name: linter.name(),
-            bin_name,
+            bin_name: linter.special_bin_name().unwrap_or(""),
             mise_tool_name: None,
             version_range: None,
             patterns: &[],

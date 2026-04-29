@@ -24,10 +24,10 @@ const PACKAGE_FILES_MSGS: &[&str] = &["Extracted dependencies", "packageFiles wi
 const RENOVATE_GITHUB_TOKEN_DISPLAY: &str = "GITHUB_COM_TOKEN or GITHUB_TOKEN";
 const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value", "invalid-version"];
 
-pub(crate) static LINTER: StaticLinter = StaticLinter::special_with_init_hook(
+pub(crate) static LINTER: StaticLinter = StaticLinter::special_with_bin_and_init_hook(
     "renovate-deps",
+    "renovate",
     SpecialKind::RenovateDeps,
-    true,
     true,
     init,
 );

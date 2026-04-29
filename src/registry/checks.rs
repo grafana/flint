@@ -403,7 +403,7 @@ fn check_dotnet_format() -> Check {
 }
 
 fn check_lychee() -> Check {
-    Check::special_with_bin(&lychee::LINTER, "lychee")
+    Check::special(&lychee::LINTER)
         .desc("Check for broken links")
         .docs(
             "Orchestrates [lychee](https://lychee.cli.rs/) for link checking. \
@@ -432,7 +432,7 @@ fn check_lychee() -> Check {
 }
 
 fn check_renovate_deps() -> Check {
-    Check::special_with_bin(&renovate_deps::LINTER, "renovate")
+    Check::special(&renovate_deps::LINTER)
         .adaptive()
         .adaptive_relevance(renovate_deps::adaptive_relevance)
         .mise_tool("npm:renovate")

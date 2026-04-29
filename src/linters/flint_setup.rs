@@ -6,7 +6,7 @@ use crate::linters::LinterOutput;
 use crate::registry::{SpecialKind, StaticLinter};
 
 pub(crate) static LINTER: StaticLinter =
-    StaticLinter::special("flint-setup", SpecialKind::FlintSetup, true, false);
+    StaticLinter::special("flint-setup", SpecialKind::FlintSetup, true);
 
 pub async fn run(
     fix: bool,

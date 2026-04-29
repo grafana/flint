@@ -21,7 +21,7 @@ const PR_LINK_REMAP_ENV_VARS: &[&str] = &[
 ];
 
 pub(crate) static LINTER: StaticLinter =
-    StaticLinter::special("lychee", SpecialKind::Links, false, true);
+    StaticLinter::special_with_bin("lychee", "lychee", SpecialKind::Links, false);
 
 pub async fn run(
     cfg: &LycheeConfig,

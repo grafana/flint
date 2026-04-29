@@ -23,13 +23,13 @@ fn detect_obsolete_keys_finds_known_stale_key() {
     use detection::detect_obsolete_keys;
     let mut keys = HashSet::new();
     keys.insert("github:mvdan/sh".to_string());
-    keys.insert("shellcheck".to_string());
+    keys.insert("github:koalaman/shellcheck".to_string());
     let found = detect_obsolete_keys(&keys);
     assert_eq!(found.len(), 2);
-    assert_eq!(found[0].0, "github:mvdan/sh");
-    assert_eq!(found[0].1, "shfmt");
-    assert_eq!(found[1].0, "shellcheck");
-    assert_eq!(found[1].1, "github:koalaman/shellcheck");
+    assert_eq!(found[0].0, "github:koalaman/shellcheck");
+    assert_eq!(found[0].1, "shellcheck");
+    assert_eq!(found[1].0, "github:mvdan/sh");
+    assert_eq!(found[1].1, "shfmt");
 }
 
 #[test]
@@ -37,7 +37,7 @@ fn detect_obsolete_keys_ignores_current_keys() {
     use detection::detect_obsolete_keys;
     let mut keys = HashSet::new();
     keys.insert("rumdl".to_string());
-    keys.insert("github:koalaman/shellcheck".to_string());
+    keys.insert("shellcheck".to_string());
     let found = detect_obsolete_keys(&keys);
     assert!(found.is_empty());
 }
@@ -144,7 +144,7 @@ bats = "1.13.0"
 java = "temurin-25.0.2+10.0.LTS"
 node = "24.15.0"
 "npm:renovate" = "43.0.0"
-"github:koalaman/shellcheck" = "0.11.0"
+shellcheck = "0.11.0"
 "#;
     let tmp = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(tmp.path(), content).unwrap();
@@ -173,7 +173,7 @@ fn normalize_tools_section_preserves_unrelated_tool_comments() {
 node = "24.15.0"
 
 # Linters
-"github:koalaman/shellcheck" = "0.11.0"
+shellcheck = "0.11.0"
 "#;
     let tmp = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(tmp.path(), content).unwrap();
@@ -193,7 +193,7 @@ custom-tool = "1.0.0"
 java = "temurin-25.0.3+9.0.LTS"
 node = "24.15.0"
 protoc = "34.1"
-"github:koalaman/shellcheck" = "0.11.0"
+shellcheck = "0.11.0"
 "#;
     let tmp = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(tmp.path(), content).unwrap();
@@ -205,9 +205,7 @@ protoc = "34.1"
     let node_pos = result.find("node =").expect("node present");
     let protoc_pos = result.find("protoc =").expect("protoc present");
     let header_pos = result.find("# Linters").expect("header present");
-    let shellcheck_pos = result
-        .find("\"github:koalaman/shellcheck\" =")
-        .expect("shellcheck present");
+    let shellcheck_pos = result.find("shellcheck =").expect("shellcheck present");
     assert!(
         custom_pos < header_pos
             && java_pos < header_pos
@@ -274,12 +272,12 @@ fn apply_changes_upgrade_preserves_version() {
 fn parse_tool_keys_reads_simple_toml() {
     let content = r#"
 [tools]
-"github:koalaman/shellcheck" = "v0.11.0"
+shellcheck = "v0.11.0"
 rumdl = "0.1.0"
 rust = { version = "1.0", components = "clippy" }
 "#;
     let keys = parse_tool_keys(content);
-    assert!(keys.contains("github:koalaman/shellcheck"));
+    assert!(keys.contains("shellcheck"));
     assert!(keys.contains("rumdl"));
     assert!(keys.contains("rust"));
     assert!(!keys.contains("nonexistent"));

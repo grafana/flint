@@ -486,7 +486,7 @@ mod tests {
     fn noop_without_npm_tools() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mise.toml");
-        let original = "[tools]\n\"github:koalaman/shellcheck\" = \"v0.11.0\"\n";
+        let original = "[tools]\nshellcheck = \"v0.11.0\"\n";
         std::fs::write(&path, original).unwrap();
 
         let added = ensure_node_for_npm(dir.path()).unwrap();

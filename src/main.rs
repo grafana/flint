@@ -1096,7 +1096,7 @@ biome = "2.3.14"
 taplo = "0.10.0"
 lychee = "0.22.0"
 "npm:renovate" = "43.92.1"
-"github:koalaman/shellcheck" = "v0.11.0"
+shellcheck = "v0.11.0"
 shfmt = "v3.13.1"
 actionlint = "1.7.10"
 editorconfig-checker = "v3.6.1"
@@ -1169,8 +1169,7 @@ license-header        (built-in)          not configured  fast      no   Check s
             .find(|check| check.name == "shellcheck")
             .expect("shellcheck check");
 
-        let active_without_binary =
-            mise_tools_from("[tools]\n\"github:koalaman/shellcheck\" = \"v0.11.0\"\n");
+        let active_without_binary = mise_tools_from("[tools]\nshellcheck = \"v0.11.0\"\n");
         assert_eq!(
             linter_status(&shellcheck, &active_without_binary, &cfg, |_| false),
             "no binary"

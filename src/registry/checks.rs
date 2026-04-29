@@ -89,11 +89,10 @@ fn check_shellcheck() -> Check {
         "shellcheck -x -P SCRIPTDIR {FILE}",
         &["*.sh", "*.bash", "*.bats"],
     )
-    .mise_tool("github:koalaman/shellcheck")
     .linter_config(".shellcheckrc", "--rcfile")
     .baseline_config(ConfigFile::config_dir(".shellcheckrc"))
     .unsupported_configs(SHELLCHECK_UNSUPPORTED_CONFIGS)
-    .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["shellcheck"])
+    .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["github:koalaman/shellcheck"])
     .desc("Lint shell scripts for common mistakes")
     .style()
 }

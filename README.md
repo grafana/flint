@@ -71,7 +71,7 @@ Add the linting tools your project needs alongside the `flint` binary itself:
 "github:grafana/flint" = "0.21.0"
 
 # Add whichever linters apply to your repo:
-"github:koalaman/shellcheck" = "0.11.0"
+shellcheck              = "0.11.0"
 shfmt                   = "v3.13.1"
 actionlint              = "1.7.10"
 rumdl                   = "0.1.78"

@@ -72,7 +72,7 @@ fn render_quickstart_tools(table: &toml::Table) -> Result<String> {
 \"github:grafana/flint\" = \"{flint}\"\n\
 \n\
 # Add whichever linters apply to your repo:\n\
-\"github:koalaman/shellcheck\" = \"{shellcheck}\"\n\
+shellcheck              = \"{shellcheck}\"\n\
 shfmt                   = \"{shfmt}\"\n\
 actionlint              = \"{actionlint}\"\n\
 rumdl                   = \"{rumdl}\"\n\
@@ -85,7 +85,7 @@ go                      = \"{go}\"    # activates gofmt\n\
 lychee                  = \"{lychee}\"    # activates links check\n\
 \"npm:renovate\"          = \"{renovate}\"  # activates renovate-deps check",
         flint = env!("CARGO_PKG_VERSION"),
-        shellcheck = versions["github:koalaman/shellcheck"],
+        shellcheck = versions["shellcheck"],
         shfmt = versions["shfmt"],
         actionlint = versions["actionlint"],
         rumdl = versions["rumdl"],

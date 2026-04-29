@@ -461,6 +461,11 @@ fn repo_renovate_config_stays_aligned_with_shared_preset_contract() {
             "package rule {group_name:?} schedule in .github/renovate.json5 drifted from default.json"
         );
         assert_eq!(
+            rule_name_field(default_rule),
+            rule_name_field(repo_rule),
+            "package rule {group_name:?} matcher field in .github/renovate.json5 drifted from default.json"
+        );
+        assert_eq!(
             rule_names(default_rule),
             rule_names(repo_rule),
             "package rule {group_name:?} package matcher in .github/renovate.json5 drifted from default.json"
@@ -570,6 +575,14 @@ fn sorted_dep_names(rule: &serde_json::Value) -> Vec<&str> {
     let mut names = dep_names(rule);
     names.sort_unstable();
     names
+}
+
+fn rule_name_field(rule: &serde_json::Value) -> &'static str {
+    if rule.get("matchDepNames").is_some() {
+        "matchDepNames"
+    } else {
+        "matchPackageNames"
+    }
 }
 
 fn rule_names(rule: &serde_json::Value) -> Vec<&str> {

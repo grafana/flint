@@ -3,6 +3,7 @@
 [expected]
 args = "run --full --fast-only renovate-deps"
 exit = 0
+stderr = "flint: warning: GITHUB_COM_TOKEN or GITHUB_TOKEN is not set; renovate-deps GitHub requests may be rate limited\n"
 
 [expected.files]
 ".renovate-ran" = """

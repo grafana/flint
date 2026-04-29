@@ -277,9 +277,9 @@ pub struct StaticSpecialLinter {
 }
 
 impl StaticSpecialLinter {
-    pub const fn new(has_fix: bool, prepare: SpecialPrepareFn) -> Self {
+    pub const fn new(prepare: SpecialPrepareFn) -> Self {
         Self {
-            has_fix,
+            has_fix: false,
             bin_name: None,
             config_display: None,
             setup: false,
@@ -287,18 +287,19 @@ impl StaticSpecialLinter {
         }
     }
 
-    pub const fn with_bin(
-        bin_name: &'static str,
-        has_fix: bool,
-        prepare: SpecialPrepareFn,
-    ) -> Self {
+    pub const fn with_bin(bin_name: &'static str, prepare: SpecialPrepareFn) -> Self {
         Self {
-            has_fix,
+            has_fix: false,
             bin_name: Some(bin_name),
             config_display: None,
             setup: false,
             prepare,
         }
+    }
+
+    pub const fn with_fix(mut self) -> Self {
+        self.has_fix = true;
+        self
     }
 
     pub const fn with_config_display(mut self, config_display: &'static str) -> Self {

@@ -10,7 +10,7 @@ use crate::registry::{
 };
 
 pub(crate) static LINTER: StaticLinter =
-    StaticLinter::special("license-header", StaticSpecialLinter::new(false, prepare));
+    StaticLinter::special("license-header", StaticSpecialLinter::new(prepare));
 
 #[derive(Debug)]
 struct PreparedLicenseHeader {

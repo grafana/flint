@@ -25,7 +25,7 @@ const PR_LINK_REMAP_ENV_VARS: &[&str] = &[
 
 pub(crate) static LINTER: StaticLinter = StaticLinter::special(
     "lychee",
-    StaticSpecialLinter::with_bin("lychee", false, prepare)
+    StaticSpecialLinter::with_bin("lychee", prepare)
         .with_config_display("via `[checks.links]` in flint.toml"),
 );
 

@@ -29,7 +29,7 @@ const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value", "invalid-v
 
 pub(crate) static LINTER: StaticLinter = StaticLinter::special_with_init_hook(
     "renovate-deps",
-    StaticSpecialLinter::with_bin("renovate", true, prepare),
+    StaticSpecialLinter::with_bin("renovate", prepare).with_fix(),
     init,
 );
 

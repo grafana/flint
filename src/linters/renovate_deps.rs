@@ -360,9 +360,10 @@ fn add_to_extends(content: &str, entry: &str) -> anyhow::Result<String> {
             .find('{')
             .context("no opening { in renovate config")?;
         let (before, after) = content.split_at(open + 1);
+        let separator = if after.trim() == "}" { "" } else { "," };
         Ok(format!(
-            "{}\n  \"extends\": [\"{}\"],{}",
-            before, entry, after
+            "{}\n  \"extends\": [\"{}\"]{}{}",
+            before, entry, separator, after
         ))
     }
 }
@@ -773,6 +774,16 @@ mod tests {
         let result = add_to_extends(input, "github>grafana/flint#v0.9.2").unwrap();
         assert!(result.contains("\"extends\""));
         assert!(result.contains("github>grafana/flint#v0.9.2"));
+    }
+
+    #[test]
+    fn adds_extends_when_absent_in_empty_object() {
+        let input = "{}\n";
+        let result = add_to_extends(input, "github>grafana/flint#v0.9.2").unwrap();
+        assert_eq!(
+            result,
+            "{\n  \"extends\": [\"github>grafana/flint#v0.9.2\"]}\n"
+        );
     }
 
     #[test]

@@ -4,7 +4,7 @@ use std::path::Path;
 
 use crate::registry::InitHookContext;
 
-pub(crate) fn run(ctx: &dyn InitHookContext) -> Result<bool> {
+pub(crate) fn init(ctx: &dyn InitHookContext) -> Result<bool> {
     generate_config(ctx.project_root(), ctx.config_dir(), ctx.line_length())
 }
 

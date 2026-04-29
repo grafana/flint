@@ -1,7 +1,7 @@
 use super::types::{Check, ConfigFile, EditorconfigDirectiveStyle, SpecialKind, WorkflowSetup};
-use crate::init::hooks;
 use crate::linters::{
-    biome, license_header, renovate_deps, renovate_deps::RENOVATE_CONFIG_PATTERNS, taplo,
+    biome, license_header, renovate_deps, renovate_deps::RENOVATE_CONFIG_PATTERNS, rumdl, rustfmt,
+    taplo, yamllint,
 };
 use crate::setup::{V1_BOOTSTRAP_SETUP_VERSION, V2_BASELINE_SETUP_VERSION};
 
@@ -113,7 +113,7 @@ fn check_rumdl() -> Check {
         .linter_config(".rumdl.toml", "--config")
         .baseline_config(ConfigFile::config_dir(".rumdl.toml"))
         .unsupported_configs(RUMDL_UNSUPPORTED_CONFIGS)
-        .init_hook(hooks::rumdl::run)
+        .init_hook(rumdl::init)
         .nonverbose_filter_prefixes(&["Success: No issues found in "])
         .formatter()
         .editorconfig_line_length_off(
@@ -130,7 +130,7 @@ fn check_yaml_lint() -> Check {
         .linter_config(".yamllint.yml", "-c")
         .baseline_config(ConfigFile::config_dir(".yamllint.yml"))
         .unsupported_configs(YAMLLINT_UNSUPPORTED_CONFIGS)
-        .init_hook(hooks::yamllint::run)
+        .init_hook(yamllint::init)
         .formatter()
         .desc("Lint YAML files for style and consistency")
         .mise_tool("aqua:owenlamont/ryl")
@@ -150,7 +150,7 @@ fn check_taplo() -> Check {
     .linter_config(".taplo.toml", "--config")
     .baseline_config(ConfigFile::config_dir(".taplo.toml"))
     .unsupported_configs(TAPLO_UNSUPPORTED_CONFIGS)
-    .init_hook(hooks::taplo::run)
+    .init_hook(taplo::init)
     .stderr_filter_prefixes(&[" INFO taplo:"])
     .nonverbose_failure_output(taplo::normalize_nonverbose_failure_output)
     .formatter()
@@ -323,7 +323,7 @@ fn check_cargo_fmt() -> Check {
         .linter_config("rustfmt.toml", "--config-path")
         .baseline_config(RUSTFMT_BASELINE_CONFIG)
         .unsupported_configs(RUSTFMT_UNSUPPORTED_CONFIGS)
-        .init_hook(hooks::rustfmt::run)
+        .init_hook(rustfmt::init)
         .bin("rustfmt")
         .mise_tool("rust")
         .toolchain_components("rustfmt")

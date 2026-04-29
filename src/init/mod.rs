@@ -9,7 +9,6 @@ use crate::registry::{Category, Check, InitHookContext, WorkflowSetup, builtin};
 mod config_files;
 mod detection;
 pub(crate) mod generation;
-pub(crate) mod hooks;
 mod migrations;
 mod mise_tools;
 mod scaffold;

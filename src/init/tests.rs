@@ -338,7 +338,7 @@ fn get_existing_config_dir_absent() {
 
 #[test]
 fn generate_rumdl_config_writes_file() {
-    use hooks::rumdl::generate_config;
+    use crate::linters::rumdl::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     let written = generate_config(tmp.path(), &config_dir, DEFAULT_LINE_LENGTH).unwrap();
@@ -353,7 +353,7 @@ fn generate_rumdl_config_writes_file() {
 
 #[test]
 fn generate_rumdl_config_skips_when_target_exists() {
-    use hooks::rumdl::generate_config;
+    use crate::linters::rumdl::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     std::fs::create_dir_all(&config_dir).unwrap();
@@ -366,7 +366,7 @@ fn generate_rumdl_config_skips_when_target_exists() {
 
 #[test]
 fn generate_rumdl_config_replaces_legacy_json() {
-    use hooks::rumdl::generate_config;
+    use crate::linters::rumdl::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     std::fs::write(tmp.path().join(".markdownlint.json"), r#"{"MD013":false}"#).unwrap();
@@ -380,7 +380,7 @@ fn generate_rumdl_config_replaces_legacy_json() {
 
 #[test]
 fn generate_rumdl_config_converts_legacy_yaml() {
-    use hooks::rumdl::generate_config;
+    use crate::linters::rumdl::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     std::fs::write(
@@ -582,7 +582,7 @@ fn disable_editorconfig_line_length_for_patterns_is_idempotent() {
 
 #[test]
 fn generate_yamllint_config_writes_file() {
-    use hooks::yamllint::generate_config;
+    use crate::linters::yamllint::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     let written = generate_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
@@ -596,7 +596,7 @@ fn generate_yamllint_config_writes_file() {
 
 #[test]
 fn generate_taplo_config_writes_file() {
-    use hooks::taplo::generate_config;
+    use crate::linters::taplo::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     let written = generate_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
@@ -609,7 +609,7 @@ fn generate_taplo_config_writes_file() {
 
 #[test]
 fn generate_taplo_config_skips_existing_supported_file() {
-    use hooks::taplo::generate_config;
+    use crate::linters::taplo::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     std::fs::create_dir_all(&config_dir).unwrap();
@@ -622,7 +622,7 @@ fn generate_taplo_config_skips_existing_supported_file() {
 
 #[test]
 fn generate_taplo_config_skips_existing_legacy_name() {
-    use hooks::taplo::generate_config;
+    use crate::linters::taplo::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     std::fs::create_dir_all(&config_dir).unwrap();
@@ -634,7 +634,7 @@ fn generate_taplo_config_skips_existing_legacy_name() {
 
 #[test]
 fn generate_rustfmt_config_writes_file() {
-    use hooks::rustfmt::generate_config;
+    use crate::linters::rustfmt::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     let written = generate_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
@@ -645,7 +645,7 @@ fn generate_rustfmt_config_writes_file() {
 
 #[test]
 fn generate_rustfmt_config_skips_existing_file() {
-    use hooks::rustfmt::generate_config;
+    use crate::linters::rustfmt::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     std::fs::create_dir_all(&config_dir).unwrap();

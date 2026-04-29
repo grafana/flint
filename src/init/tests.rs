@@ -1,4 +1,5 @@
 use super::*;
+use crate::registry::StaticInitHook;
 use config_files::generate_flint_toml;
 use detection::entry_components_differ;
 use generation::{
@@ -13,6 +14,8 @@ fn counting_init_hook(_: &dyn InitHookContext) -> anyhow::Result<bool> {
     INIT_HOOK_CALLS.fetch_add(1, Ordering::SeqCst);
     Ok(true)
 }
+
+static COUNTING_INIT_HOOK: StaticInitHook = StaticInitHook::new("shared-hook", counting_init_hook);
 
 #[test]
 fn detect_obsolete_keys_finds_known_stale_key() {
@@ -55,10 +58,8 @@ fn all_registry_checks_have_install_key_or_none() {
 #[test]
 fn apply_linter_init_hooks_runs_shared_hook_once() {
     INIT_HOOK_CALLS.store(0, Ordering::SeqCst);
-    let first =
-        Check::file("first", "first {FILE}", &["*"]).init_hook("shared-hook", counting_init_hook);
-    let second =
-        Check::file("second", "second {FILE}", &["*"]).init_hook("shared-hook", counting_init_hook);
+    let first = Check::file("first", "first {FILE}", &["*"]).init_hook(&COUNTING_INIT_HOOK);
+    let second = Check::file("second", "second {FILE}", &["*"]).init_hook(&COUNTING_INIT_HOOK);
     let tmp = tempfile::TempDir::new().unwrap();
     let changed = apply_linter_init_hooks(
         &[&first, &second],

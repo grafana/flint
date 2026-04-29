@@ -2,7 +2,9 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::path::Path;
 
-use crate::registry::InitHookContext;
+use crate::registry::{InitHookContext, StaticInitHook};
+
+pub(crate) static INIT_HOOK: StaticInitHook = StaticInitHook::new("rumdl", init);
 
 pub(crate) fn init(ctx: &dyn InitHookContext) -> Result<bool> {
     generate_config(ctx.project_root(), ctx.config_dir(), ctx.line_length())

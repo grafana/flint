@@ -191,6 +191,32 @@ pub trait InitHookContext {
 
 pub type InitHookFn = fn(&dyn InitHookContext) -> anyhow::Result<bool>;
 
+pub trait InitHookSpec: Sync {
+    fn name(&self) -> &'static str;
+    fn hook(&self) -> Option<InitHookFn>;
+}
+
+pub struct StaticInitHook {
+    name: &'static str,
+    hook: InitHookFn,
+}
+
+impl StaticInitHook {
+    pub const fn new(name: &'static str, hook: InitHookFn) -> Self {
+        Self { name, hook }
+    }
+}
+
+impl InitHookSpec for StaticInitHook {
+    fn name(&self) -> &'static str {
+        self.name
+    }
+
+    fn hook(&self) -> Option<InitHookFn> {
+        Some(self.hook)
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct InitHook {
     id: &'static str,
@@ -198,8 +224,11 @@ pub struct InitHook {
 }
 
 impl InitHook {
-    pub const fn new(id: &'static str, hook: InitHookFn) -> Self {
-        Self { id, hook }
+    pub fn from_spec(spec: &'static dyn InitHookSpec) -> Option<Self> {
+        spec.hook().map(|hook| Self {
+            id: spec.name(),
+            hook,
+        })
     }
 
     pub fn id(self) -> &'static str {
@@ -706,8 +735,8 @@ impl Check {
         self
     }
 
-    pub fn init_hook(mut self, id: &'static str, hook: InitHookFn) -> Self {
-        self.init_hook = Some(InitHook::new(id, hook));
+    pub fn init_hook(mut self, hook: &'static dyn InitHookSpec) -> Self {
+        self.init_hook = InitHook::from_spec(hook);
         self
     }
 

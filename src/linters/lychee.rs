@@ -7,8 +7,8 @@ use crate::files::FileList;
 use crate::linters::LinterOutput;
 use crate::linters::env;
 use crate::registry::{
-    PreparedSpecialCheck, SpecialKind, SpecialPrepareContext, SpecialRunContext, SpecialRunFuture,
-    StaticLinter, StaticSpecialLinter,
+    PreparedSpecialCheck, SpecialPrepareContext, SpecialRunContext, SpecialRunFuture, StaticLinter,
+    StaticSpecialLinter,
 };
 
 const GITHUB_BASE_REF_ENV: &str = "GITHUB_BASE_REF";
@@ -25,7 +25,8 @@ const PR_LINK_REMAP_ENV_VARS: &[&str] = &[
 
 pub(crate) static LINTER: StaticLinter = StaticLinter::special(
     "lychee",
-    StaticSpecialLinter::with_bin_and_kind("lychee", SpecialKind::Links, false, prepare),
+    StaticSpecialLinter::with_bin("lychee", false, prepare)
+        .with_config_display("via `[checks.links]` in flint.toml"),
 );
 
 #[derive(Debug)]

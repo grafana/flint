@@ -54,7 +54,6 @@ pub enum RunPolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpecialKind {
-    Links,
     FlintSetup,
 }
 
@@ -82,6 +81,10 @@ impl SpecialCheck {
 
     pub fn prepare(self, ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>> {
         self.special.prepare(ctx)
+    }
+
+    pub fn config_display(self) -> Option<&'static str> {
+        self.special.config_display()
     }
 }
 
@@ -129,6 +132,13 @@ impl CheckKind {
 
     pub fn is_special(&self) -> bool {
         matches!(self, Self::Special(_))
+    }
+
+    pub fn special_config_display(&self) -> Option<&'static str> {
+        match self {
+            Self::Template { .. } => None,
+            Self::Special(special) => special.config_display(),
+        }
     }
 }
 
@@ -258,6 +268,9 @@ pub trait SpecialLinter: Sync + std::fmt::Debug {
     fn bin_name(&self) -> Option<&'static str> {
         None
     }
+    fn config_display(&self) -> Option<&'static str> {
+        None
+    }
     fn uses_binary(&self) -> bool {
         self.bin_name().is_some()
     }
@@ -268,6 +281,7 @@ pub struct StaticSpecialLinter {
     kind: Option<SpecialKind>,
     has_fix: bool,
     bin_name: Option<&'static str>,
+    config_display: Option<&'static str>,
     prepare: SpecialPrepareFn,
 }
 
@@ -277,6 +291,7 @@ impl StaticSpecialLinter {
             kind: None,
             has_fix,
             bin_name: None,
+            config_display: None,
             prepare,
         }
     }
@@ -286,6 +301,7 @@ impl StaticSpecialLinter {
             kind: Some(kind),
             has_fix,
             bin_name: None,
+            config_display: None,
             prepare,
         }
     }
@@ -299,22 +315,14 @@ impl StaticSpecialLinter {
             kind: None,
             has_fix,
             bin_name: Some(bin_name),
+            config_display: None,
             prepare,
         }
     }
 
-    pub const fn with_bin_and_kind(
-        bin_name: &'static str,
-        kind: SpecialKind,
-        has_fix: bool,
-        prepare: SpecialPrepareFn,
-    ) -> Self {
-        Self {
-            kind: Some(kind),
-            has_fix,
-            bin_name: Some(bin_name),
-            prepare,
-        }
+    pub const fn with_config_display(mut self, config_display: &'static str) -> Self {
+        self.config_display = Some(config_display);
+        self
     }
 }
 
@@ -333,6 +341,10 @@ impl SpecialLinter for StaticSpecialLinter {
 
     fn bin_name(&self) -> Option<&'static str> {
         self.bin_name
+    }
+
+    fn config_display(&self) -> Option<&'static str> {
+        self.config_display
     }
 }
 

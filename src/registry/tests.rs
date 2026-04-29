@@ -880,8 +880,8 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     match check.linter_config.as_ref() {
         Some(config) => rows.push(("Config", format!("`{}`", config.display_name()))),
         None => {
-            if check.kind.is_special_kind(SpecialKind::Links) {
-                rows.push(("Config", "via `[checks.links]` in flint.toml".to_string()));
+            if let Some(config) = check.kind.special_config_display() {
+                rows.push(("Config", config.to_string()));
             }
         }
     }

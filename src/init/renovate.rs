@@ -1,6 +1,86 @@
 use anyhow::{Context, Result};
 use std::path::Path;
 
+/// Ensures `flint.toml` has the Renovate check config that init owns.
+/// Returns `true` when the file was changed.
+pub(super) fn ensure_renovate_deps_config(
+    toml_path: &Path,
+    exclude_managers: Option<&[String]>,
+) -> Result<bool> {
+    let content = std::fs::read_to_string(toml_path)
+        .with_context(|| format!("failed to read {}", toml_path.display()))?;
+    let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse flint.toml")?;
+    let Some(checks) = doc.get("checks").and_then(|item| item.as_table()) else {
+        return append_renovate_deps_config(toml_path, &content, exclude_managers);
+    };
+    let Some(table_key) = ["renovate-deps", "renovate_deps"]
+        .into_iter()
+        .find(|key| checks.contains_key(key))
+    else {
+        return append_renovate_deps_config(toml_path, &content, exclude_managers);
+    };
+
+    let managers = exclude_managers.unwrap_or_default();
+    if managers.is_empty() {
+        return Ok(false);
+    }
+    let renovate = doc
+        .get_mut("checks")
+        .and_then(|item| item.as_table_mut())
+        .and_then(|checks| checks.get_mut(table_key))
+        .and_then(|item| item.as_table_mut())
+        .with_context(|| {
+            format!(
+                "[checks.{table_key}] is not a table in {}",
+                toml_path.display()
+            )
+        })?;
+    if renovate.contains_key("exclude_managers") {
+        return Ok(false);
+    }
+    renovate.insert("exclude_managers", toml_edit::value(string_array(managers)));
+    std::fs::write(toml_path, doc.to_string())
+        .with_context(|| format!("failed to write {}", toml_path.display()))?;
+    println!(
+        "  patched {} — added checks.renovate-deps.exclude_managers",
+        toml_path.display()
+    );
+    Ok(true)
+}
+
+fn append_renovate_deps_config(
+    toml_path: &Path,
+    content: &str,
+    exclude_managers: Option<&[String]>,
+) -> Result<bool> {
+    let mut next = String::from(content);
+    if !next.ends_with('\n') {
+        next.push('\n');
+    }
+    next.push_str("\n[checks.renovate-deps]\n");
+    match exclude_managers {
+        Some(managers) if !managers.is_empty() => {
+            next.push_str(&format!("exclude_managers = {}\n", string_array(managers)));
+        }
+        _ => next.push_str("# exclude_managers = []\n"),
+    }
+    std::fs::write(toml_path, next)
+        .with_context(|| format!("failed to write {}", toml_path.display()))?;
+    println!(
+        "  patched {} — added checks.renovate-deps",
+        toml_path.display()
+    );
+    Ok(true)
+}
+
+fn string_array(values: &[String]) -> toml_edit::Array {
+    let mut array = toml_edit::Array::default();
+    for value in values {
+        array.push(value.as_str());
+    }
+    array
+}
+
 /// Returns the renovate preset entry to inject, e.g. `github>grafana/flint#v0.9.2`.
 /// Pre-release suffixes are stripped so dev builds produce a valid tag reference.
 pub(super) fn flint_preset() -> String {

@@ -189,7 +189,33 @@ pub trait InitHookContext {
     fn renovate_exclude_managers(&self) -> Option<&[String]>;
 }
 
-pub type InitHook = fn(&dyn InitHookContext) -> anyhow::Result<bool>;
+pub type InitHookFn = fn(&dyn InitHookContext) -> anyhow::Result<bool>;
+
+#[derive(Clone, Copy)]
+pub struct InitHook {
+    id: &'static str,
+    hook: InitHookFn,
+}
+
+impl InitHook {
+    pub const fn new(id: &'static str, hook: InitHookFn) -> Self {
+        Self { id, hook }
+    }
+
+    pub fn id(self) -> &'static str {
+        self.id
+    }
+
+    pub fn call(self, ctx: &dyn InitHookContext) -> anyhow::Result<bool> {
+        (self.hook)(ctx)
+    }
+}
+
+impl std::fmt::Debug for InitHook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InitHook").field("id", &self.id).finish()
+    }
+}
 
 pub trait AdaptiveRelevanceContext {
     fn file_list(&self) -> &FileList;
@@ -680,8 +706,8 @@ impl Check {
         self
     }
 
-    pub fn init_hook(mut self, hook: InitHook) -> Self {
-        self.init_hook = Some(hook);
+    pub fn init_hook(mut self, id: &'static str, hook: InitHookFn) -> Self {
+        self.init_hook = Some(InitHook::new(id, hook));
         self
     }
 

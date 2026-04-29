@@ -5,6 +5,14 @@ use generation::{
     apply_changes, get_existing_config_dir, has_slow_selected, normalize_tools_section,
 };
 use scaffold::{apply_env_and_tasks, generate_lint_workflow};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static INIT_HOOK_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+fn counting_init_hook(_: &dyn InitHookContext) -> anyhow::Result<bool> {
+    INIT_HOOK_CALLS.fetch_add(1, Ordering::SeqCst);
+    Ok(true)
+}
 
 #[test]
 fn detect_obsolete_keys_finds_known_stale_key() {
@@ -42,6 +50,28 @@ fn all_registry_checks_have_install_key_or_none() {
             );
         }
     }
+}
+
+#[test]
+fn apply_linter_init_hooks_runs_shared_hook_once() {
+    INIT_HOOK_CALLS.store(0, Ordering::SeqCst);
+    let first =
+        Check::file("first", "first {FILE}", &["*"]).init_hook("shared-hook", counting_init_hook);
+    let second =
+        Check::file("second", "second {FILE}", &["*"]).init_hook("shared-hook", counting_init_hook);
+    let tmp = tempfile::TempDir::new().unwrap();
+    let changed = apply_linter_init_hooks(
+        &[&first, &second],
+        tmp.path(),
+        tmp.path(),
+        DEFAULT_LINE_LENGTH,
+        false,
+        None,
+    )
+    .unwrap();
+
+    assert!(changed);
+    assert_eq!(INIT_HOOK_CALLS.load(Ordering::SeqCst), 1);
 }
 
 #[test]

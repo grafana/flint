@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
 
-use crate::registry::{Category, Check, InitHookContext, builtin};
+use crate::registry::{Category, Check, InitHookContext, WorkflowSetup, builtin};
 
 mod config_files;
 mod detection;
@@ -376,9 +376,11 @@ Add and stage your source files before running init so the detection is accurate
         &base_branch,
         crate::setup::LATEST_SUPPORTED_SETUP_VERSION,
     )?;
-    let has_rust = final_add.iter().any(|(k, _)| k == "rust")
-        || (current_tool_keys.contains("rust") && !final_remove.iter().any(|k| k == "rust"));
-    let workflow_generated = generate_lint_workflow(project_root, &base_branch, has_rust)?;
+    let needs_rust_components = selected_checks
+        .iter()
+        .any(|check| check.workflow_setup == Some(WorkflowSetup::RustComponents));
+    let workflow_generated =
+        generate_lint_workflow(project_root, &base_branch, needs_rust_components)?;
     let linter_init_changed = apply_linter_init_hooks(
         &selected_checks,
         project_root,

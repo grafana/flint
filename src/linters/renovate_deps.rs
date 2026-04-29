@@ -6,6 +6,7 @@ use crate::config::RenovateDepsConfig;
 use crate::files::FileList;
 use crate::linters::LinterOutput;
 use crate::linters::env;
+use crate::registry::AdaptiveRelevanceContext;
 
 const COMMITTED_FILE: &str = "renovate-tracked-deps.json";
 pub(crate) const COMMITTED_PATHS: &[&str] = &[COMMITTED_FILE, ".github/renovate-tracked-deps.json"];
@@ -111,6 +112,10 @@ pub(crate) fn is_relevant(file_list: &FileList, project_root: &Path) -> bool {
     };
 
     committed.keys().any(|path| changed.contains(path))
+}
+
+pub(crate) fn adaptive_relevance(ctx: &dyn AdaptiveRelevanceContext) -> bool {
+    is_relevant(ctx.file_list(), ctx.project_root())
 }
 
 async fn run_inner(

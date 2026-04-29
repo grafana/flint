@@ -355,6 +355,29 @@ fn editorconfig_checker_json_is_optional_not_generated_baseline() {
         check.baseline_config.is_none(),
         ".editorconfig-checker.json should not be treated as generated baseline config"
     );
+    assert!(
+        check
+            .baseline_triggers
+            .iter()
+            .any(|config| config.path == ".editorconfig"),
+        ".editorconfig changes should trigger an all-files editorconfig-checker baseline"
+    );
+}
+
+#[test]
+fn adaptive_checks_declare_relevance_hooks() {
+    let missing: Vec<_> = builtin()
+        .into_iter()
+        .filter(|check| check.run_policy == RunPolicy::Adaptive)
+        .filter(|check| check.adaptive_relevance.is_none())
+        .map(|check| check.name)
+        .collect();
+
+    assert!(
+        missing.is_empty(),
+        "adaptive checks missing relevance hooks: {}",
+        missing.join(", ")
+    );
 }
 
 #[test]

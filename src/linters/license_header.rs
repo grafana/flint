@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::config::LicenseHeaderConfig;
 use crate::linters::LinterOutput;
+use crate::registry::StatusContext;
 
 /// Checks that each file contains `cfg.text` within the first `cfg.lines_to_check` lines.
 /// Files are pre-filtered by pattern in the runner; this function checks all of them.
@@ -36,6 +37,15 @@ pub async fn run(
         stdout: vec![],
         stderr,
     }
+}
+
+pub(crate) fn status(ctx: &dyn StatusContext) -> Option<&'static str> {
+    ctx.config()
+        .checks
+        .license_header
+        .text
+        .is_empty()
+        .then_some("not configured")
 }
 
 /// Returns `true` if `text` appears anywhere within the first `lines_to_check` lines of `path`.

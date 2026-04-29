@@ -8,7 +8,10 @@ use tokio::task::JoinSet;
 use crate::config::{Config, LicenseHeaderConfig, LycheeConfig, RenovateDepsConfig, Settings};
 use crate::files::FileList;
 use crate::linters::{LinterOutput, flint_setup, license_header, lychee, renovate_deps};
-use crate::registry::{Check, CheckKind, LinterConfig, Scope, SpecialKind};
+use crate::registry::{
+    Check, CheckKind, LinterConfig, MissingComponentHint, NonverboseFailureOutputHook, Scope,
+    SpecialKind,
+};
 
 #[derive(Clone, Copy)]
 pub struct RunOptions {
@@ -46,6 +49,8 @@ enum PreparedCheck {
         env: &'static [(&'static str, &'static str)],
         nonverbose_filter_prefixes: &'static [&'static str],
         stderr_filter_prefixes: &'static [&'static str],
+        nonverbose_failure_output: Option<NonverboseFailureOutputHook>,
+        missing_component_hint: Option<MissingComponentHint>,
     },
     Links {
         name: String,
@@ -94,6 +99,8 @@ impl PreparedCheck {
                 env,
                 nonverbose_filter_prefixes,
                 stderr_filter_prefixes,
+                nonverbose_failure_output,
+                missing_component_hint,
                 ..
             } => {
                 let before = if fix && !tracked_files.is_empty() {
@@ -115,6 +122,8 @@ impl PreparedCheck {
                         },
                         stderr_filter_prefixes: if verbose { &[] } else { stderr_filter_prefixes },
                     },
+                    nonverbose_failure_output,
+                    missing_component_hint,
                     project_root,
                 )
                 .await;
@@ -282,6 +291,8 @@ fn prepare(
                 env: check.env,
                 nonverbose_filter_prefixes: check.nonverbose_filter_prefixes,
                 stderr_filter_prefixes: check.stderr_filter_prefixes,
+                nonverbose_failure_output: check.nonverbose_failure_output,
+                missing_component_hint: check.missing_component_hint,
             })
         }
         CheckKind::Special(special) => match special.kind() {
@@ -573,6 +584,8 @@ async fn run_invocations(
     invocations: &[Vec<String>],
     windows_java_jar: bool,
     output_policy: InvocationOutputPolicy<'_>,
+    nonverbose_failure_output: Option<NonverboseFailureOutputHook>,
+    missing_component_hint: Option<MissingComponentHint>,
     root: &Path,
 ) -> LinterOutput {
     let mut all_ok = true;
@@ -590,12 +603,11 @@ async fn run_invocations(
         let result = cmd.output().await;
         match result {
             Ok(out) => {
-                if name == "taplo"
-                    && !output_policy.stderr_filter_prefixes.is_empty()
+                if output_policy.nonverbose
                     && !out.status.success()
+                    && let Some(normalize) = nonverbose_failure_output
                 {
-                    let (stdout, stderr) =
-                        normalize_taplo_nonverbose_output(argv, &out.stdout, &out.stderr);
+                    let (stdout, stderr) = normalize(argv, &out.stdout, &out.stderr);
                     combined_stdout.extend_from_slice(&stdout);
                     combined_stderr.extend_from_slice(&stderr);
                 } else {
@@ -643,7 +655,7 @@ async fn run_invocations(
         }
     }
 
-    maybe_append_rust_component_note(name, &mut combined_stderr);
+    maybe_append_missing_component_note(name, missing_component_hint, &mut combined_stderr);
 
     LinterOutput {
         ok: all_ok,
@@ -674,49 +686,6 @@ fn filter_stderr_lines(stderr: &[u8], prefixes: &[&str]) -> Vec<u8> {
     out.into_bytes()
 }
 
-fn normalize_taplo_nonverbose_output(
-    argv: &[String],
-    stdout: &[u8],
-    stderr: &[u8],
-) -> (Vec<u8>, Vec<u8>) {
-    let raw = format!(
-        "{}{}",
-        String::from_utf8_lossy(stdout),
-        String::from_utf8_lossy(stderr)
-    );
-    let mut error_lines: Vec<String> = raw
-        .lines()
-        .filter(|line| line.starts_with("ERROR"))
-        .map(ToOwned::to_owned)
-        .collect();
-
-    if error_lines.is_empty()
-        && let Some(target) = argv.last()
-    {
-        error_lines.push(format!(
-            "ERROR taplo:format_files: the file is not properly formatted path=\"{target}\""
-        ));
-    }
-
-    if !error_lines.is_empty()
-        && !error_lines.iter().any(|line| {
-            line == "ERROR operation failed error=some files were not properly formatted"
-        })
-    {
-        error_lines.push(
-            "ERROR operation failed error=some files were not properly formatted".to_string(),
-        );
-    }
-
-    let stderr = if error_lines.is_empty() {
-        Vec::new()
-    } else {
-        format!("{}\n", error_lines.join("\n")).into_bytes()
-    };
-
-    (Vec::new(), stderr)
-}
-
 fn filter_output_lines(output: &[u8], predicate: impl Fn(&str) -> bool) -> Vec<u8> {
     let text = String::from_utf8_lossy(output);
     let mut out = String::new();
@@ -739,14 +708,23 @@ fn filter_output_lines(output: &[u8], predicate: impl Fn(&str) -> bool) -> Vec<u
     out.into_bytes()
 }
 
-fn maybe_append_rust_component_note(name: &str, stderr: &mut Vec<u8>) {
-    let Some(component) = missing_rust_component(name, stderr) else {
+fn maybe_append_missing_component_note(
+    name: &str,
+    hint: Option<MissingComponentHint>,
+    stderr: &mut Vec<u8>,
+) {
+    let Some(hint) = hint else {
+        return;
+    };
+    let stderr_text = String::from_utf8_lossy(stderr);
+    if !stderr_text.contains(hint.stderr_contains) {
         return;
     };
     let note = format!(
         "NOTE: `{name}` needs the Rust `{component}` component in the active toolchain.\n\
 `mise` may activate an existing Rust toolchain without adding missing components.\n\
-Install it with: `rustup component add {component}`\n"
+Install it with: `rustup component add {component}`\n",
+        component = hint.component,
     );
     stderr.extend_from_slice(note.as_bytes());
 }
@@ -760,19 +738,6 @@ fn fingerprint_files(files: &[PathBuf]) -> u64 {
         }
     }
     hasher.finish()
-}
-
-fn missing_rust_component(name: &str, stderr: &[u8]) -> Option<&'static str> {
-    let stderr = String::from_utf8_lossy(stderr);
-    match name {
-        "cargo-clippy" if stderr.contains("'cargo-clippy' is not installed for the toolchain") => {
-            Some("clippy")
-        }
-        "cargo-fmt" if stderr.contains("'rustfmt' is not installed for the toolchain") => {
-            Some("rustfmt")
-        }
-        _ => None,
-    }
 }
 
 fn format_duration_suffix(time: bool, duration: Duration) -> String {
@@ -1011,6 +976,11 @@ mod tests {
             unsupported_configs: &[],
             tool_key_migrations: vec![],
             init_hook: None,
+            adaptive_relevance: None,
+            status_hook: None,
+            nonverbose_failure_output: None,
+            missing_component_hint: None,
+            baseline_triggers: &[],
             is_formatter: false,
             defers_to_formatters: false,
             editorconfig_line_length_policy: crate::registry::EditorconfigLineLengthPolicy::Default,
@@ -1019,6 +989,7 @@ mod tests {
             run_policy: RunPolicy::Fast,
             toolchain: None,
             windows_java_jar: false,
+            workflow_setup: None,
             fix_behavior: crate::registry::FixBehavior::Definitive,
             kind: CheckKind::Template {
                 check_cmd: "run-it",
@@ -1125,7 +1096,14 @@ mod tests {
     fn appends_rust_component_note_for_missing_clippy() {
         let mut stderr = b"error: 'cargo-clippy' is not installed for the toolchain '1.94.1-x86_64-unknown-linux-gnu'.\n".to_vec();
 
-        maybe_append_rust_component_note("cargo-clippy", &mut stderr);
+        maybe_append_missing_component_note(
+            "cargo-clippy",
+            Some(MissingComponentHint {
+                component: "clippy",
+                stderr_contains: "'cargo-clippy' is not installed for the toolchain",
+            }),
+            &mut stderr,
+        );
 
         let msg = String::from_utf8(stderr).unwrap();
         assert!(msg.contains("NOTE: `cargo-clippy` needs the Rust `clippy` component"));
@@ -1137,7 +1115,14 @@ mod tests {
         let mut stderr =
             b"error: 'rustfmt' is not installed for the toolchain '1.94.1-x86_64-unknown-linux-gnu'.\n".to_vec();
 
-        maybe_append_rust_component_note("cargo-fmt", &mut stderr);
+        maybe_append_missing_component_note(
+            "cargo-fmt",
+            Some(MissingComponentHint {
+                component: "rustfmt",
+                stderr_contains: "'rustfmt' is not installed for the toolchain",
+            }),
+            &mut stderr,
+        );
 
         let msg = String::from_utf8(stderr).unwrap();
         assert!(msg.contains("NOTE: `cargo-fmt` needs the Rust `rustfmt` component"));

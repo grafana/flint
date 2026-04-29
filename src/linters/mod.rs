@@ -3,6 +3,7 @@ pub mod flint_setup;
 pub mod license_header;
 pub mod lychee;
 pub mod renovate_deps;
+pub mod taplo;
 
 /// Build a [`tokio::process::Command`] for the given argv.
 ///

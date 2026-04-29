@@ -1,6 +1,8 @@
-use super::types::{Check, ConfigFile, EditorconfigDirectiveStyle, SpecialKind};
+use super::types::{Check, ConfigFile, EditorconfigDirectiveStyle, SpecialKind, WorkflowSetup};
 use crate::init::hooks;
-use crate::linters::renovate_deps::RENOVATE_CONFIG_PATTERNS;
+use crate::linters::{
+    license_header, renovate_deps, renovate_deps::RENOVATE_CONFIG_PATTERNS, taplo,
+};
 use crate::setup::{V1_BOOTSTRAP_SETUP_VERSION, V2_BASELINE_SETUP_VERSION};
 
 const TOOL_RUMDL: &[&str] = &["tool", "rumdl"];
@@ -45,6 +47,8 @@ const EDITORCONFIG_CHECKER_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir(".ecrc"),
     ConfigFile::project(".ecrc"),
 ];
+const EDITORCONFIG_CHECKER_BASELINE_TRIGGERS: &[ConfigFile] =
+    &[ConfigFile::project(".editorconfig")];
 const GOLANGCI_LINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir(".golangci.yaml"),
     ConfigFile::config_dir(".golangci.toml"),
@@ -148,6 +152,7 @@ fn check_taplo() -> Check {
     .unsupported_configs(TAPLO_UNSUPPORTED_CONFIGS)
     .init_hook(hooks::taplo::run)
     .stderr_filter_prefixes(&[" INFO taplo:"])
+    .nonverbose_failure_output(taplo::normalize_nonverbose_failure_output)
     .formatter()
     .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["github:tamasfe/taplo"])
     .desc("Format TOML files")
@@ -216,6 +221,7 @@ fn check_editorconfig_checker() -> Check {
         .mise_tool("editorconfig-checker")
         .defer_to_formatters()
         .linter_config(".editorconfig-checker.json", "-config")
+        .baseline_triggers(EDITORCONFIG_CHECKER_BASELINE_TRIGGERS)
         .unsupported_configs(EDITORCONFIG_CHECKER_UNSUPPORTED_CONFIGS)
         .desc("Check files comply with EditorConfig settings")
 }
@@ -302,6 +308,11 @@ fn check_cargo_clippy() -> Check {
     .partial_fix()
     .mise_tool("rust")
     .toolchain_components("clippy")
+    .missing_component_hint(
+        "clippy",
+        "'cargo-clippy' is not installed for the toolchain",
+    )
+    .workflow_setup(WorkflowSetup::RustComponents)
     .desc("Lint Rust code; runs on all .rs files, not just changed")
     .lang()
 }
@@ -316,6 +327,8 @@ fn check_cargo_fmt() -> Check {
         .bin("rustfmt")
         .mise_tool("rust")
         .toolchain_components("rustfmt")
+        .missing_component_hint("rustfmt", "'rustfmt' is not installed for the toolchain")
+        .workflow_setup(WorkflowSetup::RustComponents)
         .formatter()
         .editorconfig_line_length_off(&["*.rs"], "Rust line length is handled by rustfmt", None)
         .desc("Format Rust code; runs on all .rs files, not just changed")
@@ -421,6 +434,7 @@ fn check_lychee() -> Check {
 fn check_renovate_deps() -> Check {
     Check::special_with_bin("renovate-deps", "renovate", SpecialKind::RenovateDeps, true)
         .adaptive()
+        .adaptive_relevance(renovate_deps::adaptive_relevance)
         .mise_tool("npm:renovate")
         .patterns(RENOVATE_CONFIG_PATTERNS)
         .init_hook(hooks::renovate_deps::run)
@@ -452,6 +466,7 @@ fn check_renovate_deps() -> Check {
 fn check_license_header() -> Check {
     Check::special("license-header", SpecialKind::LicenseHeader, false)
         .activate_unconditionally()
+        .status_hook(license_header::status)
         .desc("Check source files have the required license header")
 }
 

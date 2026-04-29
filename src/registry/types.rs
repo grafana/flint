@@ -1,5 +1,8 @@
 use std::path::Path;
 
+use crate::config::Config;
+use crate::files::FileList;
+
 /// How a check is invoked relative to the file list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
@@ -188,6 +191,32 @@ pub trait InitHookContext {
 
 pub type InitHook = fn(&dyn InitHookContext) -> anyhow::Result<bool>;
 
+pub trait AdaptiveRelevanceContext {
+    fn file_list(&self) -> &FileList;
+    fn project_root(&self) -> &Path;
+}
+
+pub type AdaptiveRelevanceHook = fn(&dyn AdaptiveRelevanceContext) -> bool;
+
+pub trait StatusContext {
+    fn config(&self) -> &Config;
+}
+
+pub type StatusHook = fn(&dyn StatusContext) -> Option<&'static str>;
+
+pub type NonverboseFailureOutputHook = fn(&[String], &[u8], &[u8]) -> (Vec<u8>, Vec<u8>);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MissingComponentHint {
+    pub component: &'static str,
+    pub stderr_contains: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkflowSetup {
+    RustComponents,
+}
+
 #[derive(Debug, Clone)]
 pub struct Check {
     pub name: &'static str,
@@ -232,6 +261,16 @@ pub struct Check {
     pub tool_key_migrations: Vec<ToolKeyMigration>,
     /// Optional setup-time hook that runs when this check is selected by `flint init`.
     pub init_hook: Option<InitHook>,
+    /// Optional relevance hook for adaptive checks in `--fast-only` mode.
+    pub adaptive_relevance: Option<AdaptiveRelevanceHook>,
+    /// Optional status override shown by `flint linters`.
+    pub status_hook: Option<StatusHook>,
+    /// Optional output normalizer used for non-verbose failing process runs.
+    pub nonverbose_failure_output: Option<NonverboseFailureOutputHook>,
+    /// Optional hint appended when a known toolchain component is missing.
+    pub missing_component_hint: Option<MissingComponentHint>,
+    /// Additional config-like files that trigger an all-files baseline run when changed.
+    pub baseline_triggers: &'static [ConfigFile],
     /// This check is a formatter — it owns certain file types for formatting purposes.
     pub is_formatter: bool,
     /// Skip files owned by active formatters (used by ec to avoid double-checking).
@@ -254,6 +293,8 @@ pub struct Check {
     /// On Windows, the binary is a self-executing JAR that cannot be run directly
     /// or via cmd.exe — invoke as `java -jar <resolved-path>` instead.
     pub windows_java_jar: bool,
+    /// Extra generated workflow setup needed when this check is selected by `flint init`.
+    pub workflow_setup: Option<WorkflowSetup>,
     pub fix_behavior: FixBehavior,
     pub kind: CheckKind,
     /// Plain-text description of what the check does — shown in `flint linters` and the README table.
@@ -358,6 +399,11 @@ impl Check {
             unsupported_configs: &[],
             tool_key_migrations: vec![],
             init_hook: None,
+            adaptive_relevance: None,
+            status_hook: None,
+            nonverbose_failure_output: None,
+            missing_component_hint: None,
+            baseline_triggers: &[],
             is_formatter: false,
             defers_to_formatters: false,
             editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
@@ -373,6 +419,7 @@ impl Check {
                 scope,
             },
             windows_java_jar: false,
+            workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
             desc: "",
             docs: "",
@@ -406,6 +453,11 @@ impl Check {
             unsupported_configs: &[],
             tool_key_migrations: vec![],
             init_hook: None,
+            adaptive_relevance: None,
+            status_hook: None,
+            nonverbose_failure_output: None,
+            missing_component_hint: None,
+            baseline_triggers: &[],
             is_formatter: false,
             defers_to_formatters: false,
             editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
@@ -414,6 +466,7 @@ impl Check {
             run_policy: RunPolicy::Fast,
             toolchain: None,
             windows_java_jar: false,
+            workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
             kind: CheckKind::Special(SpecialCheck::new(kind, has_fix)),
             desc: "",
@@ -629,6 +682,43 @@ impl Check {
 
     pub fn init_hook(mut self, hook: InitHook) -> Self {
         self.init_hook = Some(hook);
+        self
+    }
+
+    pub fn adaptive_relevance(mut self, hook: AdaptiveRelevanceHook) -> Self {
+        self.adaptive_relevance = Some(hook);
+        self
+    }
+
+    pub fn status_hook(mut self, hook: StatusHook) -> Self {
+        self.status_hook = Some(hook);
+        self
+    }
+
+    pub fn nonverbose_failure_output(mut self, hook: NonverboseFailureOutputHook) -> Self {
+        self.nonverbose_failure_output = Some(hook);
+        self
+    }
+
+    pub fn missing_component_hint(
+        mut self,
+        component: &'static str,
+        stderr_contains: &'static str,
+    ) -> Self {
+        self.missing_component_hint = Some(MissingComponentHint {
+            component,
+            stderr_contains,
+        });
+        self
+    }
+
+    pub fn baseline_triggers(mut self, files: &'static [ConfigFile]) -> Self {
+        self.baseline_triggers = files;
+        self
+    }
+
+    pub fn workflow_setup(mut self, setup: WorkflowSetup) -> Self {
+        self.workflow_setup = Some(setup);
         self
     }
 

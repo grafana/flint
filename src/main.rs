@@ -225,6 +225,10 @@ async fn run(
     }
     let active: Vec<&registry::Check> = {
         let mut out = vec![];
+        let relevance_ctx = AdaptiveRunContext {
+            file_list: &file_list,
+            project_root,
+        };
         for c in checks {
             if registry::check_active(c, &mise_tools) {
                 let include = if explicit || !args.fast_only {
@@ -233,12 +237,9 @@ async fn run(
                     match c.run_policy {
                         RunPolicy::Fast => true,
                         RunPolicy::Slow => false,
-                        RunPolicy::Adaptive => match &c.kind {
-                            kind if kind.is_special_kind(SpecialKind::RenovateDeps) => {
-                                linters::renovate_deps::is_relevant(&file_list, project_root)
-                            }
-                            _ => true,
-                        },
+                        RunPolicy::Adaptive => c
+                            .adaptive_relevance
+                            .map_or(true, |hook| hook(&relevance_ctx)),
                     }
                 };
                 if include {
@@ -537,6 +538,31 @@ struct RunContext<'a> {
     config_dir: &'a Path,
 }
 
+struct AdaptiveRunContext<'a> {
+    file_list: &'a files::FileList,
+    project_root: &'a Path,
+}
+
+impl registry::AdaptiveRelevanceContext for AdaptiveRunContext<'_> {
+    fn file_list(&self) -> &files::FileList {
+        self.file_list
+    }
+
+    fn project_root(&self) -> &Path {
+        self.project_root
+    }
+}
+
+struct LinterStatusContext<'a> {
+    cfg: &'a config::Config,
+}
+
+impl registry::StatusContext for LinterStatusContext<'_> {
+    fn config(&self) -> &config::Config {
+        self.cfg
+    }
+}
+
 enum FixOutcome {
     Clean,
     Fixed(String),
@@ -705,12 +731,9 @@ fn baseline_check_names(
                 || check.baseline_config.as_ref().is_some_and(|config| {
                     changed.contains(&config_file_rel_path(project_root, config_dir, config))
                 })
-                || (check.name == "editorconfig-checker"
-                    && changed.contains(&config_file_rel_path(
-                        project_root,
-                        config_dir,
-                        &registry::ConfigFile::project(".editorconfig"),
-                    )))
+                || check.baseline_triggers.iter().any(|config| {
+                    changed.contains(&config_file_rel_path(project_root, config_dir, config))
+                })
         })
         .map(|check| check.name.to_string())
         .collect()
@@ -1032,11 +1055,11 @@ where
 {
     if registry::check_active(check, mise_tools) {
         if !check.uses_binary() || binary_on_path(check.bin_name) {
-            if check.name == "license-header" && cfg.checks.license_header.text.is_empty() {
-                "not configured"
-            } else {
-                "active"
-            }
+            let status_ctx = LinterStatusContext { cfg };
+            check
+                .status_hook
+                .and_then(|hook| hook(&status_ctx))
+                .unwrap_or("active")
         } else {
             "no binary"
         }

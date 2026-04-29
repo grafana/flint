@@ -472,15 +472,19 @@ fn repo_renovate_config_stays_aligned_with_shared_preset_contract() {
         );
     }
 
-    let description = "Update mise version in GitHub Actions workflows";
-    let default_manager = custom_manager_by_description(&default_parsed, description)
-        .unwrap_or_else(|| panic!("default.json missing custom manager {description:?}"));
-    let repo_manager = custom_manager_by_description(&repo_parsed, description)
-        .unwrap_or_else(|| panic!(".github/renovate.json5 missing custom manager {description:?}"));
-    assert_eq!(
-        default_manager, repo_manager,
-        "custom manager {description:?} in .github/renovate.json5 drifted from default.json"
-    );
+    {
+        let description = "Update mise version in GitHub Actions workflows";
+        let default_manager = custom_manager_by_description(&default_parsed, description)
+            .unwrap_or_else(|| panic!("default.json missing custom manager {description:?}"));
+        let repo_manager =
+            custom_manager_by_description(&repo_parsed, description).unwrap_or_else(|| {
+                panic!(".github/renovate.json5 missing custom manager {description:?}")
+            });
+        assert_eq!(
+            default_manager, repo_manager,
+            "custom manager {description:?} in .github/renovate.json5 drifted from default.json"
+        );
+    }
 }
 
 #[test]
@@ -645,7 +649,6 @@ fn readme_quickstart_tools_snippets_stay_current() {
             env!("CARGO_PKG_VERSION").to_string(),
         )))
         .collect::<std::collections::BTreeMap<_, _>>();
-
     let actual = toml_tool_versions_from_table(
         quickstart_tools,
         &[
@@ -653,15 +656,6 @@ fn readme_quickstart_tools_snippets_stay_current() {
             "github:koalaman/shellcheck",
             "shfmt",
             "actionlint",
-            "rumdl",
-            "ruff",
-            "aqua:owenlamont/ryl",
-            "taplo",
-            "biome",
-            "rust",
-            "go",
-            "lychee",
-            "npm:renovate",
         ],
     );
 

@@ -239,7 +239,7 @@ async fn run(
                         RunPolicy::Slow => false,
                         RunPolicy::Adaptive => c
                             .adaptive_relevance
-                            .map_or(true, |hook| hook(&relevance_ctx)),
+                            .is_none_or(|hook| hook(&relevance_ctx)),
                     }
                 };
                 if include {

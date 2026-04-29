@@ -82,7 +82,7 @@ biome                   = "2.4.12"
 rust                    = "1.95.0"    # activates cargo-fmt + cargo-clippy
 go                      = "1.26.2"    # activates gofmt
 lychee                  = "0.22.0"    # activates links check
-"npm:renovate"          = "43.141.5"  # activates renovate-deps check
+"npm:renovate"          = "43.141.6"  # activates renovate-deps check
 ```
 
 Then wire up lint tasks:

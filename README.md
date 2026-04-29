@@ -118,10 +118,10 @@ run = "flint run --fix"
   run: mise run lint
 ```
 
-`GITHUB_TOKEN` is required in CI so link checks can authenticate GitHub
-requests. The GitHub environment variables let flint remap base-branch links to
-the PR branch when link checking. `fetch-depth: 0` is required for merge-base
-detection.
+`fetch-depth: 0` is required for merge-base detection. `GITHUB_TOKEN` is needed
+by some checks that query GitHub, but not every check. If `lychee` link checks
+are enabled, see [lychee](docs/linters.md#lychee) for PR remap environment
+requirements.
 
 ---
 

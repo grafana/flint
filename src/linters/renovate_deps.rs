@@ -534,10 +534,7 @@ fn committed_path_for_config(config_path: &Path) -> PathBuf {
 }
 
 fn display_path(project_root: &Path, path: &Path) -> String {
-    path.strip_prefix(project_root)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .into_owned()
+    normalize_path(path.strip_prefix(project_root).unwrap_or(path))
 }
 
 /// Parses Renovate's NDJSON log and returns the dep map.
@@ -985,6 +982,19 @@ mod tests {
         let new = dep_map(&[("a.json", &[("npm", &["y"])])]);
         let diff = unified_diff(&old, &new, "renovate-tracked-deps.json");
         assert!(diff.contains("renovate-tracked-deps.json"));
+    }
+
+    #[test]
+    fn display_path_normalizes_separators() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir
+            .path()
+            .join(".github")
+            .join("renovate-tracked-deps.json");
+        assert_eq!(
+            display_path(dir.path(), &path),
+            ".github/renovate-tracked-deps.json"
+        );
     }
 
     #[test]

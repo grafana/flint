@@ -5,6 +5,7 @@ use std::process::Stdio;
 use crate::config::RenovateDepsConfig;
 use crate::files::FileList;
 use crate::linters::LinterOutput;
+use crate::linters::env;
 
 const COMMITTED_FILE: &str = "renovate-tracked-deps.json";
 pub(crate) const COMMITTED_PATHS: &[&str] = &[COMMITTED_FILE, ".github/renovate-tracked-deps.json"];
@@ -18,16 +19,47 @@ pub(crate) const RENOVATE_CONFIG_PATTERNS: &[&str] = &[
     ".renovaterc.json5",
 ];
 const PACKAGE_FILES_MSGS: &[&str] = &["Extracted dependencies", "packageFiles with updates"];
+const RENOVATE_GITHUB_TOKEN_DISPLAY: &str = "GITHUB_COM_TOKEN or GITHUB_TOKEN";
 const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value", "invalid-version"];
 
 /// `{file_path: {manager: [dep_name, ...]}}` — all collections sorted.
 type DepMap = BTreeMap<String, BTreeMap<String, Vec<String>>>;
 
 pub async fn run(cfg: &RenovateDepsConfig, fix: bool, project_root: &Path) -> LinterOutput {
+    match validate_runtime_env() {
+        Ok(Some(warning)) => eprintln!("{warning}"),
+        Ok(None) => {}
+        Err(stderr) => return LinterOutput::err(stderr),
+    }
     match run_inner(cfg, fix, project_root).await {
         Ok(out) => out,
         Err(e) => LinterOutput::err(format!("flint: renovate-deps: {e}\n")),
     }
+}
+
+fn validate_runtime_env() -> Result<Option<String>, String> {
+    validate_runtime_env_from(|name| std::env::var(name).ok())
+}
+
+fn validate_runtime_env_from<F>(env: F) -> Result<Option<String>, String>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    if env::renovate_github_token_available(&env) {
+        return Ok(None);
+    }
+    if env::is_ci_from(&env) {
+        return Err(format!(
+            "flint: renovate-deps: missing required CI environment variable: {token_display}\n  Set {github_token}, or set {github_com_token} directly, so Renovate can authenticate GitHub requests in CI.\n",
+            token_display = RENOVATE_GITHUB_TOKEN_DISPLAY,
+            github_com_token = env::GITHUB_COM_TOKEN_ENV,
+            github_token = env::GITHUB_TOKEN_ENV,
+        ));
+    }
+    Ok(Some(env::token_warning(
+        "renovate-deps",
+        RENOVATE_GITHUB_TOKEN_DISPLAY,
+    )))
 }
 
 pub(crate) fn is_relevant(file_list: &FileList, project_root: &Path) -> bool {
@@ -162,14 +194,14 @@ async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result
         config_path.to_string_lossy().into_owned(),
     ));
     // Renovate uses GITHUB_COM_TOKEN for github.com API calls; fall back to GITHUB_TOKEN.
-    let has_com_token = std::env::var("GITHUB_COM_TOKEN")
+    let has_com_token = std::env::var(env::GITHUB_COM_TOKEN_ENV)
         .map(|v| !v.is_empty())
         .unwrap_or(false);
     if !has_com_token
-        && let Ok(token) = std::env::var("GITHUB_TOKEN")
+        && let Ok(token) = std::env::var(env::GITHUB_TOKEN_ENV)
         && !token.is_empty()
     {
-        env.push(("GITHUB_COM_TOKEN".into(), token));
+        env.push((env::GITHUB_COM_TOKEN_ENV.into(), token));
     }
 
     let out = super::spawn_command(
@@ -360,6 +392,44 @@ mod tests {
                 (file.to_string(), m)
             })
             .collect()
+    }
+
+    fn validate_env(vars: &[(&str, &str)]) -> Result<Option<String>, String> {
+        let vars: std::collections::HashMap<String, String> = vars
+            .iter()
+            .map(|(name, value)| (name.to_string(), value.to_string()))
+            .collect();
+        validate_runtime_env_from(|name| vars.get(name).cloned())
+    }
+
+    #[test]
+    fn ci_requires_github_token_or_github_com_token() {
+        let err = validate_env(&[("CI", "true")]).unwrap_err();
+
+        assert!(err.contains("GITHUB_COM_TOKEN"), "unexpected error:\n{err}");
+        assert!(err.contains("GITHUB_TOKEN"), "unexpected error:\n{err}");
+    }
+
+    #[test]
+    fn ci_accepts_github_token() {
+        let result = validate_env(&[("CI", "true"), ("GITHUB_TOKEN", "token")]);
+
+        assert!(result.is_ok(), "unexpected validation error: {result:?}");
+    }
+
+    #[test]
+    fn ci_accepts_github_com_token() {
+        let result = validate_env(&[("CI", "true"), ("GITHUB_COM_TOKEN", "token")]);
+
+        assert!(result.is_ok(), "unexpected validation error: {result:?}");
+    }
+
+    #[test]
+    fn non_ci_missing_github_token_warns_without_failing() {
+        let warning = validate_env(&[]).unwrap().unwrap();
+
+        assert!(warning.contains("renovate-deps"));
+        assert!(warning.contains("GITHUB_TOKEN"));
     }
 
     #[test]

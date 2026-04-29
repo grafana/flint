@@ -231,6 +231,10 @@ Verifies `.github/renovate-tracked-deps.json` is up to date by running
 Renovate locally and comparing its output against the committed snapshot.
 Requires `renovate` in `[tools]`.
 
+In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN`
+so Renovate can authenticate GitHub requests. If `GITHUB_COM_TOKEN` is
+unset, flint forwards `GITHUB_TOKEN` to Renovate as `GITHUB_COM_TOKEN`.
+
 With `--fix`, automatically regenerates and commits the snapshot.
 
 Configure via `flint.toml`:

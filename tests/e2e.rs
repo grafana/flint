@@ -15,6 +15,7 @@ fn flint_with_env(args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Output {
         .env_remove("GITHUB_ACTIONS")
         .env_remove("GITHUB_ACTION")
         .env_remove("GITHUB_WORKFLOW")
+        .env_remove("GITHUB_COM_TOKEN")
         .env_remove("GITHUB_TOKEN")
         .env_remove("GITHUB_EVENT_NAME")
         .env_remove("GITHUB_REPOSITORY")

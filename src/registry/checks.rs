@@ -422,6 +422,10 @@ fn check_renovate_deps() -> Check {
             Renovate locally and comparing its output against the committed snapshot.\n\
             Requires `renovate` in `[tools]`.\n\
             \n\
+            In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN`\n\
+            so Renovate can authenticate GitHub requests. If `GITHUB_COM_TOKEN` is\n\
+            unset, flint forwards `GITHUB_TOKEN` to Renovate as `GITHUB_COM_TOKEN`.\n\
+            \n\
             With `--fix`, automatically regenerates and commits the snapshot.\n\
             \n\
             Configure via `flint.toml`:\n\

@@ -2,6 +2,9 @@
 args = "run --fast-only"
 exit = 0
 
+[env]
+GITHUB_TOKEN = "token"
+
 [fake_bins]
 renovate = '''
 #!/bin/sh

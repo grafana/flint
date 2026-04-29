@@ -5,13 +5,18 @@ use tokio::process::Command;
 use crate::config::{Config, LycheeConfig, Settings};
 use crate::files::FileList;
 use crate::linters::LinterOutput;
+use crate::linters::env;
 
-const GITHUB_TOKEN_ENV: &str = "GITHUB_TOKEN";
+const GITHUB_BASE_REF_ENV: &str = "GITHUB_BASE_REF";
+const GITHUB_EVENT_NAME_ENV: &str = "GITHUB_EVENT_NAME";
+const GITHUB_HEAD_REF_ENV: &str = "GITHUB_HEAD_REF";
+const GITHUB_REPOSITORY_ENV: &str = "GITHUB_REPOSITORY";
+const PR_HEAD_REPO_ENV: &str = "PR_HEAD_REPO";
 const PR_LINK_REMAP_ENV_VARS: &[&str] = &[
-    "GITHUB_REPOSITORY",
-    "GITHUB_BASE_REF",
-    "GITHUB_HEAD_REF",
-    "PR_HEAD_REPO",
+    GITHUB_REPOSITORY_ENV,
+    GITHUB_BASE_REF_ENV,
+    GITHUB_HEAD_REF_ENV,
+    PR_HEAD_REPO_ENV,
 ];
 
 pub async fn run(
@@ -163,12 +168,12 @@ fn validate_runtime_env_from<F>(
 where
     F: Fn(&str) -> Option<String>,
 {
-    let is_ci = is_ci_env(&env);
-    let has_github_token = env_non_empty(&env, GITHUB_TOKEN_ENV);
+    let is_ci = env::is_ci_from(&env);
+    let has_github_token = env::github_token_available(&env);
 
     let mut missing = Vec::new();
     if is_ci && !has_github_token {
-        missing.push(GITHUB_TOKEN_ENV);
+        missing.push(env::GITHUB_TOKEN_ENV);
     }
 
     if is_ci && github_remaps_enabled && !full && is_github_pr_event(&env) {
@@ -176,7 +181,7 @@ where
             PR_LINK_REMAP_ENV_VARS
                 .iter()
                 .copied()
-                .filter(|name| !env_non_empty(&env, name)),
+                .filter(|name| !env::env_non_empty(&env, name)),
         );
     }
 
@@ -185,9 +190,7 @@ where
     }
 
     if !is_ci && !has_github_token {
-        return Ok(Some(format!(
-            "flint: warning: {GITHUB_TOKEN_ENV} is not set; GitHub links may be rate limited"
-        )));
+        return Ok(Some(env::token_warning("lychee", env::GITHUB_TOKEN_ENV)));
     }
 
     Ok(None)
@@ -197,47 +200,17 @@ fn github_remaps_enabled() -> bool {
     std::env::var("LYCHEE_SKIP_GITHUB_REMAPS").as_deref() != Ok("true")
 }
 
-fn is_ci_env<F>(env: &F) -> bool
-where
-    F: Fn(&str) -> Option<String>,
-{
-    ["CI", "GITHUB_ACTIONS", "GITHUB_ACTION", "GITHUB_WORKFLOW"]
-        .iter()
-        .any(|name| env_truthy(env, name))
-}
-
 fn is_github_pr_event<F>(env: &F) -> bool
 where
     F: Fn(&str) -> Option<String>,
 {
-    env("GITHUB_EVENT_NAME")
+    env(GITHUB_EVENT_NAME_ENV)
         .map(|event| matches!(event.as_str(), "pull_request" | "pull_request_target"))
         .unwrap_or_else(|| {
-            env_non_empty(env, "GITHUB_BASE_REF")
-                || env_non_empty(env, "GITHUB_HEAD_REF")
-                || env_non_empty(env, "PR_HEAD_REPO")
+            env::env_non_empty(env, GITHUB_BASE_REF_ENV)
+                || env::env_non_empty(env, GITHUB_HEAD_REF_ENV)
+                || env::env_non_empty(env, PR_HEAD_REPO_ENV)
         })
-}
-
-fn env_truthy<F>(env: &F, name: &str) -> bool
-where
-    F: Fn(&str) -> Option<String>,
-{
-    env(name)
-        .map(|value| {
-            let value = value.trim();
-            !value.is_empty() && value != "0" && !value.eq_ignore_ascii_case("false")
-        })
-        .unwrap_or(false)
-}
-
-fn env_non_empty<F>(env: &F, name: &str) -> bool
-where
-    F: Fn(&str) -> Option<String>,
-{
-    env(name)
-        .map(|value| !value.trim().is_empty())
-        .unwrap_or(false)
 }
 
 fn missing_ci_env_message(missing: &[&str]) -> String {
@@ -250,17 +223,20 @@ fn missing_ci_env_message(missing: &[&str]) -> String {
         "flint: links: missing required CI environment {noun}: {}\n",
         missing.join(", ")
     );
-    if missing.contains(&GITHUB_TOKEN_ENV) {
-        message
-            .push_str("  Set GITHUB_TOKEN so lychee can authenticate GitHub link checks in CI.\n");
+    if missing.contains(&env::GITHUB_TOKEN_ENV) {
+        message.push_str(&format!(
+            "  Set {token} so lychee can authenticate GitHub link checks in CI.\n",
+            token = env::GITHUB_TOKEN_ENV,
+        ));
     }
     if missing
         .iter()
         .any(|name| PR_LINK_REMAP_ENV_VARS.contains(name))
     {
-        message.push_str(
-            "  PR link remaps in CI require GitHub PR metadata; set PR_HEAD_REPO to github.event.pull_request.head.repo.full_name.\n",
-        );
+        message.push_str(&format!(
+            "  PR link remaps in CI require GitHub PR metadata; set {pr_head_repo} to github.event.pull_request.head.repo.full_name.\n",
+            pr_head_repo = PR_HEAD_REPO_ENV,
+        ));
     }
     message
 }

@@ -2,7 +2,7 @@
 args = "run --full lychee"
 exit = 0
 stderr = '''
-flint: warning: GITHUB_TOKEN is not set; GitHub links may be rate limited
+flint: warning: GITHUB_TOKEN is not set; lychee GitHub requests may be rate limited
 '''
 
 [fake_bins]

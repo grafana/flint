@@ -658,7 +658,7 @@ fn generate_rustfmt_config_skips_existing_file() {
 
 #[test]
 fn generate_biome_config_writes_file() {
-    use hooks::biome::generate_config;
+    use crate::linters::biome::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let written = generate_config(tmp.path()).unwrap();
     assert!(written);
@@ -669,7 +669,7 @@ fn generate_biome_config_writes_file() {
 
 #[test]
 fn generate_biome_config_skips_existing_jsonc() {
-    use hooks::biome::generate_config;
+    use crate::linters::biome::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     std::fs::write(tmp.path().join("biome.jsonc"), "existing").unwrap();
     let written = generate_config(tmp.path()).unwrap();
@@ -680,7 +680,7 @@ fn generate_biome_config_skips_existing_jsonc() {
 
 #[test]
 fn generate_biome_config_migrates_legacy_supported_json_name() {
-    use hooks::biome::generate_config;
+    use crate::linters::biome::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     std::fs::write(tmp.path().join("biome.json"), "existing").unwrap();
     let written = generate_config(tmp.path()).unwrap();

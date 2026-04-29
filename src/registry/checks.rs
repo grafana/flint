@@ -1,7 +1,7 @@
 use super::types::{Check, ConfigFile, EditorconfigDirectiveStyle, SpecialKind, WorkflowSetup};
 use crate::init::hooks;
 use crate::linters::{
-    license_header, renovate_deps, renovate_deps::RENOVATE_CONFIG_PATTERNS, taplo,
+    biome, license_header, renovate_deps, renovate_deps::RENOVATE_CONFIG_PATTERNS, taplo,
 };
 use crate::setup::{V1_BOOTSTRAP_SETUP_VERSION, V2_BASELINE_SETUP_VERSION};
 
@@ -275,7 +275,7 @@ fn check_biome() -> Check {
     .fix("biome check --fix {FILE}")
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
-    .init_hook(hooks::biome::run)
+    .init_hook(biome::init)
     .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["npm:@biomejs/biome"])
     .desc("Lint JS/TS/JSON files")
     .lang()
@@ -291,7 +291,7 @@ fn check_biome_format() -> Check {
     .fix("biome format --write {FILE}")
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
-    .init_hook(hooks::biome::run)
+    .init_hook(biome::init)
     .formatter()
     .desc("Format JS/TS/JSON files")
     .mise_tool("biome")

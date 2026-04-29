@@ -1,3 +1,4 @@
+pub mod biome;
 pub mod env;
 pub mod flint_setup;
 pub mod license_header;

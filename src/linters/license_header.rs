@@ -5,14 +5,12 @@ use crate::config::LicenseHeaderConfig;
 use crate::files::match_files;
 use crate::linters::LinterOutput;
 use crate::registry::{
-    PreparedSpecialCheck, SpecialKind, SpecialPrepareContext, SpecialRunContext, SpecialRunFuture,
-    StaticLinter, StaticSpecialLinter, StatusContext,
+    PreparedSpecialCheck, SpecialPrepareContext, SpecialRunContext, SpecialRunFuture, StaticLinter,
+    StaticSpecialLinter, StatusContext,
 };
 
-pub(crate) static LINTER: StaticLinter = StaticLinter::special(
-    "license-header",
-    StaticSpecialLinter::new(SpecialKind::LicenseHeader, false, prepare),
-);
+pub(crate) static LINTER: StaticLinter =
+    StaticLinter::special("license-header", StaticSpecialLinter::new(false, prepare));
 
 #[derive(Debug)]
 struct PreparedLicenseHeader {

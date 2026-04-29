@@ -205,7 +205,7 @@ fn names_prefer_binary_or_native_command() {
     let violations: Vec<String> = builtin()
         .into_iter()
         .filter(|check| check.uses_binary())
-        .filter(|check| check.kind.special_kind().is_none())
+        .filter(|check| !check.kind.is_special())
         .filter_map(|check| {
             let allowed = ALLOWED_ALIASES
                 .iter()

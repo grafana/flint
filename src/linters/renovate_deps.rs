@@ -8,8 +8,8 @@ use crate::files::FileList;
 use crate::linters::LinterOutput;
 use crate::linters::env;
 use crate::registry::{
-    AdaptiveRelevanceContext, InitHookContext, PreparedSpecialCheck, SpecialKind,
-    SpecialPrepareContext, SpecialRunContext, SpecialRunFuture, StaticLinter, StaticSpecialLinter,
+    AdaptiveRelevanceContext, InitHookContext, PreparedSpecialCheck, SpecialPrepareContext,
+    SpecialRunContext, SpecialRunFuture, StaticLinter, StaticSpecialLinter,
 };
 
 const COMMITTED_FILE: &str = "renovate-tracked-deps.json";
@@ -29,7 +29,7 @@ const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value", "invalid-v
 
 pub(crate) static LINTER: StaticLinter = StaticLinter::special_with_init_hook(
     "renovate-deps",
-    StaticSpecialLinter::with_bin("renovate", SpecialKind::RenovateDeps, true, prepare),
+    StaticSpecialLinter::with_bin("renovate", true, prepare),
     init,
 );
 

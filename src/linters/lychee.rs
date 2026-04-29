@@ -25,7 +25,7 @@ const PR_LINK_REMAP_ENV_VARS: &[&str] = &[
 
 pub(crate) static LINTER: StaticLinter = StaticLinter::special(
     "lychee",
-    StaticSpecialLinter::with_bin("lychee", SpecialKind::Links, false, prepare),
+    StaticSpecialLinter::with_bin_and_kind("lychee", SpecialKind::Links, false, prepare),
 );
 
 #[derive(Debug)]

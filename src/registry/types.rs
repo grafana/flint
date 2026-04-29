@@ -55,8 +55,6 @@ pub enum RunPolicy {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpecialKind {
     Links,
-    RenovateDeps,
-    LicenseHeader,
     FlintSetup,
 }
 
@@ -70,7 +68,7 @@ impl SpecialCheck {
         Self { special }
     }
 
-    pub fn kind(self) -> SpecialKind {
+    pub fn kind(self) -> Option<SpecialKind> {
         self.special.kind()
     }
 
@@ -121,12 +119,16 @@ impl CheckKind {
     pub fn special_kind(&self) -> Option<SpecialKind> {
         match self {
             Self::Template { .. } => None,
-            Self::Special(special) => Some(special.kind()),
+            Self::Special(special) => special.kind(),
         }
     }
 
     pub fn is_special_kind(&self, kind: SpecialKind) -> bool {
         self.special_kind() == Some(kind)
+    }
+
+    pub fn is_special(&self) -> bool {
+        matches!(self, Self::Special(_))
     }
 }
 
@@ -246,7 +248,9 @@ pub trait PreparedSpecialCheck: Send + std::fmt::Debug {
 pub type SpecialPrepareFn = fn(SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>>;
 
 pub trait SpecialLinter: Sync + std::fmt::Debug {
-    fn kind(&self) -> SpecialKind;
+    fn kind(&self) -> Option<SpecialKind> {
+        None
+    }
     fn prepare(&self, ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>>;
     fn has_fix(&self) -> bool {
         false
@@ -261,16 +265,25 @@ pub trait SpecialLinter: Sync + std::fmt::Debug {
 
 #[derive(Debug, Clone, Copy)]
 pub struct StaticSpecialLinter {
-    kind: SpecialKind,
+    kind: Option<SpecialKind>,
     has_fix: bool,
     bin_name: Option<&'static str>,
     prepare: SpecialPrepareFn,
 }
 
 impl StaticSpecialLinter {
-    pub const fn new(kind: SpecialKind, has_fix: bool, prepare: SpecialPrepareFn) -> Self {
+    pub const fn new(has_fix: bool, prepare: SpecialPrepareFn) -> Self {
         Self {
-            kind,
+            kind: None,
+            has_fix,
+            bin_name: None,
+            prepare,
+        }
+    }
+
+    pub const fn with_kind(kind: SpecialKind, has_fix: bool, prepare: SpecialPrepareFn) -> Self {
+        Self {
+            kind: Some(kind),
             has_fix,
             bin_name: None,
             prepare,
@@ -279,12 +292,25 @@ impl StaticSpecialLinter {
 
     pub const fn with_bin(
         bin_name: &'static str,
+        has_fix: bool,
+        prepare: SpecialPrepareFn,
+    ) -> Self {
+        Self {
+            kind: None,
+            has_fix,
+            bin_name: Some(bin_name),
+            prepare,
+        }
+    }
+
+    pub const fn with_bin_and_kind(
+        bin_name: &'static str,
         kind: SpecialKind,
         has_fix: bool,
         prepare: SpecialPrepareFn,
     ) -> Self {
         Self {
-            kind,
+            kind: Some(kind),
             has_fix,
             bin_name: Some(bin_name),
             prepare,
@@ -293,7 +319,7 @@ impl StaticSpecialLinter {
 }
 
 impl SpecialLinter for StaticSpecialLinter {
-    fn kind(&self) -> SpecialKind {
+    fn kind(&self) -> Option<SpecialKind> {
         self.kind
     }
 

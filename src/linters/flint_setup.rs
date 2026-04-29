@@ -11,7 +11,7 @@ use crate::registry::{
 
 pub(crate) static LINTER: StaticLinter = StaticLinter::special(
     "flint-setup",
-    StaticSpecialLinter::new(SpecialKind::FlintSetup, true, prepare),
+    StaticSpecialLinter::with_kind(SpecialKind::FlintSetup, true, prepare),
 );
 
 #[derive(Debug)]

@@ -726,7 +726,7 @@ fn baseline_check_names(
                 || registry::tool_version_changed(check, &previous_tools, current_tools)
                 || flint_toml.as_ref().is_some_and(|change| {
                     change.settings_changed
-                        || (check.kind.special_kind().is_some() && change.check_changed(check.name))
+                        || (check.kind.is_special() && change.check_changed(check.name))
                 })
                 || check.baseline_config.as_ref().is_some_and(|config| {
                     changed.contains(&config_file_rel_path(project_root, config_dir, config))

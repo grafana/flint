@@ -1,4 +1,6 @@
-use std::path::Path;
+use std::future::Future;
+use std::path::{Path, PathBuf};
+use std::pin::Pin;
 
 use crate::config::Config;
 use crate::files::FileList;
@@ -78,6 +80,10 @@ impl SpecialCheck {
 
     pub fn uses_binary(self) -> bool {
         self.special.uses_binary()
+    }
+
+    pub fn prepare(self, ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>> {
+        self.special.prepare(ctx)
     }
 }
 
@@ -187,6 +193,23 @@ pub trait InitHookContext {
 
 pub type InitHookFn = fn(&dyn InitHookContext) -> anyhow::Result<bool>;
 
+/// Output from a single linter run.
+pub struct LinterOutput {
+    pub ok: bool,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+}
+
+impl LinterOutput {
+    pub fn err(stderr: impl Into<Vec<u8>>) -> Self {
+        Self {
+            ok: false,
+            stdout: vec![],
+            stderr: stderr.into(),
+        }
+    }
+}
+
 pub trait Linter: Sync + std::fmt::Debug {
     fn name(&self) -> &'static str;
     fn init_hook(&self) -> Option<InitHookFn> {
@@ -197,8 +220,34 @@ pub trait Linter: Sync + std::fmt::Debug {
     }
 }
 
+pub struct SpecialPrepareContext<'a> {
+    pub name: &'static str,
+    pub file_list: &'a FileList,
+    pub project_root: &'a Path,
+    pub cfg: &'a Config,
+    pub config_dir: &'a Path,
+}
+
+pub struct SpecialRunContext {
+    pub fix: bool,
+    pub project_root: PathBuf,
+}
+
+pub type SpecialRunFuture = Pin<Box<dyn Future<Output = LinterOutput> + Send>>;
+
+pub trait PreparedSpecialCheck: Send + std::fmt::Debug {
+    fn name(&self) -> &str;
+    fn tracked_files(&self) -> &[PathBuf] {
+        &[]
+    }
+    fn run(self: Box<Self>, ctx: SpecialRunContext) -> SpecialRunFuture;
+}
+
+pub type SpecialPrepareFn = fn(SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>>;
+
 pub trait SpecialLinter: Sync + std::fmt::Debug {
     fn kind(&self) -> SpecialKind;
+    fn prepare(&self, ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>>;
     fn has_fix(&self) -> bool {
         false
     }
@@ -215,22 +264,30 @@ pub struct StaticSpecialLinter {
     kind: SpecialKind,
     has_fix: bool,
     bin_name: Option<&'static str>,
+    prepare: SpecialPrepareFn,
 }
 
 impl StaticSpecialLinter {
-    pub const fn new(kind: SpecialKind, has_fix: bool) -> Self {
+    pub const fn new(kind: SpecialKind, has_fix: bool, prepare: SpecialPrepareFn) -> Self {
         Self {
             kind,
             has_fix,
             bin_name: None,
+            prepare,
         }
     }
 
-    pub const fn with_bin(bin_name: &'static str, kind: SpecialKind, has_fix: bool) -> Self {
+    pub const fn with_bin(
+        bin_name: &'static str,
+        kind: SpecialKind,
+        has_fix: bool,
+        prepare: SpecialPrepareFn,
+    ) -> Self {
         Self {
             kind,
             has_fix,
             bin_name: Some(bin_name),
+            prepare,
         }
     }
 }
@@ -238,6 +295,10 @@ impl StaticSpecialLinter {
 impl SpecialLinter for StaticSpecialLinter {
     fn kind(&self) -> SpecialKind {
         self.kind
+    }
+
+    fn prepare(&self, ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>> {
+        (self.prepare)(ctx)
     }
 
     fn has_fix(&self) -> bool {

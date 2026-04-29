@@ -1,14 +1,60 @@
 use std::path::Path;
+use std::path::PathBuf;
 
 use crate::init::generation::{normalize_tools_section, tools_section_needs_normalization};
 use crate::init::write_setup_migration_version;
 use crate::linters::LinterOutput;
-use crate::registry::{SpecialKind, StaticLinter, StaticSpecialLinter};
+use crate::registry::{
+    PreparedSpecialCheck, SpecialKind, SpecialPrepareContext, SpecialRunContext, SpecialRunFuture,
+    StaticLinter, StaticSpecialLinter,
+};
 
 pub(crate) static LINTER: StaticLinter = StaticLinter::special(
     "flint-setup",
-    StaticSpecialLinter::new(SpecialKind::FlintSetup, true),
+    StaticSpecialLinter::new(SpecialKind::FlintSetup, true, prepare),
 );
+
+#[derive(Debug)]
+struct PreparedFlintSetup {
+    name: String,
+    config_dir: PathBuf,
+    setup_migration_version: u32,
+    tracked_files: Vec<PathBuf>,
+}
+
+fn prepare(ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>> {
+    Some(Box::new(PreparedFlintSetup {
+        name: ctx.name.to_string(),
+        config_dir: ctx.config_dir.to_path_buf(),
+        setup_migration_version: ctx.cfg.settings.setup_migration_version,
+        tracked_files: vec![
+            ctx.project_root.join("mise.toml"),
+            ctx.config_dir.join("flint.toml"),
+        ],
+    }))
+}
+
+impl PreparedSpecialCheck for PreparedFlintSetup {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn tracked_files(&self) -> &[PathBuf] {
+        &self.tracked_files
+    }
+
+    fn run(self: Box<Self>, ctx: SpecialRunContext) -> SpecialRunFuture {
+        Box::pin(async move {
+            crate::linters::flint_setup::run(
+                ctx.fix,
+                &ctx.project_root,
+                &self.config_dir,
+                self.setup_migration_version,
+            )
+            .await
+        })
+    }
+}
 
 pub async fn run(
     fix: bool,

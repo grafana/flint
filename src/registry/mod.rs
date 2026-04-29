@@ -18,8 +18,9 @@ pub use resolve::binary_on_path;
 pub use types::{
     AdaptiveRelevanceContext, Category, Check, CheckKind, ConfigBase, ConfigFile, ConfigMatch,
     EditorconfigDirectiveStyle, EditorconfigLineLengthPolicy, FixBehavior, InitHookContext,
-    LinterConfig, MissingComponentHint, NonverboseFailureOutputHook, RunPolicy, Scope, SpecialKind,
-    StaticLinter, StaticSpecialLinter, StatusContext, WorkflowSetup,
+    LinterConfig, LinterOutput, MissingComponentHint, NonverboseFailureOutputHook,
+    PreparedSpecialCheck, RunPolicy, Scope, SpecialKind, SpecialPrepareContext, SpecialRunContext,
+    SpecialRunFuture, StaticLinter, StaticSpecialLinter, StatusContext, WorkflowSetup,
 };
 
 /// Returns the explicit set of flint-managed tool keys that belong under the

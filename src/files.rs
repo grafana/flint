@@ -9,7 +9,7 @@ use crate::linters::renovate_deps::COMMITTED_PATHS;
 /// Files managed by flint itself — always excluded from generic linter checks.
 const BUILTIN_EXCLUDES: &[&str] = COMMITTED_PATHS;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct FileList {
     pub files: Vec<PathBuf>,
     /// Changed paths from git before user excludes are applied.
@@ -185,6 +185,57 @@ fn filter_names(
         .map(|name| project_root.join(name))
         .filter(|path| path.exists())
         .collect()
+}
+
+pub fn match_files<'a>(
+    files: &'a [PathBuf],
+    patterns: &[&str],
+    exclude_patterns: &[&str],
+    project_root: &Path,
+) -> Vec<&'a PathBuf> {
+    files
+        .iter()
+        .filter(|p| {
+            let rel = p.strip_prefix(project_root).unwrap_or(p);
+            let rel_str = rel.to_string_lossy();
+            let file_name = p
+                .file_name()
+                .map(|n| n.to_string_lossy())
+                .unwrap_or_default();
+            let included = patterns.iter().any(|pat| {
+                if *pat == "*" {
+                    return true;
+                }
+                glob_match(pat, file_name.as_ref()) || glob_match(pat, rel_str.as_ref())
+            });
+            let excluded = exclude_patterns.iter().any(|pat| {
+                glob_match(pat, file_name.as_ref()) || glob_match(pat, rel_str.as_ref())
+            });
+            included && !excluded
+        })
+        .collect()
+}
+
+fn glob_match(pattern: &str, name: &str) -> bool {
+    // Simple glob: splits on `*` and checks that each segment appears in order.
+    // Handles `*.ext`, `prefix*`, `dir/*.yml`, etc.
+    let parts: Vec<&str> = pattern.splitn(2, '*').collect();
+    match parts.as_slice() {
+        [only] => name == *only || name.ends_with(&format!("/{only}")),
+        [prefix, suffix] => {
+            let n = name;
+            // The prefix must match the start of the name (or the part after the last slash).
+            let anchor_start = prefix.is_empty() || n.starts_with(prefix) || {
+                // Allow matching the basename portion for patterns like `*.sh`.
+                n.contains('/') && {
+                    let after_slash = n.rfind('/').map(|i| &n[i + 1..]).unwrap_or(n);
+                    prefix.is_empty() || after_slash.starts_with(prefix)
+                }
+            };
+            anchor_start && n.ends_with(suffix)
+        }
+        _ => false,
+    }
 }
 
 #[cfg(test)]

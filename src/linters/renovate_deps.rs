@@ -8,7 +8,8 @@ use crate::files::FileList;
 use crate::linters::LinterOutput;
 use crate::linters::env;
 use crate::registry::{
-    AdaptiveRelevanceContext, InitHookContext, SpecialKind, StaticLinter, StaticSpecialLinter,
+    AdaptiveRelevanceContext, InitHookContext, PreparedSpecialCheck, SpecialKind,
+    SpecialPrepareContext, SpecialRunContext, SpecialRunFuture, StaticLinter, StaticSpecialLinter,
 };
 
 const COMMITTED_FILE: &str = "renovate-tracked-deps.json";
@@ -28,9 +29,43 @@ const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value", "invalid-v
 
 pub(crate) static LINTER: StaticLinter = StaticLinter::special_with_init_hook(
     "renovate-deps",
-    StaticSpecialLinter::with_bin("renovate", SpecialKind::RenovateDeps, true),
+    StaticSpecialLinter::with_bin("renovate", SpecialKind::RenovateDeps, true, prepare),
     init,
 );
+
+#[derive(Debug)]
+struct PreparedRenovateDeps {
+    name: String,
+    cfg: RenovateDepsConfig,
+    tracked_files: Vec<PathBuf>,
+}
+
+fn prepare(ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>> {
+    Some(Box::new(PreparedRenovateDeps {
+        name: ctx.name.to_string(),
+        cfg: ctx.cfg.checks.renovate_deps.clone(),
+        tracked_files: COMMITTED_PATHS
+            .iter()
+            .map(|path| ctx.project_root.join(path))
+            .collect(),
+    }))
+}
+
+impl PreparedSpecialCheck for PreparedRenovateDeps {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn tracked_files(&self) -> &[PathBuf] {
+        &self.tracked_files
+    }
+
+    fn run(self: Box<Self>, ctx: SpecialRunContext) -> SpecialRunFuture {
+        Box::pin(async move {
+            crate::linters::renovate_deps::run(&self.cfg, ctx.fix, &ctx.project_root).await
+        })
+    }
+}
 
 /// `{file_path: {manager: [dep_name, ...]}}` — all collections sorted.
 type DepMap = BTreeMap<String, BTreeMap<String, Vec<String>>>;

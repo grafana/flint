@@ -2,13 +2,62 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 use crate::config::LicenseHeaderConfig;
+use crate::files::match_files;
 use crate::linters::LinterOutput;
-use crate::registry::{SpecialKind, StaticLinter, StaticSpecialLinter, StatusContext};
+use crate::registry::{
+    PreparedSpecialCheck, SpecialKind, SpecialPrepareContext, SpecialRunContext, SpecialRunFuture,
+    StaticLinter, StaticSpecialLinter, StatusContext,
+};
 
 pub(crate) static LINTER: StaticLinter = StaticLinter::special(
     "license-header",
-    StaticSpecialLinter::new(SpecialKind::LicenseHeader, false),
+    StaticSpecialLinter::new(SpecialKind::LicenseHeader, false, prepare),
 );
+
+#[derive(Debug)]
+struct PreparedLicenseHeader {
+    name: String,
+    cfg: LicenseHeaderConfig,
+    files: Vec<PathBuf>,
+}
+
+fn prepare(ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>> {
+    if ctx.cfg.checks.license_header.text.is_empty() {
+        return None;
+    }
+    let patterns: Vec<&str> = ctx
+        .cfg
+        .checks
+        .license_header
+        .patterns
+        .iter()
+        .map(String::as_str)
+        .collect();
+    let files: Vec<PathBuf> = match_files(&ctx.file_list.files, &patterns, &[], ctx.project_root)
+        .into_iter()
+        .cloned()
+        .collect();
+    if files.is_empty() {
+        return None;
+    }
+    Some(Box::new(PreparedLicenseHeader {
+        name: ctx.name.to_string(),
+        cfg: ctx.cfg.checks.license_header.clone(),
+        files,
+    }))
+}
+
+impl PreparedSpecialCheck for PreparedLicenseHeader {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn run(self: Box<Self>, ctx: SpecialRunContext) -> SpecialRunFuture {
+        Box::pin(async move {
+            crate::linters::license_header::run(&self.cfg, &ctx.project_root, &self.files).await
+        })
+    }
+}
 
 /// Checks that each file contains `cfg.text` within the first `cfg.lines_to_check` lines.
 /// Files are pre-filtered by pattern in the runner; this function checks all of them.

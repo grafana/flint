@@ -5,12 +5,12 @@ use std::process::Stdio;
 use std::time::{Duration, Instant};
 use tokio::task::JoinSet;
 
-use crate::config::{Config, LicenseHeaderConfig, LycheeConfig, RenovateDepsConfig, Settings};
-use crate::files::FileList;
-use crate::linters::{LinterOutput, flint_setup, license_header, lychee, renovate_deps};
+use crate::config::Config;
+use crate::files::{FileList, match_files};
+use crate::linters::LinterOutput;
 use crate::registry::{
     Check, CheckKind, LinterConfig, MissingComponentHint, NonverboseFailureOutputHook, Scope,
-    SpecialKind,
+    SpecialPrepareContext,
 };
 
 #[derive(Clone, Copy)]
@@ -52,39 +52,14 @@ enum PreparedCheck {
         nonverbose_failure_output: Option<NonverboseFailureOutputHook>,
         missing_component_hint: Option<MissingComponentHint>,
     },
-    Links {
-        name: String,
-        cfg: LycheeConfig,
-        settings: Settings,
-        file_list: FileList,
-        config_dir: PathBuf,
-    },
-    RenovateDeps {
-        name: String,
-        cfg: RenovateDepsConfig,
-        tracked_files: Vec<PathBuf>,
-    },
-    LicenseHeader {
-        name: String,
-        cfg: LicenseHeaderConfig,
-        files: Vec<PathBuf>,
-    },
-    FlintSetup {
-        name: String,
-        path: PathBuf,
-        config_dir: PathBuf,
-        setup_migration_version: u32,
-    },
+    Special(Box<dyn crate::registry::PreparedSpecialCheck>),
 }
 
 impl PreparedCheck {
     fn name(&self) -> &str {
         match self {
-            Self::Invocations { name, .. }
-            | Self::Links { name, .. }
-            | Self::RenovateDeps { name, .. }
-            | Self::LicenseHeader { name, .. }
-            | Self::FlintSetup { name, .. } => name,
+            Self::Invocations { name, .. } => name,
+            Self::Special(special) => special.name(),
         }
     }
 
@@ -131,46 +106,19 @@ impl PreparedCheck {
                     before.is_some_and(|before| before != fingerprint_files(&tracked_files));
                 (out, changed)
             }
-            Self::Links {
-                cfg,
-                settings,
-                file_list,
-                config_dir,
-                ..
-            } => (
-                lychee::run(&cfg, &settings, &file_list, project_root, &config_dir).await,
-                false,
-            ),
-            Self::RenovateDeps {
-                cfg, tracked_files, ..
-            } => {
+            Self::Special(special) => {
+                let tracked_files = special.tracked_files().to_vec();
                 let before = if fix && !tracked_files.is_empty() {
                     Some(fingerprint_files(&tracked_files))
                 } else {
                     None
                 };
-                let out = renovate_deps::run(&cfg, fix, project_root).await;
-                let changed =
-                    before.is_some_and(|before| before != fingerprint_files(&tracked_files));
-                (out, changed)
-            }
-            Self::LicenseHeader { cfg, files, .. } => {
-                (license_header::run(&cfg, project_root, &files).await, false)
-            }
-            Self::FlintSetup {
-                path,
-                config_dir,
-                setup_migration_version,
-                ..
-            } => {
-                let tracked_files = vec![path.clone(), config_dir.join("flint.toml")];
-                let before = if fix {
-                    Some(fingerprint_files(&tracked_files))
-                } else {
-                    None
-                };
-                let out =
-                    flint_setup::run(fix, project_root, &config_dir, setup_migration_version).await;
+                let out = special
+                    .run(crate::registry::SpecialRunContext {
+                        fix,
+                        project_root: project_root.to_path_buf(),
+                    })
+                    .await;
                 let changed =
                     before.is_some_and(|before| before != fingerprint_files(&tracked_files));
                 (out, changed)
@@ -295,54 +243,15 @@ fn prepare(
                 missing_component_hint: check.missing_component_hint,
             })
         }
-        CheckKind::Special(special) => match special.kind() {
-            SpecialKind::Links => Some(PreparedCheck::Links {
-                name,
-                cfg: cfg.checks.lychee.clone(),
-                settings: cfg.settings.clone(),
-                file_list: file_list.clone(),
-                config_dir: config_dir.to_path_buf(),
-            }),
-            SpecialKind::RenovateDeps => Some(PreparedCheck::RenovateDeps {
-                name,
-                cfg: cfg.checks.renovate_deps.clone(),
-                tracked_files: renovate_deps::COMMITTED_PATHS
-                    .iter()
-                    .map(|path| project_root.join(path))
-                    .collect(),
-            }),
-            SpecialKind::LicenseHeader => {
-                if cfg.checks.license_header.text.is_empty() {
-                    return None;
-                }
-                let patterns: Vec<&str> = cfg
-                    .checks
-                    .license_header
-                    .patterns
-                    .iter()
-                    .map(String::as_str)
-                    .collect();
-                let files: Vec<PathBuf> =
-                    match_files(&file_list.files, &patterns, &[], project_root)
-                        .into_iter()
-                        .cloned()
-                        .collect();
-                if files.is_empty() {
-                    return None;
-                }
-                Some(PreparedCheck::LicenseHeader {
-                    name,
-                    cfg: cfg.checks.license_header.clone(),
-                    files,
-                })
-            }
-            SpecialKind::FlintSetup => Some(PreparedCheck::FlintSetup {
-                name,
-                path: project_root.join("mise.toml"),
-                config_dir: config_dir.to_path_buf(),
-                setup_migration_version: cfg.settings.setup_migration_version,
-            }),
-        },
+        CheckKind::Special(special) => special
+            .prepare(SpecialPrepareContext {
+                name: check.name,
+                file_list,
+                project_root,
+                cfg,
+                config_dir,
+            })
+            .map(PreparedCheck::Special),
     }
 }
 
@@ -760,57 +669,6 @@ fn flush_output(stdout: &[u8], stderr: &[u8]) {
     }
     if !stderr.is_empty() {
         eprint!("{}", String::from_utf8_lossy(stderr));
-    }
-}
-
-fn match_files<'a>(
-    files: &'a [PathBuf],
-    patterns: &[&str],
-    exclude_patterns: &[&str],
-    project_root: &Path,
-) -> Vec<&'a PathBuf> {
-    files
-        .iter()
-        .filter(|p| {
-            let rel = p.strip_prefix(project_root).unwrap_or(p);
-            let rel_str = rel.to_string_lossy();
-            let file_name = p
-                .file_name()
-                .map(|n| n.to_string_lossy())
-                .unwrap_or_default();
-            let included = patterns.iter().any(|pat| {
-                if *pat == "*" {
-                    return true;
-                }
-                glob_match(pat, file_name.as_ref()) || glob_match(pat, rel_str.as_ref())
-            });
-            let excluded = exclude_patterns.iter().any(|pat| {
-                glob_match(pat, file_name.as_ref()) || glob_match(pat, rel_str.as_ref())
-            });
-            included && !excluded
-        })
-        .collect()
-}
-
-fn glob_match(pattern: &str, name: &str) -> bool {
-    // Simple glob: splits on `*` and checks that each segment appears in order.
-    // Handles `*.ext`, `prefix*`, `dir/*.yml`, etc.
-    let parts: Vec<&str> = pattern.splitn(2, '*').collect();
-    match parts.as_slice() {
-        [only] => name == *only || name.ends_with(&format!("/{only}")),
-        [prefix, suffix] => {
-            let n = name;
-            // The prefix must match the start of the name (or the part after the last slash).
-            let anchor_start = prefix.is_empty() || n.starts_with(prefix) || {
-                // Allow matching the basename portion for patterns like `*.sh`.
-                n.contains('/') && {
-                    let after_slash = n.rfind('/').map(|i| &n[i + 1..]).unwrap_or(n);
-                    prefix.is_empty() || after_slash.starts_with(prefix)
-                }
-            };
-            anchor_start && n.ends_with(suffix)
-        }
-        _ => false,
     }
 }
 

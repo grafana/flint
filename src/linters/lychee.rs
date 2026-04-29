@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use tokio::process::Command;
 
@@ -6,7 +6,10 @@ use crate::config::{Config, LycheeConfig, Settings};
 use crate::files::FileList;
 use crate::linters::LinterOutput;
 use crate::linters::env;
-use crate::registry::{SpecialKind, StaticLinter, StaticSpecialLinter};
+use crate::registry::{
+    PreparedSpecialCheck, SpecialKind, SpecialPrepareContext, SpecialRunContext, SpecialRunFuture,
+    StaticLinter, StaticSpecialLinter,
+};
 
 const GITHUB_BASE_REF_ENV: &str = "GITHUB_BASE_REF";
 const GITHUB_EVENT_NAME_ENV: &str = "GITHUB_EVENT_NAME";
@@ -22,8 +25,46 @@ const PR_LINK_REMAP_ENV_VARS: &[&str] = &[
 
 pub(crate) static LINTER: StaticLinter = StaticLinter::special(
     "lychee",
-    StaticSpecialLinter::with_bin("lychee", SpecialKind::Links, false),
+    StaticSpecialLinter::with_bin("lychee", SpecialKind::Links, false, prepare),
 );
+
+#[derive(Debug)]
+struct PreparedLychee {
+    name: String,
+    cfg: LycheeConfig,
+    settings: Settings,
+    file_list: FileList,
+    config_dir: PathBuf,
+}
+
+fn prepare(ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>> {
+    Some(Box::new(PreparedLychee {
+        name: ctx.name.to_string(),
+        cfg: ctx.cfg.checks.lychee.clone(),
+        settings: ctx.cfg.settings.clone(),
+        file_list: ctx.file_list.clone(),
+        config_dir: ctx.config_dir.to_path_buf(),
+    }))
+}
+
+impl PreparedSpecialCheck for PreparedLychee {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn run(self: Box<Self>, ctx: SpecialRunContext) -> SpecialRunFuture {
+        Box::pin(async move {
+            crate::linters::lychee::run(
+                &self.cfg,
+                &self.settings,
+                &self.file_list,
+                &ctx.project_root,
+                &self.config_dir,
+            )
+            .await
+        })
+    }
+}
 
 pub async fn run(
     cfg: &LycheeConfig,

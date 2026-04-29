@@ -651,10 +651,9 @@ fn readme_quickstart_tools_snippets_stay_current() {
 
     let actual = toml_tool_versions_from_table(
         quickstart_tools,
-<<<<<<< HEAD
         &[
             "github:grafana/flint",
-            "github:koalaman/shellcheck",
+            "shellcheck",
             "shfmt",
             "actionlint",
             "rumdl",
@@ -667,9 +666,6 @@ fn readme_quickstart_tools_snippets_stay_current() {
             "lychee",
             "npm:renovate",
         ],
-=======
-        &["github:grafana/flint", "shellcheck", "shfmt", "actionlint"],
->>>>>>> 551a31f (fix(shellcheck): switch to bare mise key)
     );
 
     assert_eq!(

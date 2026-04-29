@@ -3,10 +3,12 @@ use std::path::Path;
 use crate::init::generation::{normalize_tools_section, tools_section_needs_normalization};
 use crate::init::write_setup_migration_version;
 use crate::linters::LinterOutput;
-use crate::registry::{SpecialKind, StaticLinter};
+use crate::registry::{SpecialKind, StaticLinter, StaticSpecialLinter};
 
-pub(crate) static LINTER: StaticLinter =
-    StaticLinter::special("flint-setup", SpecialKind::FlintSetup, true);
+pub(crate) static LINTER: StaticLinter = StaticLinter::special(
+    "flint-setup",
+    StaticSpecialLinter::new(SpecialKind::FlintSetup, true),
+);
 
 pub async fn run(
     fix: bool,

@@ -60,29 +60,24 @@ pub enum SpecialKind {
 
 #[derive(Debug, Clone, Copy)]
 pub struct SpecialCheck {
-    linter: &'static dyn Linter,
+    special: &'static dyn SpecialLinter,
 }
 
 impl SpecialCheck {
-    fn new(linter: &'static dyn Linter) -> Self {
-        if linter.special_kind().is_none() {
-            panic!("special check '{}' has no special kind", linter.name());
-        }
-        Self { linter }
+    fn new(special: &'static dyn SpecialLinter) -> Self {
+        Self { special }
     }
 
     pub fn kind(self) -> SpecialKind {
-        self.linter
-            .special_kind()
-            .expect("special check has no special kind")
+        self.special.kind()
     }
 
     pub fn has_fix(self) -> bool {
-        self.linter.special_has_fix()
+        self.special.has_fix()
     }
 
     pub fn uses_binary(self) -> bool {
-        self.linter.special_uses_binary()
+        self.special.uses_binary()
     }
 }
 
@@ -197,26 +192,67 @@ pub trait Linter: Sync + std::fmt::Debug {
     fn init_hook(&self) -> Option<InitHookFn> {
         None
     }
-    fn special_kind(&self) -> Option<SpecialKind> {
+    fn special(&'static self) -> Option<&'static dyn SpecialLinter> {
         None
     }
-    fn special_has_fix(&self) -> bool {
+}
+
+pub trait SpecialLinter: Sync + std::fmt::Debug {
+    fn kind(&self) -> SpecialKind;
+    fn has_fix(&self) -> bool {
         false
     }
-    fn special_bin_name(&self) -> Option<&'static str> {
+    fn bin_name(&self) -> Option<&'static str> {
         None
     }
-    fn special_uses_binary(&self) -> bool {
-        self.special_bin_name().is_some()
+    fn uses_binary(&self) -> bool {
+        self.bin_name().is_some()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct StaticSpecialLinter {
+    kind: SpecialKind,
+    has_fix: bool,
+    bin_name: Option<&'static str>,
+}
+
+impl StaticSpecialLinter {
+    pub const fn new(kind: SpecialKind, has_fix: bool) -> Self {
+        Self {
+            kind,
+            has_fix,
+            bin_name: None,
+        }
+    }
+
+    pub const fn with_bin(bin_name: &'static str, kind: SpecialKind, has_fix: bool) -> Self {
+        Self {
+            kind,
+            has_fix,
+            bin_name: Some(bin_name),
+        }
+    }
+}
+
+impl SpecialLinter for StaticSpecialLinter {
+    fn kind(&self) -> SpecialKind {
+        self.kind
+    }
+
+    fn has_fix(&self) -> bool {
+        self.has_fix
+    }
+
+    fn bin_name(&self) -> Option<&'static str> {
+        self.bin_name
     }
 }
 
 pub struct StaticLinter {
     name: &'static str,
     init_hook: Option<InitHookFn>,
-    special_kind: Option<SpecialKind>,
-    special_has_fix: bool,
-    special_bin_name: Option<&'static str>,
+    special: Option<StaticSpecialLinter>,
 }
 
 impl StaticLinter {
@@ -224,54 +260,27 @@ impl StaticLinter {
         Self {
             name,
             init_hook: Some(init_hook),
-            special_kind: None,
-            special_has_fix: false,
-            special_bin_name: None,
+            special: None,
         }
     }
 
-    pub const fn special(
-        name: &'static str,
-        special_kind: SpecialKind,
-        special_has_fix: bool,
-    ) -> Self {
+    pub const fn special(name: &'static str, special: StaticSpecialLinter) -> Self {
         Self {
             name,
             init_hook: None,
-            special_kind: Some(special_kind),
-            special_has_fix,
-            special_bin_name: None,
+            special: Some(special),
         }
     }
 
-    pub const fn special_with_bin(
+    pub const fn special_with_init_hook(
         name: &'static str,
-        bin_name: &'static str,
-        special_kind: SpecialKind,
-        special_has_fix: bool,
-    ) -> Self {
-        Self {
-            name,
-            init_hook: None,
-            special_kind: Some(special_kind),
-            special_has_fix,
-            special_bin_name: Some(bin_name),
-        }
-    }
-
-    pub const fn special_with_bin_and_init_hook(
-        name: &'static str,
-        bin_name: &'static str,
-        special_kind: SpecialKind,
-        special_has_fix: bool,
+        special: StaticSpecialLinter,
         init_hook: InitHookFn,
     ) -> Self {
         Self {
             name,
             init_hook: Some(init_hook),
-            special_kind: Some(special_kind),
-            special_has_fix,
-            special_bin_name: Some(bin_name),
+            special: Some(special),
         }
     }
 }
@@ -285,16 +294,10 @@ impl Linter for StaticLinter {
         self.init_hook
     }
 
-    fn special_kind(&self) -> Option<SpecialKind> {
-        self.special_kind
-    }
-
-    fn special_has_fix(&self) -> bool {
-        self.special_has_fix
-    }
-
-    fn special_bin_name(&self) -> Option<&'static str> {
-        self.special_bin_name
+    fn special(&'static self) -> Option<&'static dyn SpecialLinter> {
+        self.special
+            .as_ref()
+            .map(|special| special as &dyn SpecialLinter)
     }
 }
 
@@ -302,7 +305,7 @@ impl std::fmt::Debug for StaticLinter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StaticLinter")
             .field("name", &self.name)
-            .field("special_kind", &self.special_kind)
+            .field("special", &self.special)
             .finish()
     }
 }
@@ -544,9 +547,12 @@ impl Check {
 
     /// Special check with custom logic (not a simple command template).
     pub fn special(linter: &'static dyn Linter) -> Self {
+        let Some(special) = linter.special() else {
+            panic!("special check '{}' has no special linter", linter.name());
+        };
         Check {
             name: linter.name(),
-            bin_name: linter.special_bin_name().unwrap_or(""),
+            bin_name: special.bin_name().unwrap_or(""),
             mise_tool_name: None,
             version_range: None,
             patterns: &[],
@@ -574,7 +580,7 @@ impl Check {
             windows_java_jar: false,
             workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
-            kind: CheckKind::Special(SpecialCheck::new(linter)),
+            kind: CheckKind::Special(SpecialCheck::new(special)),
             desc: "",
             docs: "",
         }

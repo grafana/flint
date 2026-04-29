@@ -58,30 +58,31 @@ pub enum SpecialKind {
     FlintSetup,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub struct SpecialCheck {
-    kind: SpecialKind,
-    has_fix: bool,
+    linter: &'static dyn Linter,
 }
 
 impl SpecialCheck {
-    fn new(kind: SpecialKind, has_fix: bool) -> Self {
-        Self { kind, has_fix }
+    fn new(linter: &'static dyn Linter) -> Self {
+        if linter.special_kind().is_none() {
+            panic!("special check '{}' has no special kind", linter.name());
+        }
+        Self { linter }
     }
 
     pub fn kind(self) -> SpecialKind {
-        self.kind
+        self.linter
+            .special_kind()
+            .expect("special check has no special kind")
     }
 
     pub fn has_fix(self) -> bool {
-        self.has_fix
+        self.linter.special_has_fix()
     }
 
     pub fn uses_binary(self) -> bool {
-        !matches!(
-            self.kind,
-            SpecialKind::LicenseHeader | SpecialKind::FlintSetup
-        )
+        self.linter.special_uses_binary()
     }
 }
 
@@ -191,58 +192,101 @@ pub trait InitHookContext {
 
 pub type InitHookFn = fn(&dyn InitHookContext) -> anyhow::Result<bool>;
 
-pub trait InitHookSpec: Sync {
+pub trait Linter: Sync + std::fmt::Debug {
     fn name(&self) -> &'static str;
-    fn hook(&self) -> Option<InitHookFn>;
-}
-
-pub struct StaticInitHook {
-    name: &'static str,
-    hook: InitHookFn,
-}
-
-impl StaticInitHook {
-    pub const fn new(name: &'static str, hook: InitHookFn) -> Self {
-        Self { name, hook }
+    fn init_hook(&self) -> Option<InitHookFn> {
+        None
+    }
+    fn special_kind(&self) -> Option<SpecialKind> {
+        None
+    }
+    fn special_has_fix(&self) -> bool {
+        false
+    }
+    fn special_uses_binary(&self) -> bool {
+        true
     }
 }
 
-impl InitHookSpec for StaticInitHook {
+pub struct StaticLinter {
+    name: &'static str,
+    init_hook: Option<InitHookFn>,
+    special_kind: Option<SpecialKind>,
+    special_has_fix: bool,
+    special_uses_binary: bool,
+}
+
+impl StaticLinter {
+    pub const fn with_init_hook(name: &'static str, init_hook: InitHookFn) -> Self {
+        Self {
+            name,
+            init_hook: Some(init_hook),
+            special_kind: None,
+            special_has_fix: false,
+            special_uses_binary: true,
+        }
+    }
+
+    pub const fn special(
+        name: &'static str,
+        special_kind: SpecialKind,
+        special_has_fix: bool,
+        special_uses_binary: bool,
+    ) -> Self {
+        Self {
+            name,
+            init_hook: None,
+            special_kind: Some(special_kind),
+            special_has_fix,
+            special_uses_binary,
+        }
+    }
+
+    pub const fn special_with_init_hook(
+        name: &'static str,
+        special_kind: SpecialKind,
+        special_has_fix: bool,
+        special_uses_binary: bool,
+        init_hook: InitHookFn,
+    ) -> Self {
+        Self {
+            name,
+            init_hook: Some(init_hook),
+            special_kind: Some(special_kind),
+            special_has_fix,
+            special_uses_binary,
+        }
+    }
+}
+
+impl Linter for StaticLinter {
     fn name(&self) -> &'static str {
         self.name
     }
 
-    fn hook(&self) -> Option<InitHookFn> {
-        Some(self.hook)
+    fn init_hook(&self) -> Option<InitHookFn> {
+        self.init_hook
+    }
+
+    fn special_kind(&self) -> Option<SpecialKind> {
+        self.special_kind
+    }
+
+    fn special_has_fix(&self) -> bool {
+        self.special_has_fix
+    }
+
+    fn special_uses_binary(&self) -> bool {
+        self.special_uses_binary
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct InitHook {
-    id: &'static str,
-    hook: InitHookFn,
-}
-
-impl InitHook {
-    pub fn from_spec(spec: &'static dyn InitHookSpec) -> Option<Self> {
-        spec.hook().map(|hook| Self {
-            id: spec.name(),
-            hook,
-        })
-    }
-
-    pub fn id(self) -> &'static str {
-        self.id
-    }
-
-    pub fn call(self, ctx: &dyn InitHookContext) -> anyhow::Result<bool> {
-        (self.hook)(ctx)
-    }
-}
-
-impl std::fmt::Debug for InitHook {
+impl std::fmt::Debug for StaticLinter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("InitHook").field("id", &self.id).finish()
+        f.debug_struct("StaticLinter")
+            .field("name", &self.name)
+            .field("special_kind", &self.special_kind)
+            .finish()
     }
 }
 
@@ -314,8 +358,8 @@ pub struct Check {
     pub unsupported_configs: &'static [ConfigFile],
     /// Old mise tool keys that should migrate to this check's current install key.
     pub tool_key_migrations: Vec<ToolKeyMigration>,
-    /// Optional setup-time hook that runs when this check is selected by `flint init`.
-    pub init_hook: Option<InitHook>,
+    /// Optional linter-level behavior shared by related checks.
+    pub linter: Option<&'static dyn Linter>,
     /// Optional relevance hook for adaptive checks in `--fast-only` mode.
     pub adaptive_relevance: Option<AdaptiveRelevanceHook>,
     /// Optional status override shown by `flint linters`.
@@ -453,7 +497,7 @@ impl Check {
             baseline_config: None,
             unsupported_configs: &[],
             tool_key_migrations: vec![],
-            init_hook: None,
+            linter: None,
             adaptive_relevance: None,
             status_hook: None,
             nonverbose_failure_output: None,
@@ -482,19 +526,14 @@ impl Check {
     }
 
     /// Special check with custom logic (not a simple command template).
-    pub fn special(name: &'static str, kind: SpecialKind, has_fix: bool) -> Self {
-        Self::special_with_bin(name, "", kind, has_fix)
+    pub fn special(linter: &'static dyn Linter) -> Self {
+        Self::special_with_bin(linter, "")
     }
 
     /// Special check with custom logic backed by an external binary.
-    pub fn special_with_bin(
-        name: &'static str,
-        bin_name: &'static str,
-        kind: SpecialKind,
-        has_fix: bool,
-    ) -> Self {
+    pub fn special_with_bin(linter: &'static dyn Linter, bin_name: &'static str) -> Self {
         Check {
-            name,
+            name: linter.name(),
             bin_name,
             mise_tool_name: None,
             version_range: None,
@@ -507,7 +546,7 @@ impl Check {
             baseline_config: None,
             unsupported_configs: &[],
             tool_key_migrations: vec![],
-            init_hook: None,
+            linter: Some(linter),
             adaptive_relevance: None,
             status_hook: None,
             nonverbose_failure_output: None,
@@ -523,7 +562,7 @@ impl Check {
             windows_java_jar: false,
             workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
-            kind: CheckKind::Special(SpecialCheck::new(kind, has_fix)),
+            kind: CheckKind::Special(SpecialCheck::new(linter)),
             desc: "",
             docs: "",
         }
@@ -735,8 +774,8 @@ impl Check {
         self
     }
 
-    pub fn init_hook(mut self, hook: &'static dyn InitHookSpec) -> Self {
-        self.init_hook = InitHook::from_spec(hook);
+    pub fn linter(mut self, linter: &'static dyn Linter) -> Self {
+        self.linter = Some(linter);
         self
     }
 

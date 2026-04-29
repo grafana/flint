@@ -7,7 +7,7 @@ use crate::config::RenovateDepsConfig;
 use crate::files::FileList;
 use crate::linters::LinterOutput;
 use crate::linters::env;
-use crate::registry::{AdaptiveRelevanceContext, InitHookContext, StaticInitHook};
+use crate::registry::{AdaptiveRelevanceContext, InitHookContext, SpecialKind, StaticLinter};
 
 const COMMITTED_FILE: &str = "renovate-tracked-deps.json";
 pub(crate) const COMMITTED_PATHS: &[&str] = &[COMMITTED_FILE, ".github/renovate-tracked-deps.json"];
@@ -24,7 +24,13 @@ const PACKAGE_FILES_MSGS: &[&str] = &["Extracted dependencies", "packageFiles wi
 const RENOVATE_GITHUB_TOKEN_DISPLAY: &str = "GITHUB_COM_TOKEN or GITHUB_TOKEN";
 const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value", "invalid-version"];
 
-pub(crate) static INIT_HOOK: StaticInitHook = StaticInitHook::new("renovate-deps", init);
+pub(crate) static LINTER: StaticLinter = StaticLinter::special_with_init_hook(
+    "renovate-deps",
+    SpecialKind::RenovateDeps,
+    true,
+    true,
+    init,
+);
 
 /// `{file_path: {manager: [dep_name, ...]}}` — all collections sorted.
 type DepMap = BTreeMap<String, BTreeMap<String, Vec<String>>>;

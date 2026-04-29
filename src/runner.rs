@@ -975,7 +975,7 @@ mod tests {
             baseline_config: None,
             unsupported_configs: &[],
             tool_key_migrations: vec![],
-            init_hook: None,
+            linter: None,
             adaptive_relevance: None,
             status_hook: None,
             nonverbose_failure_output: None,

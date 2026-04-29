@@ -122,12 +122,13 @@ fn apply_linter_init_hooks(
         renovate_exclude_managers,
     };
     let mut changed = false;
-    let mut applied_hooks = HashSet::new();
+    let mut initialized_linters = HashSet::new();
     for check in checks {
-        if let Some(hook) = check.init_hook
-            && applied_hooks.insert(hook.id())
+        if let Some(linter) = check.linter
+            && let Some(hook) = linter.init_hook()
+            && initialized_linters.insert(linter.name())
         {
-            changed |= hook.call(&context)?;
+            changed |= hook(&context)?;
         }
     }
     Ok(changed)

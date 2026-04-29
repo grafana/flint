@@ -19,7 +19,7 @@ pub use types::{
     AdaptiveRelevanceContext, Category, Check, CheckKind, ConfigBase, ConfigFile, ConfigMatch,
     EditorconfigDirectiveStyle, EditorconfigLineLengthPolicy, FixBehavior, InitHookContext,
     LinterConfig, MissingComponentHint, NonverboseFailureOutputHook, RunPolicy, Scope, SpecialKind,
-    StaticInitHook, StatusContext, WorkflowSetup,
+    StaticLinter, StatusContext, WorkflowSetup,
 };
 
 /// Returns the explicit set of flint-managed tool keys that belong under the

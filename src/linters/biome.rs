@@ -1,9 +1,9 @@
 use anyhow::Result;
 use std::path::Path;
 
-use crate::registry::{InitHookContext, StaticInitHook};
+use crate::registry::{InitHookContext, StaticLinter};
 
-pub(crate) static INIT_HOOK: StaticInitHook = StaticInitHook::new("biome", init);
+pub(crate) static LINTER: StaticLinter = StaticLinter::with_init_hook("biome", init);
 
 pub(crate) fn init(ctx: &dyn InitHookContext) -> Result<bool> {
     generate_config(ctx.project_root())

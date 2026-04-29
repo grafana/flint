@@ -6,6 +6,7 @@ use crate::config::{Config, LycheeConfig, Settings};
 use crate::files::FileList;
 use crate::linters::LinterOutput;
 use crate::linters::env;
+use crate::registry::{SpecialKind, StaticLinter};
 
 const GITHUB_BASE_REF_ENV: &str = "GITHUB_BASE_REF";
 const GITHUB_EVENT_NAME_ENV: &str = "GITHUB_EVENT_NAME";
@@ -18,6 +19,9 @@ const PR_LINK_REMAP_ENV_VARS: &[&str] = &[
     GITHUB_HEAD_REF_ENV,
     PR_HEAD_REPO_ENV,
 ];
+
+pub(crate) static LINTER: StaticLinter =
+    StaticLinter::special("lychee", SpecialKind::Links, false, true);
 
 pub async fn run(
     cfg: &LycheeConfig,

@@ -1,5 +1,5 @@
 use super::*;
-use crate::registry::StaticInitHook;
+use crate::registry::StaticLinter;
 use config_files::generate_flint_toml;
 use detection::entry_components_differ;
 use generation::{
@@ -8,14 +8,15 @@ use generation::{
 use scaffold::{apply_env_and_tasks, generate_lint_workflow};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-static INIT_HOOK_CALLS: AtomicUsize = AtomicUsize::new(0);
+static LINTER_INIT_CALLS: AtomicUsize = AtomicUsize::new(0);
 
-fn counting_init_hook(_: &dyn InitHookContext) -> anyhow::Result<bool> {
-    INIT_HOOK_CALLS.fetch_add(1, Ordering::SeqCst);
+fn counting_linter_init(_: &dyn InitHookContext) -> anyhow::Result<bool> {
+    LINTER_INIT_CALLS.fetch_add(1, Ordering::SeqCst);
     Ok(true)
 }
 
-static COUNTING_INIT_HOOK: StaticInitHook = StaticInitHook::new("shared-hook", counting_init_hook);
+static COUNTING_LINTER: StaticLinter =
+    StaticLinter::with_init_hook("shared-hook", counting_linter_init);
 
 #[test]
 fn detect_obsolete_keys_finds_known_stale_key() {
@@ -57,9 +58,9 @@ fn all_registry_checks_have_install_key_or_none() {
 
 #[test]
 fn apply_linter_init_hooks_runs_shared_hook_once() {
-    INIT_HOOK_CALLS.store(0, Ordering::SeqCst);
-    let first = Check::file("first", "first {FILE}", &["*"]).init_hook(&COUNTING_INIT_HOOK);
-    let second = Check::file("second", "second {FILE}", &["*"]).init_hook(&COUNTING_INIT_HOOK);
+    LINTER_INIT_CALLS.store(0, Ordering::SeqCst);
+    let first = Check::file("first", "first {FILE}", &["*"]).linter(&COUNTING_LINTER);
+    let second = Check::file("second", "second {FILE}", &["*"]).linter(&COUNTING_LINTER);
     let tmp = tempfile::TempDir::new().unwrap();
     let changed = apply_linter_init_hooks(
         &[&first, &second],
@@ -72,7 +73,7 @@ fn apply_linter_init_hooks_runs_shared_hook_once() {
     .unwrap();
 
     assert!(changed);
-    assert_eq!(INIT_HOOK_CALLS.load(Ordering::SeqCst), 1);
+    assert_eq!(LINTER_INIT_CALLS.load(Ordering::SeqCst), 1);
 }
 
 #[test]

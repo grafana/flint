@@ -3,7 +3,10 @@ use std::path::{Path, PathBuf};
 
 use crate::config::LicenseHeaderConfig;
 use crate::linters::LinterOutput;
-use crate::registry::StatusContext;
+use crate::registry::{SpecialKind, StaticLinter, StatusContext};
+
+pub(crate) static LINTER: StaticLinter =
+    StaticLinter::special("license-header", SpecialKind::LicenseHeader, false, false);
 
 /// Checks that each file contains `cfg.text` within the first `cfg.lines_to_check` lines.
 /// Files are pre-filtered by pattern in the runner; this function checks all of them.

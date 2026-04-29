@@ -52,11 +52,6 @@ pub enum RunPolicy {
     Adaptive,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SpecialKind {
-    FlintSetup,
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct SpecialCheck {
     special: &'static dyn SpecialLinter,
@@ -65,10 +60,6 @@ pub struct SpecialCheck {
 impl SpecialCheck {
     fn new(special: &'static dyn SpecialLinter) -> Self {
         Self { special }
-    }
-
-    pub fn kind(self) -> Option<SpecialKind> {
-        self.special.kind()
     }
 
     pub fn has_fix(self) -> bool {
@@ -85,6 +76,10 @@ impl SpecialCheck {
 
     pub fn config_display(self) -> Option<&'static str> {
         self.special.config_display()
+    }
+
+    pub fn is_setup(self) -> bool {
+        self.special.is_setup()
     }
 }
 
@@ -119,19 +114,15 @@ impl CheckKind {
         }
     }
 
-    pub fn special_kind(&self) -> Option<SpecialKind> {
-        match self {
-            Self::Template { .. } => None,
-            Self::Special(special) => special.kind(),
-        }
-    }
-
-    pub fn is_special_kind(&self, kind: SpecialKind) -> bool {
-        self.special_kind() == Some(kind)
-    }
-
     pub fn is_special(&self) -> bool {
         matches!(self, Self::Special(_))
+    }
+
+    pub fn is_setup(&self) -> bool {
+        match self {
+            Self::Template { .. } => false,
+            Self::Special(special) => special.is_setup(),
+        }
     }
 
     pub fn special_config_display(&self) -> Option<&'static str> {
@@ -258,9 +249,6 @@ pub trait PreparedSpecialCheck: Send + std::fmt::Debug {
 pub type SpecialPrepareFn = fn(SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>>;
 
 pub trait SpecialLinter: Sync + std::fmt::Debug {
-    fn kind(&self) -> Option<SpecialKind> {
-        None
-    }
     fn prepare(&self, ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>>;
     fn has_fix(&self) -> bool {
         false
@@ -271,6 +259,9 @@ pub trait SpecialLinter: Sync + std::fmt::Debug {
     fn config_display(&self) -> Option<&'static str> {
         None
     }
+    fn is_setup(&self) -> bool {
+        false
+    }
     fn uses_binary(&self) -> bool {
         self.bin_name().is_some()
     }
@@ -278,30 +269,20 @@ pub trait SpecialLinter: Sync + std::fmt::Debug {
 
 #[derive(Debug, Clone, Copy)]
 pub struct StaticSpecialLinter {
-    kind: Option<SpecialKind>,
     has_fix: bool,
     bin_name: Option<&'static str>,
     config_display: Option<&'static str>,
+    setup: bool,
     prepare: SpecialPrepareFn,
 }
 
 impl StaticSpecialLinter {
     pub const fn new(has_fix: bool, prepare: SpecialPrepareFn) -> Self {
         Self {
-            kind: None,
             has_fix,
             bin_name: None,
             config_display: None,
-            prepare,
-        }
-    }
-
-    pub const fn with_kind(kind: SpecialKind, has_fix: bool, prepare: SpecialPrepareFn) -> Self {
-        Self {
-            kind: Some(kind),
-            has_fix,
-            bin_name: None,
-            config_display: None,
+            setup: false,
             prepare,
         }
     }
@@ -312,10 +293,10 @@ impl StaticSpecialLinter {
         prepare: SpecialPrepareFn,
     ) -> Self {
         Self {
-            kind: None,
             has_fix,
             bin_name: Some(bin_name),
             config_display: None,
+            setup: false,
             prepare,
         }
     }
@@ -324,13 +305,14 @@ impl StaticSpecialLinter {
         self.config_display = Some(config_display);
         self
     }
+
+    pub const fn setup(mut self) -> Self {
+        self.setup = true;
+        self
+    }
 }
 
 impl SpecialLinter for StaticSpecialLinter {
-    fn kind(&self) -> Option<SpecialKind> {
-        self.kind
-    }
-
     fn prepare(&self, ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>> {
         (self.prepare)(ctx)
     }
@@ -345,6 +327,10 @@ impl SpecialLinter for StaticSpecialLinter {
 
     fn config_display(&self) -> Option<&'static str> {
         self.config_display
+    }
+
+    fn is_setup(&self) -> bool {
+        self.setup
     }
 }
 

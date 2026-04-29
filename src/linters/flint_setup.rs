@@ -5,13 +5,13 @@ use crate::init::generation::{normalize_tools_section, tools_section_needs_norma
 use crate::init::write_setup_migration_version;
 use crate::linters::LinterOutput;
 use crate::registry::{
-    PreparedSpecialCheck, SpecialKind, SpecialPrepareContext, SpecialRunContext, SpecialRunFuture,
-    StaticLinter, StaticSpecialLinter,
+    PreparedSpecialCheck, SpecialPrepareContext, SpecialRunContext, SpecialRunFuture, StaticLinter,
+    StaticSpecialLinter,
 };
 
 pub(crate) static LINTER: StaticLinter = StaticLinter::special(
     "flint-setup",
-    StaticSpecialLinter::with_kind(SpecialKind::FlintSetup, true, prepare),
+    StaticSpecialLinter::new(true, prepare).setup(),
 );
 
 #[derive(Debug)]

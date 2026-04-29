@@ -9,7 +9,7 @@ mod setup;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
-use registry::{CheckKind, FixBehavior, LinterConfig, RunPolicy, Scope, SpecialKind};
+use registry::{CheckKind, FixBehavior, LinterConfig, RunPolicy, Scope};
 use runner::{CheckResult, RunOptions};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -207,9 +207,7 @@ async fn run(
     // --fast-only policy (skipped when linters are named explicitly, relevance-gated for
     // adaptive checks). mise guarantees declared tools are on PATH, so no PATH check needed.
     let mise_tools = registry::read_mise_tools(project_root);
-    let flint_setup_selected = checks
-        .iter()
-        .any(|c| c.kind.is_special_kind(SpecialKind::FlintSetup));
+    let flint_setup_selected = checks.iter().any(|c| c.kind.is_setup());
     if !flint_setup_selected {
         if let Some((old, new)) = registry::find_obsolete_key(&mise_tools) {
             eprintln!("flint: obsolete tool key in mise.toml: {old:?} (replaced by {new:?})");
@@ -644,7 +642,7 @@ fn classify_single_pass_fix(result: CheckResult) -> FixOutcome {
 }
 
 fn is_flint_setup(check: &registry::Check) -> bool {
-    check.kind.is_special_kind(SpecialKind::FlintSetup)
+    check.kind.is_setup()
 }
 
 async fn run_checks(

@@ -19,7 +19,7 @@ pub use types::{
     AdaptiveRelevanceContext, Category, Check, CheckKind, ConfigBase, ConfigFile, ConfigMatch,
     EditorconfigDirectiveStyle, EditorconfigLineLengthPolicy, FixBehavior, InitHookContext,
     LinterConfig, LinterOutput, MissingComponentHint, NonverboseFailureOutputHook,
-    PreparedSpecialCheck, RunPolicy, Scope, SpecialKind, SpecialPrepareContext, SpecialRunContext,
+    PreparedSpecialCheck, RunPolicy, Scope, SpecialPrepareContext, SpecialRunContext,
     SpecialRunFuture, StaticLinter, StaticSpecialLinter, StatusContext, WorkflowSetup,
 };
 

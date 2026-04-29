@@ -426,6 +426,11 @@ fn check_renovate_deps() -> Check {
             so Renovate can authenticate GitHub requests. If `GITHUB_COM_TOKEN` is\n\
             unset, flint forwards `GITHUB_TOKEN` to Renovate as `GITHUB_COM_TOKEN`.\n\
             \n\
+            `flint init` creates or patches this section when `renovate-deps` is\n\
+            selected, so you normally do not need to add these fields by hand. It\n\
+            also migrates legacy `RENOVATE_TRACKED_DEPS_EXCLUDE` values into\n\
+            `exclude_managers`.\n\
+            \n\
             With `--fix`, automatically regenerates and commits the snapshot.\n\
             \n\
             Configure via `flint.toml`:\n\

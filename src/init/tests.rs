@@ -763,6 +763,68 @@ fn generate_flint_toml_with_renovate_managers() {
 }
 
 #[test]
+fn generate_flint_toml_patches_existing_with_renovate_placeholder() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    std::fs::write(tmp.path().join("flint.toml"), "[settings]\n").unwrap();
+    let written = generate_flint_toml(
+        tmp.path(),
+        "main",
+        crate::setup::V2_BASELINE_SETUP_VERSION,
+        true,
+        None,
+    )
+    .unwrap();
+    assert!(written);
+    let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
+    assert!(content.contains("[checks.renovate-deps]"));
+    assert!(content.contains("# exclude_managers = []"));
+}
+
+#[test]
+fn generate_flint_toml_patches_existing_with_renovate_managers() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    std::fs::write(tmp.path().join("flint.toml"), "[settings]\n").unwrap();
+    let managers = vec!["github-actions".to_string(), "cargo".to_string()];
+    let written = generate_flint_toml(
+        tmp.path(),
+        "main",
+        crate::setup::V2_BASELINE_SETUP_VERSION,
+        true,
+        Some(&managers),
+    )
+    .unwrap();
+    assert!(written);
+    let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
+    assert!(
+        content.contains("exclude_managers = [\"github-actions\", \"cargo\"]"),
+        "managers written uncommented: {content}"
+    );
+}
+
+#[test]
+fn generate_flint_toml_keeps_existing_renovate_managers() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    std::fs::write(
+        tmp.path().join("flint.toml"),
+        "[checks.renovate-deps]\nexclude_managers = [\"npm\"]\n",
+    )
+    .unwrap();
+    let managers = vec!["github-actions".to_string(), "cargo".to_string()];
+    let written = generate_flint_toml(
+        tmp.path(),
+        "main",
+        crate::setup::V2_BASELINE_SETUP_VERSION,
+        true,
+        Some(&managers),
+    )
+    .unwrap();
+    assert!(!written);
+    let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
+    assert!(content.contains("exclude_managers = [\"npm\"]"));
+    assert!(!content.contains("github-actions"));
+}
+
+#[test]
 fn generate_flint_toml_skips_existing() {
     let tmp = tempfile::TempDir::new().unwrap();
     std::fs::write(tmp.path().join("flint.toml"), "existing content").unwrap();

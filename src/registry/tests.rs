@@ -397,7 +397,7 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
         .find(|rule| rule["groupName"].as_str() == Some("linters"))
         .expect("default.json must define a packageRules entry with groupName 'linters'");
 
-    let actual = package_names(linters_rule);
+    let actual = dep_names(linters_rule);
     let expected: Vec<&str> = builtin()
         .into_iter()
         .filter(|check| check.uses_binary())
@@ -413,8 +413,8 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
     );
     assert_eq!(
         actual,
-        sorted_package_names(linters_rule),
-        "default.json weekly linters rule matchPackageNames must be sorted"
+        sorted_dep_names(linters_rule),
+        "default.json weekly linters rule matchDepNames must be sorted"
     );
 
     assert_eq!(
@@ -461,14 +461,14 @@ fn repo_renovate_config_stays_aligned_with_shared_preset_contract() {
             "package rule {group_name:?} schedule in .github/renovate.json5 drifted from default.json"
         );
         assert_eq!(
-            package_names(default_rule),
-            package_names(repo_rule),
-            "package rule {group_name:?} matchPackageNames in .github/renovate.json5 drifted from default.json"
+            rule_names(default_rule),
+            rule_names(repo_rule),
+            "package rule {group_name:?} package matcher in .github/renovate.json5 drifted from default.json"
         );
         assert_eq!(
-            package_names(repo_rule),
-            sorted_package_names(repo_rule),
-            "package rule {group_name:?} matchPackageNames in .github/renovate.json5 must be sorted"
+            rule_names(repo_rule),
+            sorted_rule_names(repo_rule),
+            "package rule {group_name:?} package matcher in .github/renovate.json5 must be sorted"
         );
     }
 
@@ -553,8 +553,35 @@ fn package_names(rule: &serde_json::Value) -> Vec<&str> {
         .collect()
 }
 
-fn sorted_package_names(rule: &serde_json::Value) -> Vec<&str> {
-    let mut names = package_names(rule);
+fn dep_names(rule: &serde_json::Value) -> Vec<&str> {
+    rule["matchDepNames"]
+        .as_array()
+        .expect("package rule must declare matchDepNames")
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .expect("package rule matchDepNames entries must be strings")
+        })
+        .collect()
+}
+
+fn sorted_dep_names(rule: &serde_json::Value) -> Vec<&str> {
+    let mut names = dep_names(rule);
+    names.sort_unstable();
+    names
+}
+
+fn rule_names(rule: &serde_json::Value) -> Vec<&str> {
+    if rule.get("matchDepNames").is_some() {
+        dep_names(rule)
+    } else {
+        package_names(rule)
+    }
+}
+
+fn sorted_rule_names(rule: &serde_json::Value) -> Vec<&str> {
+    let mut names = rule_names(rule);
     names.sort_unstable();
     names
 }

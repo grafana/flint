@@ -62,7 +62,7 @@
   ],
   packageRules: [
     {
-      matchPackageNames: [
+      matchDepNames: [
         "actionlint",
         "aqua:owenlamont/ryl",
         "biome",

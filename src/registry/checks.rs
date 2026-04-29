@@ -394,7 +394,9 @@ fn check_lychee() -> Check {
             in all files — useful when broken internal links from unchanged files also\n\
             matter.\n\
             \n\
-            On CI, `GITHUB_TOKEN` is required for authenticated GitHub link checks.\n\
+            `GITHUB_TOKEN` is needed by some checks that query GitHub, but not every\n\
+            check. For `lychee`, CI runs require it so GitHub link checks can\n\
+            authenticate.\n\
             On GitHub Actions PR runs in changed-file mode, link remaps also require\n\
             `GITHUB_REPOSITORY`, `GITHUB_BASE_REF`, `GITHUB_HEAD_REF`, and `PR_HEAD_REPO`.\n\
             GitHub Actions provides the first three; set `PR_HEAD_REPO` from\n\

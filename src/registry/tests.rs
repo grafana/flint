@@ -424,6 +424,16 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
         )]),
         "linters package rule must remain on the weekly Monday schedule"
     );
+    assert_eq!(
+        linters_rule["commitMessageTopic"].as_str(),
+        Some("flint-managed linter updates"),
+        "linters package rule must keep the grouped PR title readable"
+    );
+    assert_eq!(
+        linters_rule["separateMajorMinor"].as_bool(),
+        Some(false),
+        "linters package rule must keep major and non-major updates in one Monday PR"
+    );
     assert!(
         !actual.contains(&"node"),
         "node is a runtime prerequisite, not a linter, and must not be in the weekly linters rule"
@@ -459,6 +469,14 @@ fn repo_renovate_config_stays_aligned_with_shared_preset_contract() {
         assert_eq!(
             default_rule["schedule"], repo_rule["schedule"],
             "package rule {group_name:?} schedule in .github/renovate.json5 drifted from default.json"
+        );
+        assert_eq!(
+            default_rule["commitMessageTopic"], repo_rule["commitMessageTopic"],
+            "package rule {group_name:?} commitMessageTopic in .github/renovate.json5 drifted from default.json"
+        );
+        assert_eq!(
+            default_rule["separateMajorMinor"], repo_rule["separateMajorMinor"],
+            "package rule {group_name:?} separateMajorMinor in .github/renovate.json5 drifted from default.json"
         );
         assert_eq!(
             package_names(default_rule),

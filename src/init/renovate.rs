@@ -1,22 +1,28 @@
 use anyhow::{Context, Result};
 use std::path::Path;
 
-/// Carries legacy v1 Renovate manager excludes into `flint.toml`.
+/// Ensures `flint.toml` has the Renovate check config requested by init.
 /// Returns `true` when the file was changed.
-pub(super) fn migrate_renovate_deps_config(toml_path: &Path, managers: &[String]) -> Result<bool> {
+pub(super) fn configure_renovate_deps_config(
+    toml_path: &Path,
+    exclude_managers: Option<&[String]>,
+) -> Result<bool> {
     let content = std::fs::read_to_string(toml_path)
         .with_context(|| format!("failed to read {}", toml_path.display()))?;
     let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse flint.toml")?;
     let Some(checks) = doc.get("checks").and_then(|item| item.as_table()) else {
-        return append_renovate_deps_config(toml_path, &content, managers);
+        return append_renovate_deps_config(toml_path, &content, exclude_managers);
     };
     let Some(table_key) = ["renovate-deps", "renovate_deps"]
         .into_iter()
         .find(|key| checks.contains_key(key))
     else {
-        return append_renovate_deps_config(toml_path, &content, managers);
+        return append_renovate_deps_config(toml_path, &content, exclude_managers);
     };
 
+    let Some(managers) = exclude_managers.filter(|managers| !managers.is_empty()) else {
+        return Ok(false);
+    };
     let renovate = doc
         .get_mut("checks")
         .and_then(|item| item.as_table_mut())
@@ -44,14 +50,19 @@ pub(super) fn migrate_renovate_deps_config(toml_path: &Path, managers: &[String]
 fn append_renovate_deps_config(
     toml_path: &Path,
     content: &str,
-    managers: &[String],
+    exclude_managers: Option<&[String]>,
 ) -> Result<bool> {
     let mut next = String::from(content);
     if !next.ends_with('\n') {
         next.push('\n');
     }
     next.push_str("\n[checks.renovate-deps]\n");
-    next.push_str(&format!("exclude_managers = {}\n", string_array(managers)));
+    match exclude_managers {
+        Some(managers) if !managers.is_empty() => {
+            next.push_str(&format!("exclude_managers = {}\n", string_array(managers)));
+        }
+        _ => next.push_str("# exclude_managers = []\n"),
+    }
     std::fs::write(toml_path, next)
         .with_context(|| format!("failed to write {}", toml_path.display()))?;
     println!(
@@ -67,6 +78,25 @@ fn string_array(values: &[String]) -> toml_edit::Array {
         array.push(value.as_str());
     }
     array
+}
+
+pub(super) fn patch_renovate_preset(project_root: &Path) -> Result<bool> {
+    let Some(path) = find_renovate_config(project_root) else {
+        return Ok(false);
+    };
+    let changed = patch_renovate_extends(&path)?;
+    if changed {
+        let rel = path.strip_prefix(project_root).unwrap_or(&path);
+        println!("  patched {} — added {}", rel.display(), flint_preset());
+    }
+    Ok(changed)
+}
+
+fn find_renovate_config(project_root: &Path) -> Option<std::path::PathBuf> {
+    crate::linters::renovate_deps::RENOVATE_CONFIG_PATTERNS
+        .iter()
+        .map(|p| project_root.join(p))
+        .find(|p| p.exists())
 }
 
 /// Returns the renovate preset entry to inject, e.g. `github>grafana/flint#v0.9.2`.
@@ -163,12 +193,47 @@ fn add_to_extends(content: &str, entry: &str) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{add_to_extends, patch_renovate_extends};
+    use super::{add_to_extends, configure_renovate_deps_config, patch_renovate_extends};
 
     fn write_tmp(content: &str) -> tempfile::NamedTempFile {
         let f = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(f.path(), content).unwrap();
         f
+    }
+
+    #[test]
+    fn configure_renovate_deps_appends_placeholder() {
+        let tmp = write_tmp("[settings]\n");
+        let changed = configure_renovate_deps_config(tmp.path(), None).unwrap();
+        assert!(changed);
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(result.contains("[checks.renovate-deps]"));
+        assert!(result.contains("# exclude_managers = []"));
+    }
+
+    #[test]
+    fn configure_renovate_deps_appends_migrated_managers() {
+        let tmp = write_tmp("[settings]\n");
+        let managers = vec!["github-actions".to_string(), "cargo".to_string()];
+        let changed = configure_renovate_deps_config(tmp.path(), Some(&managers)).unwrap();
+        assert!(changed);
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(
+            result.contains("exclude_managers = [\"github-actions\", \"cargo\"]"),
+            "managers written uncommented: {result}"
+        );
+        assert!(!result.contains("# exclude_managers"));
+    }
+
+    #[test]
+    fn configure_renovate_deps_keeps_existing_managers() {
+        let tmp = write_tmp("[checks.renovate-deps]\nexclude_managers = [\"npm\"]\n");
+        let managers = vec!["github-actions".to_string(), "cargo".to_string()];
+        let changed = configure_renovate_deps_config(tmp.path(), Some(&managers)).unwrap();
+        assert!(!changed);
+        let result = std::fs::read_to_string(tmp.path()).unwrap();
+        assert!(result.contains("exclude_managers = [\"npm\"]"));
+        assert!(!result.contains("github-actions"));
     }
 
     #[test]

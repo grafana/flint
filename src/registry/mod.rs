@@ -17,7 +17,8 @@ pub use obsolete::{
 pub use resolve::binary_on_path;
 pub use types::{
     Category, Check, CheckKind, ConfigBase, ConfigFile, ConfigMatch, EditorconfigDirectiveStyle,
-    EditorconfigLineLengthPolicy, FixBehavior, LinterConfig, RunPolicy, Scope, SpecialKind,
+    EditorconfigLineLengthPolicy, FixBehavior, InitHookContext, LinterConfig, RunPolicy, Scope,
+    SpecialKind,
 };
 
 /// Returns the explicit set of flint-managed tool keys that belong under the

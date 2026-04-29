@@ -1,4 +1,5 @@
 use super::types::{Check, ConfigFile, EditorconfigDirectiveStyle, SpecialKind};
+use crate::init::hooks;
 use crate::linters::renovate_deps::RENOVATE_CONFIG_PATTERNS;
 use crate::setup::{V1_BOOTSTRAP_SETUP_VERSION, V2_BASELINE_SETUP_VERSION};
 
@@ -108,6 +109,7 @@ fn check_rumdl() -> Check {
         .linter_config(".rumdl.toml", "--config")
         .baseline_config(ConfigFile::config_dir(".rumdl.toml"))
         .unsupported_configs(RUMDL_UNSUPPORTED_CONFIGS)
+        .init_hook(hooks::rumdl::run)
         .nonverbose_filter_prefixes(&["Success: No issues found in "])
         .formatter()
         .editorconfig_line_length_off(
@@ -124,6 +126,7 @@ fn check_yaml_lint() -> Check {
         .linter_config(".yamllint.yml", "-c")
         .baseline_config(ConfigFile::config_dir(".yamllint.yml"))
         .unsupported_configs(YAMLLINT_UNSUPPORTED_CONFIGS)
+        .init_hook(hooks::yamllint::run)
         .formatter()
         .desc("Lint YAML files for style and consistency")
         .mise_tool("aqua:owenlamont/ryl")
@@ -143,6 +146,7 @@ fn check_taplo() -> Check {
     .linter_config(".taplo.toml", "--config")
     .baseline_config(ConfigFile::config_dir(".taplo.toml"))
     .unsupported_configs(TAPLO_UNSUPPORTED_CONFIGS)
+    .init_hook(hooks::taplo::run)
     .stderr_filter_prefixes(&[" INFO taplo:"])
     .formatter()
     .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["github:tamasfe/taplo"])
@@ -265,6 +269,7 @@ fn check_biome() -> Check {
     .fix("biome check --fix {FILE}")
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
+    .init_hook(hooks::biome::run)
     .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["npm:@biomejs/biome"])
     .desc("Lint JS/TS/JSON files")
     .lang()
@@ -280,6 +285,7 @@ fn check_biome_format() -> Check {
     .fix("biome format --write {FILE}")
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
+    .init_hook(hooks::biome::run)
     .formatter()
     .desc("Format JS/TS/JSON files")
     .mise_tool("biome")
@@ -306,6 +312,7 @@ fn check_cargo_fmt() -> Check {
         .linter_config("rustfmt.toml", "--config-path")
         .baseline_config(RUSTFMT_BASELINE_CONFIG)
         .unsupported_configs(RUSTFMT_UNSUPPORTED_CONFIGS)
+        .init_hook(hooks::rustfmt::run)
         .bin("rustfmt")
         .mise_tool("rust")
         .toolchain_components("rustfmt")
@@ -416,6 +423,7 @@ fn check_renovate_deps() -> Check {
         .adaptive()
         .mise_tool("npm:renovate")
         .patterns(RENOVATE_CONFIG_PATTERNS)
+        .init_hook(hooks::renovate_deps::run)
         .desc("Verify Renovate dependency snapshot is up to date")
         .docs(
             "Verifies `.github/renovate-tracked-deps.json` is up to date by running\n\

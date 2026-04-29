@@ -1,3 +1,5 @@
+use std::path::Path;
+
 /// How a check is invoked relative to the file list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
@@ -176,6 +178,16 @@ pub struct ToolKeyMigration {
     pub old_key: &'static str,
 }
 
+pub trait InitHookContext {
+    fn project_root(&self) -> &Path;
+    fn config_dir(&self) -> &Path;
+    fn line_length(&self) -> u16;
+    fn flint_toml_generated(&self) -> bool;
+    fn renovate_exclude_managers(&self) -> Option<&[String]>;
+}
+
+pub type InitHook = fn(&dyn InitHookContext) -> anyhow::Result<bool>;
+
 #[derive(Debug, Clone)]
 pub struct Check {
     pub name: &'static str,
@@ -218,6 +230,8 @@ pub struct Check {
     pub unsupported_configs: &'static [ConfigFile],
     /// Old mise tool keys that should migrate to this check's current install key.
     pub tool_key_migrations: Vec<ToolKeyMigration>,
+    /// Optional setup-time hook that runs when this check is selected by `flint init`.
+    pub init_hook: Option<InitHook>,
     /// This check is a formatter — it owns certain file types for formatting purposes.
     pub is_formatter: bool,
     /// Skip files owned by active formatters (used by ec to avoid double-checking).
@@ -343,6 +357,7 @@ impl Check {
             baseline_config: None,
             unsupported_configs: &[],
             tool_key_migrations: vec![],
+            init_hook: None,
             is_formatter: false,
             defers_to_formatters: false,
             editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
@@ -390,6 +405,7 @@ impl Check {
             baseline_config: None,
             unsupported_configs: &[],
             tool_key_migrations: vec![],
+            init_hook: None,
             is_formatter: false,
             defers_to_formatters: false,
             editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
@@ -608,6 +624,11 @@ impl Check {
 
     pub fn unsupported_configs(mut self, files: &'static [ConfigFile]) -> Self {
         self.unsupported_configs = files;
+        self
+    }
+
+    pub fn init_hook(mut self, hook: InitHook) -> Self {
+        self.init_hook = Some(hook);
         self
     }
 

@@ -4,11 +4,12 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
 
-use crate::registry::{Category, Check, builtin};
+use crate::registry::{Category, Check, InitHookContext, builtin};
 
 mod config_files;
 mod detection;
 pub(crate) mod generation;
+pub(crate) mod hooks;
 mod migrations;
 mod mise_tools;
 mod renovate;
@@ -19,17 +20,15 @@ mod v1;
 pub(crate) use config_files::write_setup_migration_version;
 
 use config_files::{
-    disable_editorconfig_line_length_for_patterns, generate_biome_config, generate_editorconfig,
-    generate_flint_toml, generate_rumdl_config, generate_rustfmt_config, generate_taplo_config,
-    generate_yamllint_config,
+    disable_editorconfig_line_length_for_patterns, generate_editorconfig, generate_flint_toml,
 };
 use detection::{
     build_linter_groups, detect_obsolete_keys, detect_present_patterns, parse_tool_keys,
 };
 use generation::{
-    apply_changes, detect_base_branch, ensure_flint_self_pin, ensure_node_for_npm, flint_preset,
-    get_existing_config_dir, has_slow_selected, normalize_tools_section, patch_renovate_extends,
-    prompt_config_dir, remove_tool_keys, remove_v1_tasks,
+    apply_changes, detect_base_branch, ensure_flint_self_pin, ensure_node_for_npm,
+    get_existing_config_dir, has_slow_selected, normalize_tools_section, prompt_config_dir,
+    remove_tool_keys, remove_v1_tasks,
 };
 use migrations::{
     apply_repo_migrations, selected_editorconfig_cleanup_sections,
@@ -77,6 +76,60 @@ fn selected_checks<'a>(groups: &'a [LinterGroup<'a>]) -> Vec<&'a Check> {
                 .filter_map(|(check, selected)| selected.then_some(*check))
         })
         .collect()
+}
+
+struct LinterInitHookContext<'a> {
+    project_root: &'a Path,
+    config_dir: &'a Path,
+    line_length: u16,
+    flint_toml_generated: bool,
+    renovate_exclude_managers: Option<&'a [String]>,
+}
+
+impl InitHookContext for LinterInitHookContext<'_> {
+    fn project_root(&self) -> &Path {
+        self.project_root
+    }
+
+    fn config_dir(&self) -> &Path {
+        self.config_dir
+    }
+
+    fn line_length(&self) -> u16 {
+        self.line_length
+    }
+
+    fn flint_toml_generated(&self) -> bool {
+        self.flint_toml_generated
+    }
+
+    fn renovate_exclude_managers(&self) -> Option<&[String]> {
+        self.renovate_exclude_managers
+    }
+}
+
+fn apply_linter_init_hooks(
+    checks: &[&Check],
+    project_root: &Path,
+    config_dir: &Path,
+    line_length: u16,
+    flint_toml_generated: bool,
+    renovate_exclude_managers: Option<&[String]>,
+) -> Result<bool> {
+    let context = LinterInitHookContext {
+        project_root,
+        config_dir,
+        line_length,
+        flint_toml_generated,
+        renovate_exclude_managers,
+    };
+    let mut changed = false;
+    for check in checks {
+        if let Some(hook) = check.init_hook {
+            changed |= hook(&context)?;
+        }
+    }
+    Ok(changed)
 }
 
 /// Desired tools for a profile: maps each mise tool key to its optional components string.
@@ -283,42 +336,7 @@ Add and stage your source files before running init so the detection is accurate
     }
 
     let has_slow = has_slow_selected(&groups);
-    let has_renovate = groups.iter().any(|g| {
-        g.checks
-            .iter()
-            .zip(&g.check_selected)
-            .any(|(c, &sel)| sel && c.name == "renovate-deps")
-    });
-    let has_rumdl = groups.iter().any(|g| {
-        g.checks
-            .iter()
-            .zip(&g.check_selected)
-            .any(|(c, &sel)| sel && c.name == "rumdl")
-    });
-    let has_yaml_lint = groups.iter().any(|g| {
-        g.checks
-            .iter()
-            .zip(&g.check_selected)
-            .any(|(c, &sel)| sel && c.name == "ryl")
-    });
-    let has_taplo = groups.iter().any(|g| {
-        g.checks
-            .iter()
-            .zip(&g.check_selected)
-            .any(|(c, &sel)| sel && c.name == "taplo")
-    });
-    let has_biome = groups.iter().any(|g| {
-        g.checks
-            .iter()
-            .zip(&g.check_selected)
-            .any(|(c, &sel)| sel && (c.name == "biome" || c.name == "biome-format"))
-    });
-    let has_cargo_fmt = groups.iter().any(|g| {
-        g.checks
-            .iter()
-            .zip(&g.check_selected)
-            .any(|(c, &sel)| sel && c.name == "cargo-fmt")
-    });
+    let selected_checks = selected_checks(&groups);
 
     // Prompt for the flint config dir (skipped if already set in mise.toml or --yes).
     let existing_config_dir = get_existing_config_dir(&current_content);
@@ -357,18 +375,18 @@ Add and stage your source files before running init so the detection is accurate
         &config_dir_path,
         &base_branch,
         crate::setup::LATEST_SUPPORTED_SETUP_VERSION,
-        has_renovate,
-        v1.renovate_exclude_managers.as_deref(),
     )?;
     let has_rust = final_add.iter().any(|(k, _)| k == "rust")
         || (current_tool_keys.contains("rust") && !final_remove.iter().any(|k| k == "rust"));
     let workflow_generated = generate_lint_workflow(project_root, &base_branch, has_rust)?;
-    let rumdl_generated = if has_rumdl {
-        generate_rumdl_config(project_root, &config_dir_path, line_length)?
-    } else {
-        false
-    };
-    let selected_checks = selected_checks(&groups);
+    let linter_init_changed = apply_linter_init_hooks(
+        &selected_checks,
+        project_root,
+        &config_dir_path,
+        line_length,
+        toml_generated,
+        v1.renovate_exclude_managers.as_deref(),
+    )?;
     let editorconfig_line_length_sections =
         selected_editorconfig_line_length_sections(&selected_checks);
     let editorconfig_cleanup_sections = selected_editorconfig_cleanup_sections(&selected_checks);
@@ -389,39 +407,6 @@ Add and stage your source files before running init so the detection is accurate
             editorconfig_line_length_disabled.join(", ")
         );
     }
-    let yamllint_generated = if has_yaml_lint {
-        generate_yamllint_config(&config_dir_path, line_length)?
-    } else {
-        false
-    };
-    let taplo_generated = if has_taplo {
-        generate_taplo_config(&config_dir_path, line_length)?
-    } else {
-        false
-    };
-    let rustfmt_generated = if has_cargo_fmt {
-        generate_rustfmt_config(&config_dir_path, line_length)?
-    } else {
-        false
-    };
-    let biome_generated = if has_biome {
-        generate_biome_config(project_root)?
-    } else {
-        false
-    };
-
-    let renovate_patched = find_renovate_config(project_root)
-        .map(|path| {
-            let result = patch_renovate_extends(&path);
-            if let Ok(true) = result {
-                let rel = path.strip_prefix(project_root).unwrap_or(&path);
-                println!("  patched {} — added {}", rel.display(), flint_preset());
-            }
-            result
-        })
-        .transpose()?
-        .unwrap_or(false);
-
     if !tools_changed
         && migration_summary.is_noop()
         && !flint_pinned
@@ -431,14 +416,9 @@ Add and stage your source files before running init so the detection is accurate
         && !tools_normalized
         && !toml_generated
         && !workflow_generated
-        && !rumdl_generated
+        && !linter_init_changed
         && !editorconfig_generated
         && editorconfig_line_length_disabled.is_empty()
-        && !yamllint_generated
-        && !taplo_generated
-        && !rustfmt_generated
-        && !biome_generated
-        && !renovate_patched
     {
         println!("No changes to apply.");
         return Ok(());
@@ -448,13 +428,6 @@ Add and stage your source files before running init so the detection is accurate
 
     println!("Done. Run `mise install` to install the new tools.");
     Ok(())
-}
-
-fn find_renovate_config(project_root: &Path) -> Option<std::path::PathBuf> {
-    crate::linters::renovate_deps::RENOVATE_CONFIG_PATTERNS
-        .iter()
-        .map(|p| project_root.join(p))
-        .find(|p| p.exists())
 }
 
 /// Returns the canonical mise.toml tool key to write when installing this check

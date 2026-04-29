@@ -1010,6 +1010,7 @@ mod tests {
             baseline_config: None,
             unsupported_configs: &[],
             tool_key_migrations: vec![],
+            init_hook: None,
             is_formatter: false,
             defers_to_formatters: false,
             editorconfig_line_length_policy: crate::registry::EditorconfigLineLengthPolicy::Default,

@@ -25,6 +25,36 @@
     },
     {
       customType: "regex",
+      description: "Update shellcheck version in README quickstart example",
+      managerFilePatterns: ["/^README\\.md$/"],
+      matchStrings: [
+        "# Add whichever linters apply to your repo:\\n[\\s\\S]*?\"github:koalaman/shellcheck\"\\s*=\\s*\"(?<currentValue>[^\"]+)\"[\\s\\S]*?\\n```",
+      ],
+      datasourceTemplate: "github-releases",
+      depNameTemplate: "koalaman/shellcheck",
+    },
+    {
+      customType: "regex",
+      description: "Update shfmt version in README quickstart example",
+      managerFilePatterns: ["/^README\\.md$/"],
+      matchStrings: [
+        "# Add whichever linters apply to your repo:\\n[\\s\\S]*?shfmt\\s*=\\s*\"(?<currentValue>[^\"]+)\"[\\s\\S]*?\\n```",
+      ],
+      datasourceTemplate: "github-releases",
+      depNameTemplate: "mvdan/sh",
+    },
+    {
+      customType: "regex",
+      description: "Update actionlint version in README quickstart example",
+      managerFilePatterns: ["/^README\\.md$/"],
+      matchStrings: [
+        "# Add whichever linters apply to your repo:\\n[\\s\\S]*?actionlint\\s*=\\s*\"(?<currentValue>[^\"]+)\"[\\s\\S]*?\\n```",
+      ],
+      datasourceTemplate: "github-releases",
+      depNameTemplate: "rhysd/actionlint",
+    },
+    {
+      customType: "regex",
       description: "Update mise version in GitHub Actions workflows",
       managerFilePatterns: ["/(^|/)(workflow-templates|\\.(?:github|gitea|forgejo)/(?:workflows|actions))/.+\\.ya?ml$/", "/(^|/)action\\.ya?ml$/"],
       datasourceTemplate: "github-release-attachments",

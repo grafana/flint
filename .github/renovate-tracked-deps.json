@@ -19,6 +19,13 @@
       "mise"
     ]
   },
+  "README.md": {
+    "regex": [
+      "koalaman/shellcheck",
+      "mvdan/sh",
+      "rhysd/actionlint"
+    ]
+  },
   "mise.toml": {
     "mise": [
       "actionlint",

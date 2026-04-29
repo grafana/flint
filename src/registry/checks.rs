@@ -113,7 +113,7 @@ fn check_rumdl() -> Check {
         .linter_config(".rumdl.toml", "--config")
         .baseline_config(ConfigFile::config_dir(".rumdl.toml"))
         .unsupported_configs(RUMDL_UNSUPPORTED_CONFIGS)
-        .linter(&rumdl::LINTER)
+        .check_type(&rumdl::CHECK_TYPE)
         .nonverbose_filter_prefixes(&["Success: No issues found in "])
         .formatter()
         .editorconfig_line_length_off(
@@ -130,7 +130,7 @@ fn check_yaml_lint() -> Check {
         .linter_config(".yamllint.yml", "-c")
         .baseline_config(ConfigFile::config_dir(".yamllint.yml"))
         .unsupported_configs(YAMLLINT_UNSUPPORTED_CONFIGS)
-        .linter(&yamllint::LINTER)
+        .check_type(&yamllint::CHECK_TYPE)
         .formatter()
         .desc("Lint YAML files for style and consistency")
         .mise_tool("aqua:owenlamont/ryl")
@@ -150,7 +150,7 @@ fn check_taplo() -> Check {
     .linter_config(".taplo.toml", "--config")
     .baseline_config(ConfigFile::config_dir(".taplo.toml"))
     .unsupported_configs(TAPLO_UNSUPPORTED_CONFIGS)
-    .linter(&taplo::LINTER)
+    .check_type(&taplo::CHECK_TYPE)
     .stderr_filter_prefixes(&[" INFO taplo:"])
     .nonverbose_failure_output(taplo::normalize_nonverbose_failure_output)
     .formatter()
@@ -275,7 +275,7 @@ fn check_biome() -> Check {
     .fix("biome check --fix {FILE}")
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
-    .linter(&biome::LINTER)
+    .check_type(&biome::CHECK_TYPE)
     .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["npm:@biomejs/biome"])
     .desc("Lint JS/TS/JSON files")
     .lang()
@@ -291,7 +291,7 @@ fn check_biome_format() -> Check {
     .fix("biome format --write {FILE}")
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
-    .linter(&biome::LINTER)
+    .check_type(&biome::CHECK_TYPE)
     .formatter()
     .desc("Format JS/TS/JSON files")
     .mise_tool("biome")
@@ -323,7 +323,7 @@ fn check_cargo_fmt() -> Check {
         .linter_config("rustfmt.toml", "--config-path")
         .baseline_config(RUSTFMT_BASELINE_CONFIG)
         .unsupported_configs(RUSTFMT_UNSUPPORTED_CONFIGS)
-        .linter(&rustfmt::LINTER)
+        .check_type(&rustfmt::CHECK_TYPE)
         .bin("rustfmt")
         .mise_tool("rust")
         .toolchain_components("rustfmt")
@@ -403,7 +403,7 @@ fn check_dotnet_format() -> Check {
 }
 
 fn check_lychee() -> Check {
-    Check::special(&lychee::LINTER)
+    Check::native(&lychee::CHECK_TYPE)
         .desc("Check for broken links")
         .docs(
             "Orchestrates [lychee](https://lychee.cli.rs/) for link checking. \
@@ -432,7 +432,7 @@ fn check_lychee() -> Check {
 }
 
 fn check_renovate_deps() -> Check {
-    Check::special(&renovate_deps::LINTER)
+    Check::native(&renovate_deps::CHECK_TYPE)
         .adaptive()
         .adaptive_relevance(renovate_deps::adaptive_relevance)
         .mise_tool("npm:renovate")
@@ -463,14 +463,14 @@ fn check_renovate_deps() -> Check {
 }
 
 fn check_license_header() -> Check {
-    Check::special(&license_header::LINTER)
+    Check::native(&license_header::CHECK_TYPE)
         .activate_unconditionally()
         .status_hook(license_header::status)
         .desc("Check source files have the required license header")
 }
 
 fn check_flint_setup() -> Check {
-    Check::special(&flint_setup::LINTER)
+    Check::native(&flint_setup::CHECK_TYPE)
         .activate_unconditionally()
         .patterns(&["mise.toml"])
         .desc("Keep Flint setup current and mise.toml lint tooling canonical")

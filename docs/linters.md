@@ -106,7 +106,7 @@ still choose the config directory via `FLINT_CONFIG_DIR` where supported.
 | Description | Keep Flint setup current and mise.toml lint tooling canonical |
 | Fix         | yes                                                           |
 | Binary      | (built-in)                                                    |
-| Scope       | [special](#scope-special)                                     |
+| Scope       | [native](#scope-native)                                       |
 | Patterns    | `mise.toml`                                                   |
 
 Checks the repo's Flint-managed setup state and `mise.toml` layout.
@@ -182,7 +182,7 @@ With `--fix`, rewrites Flint-managed config in place and advances
 | Description | Check source files have the required license header |
 | Fix         | no                                                  |
 | Binary      | (built-in)                                          |
-| Scope       | [special](#scope-special)                           |
+| Scope       | [native](#scope-native)                             |
 
 ## `lychee`
 
@@ -191,7 +191,7 @@ With `--fix`, rewrites Flint-managed config in place and advances
 | Description | Check for broken links             |
 | Fix         | no                                 |
 | Binary      | `lychee`                           |
-| Scope       | [special](#scope-special)          |
+| Scope       | [native](#scope-native)            |
 | Config      | via `[checks.links]` in flint.toml |
 
 Orchestrates [lychee](https://lychee.cli.rs/) for link checking. Requires `lychee` in `[tools]`.
@@ -223,7 +223,7 @@ check_all_local = true
 | Description | Verify Renovate dependency snapshot is up to date                                                                          |
 | Fix         | yes                                                                                                                        |
 | Binary      | `renovate`                                                                                                                 |
-| Scope       | [special](#scope-special)                                                                                                  |
+| Scope       | [native](#scope-native)                                                                                                    |
 | Patterns    | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
 | Run policy  | adaptive — runs in `--fast-only` only when relevant                                                                        |
 
@@ -362,7 +362,7 @@ Invoked once with no file args; for checks with patterns set (e.g.
 whole project when it does run. `golangci-lint` is the exception — it uses
 `--new-from-rev` to scope analysis to changed code even within the project run.
 
-### Scope: special
+### Scope: native
 
 Implemented in-process rather than via a command template. These checks may run
 without file arguments or use custom orchestration logic.

@@ -7,8 +7,8 @@ use crate::files::FileList;
 use crate::linters::LinterOutput;
 use crate::linters::env;
 use crate::registry::{
-    PreparedSpecialCheck, SpecialPrepareContext, SpecialRunContext, SpecialRunFuture, StaticLinter,
-    StaticSpecialLinter,
+    CheckTypeDef, NativeCheckDef, NativePrepareContext, NativeRunContext, NativeRunFuture,
+    PreparedNativeCheck,
 };
 
 const GITHUB_BASE_REF_ENV: &str = "GITHUB_BASE_REF";
@@ -23,9 +23,9 @@ const PR_LINK_REMAP_ENV_VARS: &[&str] = &[
     PR_HEAD_REPO_ENV,
 ];
 
-pub(crate) static LINTER: StaticLinter = StaticLinter::special(
+pub(crate) static CHECK_TYPE: CheckTypeDef = CheckTypeDef::native(
     "lychee",
-    StaticSpecialLinter::with_bin("lychee", prepare)
+    NativeCheckDef::with_bin("lychee", prepare)
         .with_config_display("via `[checks.links]` in flint.toml"),
 );
 
@@ -38,7 +38,7 @@ struct PreparedLychee {
     config_dir: PathBuf,
 }
 
-fn prepare(ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>> {
+fn prepare(ctx: NativePrepareContext<'_>) -> Option<Box<dyn PreparedNativeCheck>> {
     Some(Box::new(PreparedLychee {
         name: ctx.name.to_string(),
         cfg: ctx.cfg.checks.lychee.clone(),
@@ -48,12 +48,12 @@ fn prepare(ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialChec
     }))
 }
 
-impl PreparedSpecialCheck for PreparedLychee {
+impl PreparedNativeCheck for PreparedLychee {
     fn name(&self) -> &str {
         &self.name
     }
 
-    fn run(self: Box<Self>, ctx: SpecialRunContext) -> SpecialRunFuture {
+    fn run(self: Box<Self>, ctx: NativeRunContext) -> NativeRunFuture {
         Box::pin(async move {
             crate::linters::lychee::run(
                 &self.cfg,

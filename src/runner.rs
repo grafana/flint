@@ -9,8 +9,8 @@ use crate::config::Config;
 use crate::files::{FileList, match_files};
 use crate::linters::LinterOutput;
 use crate::registry::{
-    Check, CheckKind, LinterConfig, MissingComponentHint, NonverboseFailureOutputHook, Scope,
-    SpecialPrepareContext,
+    Check, CheckKind, LinterConfig, MissingComponentHint, NativePrepareContext,
+    NonverboseFailureOutputHook, Scope,
 };
 
 #[derive(Clone, Copy)]
@@ -52,14 +52,14 @@ enum PreparedCheck {
         nonverbose_failure_output: Option<NonverboseFailureOutputHook>,
         missing_component_hint: Option<MissingComponentHint>,
     },
-    Special(Box<dyn crate::registry::PreparedSpecialCheck>),
+    Native(Box<dyn crate::registry::PreparedNativeCheck>),
 }
 
 impl PreparedCheck {
     fn name(&self) -> &str {
         match self {
             Self::Invocations { name, .. } => name,
-            Self::Special(special) => special.name(),
+            Self::Native(native) => native.name(),
         }
     }
 
@@ -106,15 +106,15 @@ impl PreparedCheck {
                     before.is_some_and(|before| before != fingerprint_files(&tracked_files));
                 (out, changed)
             }
-            Self::Special(special) => {
-                let tracked_files = special.tracked_files().to_vec();
+            Self::Native(native) => {
+                let tracked_files = native.tracked_files().to_vec();
                 let before = if fix && !tracked_files.is_empty() {
                     Some(fingerprint_files(&tracked_files))
                 } else {
                     None
                 };
-                let out = special
-                    .run(crate::registry::SpecialRunContext {
+                let out = native
+                    .run(crate::registry::NativeRunContext {
                         fix,
                         project_root: project_root.to_path_buf(),
                     })
@@ -243,15 +243,15 @@ fn prepare(
                 missing_component_hint: check.missing_component_hint,
             })
         }
-        CheckKind::Special(special) => special
-            .prepare(SpecialPrepareContext {
+        CheckKind::Native(native) => native
+            .prepare(NativePrepareContext {
                 name: check.name,
                 file_list,
                 project_root,
                 cfg,
                 config_dir,
             })
-            .map(PreparedCheck::Special),
+            .map(PreparedCheck::Native),
     }
 }
 
@@ -833,7 +833,7 @@ mod tests {
             baseline_config: None,
             unsupported_configs: &[],
             tool_key_migrations: vec![],
-            linter: None,
+            check_type: None,
             adaptive_relevance: None,
             status_hook: None,
             nonverbose_failure_output: None,

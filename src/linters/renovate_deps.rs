@@ -8,8 +8,8 @@ use crate::files::FileList;
 use crate::linters::LinterOutput;
 use crate::linters::env;
 use crate::registry::{
-    AdaptiveRelevanceContext, InitHookContext, PreparedSpecialCheck, SpecialPrepareContext,
-    SpecialRunContext, SpecialRunFuture, StaticLinter, StaticSpecialLinter,
+    AdaptiveRelevanceContext, CheckTypeDef, InitHookContext, NativeCheckDef, NativePrepareContext,
+    NativeRunContext, NativeRunFuture, PreparedNativeCheck,
 };
 
 const COMMITTED_FILE: &str = "renovate-tracked-deps.json";
@@ -27,9 +27,9 @@ const PACKAGE_FILES_MSGS: &[&str] = &["Extracted dependencies", "packageFiles wi
 const RENOVATE_GITHUB_TOKEN_DISPLAY: &str = "GITHUB_COM_TOKEN or GITHUB_TOKEN";
 const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value", "invalid-version"];
 
-pub(crate) static LINTER: StaticLinter = StaticLinter::special_with_init_hook(
+pub(crate) static CHECK_TYPE: CheckTypeDef = CheckTypeDef::native_with_init_hook(
     "renovate-deps",
-    StaticSpecialLinter::with_bin("renovate", prepare).with_fix(),
+    NativeCheckDef::with_bin("renovate", prepare).with_fix(),
     init,
 );
 
@@ -40,7 +40,7 @@ struct PreparedRenovateDeps {
     tracked_files: Vec<PathBuf>,
 }
 
-fn prepare(ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>> {
+fn prepare(ctx: NativePrepareContext<'_>) -> Option<Box<dyn PreparedNativeCheck>> {
     Some(Box::new(PreparedRenovateDeps {
         name: ctx.name.to_string(),
         cfg: ctx.cfg.checks.renovate_deps.clone(),
@@ -51,7 +51,7 @@ fn prepare(ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialChec
     }))
 }
 
-impl PreparedSpecialCheck for PreparedRenovateDeps {
+impl PreparedNativeCheck for PreparedRenovateDeps {
     fn name(&self) -> &str {
         &self.name
     }
@@ -60,7 +60,7 @@ impl PreparedSpecialCheck for PreparedRenovateDeps {
         &self.tracked_files
     }
 
-    fn run(self: Box<Self>, ctx: SpecialRunContext) -> SpecialRunFuture {
+    fn run(self: Box<Self>, ctx: NativeRunContext) -> NativeRunFuture {
         Box::pin(async move {
             crate::linters::renovate_deps::run(&self.cfg, ctx.fix, &ctx.project_root).await
         })

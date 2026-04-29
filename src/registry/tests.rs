@@ -178,7 +178,7 @@ fn normalized_command_prefix(check: &Check) -> Option<String> {
                 *check_cmd
             }
         }
-        crate::registry::CheckKind::Special(_) => return None,
+        crate::registry::CheckKind::Native(_) => return None,
     };
 
     let mut words = vec![];
@@ -205,7 +205,7 @@ fn names_prefer_binary_or_native_command() {
     let violations: Vec<String> = builtin()
         .into_iter()
         .filter(|check| check.uses_binary())
-        .filter(|check| !check.kind.is_special())
+        .filter(|check| !check.kind.is_native())
         .filter_map(|check| {
             let allowed = ALLOWED_ALIASES
                 .iter()
@@ -880,7 +880,7 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     match check.linter_config.as_ref() {
         Some(config) => rows.push(("Config", format!("`{}`", config.display_name()))),
         None => {
-            if let Some(config) = check.kind.special_config_display() {
+            if let Some(config) = check.kind.native_config_display() {
                 rows.push(("Config", config.to_string()));
             }
         }

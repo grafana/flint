@@ -76,7 +76,7 @@ fn selected_checks<'a>(groups: &'a [LinterGroup<'a>]) -> Vec<&'a Check> {
         .collect()
 }
 
-struct LinterInitHookContext<'a> {
+struct CheckTypeInitHookContext<'a> {
     project_root: &'a Path,
     config_dir: &'a Path,
     line_length: u16,
@@ -84,7 +84,7 @@ struct LinterInitHookContext<'a> {
     renovate_exclude_managers: Option<&'a [String]>,
 }
 
-impl InitHookContext for LinterInitHookContext<'_> {
+impl InitHookContext for CheckTypeInitHookContext<'_> {
     fn project_root(&self) -> &Path {
         self.project_root
     }
@@ -106,7 +106,7 @@ impl InitHookContext for LinterInitHookContext<'_> {
     }
 }
 
-fn apply_linter_init_hooks(
+fn apply_check_type_init_hooks(
     checks: &[&Check],
     project_root: &Path,
     config_dir: &Path,
@@ -114,7 +114,7 @@ fn apply_linter_init_hooks(
     flint_toml_generated: bool,
     renovate_exclude_managers: Option<&[String]>,
 ) -> Result<bool> {
-    let context = LinterInitHookContext {
+    let context = CheckTypeInitHookContext {
         project_root,
         config_dir,
         line_length,
@@ -122,11 +122,11 @@ fn apply_linter_init_hooks(
         renovate_exclude_managers,
     };
     let mut changed = false;
-    let mut initialized_linters = HashSet::new();
+    let mut initialized_check_types = HashSet::new();
     for check in checks {
-        if let Some(linter) = check.linter
-            && let Some(hook) = linter.init_hook()
-            && initialized_linters.insert(linter.name())
+        if let Some(check_type) = check.check_type
+            && let Some(hook) = check_type.init_hook()
+            && initialized_check_types.insert(check_type.name())
         {
             changed |= hook(&context)?;
         }
@@ -383,7 +383,7 @@ Add and stage your source files before running init so the detection is accurate
         .any(|check| check.workflow_setup == Some(WorkflowSetup::RustComponents));
     let workflow_generated =
         generate_lint_workflow(project_root, &base_branch, needs_rust_components)?;
-    let linter_init_changed = apply_linter_init_hooks(
+    let check_type_init_changed = apply_check_type_init_hooks(
         &selected_checks,
         project_root,
         &config_dir_path,
@@ -420,7 +420,7 @@ Add and stage your source files before running init so the detection is accurate
         && !tools_normalized
         && !toml_generated
         && !workflow_generated
-        && !linter_init_changed
+        && !check_type_init_changed
         && !editorconfig_generated
         && editorconfig_line_length_disabled.is_empty()
     {

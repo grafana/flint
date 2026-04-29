@@ -1,9 +1,9 @@
 use anyhow::Result;
 use std::path::Path;
 
-use crate::registry::{InitHookContext, StaticLinter};
+use crate::registry::{CheckTypeDef, InitHookContext};
 
-pub(crate) static LINTER: StaticLinter = StaticLinter::with_init_hook("rustfmt", init);
+pub(crate) static CHECK_TYPE: CheckTypeDef = CheckTypeDef::with_init_hook("rustfmt", init);
 
 pub(crate) fn init(ctx: &dyn InitHookContext) -> Result<bool> {
     generate_config(ctx.config_dir(), ctx.line_length())

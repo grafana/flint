@@ -5,13 +5,13 @@ use crate::init::generation::{normalize_tools_section, tools_section_needs_norma
 use crate::init::write_setup_migration_version;
 use crate::linters::LinterOutput;
 use crate::registry::{
-    PreparedSpecialCheck, SpecialPrepareContext, SpecialRunContext, SpecialRunFuture, StaticLinter,
-    StaticSpecialLinter,
+    CheckTypeDef, NativeCheckDef, NativePrepareContext, NativeRunContext, NativeRunFuture,
+    PreparedNativeCheck,
 };
 
-pub(crate) static LINTER: StaticLinter = StaticLinter::special(
+pub(crate) static CHECK_TYPE: CheckTypeDef = CheckTypeDef::native(
     "flint-setup",
-    StaticSpecialLinter::new(prepare).with_fix().setup(),
+    NativeCheckDef::new(prepare).with_fix().setup(),
 );
 
 #[derive(Debug)]
@@ -22,7 +22,7 @@ struct PreparedFlintSetup {
     tracked_files: Vec<PathBuf>,
 }
 
-fn prepare(ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>> {
+fn prepare(ctx: NativePrepareContext<'_>) -> Option<Box<dyn PreparedNativeCheck>> {
     Some(Box::new(PreparedFlintSetup {
         name: ctx.name.to_string(),
         config_dir: ctx.config_dir.to_path_buf(),
@@ -34,7 +34,7 @@ fn prepare(ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialChec
     }))
 }
 
-impl PreparedSpecialCheck for PreparedFlintSetup {
+impl PreparedNativeCheck for PreparedFlintSetup {
     fn name(&self) -> &str {
         &self.name
     }
@@ -43,7 +43,7 @@ impl PreparedSpecialCheck for PreparedFlintSetup {
         &self.tracked_files
     }
 
-    fn run(self: Box<Self>, ctx: SpecialRunContext) -> SpecialRunFuture {
+    fn run(self: Box<Self>, ctx: NativeRunContext) -> NativeRunFuture {
         Box::pin(async move {
             crate::linters::flint_setup::run(
                 ctx.fix,

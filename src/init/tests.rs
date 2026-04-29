@@ -1,5 +1,5 @@
 use super::*;
-use crate::registry::StaticLinter;
+use crate::registry::CheckTypeDef;
 use config_files::generate_flint_toml;
 use detection::entry_components_differ;
 use generation::{
@@ -8,15 +8,15 @@ use generation::{
 use scaffold::{apply_env_and_tasks, generate_lint_workflow};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-static LINTER_INIT_CALLS: AtomicUsize = AtomicUsize::new(0);
+static CHECK_TYPE_INIT_CALLS: AtomicUsize = AtomicUsize::new(0);
 
-fn counting_linter_init(_: &dyn InitHookContext) -> anyhow::Result<bool> {
-    LINTER_INIT_CALLS.fetch_add(1, Ordering::SeqCst);
+fn counting_check_type_init(_: &dyn InitHookContext) -> anyhow::Result<bool> {
+    CHECK_TYPE_INIT_CALLS.fetch_add(1, Ordering::SeqCst);
     Ok(true)
 }
 
-static COUNTING_LINTER: StaticLinter =
-    StaticLinter::with_init_hook("shared-hook", counting_linter_init);
+static COUNTING_CHECK_TYPE: CheckTypeDef =
+    CheckTypeDef::with_init_hook("shared-hook", counting_check_type_init);
 
 #[test]
 fn detect_obsolete_keys_finds_known_stale_key() {
@@ -57,12 +57,12 @@ fn all_registry_checks_have_install_key_or_none() {
 }
 
 #[test]
-fn apply_linter_init_hooks_runs_shared_hook_once() {
-    LINTER_INIT_CALLS.store(0, Ordering::SeqCst);
-    let first = Check::file("first", "first {FILE}", &["*"]).linter(&COUNTING_LINTER);
-    let second = Check::file("second", "second {FILE}", &["*"]).linter(&COUNTING_LINTER);
+fn apply_check_type_init_hooks_runs_shared_hook_once() {
+    CHECK_TYPE_INIT_CALLS.store(0, Ordering::SeqCst);
+    let first = Check::file("first", "first {FILE}", &["*"]).check_type(&COUNTING_CHECK_TYPE);
+    let second = Check::file("second", "second {FILE}", &["*"]).check_type(&COUNTING_CHECK_TYPE);
     let tmp = tempfile::TempDir::new().unwrap();
-    let changed = apply_linter_init_hooks(
+    let changed = apply_check_type_init_hooks(
         &[&first, &second],
         tmp.path(),
         tmp.path(),
@@ -73,7 +73,7 @@ fn apply_linter_init_hooks_runs_shared_hook_once() {
     .unwrap();
 
     assert!(changed);
-    assert_eq!(LINTER_INIT_CALLS.load(Ordering::SeqCst), 1);
+    assert_eq!(CHECK_TYPE_INIT_CALLS.load(Ordering::SeqCst), 1);
 }
 
 #[test]

@@ -110,7 +110,7 @@ pub fn load(config_dir: &Path) -> Result<Config> {
         //   FLINT_BASE_BRANCH, FLINT_EXCLUDE          → settings.*
         //   FLINT_LYCHEE_CONFIG, FLINT_LYCHEE_*       → checks.lychee.*
         //   FLINT_RENOVATE_DEPS_EXCLUDE_MANAGERS       → checks.renovate_deps.*
-        // New Special checks added to the registry get env support automatically.
+        // New native checks added to the registry get env support automatically.
         .merge(Env::prefixed("FLINT_").map(move |k| {
             let k = k.as_str();
             for (prefix, namespace) in &sections {

@@ -5,12 +5,12 @@ use crate::config::LicenseHeaderConfig;
 use crate::files::match_files;
 use crate::linters::LinterOutput;
 use crate::registry::{
-    PreparedSpecialCheck, SpecialPrepareContext, SpecialRunContext, SpecialRunFuture, StaticLinter,
-    StaticSpecialLinter, StatusContext,
+    CheckTypeDef, NativeCheckDef, NativePrepareContext, NativeRunContext, NativeRunFuture,
+    PreparedNativeCheck, StatusContext,
 };
 
-pub(crate) static LINTER: StaticLinter =
-    StaticLinter::special("license-header", StaticSpecialLinter::new(prepare));
+pub(crate) static CHECK_TYPE: CheckTypeDef =
+    CheckTypeDef::native("license-header", NativeCheckDef::new(prepare));
 
 #[derive(Debug)]
 struct PreparedLicenseHeader {
@@ -19,7 +19,7 @@ struct PreparedLicenseHeader {
     files: Vec<PathBuf>,
 }
 
-fn prepare(ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialCheck>> {
+fn prepare(ctx: NativePrepareContext<'_>) -> Option<Box<dyn PreparedNativeCheck>> {
     if ctx.cfg.checks.license_header.text.is_empty() {
         return None;
     }
@@ -45,12 +45,12 @@ fn prepare(ctx: SpecialPrepareContext<'_>) -> Option<Box<dyn PreparedSpecialChec
     }))
 }
 
-impl PreparedSpecialCheck for PreparedLicenseHeader {
+impl PreparedNativeCheck for PreparedLicenseHeader {
     fn name(&self) -> &str {
         &self.name
     }
 
-    fn run(self: Box<Self>, ctx: SpecialRunContext) -> SpecialRunFuture {
+    fn run(self: Box<Self>, ctx: NativeRunContext) -> NativeRunFuture {
         Box::pin(async move {
             crate::linters::license_header::run(&self.cfg, &ctx.project_root, &self.files).await
         })

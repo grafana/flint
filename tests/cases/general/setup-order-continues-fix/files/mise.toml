@@ -1,0 +1,3 @@
+[tools]
+shfmt = "latest"
+node = "20"

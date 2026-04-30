@@ -1,0 +1,38 @@
+[expected]
+args = "run --full --fix"
+exit = 1
+stdout = "  normalized [tools] in <REPO>/mise.toml\n"
+stderr = "flint: fixed: flint-setup, shfmt — commit before pushing\n"
+
+[expected.files]
+"mise.toml" = '''
+[tools]
+node = "20"
+
+# Linters
+shfmt = "latest"
+'''
+"script.sh" = '''
+#!/bin/sh
+if true; then
+	echo "hello"
+fi
+'''
+
+[fake_bins]
+shfmt = '''
+#!/bin/sh
+set -eu
+
+if [ "${1:-}" != "-w" ]; then
+  echo "unexpected shfmt invocation: $*" >&2
+  exit 1
+fi
+
+cat >"$2" <<'EOF'
+#!/bin/sh
+if true; then
+	echo "hello"
+fi
+EOF
+'''

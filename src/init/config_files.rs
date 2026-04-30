@@ -450,19 +450,46 @@ pub(super) fn disable_editorconfig_line_length_for_patterns(
                 })
                 .unwrap_or(lines.len());
             let section_lines = &lines[section_start + 1..section_end];
-            if section_lines
+            let existing_line_lengths: Vec<usize> = section_lines
                 .iter()
-                .any(|line| line.trim_start().starts_with("max_line_length"))
-            {
+                .enumerate()
+                .filter_map(|(idx, line)| {
+                    is_editorconfig_max_line_length(line).then_some(section_start + 1 + idx)
+                })
+                .collect();
+            let has_comment = section_lines.iter().any(|line| line.trim() == comment_line);
+            let Some(mut line_idx) = existing_line_lengths.first().copied() else {
+                let mut insert = vec![];
+                if !has_comment {
+                    insert.push(comment_line);
+                }
+                insert.push("max_line_length = off".to_string());
+                lines.splice(section_end..section_end, insert);
+                changed_sections.push(header);
                 continue;
+            };
+
+            let mut changed = false;
+            let mut section_end = section_end;
+            if !has_comment {
+                lines.insert(line_idx, comment_line);
+                line_idx += 1;
+                section_end += 1;
+                changed = true;
             }
-            let mut insert = vec![];
-            if !section_lines.iter().any(|line| line.trim() == comment_line) {
-                insert.push(comment_line);
+            if lines[line_idx].trim() != "max_line_length = off" {
+                lines[line_idx] = "max_line_length = off".to_string();
+                changed = true;
             }
-            insert.push("max_line_length = off".to_string());
-            lines.splice(section_end..section_end, insert);
-            changed_sections.push(header);
+            for idx in (line_idx + 1..section_end).rev() {
+                if is_editorconfig_max_line_length(&lines[idx]) {
+                    lines.remove(idx);
+                    changed = true;
+                }
+            }
+            if changed {
+                changed_sections.push(header);
+            }
             continue;
         }
 
@@ -493,4 +520,9 @@ fn editorconfig_section_header(patterns: &[&str]) -> String {
     } else {
         format!("[{{{}}}]", patterns.join(","))
     }
+}
+fn is_editorconfig_max_line_length(line: &str) -> bool {
+    line.trim_start()
+        .split_once('=')
+        .is_some_and(|(key, _)| key.trim() == "max_line_length")
 }

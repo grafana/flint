@@ -384,4 +384,6 @@ files itself.
 length**: today that means `rumdl` for `*.md`, `rustfmt` for `*.rs`, and
 `google-java-format` for `*.java`. Those sections use
 `max_line_length = off` so editors and `editorconfig-checker` share the same
-intent instead of relying on checker-specific JSON excludes.
+intent instead of relying on checker-specific JSON excludes. If a matching
+section already exists, `flint init` rewrites its `max_line_length` to `off`
+instead of leaving a formatter-conflicting numeric value in place.

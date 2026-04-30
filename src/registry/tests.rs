@@ -424,6 +424,16 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
         )]),
         "linters package rule must remain on the weekly Monday schedule"
     );
+    assert_eq!(
+        linters_rule["commitMessageTopic"].as_str(),
+        Some("flint-managed linter updates"),
+        "linters package rule must keep the grouped PR title readable"
+    );
+    assert_eq!(
+        linters_rule["separateMajorMinor"].as_bool(),
+        Some(false),
+        "linters package rule must keep major and non-major updates in one Monday PR"
+    );
     assert!(
         !actual.contains(&"node"),
         "node is a runtime prerequisite, not a linter, and must not be in the weekly linters rule"
@@ -461,6 +471,14 @@ fn repo_renovate_config_stays_aligned_with_shared_preset_contract() {
             "package rule {group_name:?} schedule in .github/renovate.json5 drifted from default.json"
         );
         assert_eq!(
+            default_rule["commitMessageTopic"], repo_rule["commitMessageTopic"],
+            "package rule {group_name:?} commitMessageTopic in .github/renovate.json5 drifted from default.json"
+        );
+        assert_eq!(
+            default_rule["separateMajorMinor"], repo_rule["separateMajorMinor"],
+            "package rule {group_name:?} separateMajorMinor in .github/renovate.json5 drifted from default.json"
+        );
+        assert_eq!(
             package_names(default_rule),
             package_names(repo_rule),
             "package rule {group_name:?} matchPackageNames in .github/renovate.json5 drifted from default.json"
@@ -472,15 +490,19 @@ fn repo_renovate_config_stays_aligned_with_shared_preset_contract() {
         );
     }
 
-    let description = "Update mise version in GitHub Actions workflows";
-    let default_manager = custom_manager_by_description(&default_parsed, description)
-        .unwrap_or_else(|| panic!("default.json missing custom manager {description:?}"));
-    let repo_manager = custom_manager_by_description(&repo_parsed, description)
-        .unwrap_or_else(|| panic!(".github/renovate.json5 missing custom manager {description:?}"));
-    assert_eq!(
-        default_manager, repo_manager,
-        "custom manager {description:?} in .github/renovate.json5 drifted from default.json"
-    );
+    {
+        let description = "Update mise version in GitHub Actions workflows";
+        let default_manager = custom_manager_by_description(&default_parsed, description)
+            .unwrap_or_else(|| panic!("default.json missing custom manager {description:?}"));
+        let repo_manager =
+            custom_manager_by_description(&repo_parsed, description).unwrap_or_else(|| {
+                panic!(".github/renovate.json5 missing custom manager {description:?}")
+            });
+        assert_eq!(
+            default_manager, repo_manager,
+            "custom manager {description:?} in .github/renovate.json5 drifted from default.json"
+        );
+    }
 }
 
 #[test]
@@ -645,7 +667,6 @@ fn readme_quickstart_tools_snippets_stay_current() {
             env!("CARGO_PKG_VERSION").to_string(),
         )))
         .collect::<std::collections::BTreeMap<_, _>>();
-
     let actual = toml_tool_versions_from_table(
         quickstart_tools,
         &[
@@ -653,15 +674,6 @@ fn readme_quickstart_tools_snippets_stay_current() {
             "github:koalaman/shellcheck",
             "shfmt",
             "actionlint",
-            "rumdl",
-            "ruff",
-            "aqua:owenlamont/ryl",
-            "taplo",
-            "biome",
-            "rust",
-            "go",
-            "lychee",
-            "npm:renovate",
         ],
     );
 

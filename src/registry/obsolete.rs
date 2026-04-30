@@ -73,8 +73,5 @@ fn registry_tool_key_migrations_after(version: u32) -> Vec<(&'static str, &'stat
 }
 
 fn obsolete_key_present(mise_tools: &HashMap<String, String>, old: &str) -> bool {
-    if old == "shellcheck" && mise_tools.contains_key("github:koalaman/shellcheck") {
-        return false;
-    }
     mise_tools.contains_key(old)
 }

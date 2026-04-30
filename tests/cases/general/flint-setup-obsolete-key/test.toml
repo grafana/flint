@@ -9,8 +9,8 @@ stderr = "flint: fixed: flint-setup — commit before pushing\n"
 [tools]
 
 # Linters
-"github:koalaman/shellcheck" = "v0.11.0"
 ruff = "0.15.0"
+shellcheck = "v0.11.0"
 '''
 "flint.toml" = '''
 [settings]

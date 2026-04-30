@@ -51,7 +51,7 @@ fn find_obsolete_key_detects_legacy_ruff_backend() {
 }
 
 #[test]
-fn shellcheck_alias_does_not_make_github_backend_obsolete() {
+fn shellcheck_github_backend_is_obsolete_even_when_bare_key_exists() {
     let tools = HashMap::from([
         (
             "github:koalaman/shellcheck".to_string(),
@@ -60,7 +60,10 @@ fn shellcheck_alias_does_not_make_github_backend_obsolete() {
         ("shellcheck".to_string(), "0.11.0".to_string()),
     ]);
 
-    assert_eq!(find_obsolete_key(&tools), None);
+    assert_eq!(
+        find_obsolete_key(&tools),
+        Some(("github:koalaman/shellcheck", "shellcheck"))
+    );
 }
 
 #[test]
@@ -71,7 +74,7 @@ fn check_owned_tool_migrations_apply_after_v2_baseline() {
     assert!(obsolete.contains(&("github:owenlamont/ryl", "aqua:owenlamont/ryl")));
     assert!(obsolete.contains(&("pipx:ruff", "ruff")));
     assert!(obsolete.contains(&("github:astral-sh/ruff", "ruff")));
-    assert!(obsolete.contains(&("shellcheck", "github:koalaman/shellcheck")));
+    assert!(obsolete.contains(&("github:koalaman/shellcheck", "shellcheck")));
     assert!(obsolete.contains(&("cargo:xmloxide", "github:jonwiggins/xmloxide")));
     assert!(obsolete_keys_after(crate::setup::LATEST_SUPPORTED_SETUP_VERSION).is_empty());
 }
@@ -650,7 +653,7 @@ fn readme_quickstart_tools_snippets_stay_current() {
         quickstart_tools,
         &[
             "github:grafana/flint",
-            "github:koalaman/shellcheck",
+            "shellcheck",
             "shfmt",
             "actionlint",
             "rumdl",

@@ -104,15 +104,15 @@ fn collect_changed_names(
     let mut names: std::collections::BTreeSet<String> = Default::default();
 
     // Committed changes in the range.
-    for line in git_diff_names(project_root, &["--diff-filter=d", &range])? {
+    for line in git_diff_names(project_root, &[&range])? {
         names.insert(line);
     }
     // Unstaged changes.
-    for line in git_diff_names(project_root, &["--diff-filter=d"])? {
+    for line in git_diff_names(project_root, &[])? {
         names.insert(line);
     }
     // Staged changes.
-    for line in git_diff_names(project_root, &["--cached", "--diff-filter=d"])? {
+    for line in git_diff_names(project_root, &["--cached"])? {
         names.insert(line);
     }
 

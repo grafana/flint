@@ -75,28 +75,11 @@ fn render_quickstart_tools(table: &toml::Table) -> Result<String> {
 \"github:koalaman/shellcheck\" = \"{shellcheck}\"\n\
 shfmt                   = \"{shfmt}\"\n\
 actionlint              = \"{actionlint}\"\n\
-rumdl                   = \"{rumdl}\"\n\
-ruff                    = \"{ruff}\"\n\
-\"aqua:owenlamont/ryl\"   = \"{ryl}\"\n\
-taplo                   = \"{taplo}\"\n\
-biome                   = \"{biome}\"\n\
-rust                    = \"{rust}\"    # activates cargo-fmt + cargo-clippy\n\
-go                      = \"{go}\"    # activates gofmt\n\
-lychee                  = \"{lychee}\"    # activates links check\n\
-\"npm:renovate\"          = \"{renovate}\"  # activates renovate-deps check",
+",
         flint = env!("CARGO_PKG_VERSION"),
         shellcheck = versions["github:koalaman/shellcheck"],
         shfmt = versions["shfmt"],
         actionlint = versions["actionlint"],
-        rumdl = versions["rumdl"],
-        ruff = versions["ruff"],
-        ryl = versions["aqua:owenlamont/ryl"],
-        taplo = versions["taplo"],
-        biome = versions["biome"],
-        rust = versions["rust"],
-        go = versions["go"],
-        lychee = versions["lychee"],
-        renovate = versions["npm:renovate"],
     ))
 }
 

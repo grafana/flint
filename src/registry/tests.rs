@@ -578,18 +578,26 @@ fn sorted_dep_names(rule: &serde_json::Value) -> Vec<&str> {
 }
 
 fn rule_name_field(rule: &serde_json::Value) -> &'static str {
-    if rule.get("matchDepNames").is_some() {
-        "matchDepNames"
-    } else {
-        "matchPackageNames"
+    match (
+        rule.get("matchDepNames").is_some(),
+        rule.get("matchPackageNames").is_some(),
+    ) {
+        (true, false) => "matchDepNames",
+        (false, true) => "matchPackageNames",
+        (true, true) => {
+            panic!("package rule must not declare both matchDepNames and matchPackageNames")
+        }
+        (false, false) => {
+            panic!("package rule must declare matchDepNames or matchPackageNames")
+        }
     }
 }
 
 fn rule_names(rule: &serde_json::Value) -> Vec<&str> {
-    if rule.get("matchDepNames").is_some() {
-        dep_names(rule)
-    } else {
-        package_names(rule)
+    match rule_name_field(rule) {
+        "matchDepNames" => dep_names(rule),
+        "matchPackageNames" => package_names(rule),
+        _ => unreachable!("unexpected rule_name_field result"),
     }
 }
 

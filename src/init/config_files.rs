@@ -90,19 +90,6 @@ pub(super) fn remove_legacy_lint_files(
     Ok(removed)
 }
 
-pub(super) fn existing_legacy_lint_files(project_root: &Path, config_dir: &Path) -> Vec<String> {
-    legacy_lint_files(project_root, config_dir)
-        .into_iter()
-        .filter(|path| path.exists())
-        .map(|path| {
-            path.strip_prefix(project_root)
-                .unwrap_or(&path)
-                .display()
-                .to_string()
-        })
-        .collect()
-}
-
 fn legacy_lint_files(project_root: &Path, config_dir: &Path) -> Vec<std::path::PathBuf> {
     vec![
         project_root.join(".prettierignore"),
@@ -133,16 +120,6 @@ pub(super) fn remove_stale_markdownlint_line_length_directives(
         changed_files.push(rel.to_string());
     }
     Ok(changed_files)
-}
-
-pub(super) fn stale_markdownlint_line_length_directive_files(
-    project_root: &Path,
-) -> Result<Vec<String>> {
-    stale_transformed_files(
-        project_root,
-        &[&["*.md"]],
-        strip_stale_markdownlint_md013_directives,
-    )
 }
 
 fn tracked_files_for_patterns(project_root: &Path, patterns: &[&[&str]]) -> Result<Vec<String>> {
@@ -194,45 +171,6 @@ pub(super) fn remove_stale_editorconfig_checker_directives(
     }
     changed_files.sort();
     changed_files.dedup();
-    Ok(changed_files)
-}
-
-pub(super) fn stale_editorconfig_checker_directive_files(
-    project_root: &Path,
-    delegated_sections: &[(&[&str], EditorconfigDirectiveStyle)],
-) -> Result<Vec<String>> {
-    let mut changed_files = vec![];
-    for (patterns, directive_style) in delegated_sections {
-        changed_files.extend(stale_transformed_files(
-            project_root,
-            &[*patterns],
-            |content| strip_stale_editorconfig_checker_directives(content, *directive_style),
-        )?);
-    }
-    changed_files.sort();
-    changed_files.dedup();
-    Ok(changed_files)
-}
-
-fn stale_transformed_files<F>(
-    project_root: &Path,
-    patterns: &[&[&str]],
-    transform: F,
-) -> Result<Vec<String>>
-where
-    F: Fn(&str) -> String,
-{
-    let tracked_files = tracked_files_for_patterns(project_root, patterns)?;
-    let mut changed_files = vec![];
-    for rel in tracked_files {
-        let path = project_root.join(rel.as_str());
-        let Ok(content) = std::fs::read_to_string(&path) else {
-            continue;
-        };
-        if transform(&content) != content {
-            changed_files.push(rel);
-        }
-    }
     Ok(changed_files)
 }
 

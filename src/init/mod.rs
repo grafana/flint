@@ -32,7 +32,7 @@ use migrations::{
     apply_repo_migrations, selected_editorconfig_cleanup_sections,
     selected_editorconfig_line_length_sections,
 };
-pub(crate) use migrations::{apply_setup_migrations, detect_setup_drift, detect_setup_migrations};
+pub(crate) use migrations::{apply_setup_migrations, detect_setup_migrations};
 use scaffold::{apply_env_and_tasks, generate_lint_workflow, maybe_install_hook};
 use ui::{interactive_select_linters, select_categories_arrow};
 

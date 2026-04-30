@@ -1,0 +1,7 @@
+[expected]
+args = "run --full lychee"
+exit = 1
+stderr_contains = ["flint: links: missing required CI environment variable: GITHUB_TOKEN", "Set GITHUB_TOKEN so lychee can authenticate GitHub link checks in CI."]
+
+[env]
+CI = "true"

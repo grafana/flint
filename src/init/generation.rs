@@ -12,7 +12,6 @@ pub(crate) use super::mise_tools::{
     needs_node_for_npm, normalize_tools_section, replace_obsolete_keys,
     tools_section_needs_normalization,
 };
-pub(super) use super::renovate::{flint_preset, patch_renovate_extends};
 pub(super) use super::v1::remove_v1_tasks;
 
 /// Returns true if any currently-selected check has `Category::Slow`.

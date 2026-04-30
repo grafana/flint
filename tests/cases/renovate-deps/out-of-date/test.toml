@@ -27,6 +27,9 @@ flint: 1 check failed (renovate-deps)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
 '''
 
+[env]
+GITHUB_TOKEN = "token"
+
 [expected.files]
 ".github/renovate-tracked-deps.json" = """
 {

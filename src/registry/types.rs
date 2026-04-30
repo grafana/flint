@@ -1,3 +1,10 @@
+use std::future::Future;
+use std::path::{Path, PathBuf};
+use std::pin::Pin;
+
+use crate::config::Config;
+use crate::files::FileList;
+
 /// How a check is invoked relative to the file list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
@@ -45,38 +52,34 @@ pub enum RunPolicy {
     Adaptive,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SpecialKind {
-    Links,
-    RenovateDeps,
-    LicenseHeader,
-    FlintSetup,
+#[derive(Debug, Clone, Copy)]
+pub struct NativeCheckRef {
+    native: &'static dyn NativeCheck,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SpecialCheck {
-    kind: SpecialKind,
-    has_fix: bool,
-}
-
-impl SpecialCheck {
-    fn new(kind: SpecialKind, has_fix: bool) -> Self {
-        Self { kind, has_fix }
-    }
-
-    pub fn kind(self) -> SpecialKind {
-        self.kind
+impl NativeCheckRef {
+    fn new(native: &'static dyn NativeCheck) -> Self {
+        Self { native }
     }
 
     pub fn has_fix(self) -> bool {
-        self.has_fix
+        self.native.has_fix()
     }
 
     pub fn uses_binary(self) -> bool {
-        !matches!(
-            self.kind,
-            SpecialKind::LicenseHeader | SpecialKind::FlintSetup
-        )
+        self.native.uses_binary()
+    }
+
+    pub fn prepare(self, ctx: NativePrepareContext<'_>) -> Option<Box<dyn PreparedNativeCheck>> {
+        self.native.prepare(ctx)
+    }
+
+    pub fn config_display(self) -> Option<&'static str> {
+        self.native.config_display()
+    }
+
+    pub fn is_setup(self) -> bool {
+        self.native.is_setup()
     }
 }
 
@@ -100,26 +103,33 @@ pub enum CheckKind {
         full_fix_cmd: &'static str,
         scope: Scope,
     },
-    Special(SpecialCheck),
+    Native(NativeCheckRef),
 }
 
 impl CheckKind {
     pub fn scope_name(&self) -> &'static str {
         match self {
             Self::Template { scope, .. } => scope.name(),
-            Self::Special(_) => "special",
+            Self::Native(_) => "native",
         }
     }
 
-    pub fn special_kind(&self) -> Option<SpecialKind> {
+    pub fn is_native(&self) -> bool {
+        matches!(self, Self::Native(_))
+    }
+
+    pub fn is_setup(&self) -> bool {
+        match self {
+            Self::Template { .. } => false,
+            Self::Native(native) => native.is_setup(),
+        }
+    }
+
+    pub fn native_config_display(&self) -> Option<&'static str> {
         match self {
             Self::Template { .. } => None,
-            Self::Special(special) => Some(special.kind()),
+            Self::Native(native) => native.config_display(),
         }
-    }
-
-    pub fn is_special_kind(&self, kind: SpecialKind) -> bool {
-        self.special_kind() == Some(kind)
     }
 }
 
@@ -176,6 +186,242 @@ pub struct ToolKeyMigration {
     pub old_key: &'static str,
 }
 
+pub trait InitHookContext {
+    fn project_root(&self) -> &Path;
+    fn config_dir(&self) -> &Path;
+    fn line_length(&self) -> u16;
+    fn flint_toml_generated(&self) -> bool;
+    fn renovate_exclude_managers(&self) -> Option<&[String]>;
+}
+
+pub type InitHookFn = fn(&dyn InitHookContext) -> anyhow::Result<bool>;
+
+/// Output from a single linter run.
+pub struct LinterOutput {
+    pub ok: bool,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+}
+
+impl LinterOutput {
+    pub fn err(stderr: impl Into<Vec<u8>>) -> Self {
+        Self {
+            ok: false,
+            stdout: vec![],
+            stderr: stderr.into(),
+        }
+    }
+}
+
+pub trait CheckType: Sync + std::fmt::Debug {
+    fn name(&self) -> &'static str;
+    fn init_hook(&self) -> Option<InitHookFn> {
+        None
+    }
+    fn native_check(&'static self) -> Option<&'static dyn NativeCheck> {
+        None
+    }
+}
+
+pub struct NativePrepareContext<'a> {
+    pub name: &'static str,
+    pub file_list: &'a FileList,
+    pub project_root: &'a Path,
+    pub cfg: &'a Config,
+    pub config_dir: &'a Path,
+}
+
+pub struct NativeRunContext {
+    pub fix: bool,
+    pub project_root: PathBuf,
+}
+
+pub type NativeRunFuture = Pin<Box<dyn Future<Output = LinterOutput> + Send>>;
+
+pub trait PreparedNativeCheck: Send + std::fmt::Debug {
+    fn name(&self) -> &str;
+    fn tracked_files(&self) -> &[PathBuf] {
+        &[]
+    }
+    fn run(self: Box<Self>, ctx: NativeRunContext) -> NativeRunFuture;
+}
+
+pub type NativePrepareFn = fn(NativePrepareContext<'_>) -> Option<Box<dyn PreparedNativeCheck>>;
+
+pub trait NativeCheck: Sync + std::fmt::Debug {
+    fn prepare(&self, ctx: NativePrepareContext<'_>) -> Option<Box<dyn PreparedNativeCheck>>;
+    fn has_fix(&self) -> bool {
+        false
+    }
+    fn bin_name(&self) -> Option<&'static str> {
+        None
+    }
+    fn config_display(&self) -> Option<&'static str> {
+        None
+    }
+    fn is_setup(&self) -> bool {
+        false
+    }
+    fn uses_binary(&self) -> bool {
+        self.bin_name().is_some()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct NativeCheckDef {
+    has_fix: bool,
+    bin_name: Option<&'static str>,
+    config_display: Option<&'static str>,
+    setup: bool,
+    prepare: NativePrepareFn,
+}
+
+impl NativeCheckDef {
+    pub const fn new(prepare: NativePrepareFn) -> Self {
+        Self {
+            has_fix: false,
+            bin_name: None,
+            config_display: None,
+            setup: false,
+            prepare,
+        }
+    }
+
+    pub const fn with_bin(bin_name: &'static str, prepare: NativePrepareFn) -> Self {
+        Self {
+            has_fix: false,
+            bin_name: Some(bin_name),
+            config_display: None,
+            setup: false,
+            prepare,
+        }
+    }
+
+    pub const fn with_fix(mut self) -> Self {
+        self.has_fix = true;
+        self
+    }
+
+    pub const fn with_config_display(mut self, config_display: &'static str) -> Self {
+        self.config_display = Some(config_display);
+        self
+    }
+
+    pub const fn setup(mut self) -> Self {
+        self.setup = true;
+        self
+    }
+}
+
+impl NativeCheck for NativeCheckDef {
+    fn prepare(&self, ctx: NativePrepareContext<'_>) -> Option<Box<dyn PreparedNativeCheck>> {
+        (self.prepare)(ctx)
+    }
+
+    fn has_fix(&self) -> bool {
+        self.has_fix
+    }
+
+    fn bin_name(&self) -> Option<&'static str> {
+        self.bin_name
+    }
+
+    fn config_display(&self) -> Option<&'static str> {
+        self.config_display
+    }
+
+    fn is_setup(&self) -> bool {
+        self.setup
+    }
+}
+
+pub struct CheckTypeDef {
+    name: &'static str,
+    init_hook: Option<InitHookFn>,
+    native: Option<NativeCheckDef>,
+}
+
+impl CheckTypeDef {
+    pub const fn with_init_hook(name: &'static str, init_hook: InitHookFn) -> Self {
+        Self {
+            name,
+            init_hook: Some(init_hook),
+            native: None,
+        }
+    }
+
+    pub const fn native(name: &'static str, native: NativeCheckDef) -> Self {
+        Self {
+            name,
+            init_hook: None,
+            native: Some(native),
+        }
+    }
+
+    pub const fn native_with_init_hook(
+        name: &'static str,
+        native: NativeCheckDef,
+        init_hook: InitHookFn,
+    ) -> Self {
+        Self {
+            name,
+            init_hook: Some(init_hook),
+            native: Some(native),
+        }
+    }
+}
+
+impl CheckType for CheckTypeDef {
+    fn name(&self) -> &'static str {
+        self.name
+    }
+
+    fn init_hook(&self) -> Option<InitHookFn> {
+        self.init_hook
+    }
+
+    fn native_check(&'static self) -> Option<&'static dyn NativeCheck> {
+        self.native
+            .as_ref()
+            .map(|native| native as &dyn NativeCheck)
+    }
+}
+
+impl std::fmt::Debug for CheckTypeDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CheckTypeDef")
+            .field("name", &self.name)
+            .field("native", &self.native)
+            .finish()
+    }
+}
+
+pub trait AdaptiveRelevanceContext {
+    fn file_list(&self) -> &FileList;
+    fn project_root(&self) -> &Path;
+}
+
+pub type AdaptiveRelevanceHook = fn(&dyn AdaptiveRelevanceContext) -> bool;
+
+pub trait StatusContext {
+    fn config(&self) -> &Config;
+}
+
+pub type StatusHook = fn(&dyn StatusContext) -> Option<&'static str>;
+
+pub type NonverboseFailureOutputHook = fn(&[String], &[u8], &[u8]) -> (Vec<u8>, Vec<u8>);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MissingComponentHint {
+    pub component: &'static str,
+    pub stderr_contains: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkflowSetup {
+    RustComponents,
+}
+
 #[derive(Debug, Clone)]
 pub struct Check {
     pub name: &'static str,
@@ -218,6 +464,18 @@ pub struct Check {
     pub unsupported_configs: &'static [ConfigFile],
     /// Old mise tool keys that should migrate to this check's current install key.
     pub tool_key_migrations: Vec<ToolKeyMigration>,
+    /// Optional check-type behavior shared by related checks.
+    pub check_type: Option<&'static dyn CheckType>,
+    /// Optional relevance hook for adaptive checks in `--fast-only` mode.
+    pub adaptive_relevance: Option<AdaptiveRelevanceHook>,
+    /// Optional status override shown by `flint linters`.
+    pub status_hook: Option<StatusHook>,
+    /// Optional output normalizer used for non-verbose failing process runs.
+    pub nonverbose_failure_output: Option<NonverboseFailureOutputHook>,
+    /// Optional hint appended when a known toolchain component is missing.
+    pub missing_component_hint: Option<MissingComponentHint>,
+    /// Additional config-like files that trigger an all-files baseline run when changed.
+    pub baseline_triggers: &'static [ConfigFile],
     /// This check is a formatter — it owns certain file types for formatting purposes.
     pub is_formatter: bool,
     /// Skip files owned by active formatters (used by ec to avoid double-checking).
@@ -240,6 +498,8 @@ pub struct Check {
     /// On Windows, the binary is a self-executing JAR that cannot be run directly
     /// or via cmd.exe — invoke as `java -jar <resolved-path>` instead.
     pub windows_java_jar: bool,
+    /// Extra generated workflow setup needed when this check is selected by `flint init`.
+    pub workflow_setup: Option<WorkflowSetup>,
     pub fix_behavior: FixBehavior,
     pub kind: CheckKind,
     /// Plain-text description of what the check does — shown in `flint linters` and the README table.
@@ -252,7 +512,7 @@ impl Check {
     pub fn has_fix(&self) -> bool {
         match &self.kind {
             CheckKind::Template { fix_cmd, .. } => !fix_cmd.is_empty(),
-            CheckKind::Special(special) => special.has_fix(),
+            CheckKind::Native(native) => native.has_fix(),
         }
     }
 
@@ -260,7 +520,7 @@ impl Check {
     pub fn uses_binary(&self) -> bool {
         match &self.kind {
             CheckKind::Template { .. } => true,
-            CheckKind::Special(special) => special.uses_binary(),
+            CheckKind::Native(native) => native.uses_binary(),
         }
     }
 
@@ -343,6 +603,12 @@ impl Check {
             baseline_config: None,
             unsupported_configs: &[],
             tool_key_migrations: vec![],
+            check_type: None,
+            adaptive_relevance: None,
+            status_hook: None,
+            nonverbose_failure_output: None,
+            missing_component_hint: None,
+            baseline_triggers: &[],
             is_formatter: false,
             defers_to_formatters: false,
             editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
@@ -358,27 +624,24 @@ impl Check {
                 scope,
             },
             windows_java_jar: false,
+            workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
             desc: "",
             docs: "",
         }
     }
 
-    /// Special check with custom logic (not a simple command template).
-    pub fn special(name: &'static str, kind: SpecialKind, has_fix: bool) -> Self {
-        Self::special_with_bin(name, "", kind, has_fix)
-    }
-
-    /// Special check with custom logic backed by an external binary.
-    pub fn special_with_bin(
-        name: &'static str,
-        bin_name: &'static str,
-        kind: SpecialKind,
-        has_fix: bool,
-    ) -> Self {
+    /// Native check with custom logic (not a simple command template).
+    pub fn native(check_type: &'static dyn CheckType) -> Self {
+        let Some(native) = check_type.native_check() else {
+            panic!(
+                "native check '{}' has no native check implementation",
+                check_type.name()
+            );
+        };
         Check {
-            name,
-            bin_name,
+            name: check_type.name(),
+            bin_name: native.bin_name().unwrap_or(""),
             mise_tool_name: None,
             version_range: None,
             patterns: &[],
@@ -390,6 +653,12 @@ impl Check {
             baseline_config: None,
             unsupported_configs: &[],
             tool_key_migrations: vec![],
+            check_type: Some(check_type),
+            adaptive_relevance: None,
+            status_hook: None,
+            nonverbose_failure_output: None,
+            missing_component_hint: None,
+            baseline_triggers: &[],
             is_formatter: false,
             defers_to_formatters: false,
             editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
@@ -398,8 +667,9 @@ impl Check {
             run_policy: RunPolicy::Fast,
             toolchain: None,
             windows_java_jar: false,
+            workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
-            kind: CheckKind::Special(SpecialCheck::new(kind, has_fix)),
+            kind: CheckKind::Native(NativeCheckRef::new(native)),
             desc: "",
             docs: "",
         }
@@ -528,7 +798,7 @@ impl Check {
         self
     }
 
-    /// Override the patterns field (useful for Special checks that need init-detection
+    /// Override the patterns field (useful for native checks that need init-detection
     /// patterns but don't use them for file matching at runtime).
     pub fn patterns(mut self, patterns: &'static [&'static str]) -> Self {
         self.patterns = patterns;
@@ -608,6 +878,48 @@ impl Check {
 
     pub fn unsupported_configs(mut self, files: &'static [ConfigFile]) -> Self {
         self.unsupported_configs = files;
+        self
+    }
+
+    pub fn check_type(mut self, check_type: &'static dyn CheckType) -> Self {
+        self.check_type = Some(check_type);
+        self
+    }
+
+    pub fn adaptive_relevance(mut self, hook: AdaptiveRelevanceHook) -> Self {
+        self.adaptive_relevance = Some(hook);
+        self
+    }
+
+    pub fn status_hook(mut self, hook: StatusHook) -> Self {
+        self.status_hook = Some(hook);
+        self
+    }
+
+    pub fn nonverbose_failure_output(mut self, hook: NonverboseFailureOutputHook) -> Self {
+        self.nonverbose_failure_output = Some(hook);
+        self
+    }
+
+    pub fn missing_component_hint(
+        mut self,
+        component: &'static str,
+        stderr_contains: &'static str,
+    ) -> Self {
+        self.missing_component_hint = Some(MissingComponentHint {
+            component,
+            stderr_contains,
+        });
+        self
+    }
+
+    pub fn baseline_triggers(mut self, files: &'static [ConfigFile]) -> Self {
+        self.baseline_triggers = files;
+        self
+    }
+
+    pub fn workflow_setup(mut self, setup: WorkflowSetup) -> Self {
+        self.workflow_setup = Some(setup);
         self
     }
 

@@ -5,6 +5,9 @@ stderr = '''
 flint: fixed: renovate-deps — commit before pushing
 '''
 
+[env]
+GITHUB_TOKEN = "token"
+
 [expected.files]
 ".github/renovate-tracked-deps.json" = """
 {

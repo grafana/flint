@@ -8,13 +8,13 @@ Tip: flint init detects languages from tracked files (`git ls-files`). Add and s
   normalized [tools] in <REPO>/mise.toml
   wrote <REPO>/.github/config/flint.toml
   wrote <REPO>/.github/workflows/lint.yml
+  wrote <REPO>/biome.jsonc
+  wrote <REPO>/.github/config/rustfmt.toml
   removed <REPO>/.markdownlint.json (replaced by .rumdl.toml)
   wrote <REPO>/.github/config/.rumdl.toml
+  wrote <REPO>/.github/config/.yamllint.yml
   patched <REPO>/.editorconfig — set max_line_length = 120
   patched <REPO>/.editorconfig — disable max_line_length for [*.rs], [*.md]
-  wrote <REPO>/.github/config/.yamllint.yml
-  wrote <REPO>/.github/config/rustfmt.toml
-  wrote <REPO>/biome.jsonc
 installed pre-commit hook (.git/hooks/pre-commit)
 Done. Run `mise install` to install the new tools.
 '''

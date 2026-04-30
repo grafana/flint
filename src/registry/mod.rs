@@ -16,8 +16,11 @@ pub use obsolete::{
 };
 pub use resolve::binary_on_path;
 pub use types::{
-    Category, Check, CheckKind, ConfigBase, ConfigFile, ConfigMatch, EditorconfigDirectiveStyle,
-    EditorconfigLineLengthPolicy, FixBehavior, LinterConfig, RunPolicy, Scope, SpecialKind,
+    AdaptiveRelevanceContext, Category, Check, CheckKind, CheckTypeDef, ConfigBase, ConfigFile,
+    ConfigMatch, EditorconfigDirectiveStyle, EditorconfigLineLengthPolicy, FixBehavior,
+    InitHookContext, LinterConfig, LinterOutput, MissingComponentHint, NativeCheck, NativeCheckDef,
+    NativePrepareContext, NativeRunContext, NativeRunFuture, NonverboseFailureOutputHook,
+    PreparedNativeCheck, RunPolicy, Scope, StatusContext, WorkflowSetup,
 };
 
 /// Returns the explicit set of flint-managed tool keys that belong under the

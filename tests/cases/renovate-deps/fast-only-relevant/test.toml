@@ -6,6 +6,9 @@ exit = 0
 ".renovate-ran" = """
 """
 
+[env]
+GITHUB_TOKEN = "token"
+
 [fake_bins]
 renovate = '''
 #!/bin/sh

@@ -1,7 +1,15 @@
+pub mod biome;
+pub mod env;
 pub mod flint_setup;
 pub mod license_header;
 pub mod lychee;
 pub mod renovate_deps;
+pub mod rumdl;
+pub mod rustfmt;
+pub mod taplo;
+pub mod yamllint;
+
+pub use crate::registry::LinterOutput;
 
 /// Build a [`tokio::process::Command`] for the given argv.
 ///
@@ -78,21 +86,4 @@ fn find_file_in_path(binary: &str) -> Option<std::path::PathBuf> {
         let candidate = dir.join(binary);
         candidate.is_file().then_some(candidate)
     })
-}
-
-/// Output from a single linter run.
-pub struct LinterOutput {
-    pub ok: bool,
-    pub stdout: Vec<u8>,
-    pub stderr: Vec<u8>,
-}
-
-impl LinterOutput {
-    pub fn err(stderr: impl Into<Vec<u8>>) -> Self {
-        Self {
-            ok: false,
-            stdout: vec![],
-            stderr: stderr.into(),
-        }
-    }
 }

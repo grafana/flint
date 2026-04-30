@@ -1,5 +1,8 @@
-use super::types::{Check, ConfigFile, EditorconfigDirectiveStyle, SpecialKind};
-use crate::linters::renovate_deps::RENOVATE_CONFIG_PATTERNS;
+use super::types::{Check, ConfigFile, EditorconfigDirectiveStyle, WorkflowSetup};
+use crate::linters::{
+    biome, flint_setup, license_header, lychee, renovate_deps,
+    renovate_deps::RENOVATE_CONFIG_PATTERNS, rumdl, rustfmt, taplo, yamllint,
+};
 use crate::setup::{V1_BOOTSTRAP_SETUP_VERSION, V2_BASELINE_SETUP_VERSION};
 
 const TOOL_RUMDL: &[&str] = &["tool", "rumdl"];
@@ -44,6 +47,8 @@ const EDITORCONFIG_CHECKER_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir(".ecrc"),
     ConfigFile::project(".ecrc"),
 ];
+const EDITORCONFIG_CHECKER_BASELINE_TRIGGERS: &[ConfigFile] =
+    &[ConfigFile::project(".editorconfig")];
 const GOLANGCI_LINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir(".golangci.yaml"),
     ConfigFile::config_dir(".golangci.toml"),
@@ -108,6 +113,7 @@ fn check_rumdl() -> Check {
         .linter_config(".rumdl.toml", "--config")
         .baseline_config(ConfigFile::config_dir(".rumdl.toml"))
         .unsupported_configs(RUMDL_UNSUPPORTED_CONFIGS)
+        .check_type(&rumdl::CHECK_TYPE)
         .nonverbose_filter_prefixes(&["Success: No issues found in "])
         .formatter()
         .editorconfig_line_length_off(
@@ -124,6 +130,7 @@ fn check_yaml_lint() -> Check {
         .linter_config(".yamllint.yml", "-c")
         .baseline_config(ConfigFile::config_dir(".yamllint.yml"))
         .unsupported_configs(YAMLLINT_UNSUPPORTED_CONFIGS)
+        .check_type(&yamllint::CHECK_TYPE)
         .formatter()
         .desc("Lint YAML files for style and consistency")
         .mise_tool("aqua:owenlamont/ryl")
@@ -143,7 +150,9 @@ fn check_taplo() -> Check {
     .linter_config(".taplo.toml", "--config")
     .baseline_config(ConfigFile::config_dir(".taplo.toml"))
     .unsupported_configs(TAPLO_UNSUPPORTED_CONFIGS)
+    .check_type(&taplo::CHECK_TYPE)
     .stderr_filter_prefixes(&[" INFO taplo:"])
+    .nonverbose_failure_output(taplo::normalize_nonverbose_failure_output)
     .formatter()
     .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["github:tamasfe/taplo"])
     .desc("Format TOML files")
@@ -212,6 +221,7 @@ fn check_editorconfig_checker() -> Check {
         .mise_tool("editorconfig-checker")
         .defer_to_formatters()
         .linter_config(".editorconfig-checker.json", "-config")
+        .baseline_triggers(EDITORCONFIG_CHECKER_BASELINE_TRIGGERS)
         .unsupported_configs(EDITORCONFIG_CHECKER_UNSUPPORTED_CONFIGS)
         .desc("Check files comply with EditorConfig settings")
 }
@@ -265,6 +275,7 @@ fn check_biome() -> Check {
     .fix("biome check --fix {FILE}")
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
+    .check_type(&biome::CHECK_TYPE)
     .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["npm:@biomejs/biome"])
     .desc("Lint JS/TS/JSON files")
     .lang()
@@ -280,6 +291,7 @@ fn check_biome_format() -> Check {
     .fix("biome format --write {FILE}")
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
+    .check_type(&biome::CHECK_TYPE)
     .formatter()
     .desc("Format JS/TS/JSON files")
     .mise_tool("biome")
@@ -296,6 +308,11 @@ fn check_cargo_clippy() -> Check {
     .partial_fix()
     .mise_tool("rust")
     .toolchain_components("clippy")
+    .missing_component_hint(
+        "clippy",
+        "'cargo-clippy' is not installed for the toolchain",
+    )
+    .workflow_setup(WorkflowSetup::RustComponents)
     .desc("Lint Rust code; runs on all .rs files, not just changed")
     .lang()
 }
@@ -306,9 +323,12 @@ fn check_cargo_fmt() -> Check {
         .linter_config("rustfmt.toml", "--config-path")
         .baseline_config(RUSTFMT_BASELINE_CONFIG)
         .unsupported_configs(RUSTFMT_UNSUPPORTED_CONFIGS)
+        .check_type(&rustfmt::CHECK_TYPE)
         .bin("rustfmt")
         .mise_tool("rust")
         .toolchain_components("rustfmt")
+        .missing_component_hint("rustfmt", "'rustfmt' is not installed for the toolchain")
+        .workflow_setup(WorkflowSetup::RustComponents)
         .formatter()
         .editorconfig_line_length_off(&["*.rs"], "Rust line length is handled by rustfmt", None)
         .desc("Format Rust code; runs on all .rs files, not just changed")
@@ -383,7 +403,7 @@ fn check_dotnet_format() -> Check {
 }
 
 fn check_lychee() -> Check {
-    Check::special_with_bin("lychee", "lychee", SpecialKind::Links, false)
+    Check::native(&lychee::CHECK_TYPE)
         .desc("Check for broken links")
         .docs(
             "Orchestrates [lychee](https://lychee.cli.rs/) for link checking. \
@@ -393,6 +413,13 @@ fn check_lychee() -> Check {
             `check_all_local = true` in `flint.toml`, adds a second pass over local links\n\
             in all files — useful when broken internal links from unchanged files also\n\
             matter.\n\
+            \n\
+            In CI, `lychee` requires `GITHUB_TOKEN` so GitHub link checks can authenticate.\n\
+            On GitHub Actions PR runs in changed-file mode, link remaps also require\n\
+            `GITHUB_REPOSITORY`, `GITHUB_BASE_REF`, `GITHUB_HEAD_REF`, and `PR_HEAD_REPO`.\n\
+            GitHub Actions provides the first three; set `PR_HEAD_REPO` from\n\
+            `github.event.pull_request.head.repo.full_name`. `--full` does not require\n\
+            the PR remap metadata.\n\
             \n\
             Configure via `flint.toml`:\n\
             \n\
@@ -405,8 +432,9 @@ fn check_lychee() -> Check {
 }
 
 fn check_renovate_deps() -> Check {
-    Check::special_with_bin("renovate-deps", "renovate", SpecialKind::RenovateDeps, true)
+    Check::native(&renovate_deps::CHECK_TYPE)
         .adaptive()
+        .adaptive_relevance(renovate_deps::adaptive_relevance)
         .mise_tool("npm:renovate")
         .patterns(RENOVATE_CONFIG_PATTERNS)
         .desc("Verify Renovate dependency snapshot is up to date")
@@ -414,6 +442,14 @@ fn check_renovate_deps() -> Check {
             "Verifies `.github/renovate-tracked-deps.json` is up to date by running\n\
             Renovate locally and comparing its output against the committed snapshot.\n\
             Requires `renovate` in `[tools]`.\n\
+            \n\
+            In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN`\n\
+            so Renovate can authenticate GitHub requests. If `GITHUB_COM_TOKEN` is\n\
+            unset, flint forwards `GITHUB_TOKEN` to Renovate as `GITHUB_COM_TOKEN`.\n\
+            \n\
+            When `flint init` writes a new `flint.toml`, it includes this section if\n\
+            `renovate-deps` is selected. During v1 setup migration it also carries\n\
+            legacy `RENOVATE_TRACKED_DEPS_EXCLUDE` values into `exclude_managers`.\n\
             \n\
             With `--fix`, automatically regenerates and commits the snapshot.\n\
             \n\
@@ -427,13 +463,14 @@ fn check_renovate_deps() -> Check {
 }
 
 fn check_license_header() -> Check {
-    Check::special("license-header", SpecialKind::LicenseHeader, false)
+    Check::native(&license_header::CHECK_TYPE)
         .activate_unconditionally()
+        .status_hook(license_header::status)
         .desc("Check source files have the required license header")
 }
 
 fn check_flint_setup() -> Check {
-    Check::special("flint-setup", SpecialKind::FlintSetup, true)
+    Check::native(&flint_setup::CHECK_TYPE)
         .activate_unconditionally()
         .patterns(&["mise.toml"])
         .desc("Keep Flint setup current and mise.toml lint tooling canonical")

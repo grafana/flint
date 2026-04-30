@@ -178,7 +178,7 @@ fn normalized_command_prefix(check: &Check) -> Option<String> {
                 *check_cmd
             }
         }
-        crate::registry::CheckKind::Special(_) => return None,
+        crate::registry::CheckKind::Native(_) => return None,
     };
 
     let mut words = vec![];
@@ -205,7 +205,7 @@ fn names_prefer_binary_or_native_command() {
     let violations: Vec<String> = builtin()
         .into_iter()
         .filter(|check| check.uses_binary())
-        .filter(|check| check.kind.special_kind().is_none())
+        .filter(|check| !check.kind.is_native())
         .filter_map(|check| {
             let allowed = ALLOWED_ALIASES
                 .iter()
@@ -354,6 +354,29 @@ fn editorconfig_checker_json_is_optional_not_generated_baseline() {
     assert!(
         check.baseline_config.is_none(),
         ".editorconfig-checker.json should not be treated as generated baseline config"
+    );
+    assert!(
+        check
+            .baseline_triggers
+            .iter()
+            .any(|config| config.path == ".editorconfig"),
+        ".editorconfig changes should trigger an all-files editorconfig-checker baseline"
+    );
+}
+
+#[test]
+fn adaptive_checks_declare_relevance_hooks() {
+    let missing: Vec<_> = builtin()
+        .into_iter()
+        .filter(|check| check.run_policy == RunPolicy::Adaptive)
+        .filter(|check| check.adaptive_relevance.is_none())
+        .map(|check| check.name)
+        .collect();
+
+    assert!(
+        missing.is_empty(),
+        "adaptive checks missing relevance hooks: {}",
+        missing.join(", ")
     );
 }
 
@@ -857,8 +880,8 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     match check.linter_config.as_ref() {
         Some(config) => rows.push(("Config", format!("`{}`", config.display_name()))),
         None => {
-            if check.kind.is_special_kind(SpecialKind::Links) {
-                rows.push(("Config", "via `[checks.links]` in flint.toml".to_string()));
+            if let Some(config) = check.kind.native_config_display() {
+                rows.push(("Config", config.to_string()));
             }
         }
     }

@@ -7,7 +7,7 @@ use std::path::Path;
 pub(super) fn generate_lint_workflow(
     project_root: &Path,
     base_branch: &str,
-    has_rust: bool,
+    needs_rust_components: bool,
 ) -> Result<bool> {
     let workflows_dir = project_root.join(".github/workflows");
     let workflow_path = workflows_dir.join("lint.yml");
@@ -15,12 +15,12 @@ pub(super) fn generate_lint_workflow(
         return Ok(false);
     }
     std::fs::create_dir_all(&workflows_dir)?;
-    let push_comment = if has_rust {
+    let push_comment = if needs_rust_components {
         " # warms the Rust cache so PR branches get a cache hit"
     } else {
         ""
     };
-    let rust_steps = if has_rust {
+    let rust_steps = if needs_rust_components {
         "\n      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1\n\n      - name: Install Rust lint components\n        run: rustup component add clippy rustfmt\n"
     } else {
         ""

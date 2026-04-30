@@ -9,7 +9,7 @@ mod setup;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
-use registry::{CheckKind, FixBehavior, LinterConfig, RunPolicy, Scope, SpecialKind};
+use registry::{CheckKind, FixBehavior, LinterConfig, RunPolicy, Scope};
 use runner::{CheckResult, RunOptions};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -207,9 +207,7 @@ async fn run(
     // --fast-only policy (skipped when linters are named explicitly, relevance-gated for
     // adaptive checks). mise guarantees declared tools are on PATH, so no PATH check needed.
     let mise_tools = registry::read_mise_tools(project_root);
-    let flint_setup_selected = checks
-        .iter()
-        .any(|c| c.kind.is_special_kind(SpecialKind::FlintSetup));
+    let flint_setup_selected = checks.iter().any(|c| c.kind.is_setup());
     if !flint_setup_selected {
         if let Some((old, new)) = registry::find_obsolete_key(&mise_tools) {
             eprintln!("flint: obsolete tool key in mise.toml: {old:?} (replaced by {new:?})");
@@ -225,6 +223,10 @@ async fn run(
     }
     let active: Vec<&registry::Check> = {
         let mut out = vec![];
+        let relevance_ctx = AdaptiveRunContext {
+            file_list: &file_list,
+            project_root,
+        };
         for c in checks {
             if registry::check_active(c, &mise_tools) {
                 let include = if explicit || !args.fast_only {
@@ -233,12 +235,9 @@ async fn run(
                     match c.run_policy {
                         RunPolicy::Fast => true,
                         RunPolicy::Slow => false,
-                        RunPolicy::Adaptive => match &c.kind {
-                            kind if kind.is_special_kind(SpecialKind::RenovateDeps) => {
-                                linters::renovate_deps::is_relevant(&file_list, project_root)
-                            }
-                            _ => true,
-                        },
+                        RunPolicy::Adaptive => {
+                            c.adaptive_relevance.is_none_or(|hook| hook(&relevance_ctx))
+                        }
                     }
                 };
                 if include {
@@ -537,6 +536,31 @@ struct RunContext<'a> {
     config_dir: &'a Path,
 }
 
+struct AdaptiveRunContext<'a> {
+    file_list: &'a files::FileList,
+    project_root: &'a Path,
+}
+
+impl registry::AdaptiveRelevanceContext for AdaptiveRunContext<'_> {
+    fn file_list(&self) -> &files::FileList {
+        self.file_list
+    }
+
+    fn project_root(&self) -> &Path {
+        self.project_root
+    }
+}
+
+struct LinterStatusContext<'a> {
+    cfg: &'a config::Config,
+}
+
+impl registry::StatusContext for LinterStatusContext<'_> {
+    fn config(&self) -> &config::Config {
+        self.cfg
+    }
+}
+
 enum FixOutcome {
     Clean,
     Fixed(String),
@@ -618,7 +642,7 @@ fn classify_single_pass_fix(result: CheckResult) -> FixOutcome {
 }
 
 fn is_flint_setup(check: &registry::Check) -> bool {
-    check.kind.is_special_kind(SpecialKind::FlintSetup)
+    check.kind.is_setup()
 }
 
 async fn run_checks(
@@ -700,17 +724,14 @@ fn baseline_check_names(
                 || registry::tool_version_changed(check, &previous_tools, current_tools)
                 || flint_toml.as_ref().is_some_and(|change| {
                     change.settings_changed
-                        || (check.kind.special_kind().is_some() && change.check_changed(check.name))
+                        || (check.kind.is_native() && change.check_changed(check.name))
                 })
                 || check.baseline_config.as_ref().is_some_and(|config| {
                     changed.contains(&config_file_rel_path(project_root, config_dir, config))
                 })
-                || (check.name == "editorconfig-checker"
-                    && changed.contains(&config_file_rel_path(
-                        project_root,
-                        config_dir,
-                        &registry::ConfigFile::project(".editorconfig"),
-                    )))
+                || check.baseline_triggers.iter().any(|config| {
+                    changed.contains(&config_file_rel_path(project_root, config_dir, config))
+                })
         })
         .map(|check| check.name.to_string())
         .collect()
@@ -1032,11 +1053,11 @@ where
 {
     if registry::check_active(check, mise_tools) {
         if !check.uses_binary() || binary_on_path(check.bin_name) {
-            if check.name == "license-header" && cfg.checks.license_header.text.is_empty() {
-                "not configured"
-            } else {
-                "active"
-            }
+            let status_ctx = LinterStatusContext { cfg };
+            check
+                .status_hook
+                .and_then(|hook| hook(&status_ctx))
+                .unwrap_or("active")
         } else {
             "no binary"
         }

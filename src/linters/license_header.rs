@@ -2,7 +2,60 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 use crate::config::LicenseHeaderConfig;
+use crate::files::match_files;
 use crate::linters::LinterOutput;
+use crate::registry::{
+    CheckTypeDef, NativeCheckDef, NativePrepareContext, NativeRunContext, NativeRunFuture,
+    PreparedNativeCheck, StatusContext,
+};
+
+pub(crate) static CHECK_TYPE: CheckTypeDef =
+    CheckTypeDef::native("license-header", NativeCheckDef::new(prepare));
+
+#[derive(Debug)]
+struct PreparedLicenseHeader {
+    name: String,
+    cfg: LicenseHeaderConfig,
+    files: Vec<PathBuf>,
+}
+
+fn prepare(ctx: NativePrepareContext<'_>) -> Option<Box<dyn PreparedNativeCheck>> {
+    if ctx.cfg.checks.license_header.text.is_empty() {
+        return None;
+    }
+    let patterns: Vec<&str> = ctx
+        .cfg
+        .checks
+        .license_header
+        .patterns
+        .iter()
+        .map(String::as_str)
+        .collect();
+    let files: Vec<PathBuf> = match_files(&ctx.file_list.files, &patterns, &[], ctx.project_root)
+        .into_iter()
+        .cloned()
+        .collect();
+    if files.is_empty() {
+        return None;
+    }
+    Some(Box::new(PreparedLicenseHeader {
+        name: ctx.name.to_string(),
+        cfg: ctx.cfg.checks.license_header.clone(),
+        files,
+    }))
+}
+
+impl PreparedNativeCheck for PreparedLicenseHeader {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn run(self: Box<Self>, ctx: NativeRunContext) -> NativeRunFuture {
+        Box::pin(async move {
+            crate::linters::license_header::run(&self.cfg, &ctx.project_root, &self.files).await
+        })
+    }
+}
 
 /// Checks that each file contains `cfg.text` within the first `cfg.lines_to_check` lines.
 /// Files are pre-filtered by pattern in the runner; this function checks all of them.
@@ -36,6 +89,15 @@ pub async fn run(
         stdout: vec![],
         stderr,
     }
+}
+
+pub(crate) fn status(ctx: &dyn StatusContext) -> Option<&'static str> {
+    ctx.config()
+        .checks
+        .license_header
+        .text
+        .is_empty()
+        .then_some("not configured")
 }
 
 /// Returns `true` if `text` appears anywhere within the first `lines_to_check` lines of `path`.

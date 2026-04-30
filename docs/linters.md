@@ -106,7 +106,7 @@ still choose the config directory via `FLINT_CONFIG_DIR` where supported.
 | Description | Keep Flint setup current and mise.toml lint tooling canonical |
 | Fix         | yes                                                           |
 | Binary      | (built-in)                                                    |
-| Scope       | [special](#scope-special)                                     |
+| Scope       | [native](#scope-native)                                       |
 | Patterns    | `mise.toml`                                                   |
 
 Checks the repo's Flint-managed setup state and `mise.toml` layout.
@@ -182,7 +182,7 @@ With `--fix`, rewrites Flint-managed config in place and advances
 | Description | Check source files have the required license header |
 | Fix         | no                                                  |
 | Binary      | (built-in)                                          |
-| Scope       | [special](#scope-special)                           |
+| Scope       | [native](#scope-native)                             |
 
 ## `lychee`
 
@@ -191,7 +191,7 @@ With `--fix`, rewrites Flint-managed config in place and advances
 | Description | Check for broken links             |
 | Fix         | no                                 |
 | Binary      | `lychee`                           |
-| Scope       | [special](#scope-special)          |
+| Scope       | [native](#scope-native)            |
 | Config      | via `[checks.links]` in flint.toml |
 
 Orchestrates [lychee](https://lychee.cli.rs/) for link checking. Requires `lychee` in `[tools]`.
@@ -200,6 +200,13 @@ Default behavior: checks all links in changed files. When
 `check_all_local = true` in `flint.toml`, adds a second pass over local links
 in all files — useful when broken internal links from unchanged files also
 matter.
+
+In CI, `lychee` requires `GITHUB_TOKEN` so GitHub link checks can authenticate.
+On GitHub Actions PR runs in changed-file mode, link remaps also require
+`GITHUB_REPOSITORY`, `GITHUB_BASE_REF`, `GITHUB_HEAD_REF`, and `PR_HEAD_REPO`.
+GitHub Actions provides the first three; set `PR_HEAD_REPO` from
+`github.event.pull_request.head.repo.full_name`. `--full` does not require
+the PR remap metadata.
 
 Configure via `flint.toml`:
 
@@ -216,13 +223,21 @@ check_all_local = true
 | Description | Verify Renovate dependency snapshot is up to date                                                                          |
 | Fix         | yes                                                                                                                        |
 | Binary      | `renovate`                                                                                                                 |
-| Scope       | [special](#scope-special)                                                                                                  |
+| Scope       | [native](#scope-native)                                                                                                    |
 | Patterns    | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
 | Run policy  | adaptive — runs in `--fast-only` only when relevant                                                                        |
 
 Verifies `.github/renovate-tracked-deps.json` is up to date by running
 Renovate locally and comparing its output against the committed snapshot.
 Requires `renovate` in `[tools]`.
+
+In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN`
+so Renovate can authenticate GitHub requests. If `GITHUB_COM_TOKEN` is
+unset, flint forwards `GITHUB_TOKEN` to Renovate as `GITHUB_COM_TOKEN`.
+
+When `flint init` writes a new `flint.toml`, it includes this section if
+`renovate-deps` is selected. During v1 setup migration it also carries
+legacy `RENOVATE_TRACKED_DEPS_EXCLUDE` values into `exclude_managers`.
 
 With `--fix`, automatically regenerates and commits the snapshot.
 
@@ -347,7 +362,7 @@ Invoked once with no file args; for checks with patterns set (e.g.
 whole project when it does run. `golangci-lint` is the exception — it uses
 `--new-from-rev` to scope analysis to changed code even within the project run.
 
-### Scope: special
+### Scope: native
 
 Implemented in-process rather than via a command template. These checks may run
 without file arguments or use custom orchestration logic.

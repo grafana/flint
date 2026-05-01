@@ -31,7 +31,9 @@ indent_style = space
 indent_size = 2
 max_line_length = 120
 
+# Existing Rust section should keep non-line-length settings while rustfmt owns line length.
 [*.rs]
+indent_size = 4
 # Rust line length is handled by rustfmt
 max_line_length = off
 

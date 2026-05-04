@@ -4,6 +4,20 @@ use std::path::Path;
 
 use super::snapshot::Snapshot;
 
+const MATCH_PREFIX: &str = "match";
+const MATCH_DEP_NAMES: &str = "matchDepNames";
+const MATCH_PACKAGE_NAMES: &str = "matchPackageNames";
+const CONTEXTUAL_MATCHERS: &[&str] = &[
+    "matchCategories",
+    "matchDatasources",
+    "matchDepTypes",
+    "matchFileNames",
+    "matchManagers",
+    "matchPaths",
+    "matchRepositories",
+    "matchSourceUrls",
+];
+
 #[derive(Debug)]
 pub(crate) enum RuleMatcher {
     DepNames(BTreeSet<String>),
@@ -128,8 +142,8 @@ fn comparable_package_rule(
         .as_object()
         .into_iter()
         .flat_map(|obj| obj.keys())
-        .filter(|key| key.starts_with("match"))
-        .filter(|key| *key != "matchDepNames" && *key != "matchPackageNames")
+        .filter(|key| key.starts_with(MATCH_PREFIX))
+        .filter(|key| *key != MATCH_DEP_NAMES && *key != MATCH_PACKAGE_NAMES)
         .cloned()
         .collect();
     let contextual_matchers: Vec<_> = extra_matchers
@@ -138,8 +152,8 @@ fn comparable_package_rule(
         .cloned()
         .collect();
 
-    let dep_names = optional_matcher_values(rule, idx, "matchDepNames")?;
-    let package_names = optional_matcher_values(rule, idx, "matchPackageNames")?;
+    let dep_names = optional_matcher_values(rule, idx, MATCH_DEP_NAMES)?;
+    let package_names = optional_matcher_values(rule, idx, MATCH_PACKAGE_NAMES)?;
 
     let label = rule_label(rule, idx);
 
@@ -211,17 +225,7 @@ fn optional_matcher_values(
 }
 
 fn requires_contextual_matching(key: &str) -> bool {
-    matches!(
-        key,
-        "matchCategories"
-            | "matchDatasources"
-            | "matchDepTypes"
-            | "matchFileNames"
-            | "matchManagers"
-            | "matchPaths"
-            | "matchRepositories"
-            | "matchSourceUrls"
-    )
+    CONTEXTUAL_MATCHERS.contains(&key)
 }
 
 impl ComparablePackageRule {

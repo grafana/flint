@@ -182,7 +182,6 @@ pub enum EditorconfigLineLengthPolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ToolKeyMigration {
-    pub after_setup_migration_version: u32,
     pub old_key: &'static str,
 }
 
@@ -953,19 +952,11 @@ impl Check {
         self
     }
 
-    /// Old mise tool keys that should migrate to this check's current install
-    /// key when the repo setup migration version is at or before
-    /// `after_setup_migration_version`.
-    pub fn migrate_tool_keys_after(
-        mut self,
-        after_setup_migration_version: u32,
-        old_keys: &'static [&'static str],
-    ) -> Self {
+    /// Old mise tool keys that should always migrate to this check's current
+    /// install key when encountered in `mise.toml`.
+    pub fn migrate_tool_keys(mut self, old_keys: &'static [&'static str]) -> Self {
         self.tool_key_migrations
-            .extend(old_keys.iter().map(|old_key| ToolKeyMigration {
-                after_setup_migration_version,
-                old_key,
-            }));
+            .extend(old_keys.iter().map(|old_key| ToolKeyMigration { old_key }));
         self
     }
 }

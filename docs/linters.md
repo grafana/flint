@@ -120,8 +120,8 @@ This verifies and fixes Flint-managed setup:
 - keep lint-managed tool entries under the `# Linters` header
 - keep runtime, SDK, and unknown tool entries above that header
 
-With `--fix`, rewrites Flint-managed config in place and advances
-`settings.setup_migration_version` when a migration applies.
+With `--fix`, rewrites Flint-managed config in place and applies any
+currently actionable setup migration.
 
 ## `gofmt`
 

@@ -14,5 +14,4 @@ ruff = "0.15.0"
 '''
 "flint.toml" = '''
 [settings]
-setup_migration_version = 2
 '''

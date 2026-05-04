@@ -64,8 +64,8 @@ fn shellcheck_alias_does_not_make_github_backend_obsolete() {
 }
 
 #[test]
-fn check_owned_tool_migrations_apply_after_v2_baseline() {
-    let obsolete = obsolete_keys_after(crate::setup::V2_BASELINE_SETUP_VERSION);
+fn check_owned_tool_migrations_are_always_actionable() {
+    let obsolete = obsolete_keys();
 
     assert!(obsolete.contains(&("cargo:yaml-lint", "aqua:owenlamont/ryl")));
     assert!(obsolete.contains(&("github:owenlamont/ryl", "aqua:owenlamont/ryl")));
@@ -73,7 +73,6 @@ fn check_owned_tool_migrations_apply_after_v2_baseline() {
     assert!(obsolete.contains(&("github:astral-sh/ruff", "ruff")));
     assert!(obsolete.contains(&("shellcheck", "github:koalaman/shellcheck")));
     assert!(obsolete.contains(&("cargo:xmloxide", "github:jonwiggins/xmloxide")));
-    assert!(obsolete_keys_after(crate::setup::LATEST_SUPPORTED_SETUP_VERSION).is_empty());
 }
 
 #[test]

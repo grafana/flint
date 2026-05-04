@@ -726,8 +726,7 @@ fn generate_biome_config_migrates_legacy_supported_json_name() {
 fn generate_flint_toml_writes_skeleton() {
     let tmp = tempfile::TempDir::new().unwrap();
     let dir = tmp.path().join("config");
-    let written =
-        generate_flint_toml(&dir, "main", crate::setup::V2_BASELINE_SETUP_VERSION).unwrap();
+    let written = generate_flint_toml(&dir, "main").unwrap();
     assert!(written);
     let content = std::fs::read_to_string(dir.join("flint.toml")).unwrap();
     assert!(content.contains("[settings]"));
@@ -738,12 +737,7 @@ fn generate_flint_toml_writes_skeleton() {
 #[test]
 fn generate_flint_toml_non_main_branch() {
     let tmp = tempfile::TempDir::new().unwrap();
-    let written = generate_flint_toml(
-        tmp.path(),
-        "master",
-        crate::setup::V2_BASELINE_SETUP_VERSION,
-    )
-    .unwrap();
+    let written = generate_flint_toml(tmp.path(), "master").unwrap();
     assert!(written);
     let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
     assert!(content.contains("base_branch = \"master\""));
@@ -753,8 +747,7 @@ fn generate_flint_toml_non_main_branch() {
 fn generate_flint_toml_skips_existing() {
     let tmp = tempfile::TempDir::new().unwrap();
     std::fs::write(tmp.path().join("flint.toml"), "existing content").unwrap();
-    let written =
-        generate_flint_toml(tmp.path(), "main", crate::setup::V2_BASELINE_SETUP_VERSION).unwrap();
+    let written = generate_flint_toml(tmp.path(), "main").unwrap();
     assert!(!written);
     let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
     assert_eq!(content, "existing content");

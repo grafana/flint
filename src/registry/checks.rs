@@ -3,8 +3,6 @@ use crate::linters::{
     biome, flint_setup, license_header, lychee, renovate_deps,
     renovate_deps::RENOVATE_CONFIG_PATTERNS, rumdl, rustfmt, taplo, yamllint,
 };
-use crate::setup::{V1_BOOTSTRAP_SETUP_VERSION, V2_BASELINE_SETUP_VERSION};
-
 const TOOL_RUMDL: &[&str] = &["tool", "rumdl"];
 const TOOL_CODESPELL: &[&str] = &["tool", "codespell"];
 const TOOL_RUFF: &[&str] = &["tool", "ruff"];
@@ -93,7 +91,7 @@ fn check_shellcheck() -> Check {
     .linter_config(".shellcheckrc", "--rcfile")
     .baseline_config(ConfigFile::config_dir(".shellcheckrc"))
     .unsupported_configs(SHELLCHECK_UNSUPPORTED_CONFIGS)
-    .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["shellcheck"])
+    .migrate_tool_keys(&["shellcheck"])
     .desc("Lint shell scripts for common mistakes")
     .style()
 }
@@ -102,7 +100,7 @@ fn check_shfmt() -> Check {
     Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"])
         .fix("shfmt -w {FILE}")
         .formatter()
-        .migrate_tool_keys_after(V1_BOOTSTRAP_SETUP_VERSION, &["github:mvdan/sh"])
+        .migrate_tool_keys(&["github:mvdan/sh"])
         .desc("Format shell scripts")
         .style()
 }
@@ -134,10 +132,7 @@ fn check_yaml_lint() -> Check {
         .formatter()
         .desc("Lint YAML files for style and consistency")
         .mise_tool("aqua:owenlamont/ryl")
-        .migrate_tool_keys_after(
-            V2_BASELINE_SETUP_VERSION,
-            &["cargo:yaml-lint", "github:owenlamont/ryl"],
-        )
+        .migrate_tool_keys(&["cargo:yaml-lint", "github:owenlamont/ryl"])
 }
 
 fn check_taplo() -> Check {
@@ -154,7 +149,7 @@ fn check_taplo() -> Check {
     .stderr_filter_prefixes(&[" INFO taplo:"])
     .nonverbose_failure_output(taplo::normalize_nonverbose_failure_output)
     .formatter()
-    .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["github:tamasfe/taplo"])
+    .migrate_tool_keys(&["github:tamasfe/taplo"])
     .desc("Format TOML files")
     .docs(
         "Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).\n\
@@ -198,7 +193,7 @@ fn check_hadolint() -> Check {
 fn check_xmllint() -> Check {
     Check::files("xmllint", "xmllint --noout {FILES}", &["*.xml"])
         .mise_tool("github:jonwiggins/xmloxide")
-        .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["cargo:xmloxide"])
+        .migrate_tool_keys(&["cargo:xmloxide"])
         .desc("Validate XML files are well-formed")
 }
 
@@ -245,10 +240,7 @@ fn check_ruff() -> Check {
         .linter_config("ruff.toml", "--config")
         .baseline_config(RUFF_BASELINE_CONFIG)
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
-        .migrate_tool_keys_after(
-            V2_BASELINE_SETUP_VERSION,
-            &["pipx:ruff", "github:astral-sh/ruff"],
-        )
+        .migrate_tool_keys(&["pipx:ruff", "github:astral-sh/ruff"])
         .desc("Lint Python code")
         .lang()
 }
@@ -276,7 +268,7 @@ fn check_biome() -> Check {
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
     .check_type(&biome::CHECK_TYPE)
-    .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["npm:@biomejs/biome"])
+    .migrate_tool_keys(&["npm:@biomejs/biome"])
     .desc("Lint JS/TS/JSON files")
     .lang()
 }
@@ -359,10 +351,7 @@ fn check_google_java_format() -> Check {
         "Java line length is handled by google-java-format",
         Some(EditorconfigDirectiveStyle::Slash),
     )
-    .migrate_tool_keys_after(
-        V1_BOOTSTRAP_SETUP_VERSION,
-        &["ubi:google/google-java-format"],
-    )
+    .migrate_tool_keys(&["ubi:google/google-java-format"])
     .desc("Format Java code")
     .lang()
 }
@@ -380,8 +369,8 @@ fn check_ktlint() -> Check {
     )
     .windows_java_jar()
     .formatter()
-    .migrate_tool_keys_after(V1_BOOTSTRAP_SETUP_VERSION, &["ubi:pinterest/ktlint"])
-    .migrate_tool_keys_after(V2_BASELINE_SETUP_VERSION, &["github:pinterest/ktlint"])
+    .migrate_tool_keys(&["ubi:pinterest/ktlint"])
+    .migrate_tool_keys(&["github:pinterest/ktlint"])
     .desc("Lint and format Kotlin code")
     .lang()
 }
@@ -485,8 +474,8 @@ fn check_flint_setup() -> Check {
             - keep lint-managed tool entries under the `# Linters` header\n\
             - keep runtime, SDK, and unknown tool entries above that header\n\
             \n\
-            With `--fix`, rewrites Flint-managed config in place and advances\n\
-            `settings.setup_migration_version` when a migration applies.",
+            With `--fix`, rewrites Flint-managed config in place and applies any\n\
+            currently actionable setup migration.",
         )
 }
 

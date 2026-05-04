@@ -12,8 +12,11 @@ separate Renovate PRs or README drift.
 
 ## What it catches
 
-Example: `mise.toml` and `README.md` both refer to actionlint, but extract
-different dependency names:
+Intent: `mise.toml` and `README.md` both refer to actionlint, so you expect
+Renovate to treat them as the same dependency and keep them in the same group.
+
+A naive setup can break that intent by extracting different dependency names for
+the same upstream package:
 
 ```json5
 {
@@ -34,15 +37,14 @@ different dependency names:
 }
 ```
 
-That setup is split:
+Where it fails:
 
 - `mise.toml` extracts `actionlint`
 - `README.md` extracts `rhysd/actionlint`
 - the `linters` rule matches only `actionlint`
 
-Renovate can now update those occurrences separately. One result is a PR that
-updates the README example without updating `mise.toml`, which later fails the
-README drift test.
+Renovate can now stop grouping those occurrences consistently and update them
+separately.
 
 `renovate-deps` reports that mismatch earlier, at config-check time.
 

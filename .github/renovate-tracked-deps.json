@@ -1,16 +1,8 @@
 {
   "meta": {
-    "Swatinem/rust-cache": {
-      "packageName": "Swatinem/rust-cache",
-      "datasource": "github-tags"
-    },
     "actionlint": {
       "packageName": "rhysd/actionlint",
       "datasource": "github-releases"
-    },
-    "actions/checkout": {
-      "packageName": "actions/checkout",
-      "datasource": "github-tags"
     },
     "aqua:owenlamont/ryl": {
       "packageName": "owenlamont/ryl",
@@ -18,9 +10,6 @@
     },
     "biome": {
       "packageName": "biome"
-    },
-    "dotnet": {
-      "packageName": "dotnet"
     },
     "editorconfig-checker": {
       "packageName": "editorconfig-checker/editorconfig-checker",
@@ -38,20 +27,12 @@
       "packageName": "koalaman/shellcheck",
       "datasource": "github-releases"
     },
-    "go": {
-      "packageName": "golang/go",
-      "datasource": "github-tags"
-    },
     "golangci-lint": {
       "packageName": "golangci/golangci-lint",
       "datasource": "github-tags"
     },
     "hadolint": {
       "packageName": "hadolint/hadolint",
-      "datasource": "github-tags"
-    },
-    "jdx/mise-action": {
-      "packageName": "jdx/mise-action",
       "datasource": "github-tags"
     },
     "ktlint": {
@@ -66,10 +47,6 @@
       "packageName": "jdx/mise",
       "datasource": "github-release-attachments"
     },
-    "node": {
-      "packageName": "node",
-      "datasource": "node-version"
-    },
     "npm:renovate": {
       "packageName": "renovate",
       "datasource": "npm"
@@ -78,9 +55,6 @@
       "packageName": "codespell",
       "datasource": "pypi"
     },
-    "release-plz": {
-      "packageName": "release-plz"
-    },
     "ruff": {
       "packageName": "astral-sh/ruff",
       "datasource": "github-releases"
@@ -88,10 +62,6 @@
     "rumdl": {
       "packageName": "rvben/rumdl",
       "datasource": "github-releases"
-    },
-    "rust": {
-      "packageName": "rust-lang/rust",
-      "datasource": "github-tags"
     },
     "shfmt": {
       "packageName": "mvdan/sh",

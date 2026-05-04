@@ -3,9 +3,8 @@ args = "run --full renovate-deps"
 exit = 1
 stderr_contains = [
   "--- .github/renovate-tracked-deps.json",
-  "\"npm:renovate\": {",
-  "\"packageName\": \"renovate\"",
-  "\"datasource\": \"npm\"",
+  "\"mise.toml\": {",
+  "\"npm:renovate\"",
   "ERROR: renovate-tracked-deps.json is out of date.",
 ]
 

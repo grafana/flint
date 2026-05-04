@@ -1,8 +1,5 @@
 {
-  "meta": {
-    "express": {},
-    "lodash": {}
-  },
+  "meta": {},
   "files": {
     "package.json": {
       "npm": [

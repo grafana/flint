@@ -417,6 +417,7 @@ async fn run_inner(
     project_root: &Path,
 ) -> anyhow::Result<LinterOutput> {
     let config_path = resolve_renovate_config_path(project_root)?;
+    let rules = comparable_package_rules_for_config(&config_path)?;
     let committed_path = committed_path_for_config(&config_path);
     let committed_display = display_path(project_root, &committed_path);
 
@@ -432,7 +433,8 @@ async fn run_inner(
         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
     }
 
-    validate_rule_coverage(&config_path, &generated)?;
+    validate_rule_coverage(&generated, &rules)?;
+    trim_snapshot_meta(&mut generated, &rules);
 
     if !committed_path.exists() {
         if fix {
@@ -735,13 +737,15 @@ struct ComparablePackageRule {
     matcher: RuleMatcher,
 }
 
-fn validate_rule_coverage(config_path: &Path, snapshot: &Snapshot) -> anyhow::Result<()> {
+fn comparable_package_rules_for_config(
+    config_path: &Path,
+) -> anyhow::Result<Vec<ComparablePackageRule>> {
     let config = std::fs::read_to_string(config_path)
         .with_context(|| format!("failed to read {}", config_path.display()))?;
     let parsed: serde_json::Value = json5::from_str(&config)
         .with_context(|| format!("failed to parse {}", config_path.display()))?;
 
-    let rules = parsed["packageRules"]
+    Ok(parsed["packageRules"]
         .as_array()
         .map(|rules| {
             rules
@@ -750,8 +754,13 @@ fn validate_rule_coverage(config_path: &Path, snapshot: &Snapshot) -> anyhow::Re
                 .filter_map(|(idx, rule)| comparable_package_rule(rule, idx))
                 .collect::<Vec<_>>()
         })
-        .unwrap_or_default();
+        .unwrap_or_default())
+}
 
+fn validate_rule_coverage(
+    snapshot: &Snapshot,
+    rules: &[ComparablePackageRule],
+) -> anyhow::Result<()> {
     let package_groups = package_groups(snapshot);
     let mut errors = vec![];
 
@@ -759,7 +768,7 @@ fn validate_rule_coverage(config_path: &Path, snapshot: &Snapshot) -> anyhow::Re
         if deps.len() < 2 {
             continue;
         }
-        for rule in &rules {
+        for rule in rules {
             let matched: Vec<_> = deps
                 .iter()
                 .filter(|dep| rule.matches(dep, snapshot))
@@ -794,6 +803,13 @@ fn validate_rule_coverage(config_path: &Path, snapshot: &Snapshot) -> anyhow::Re
     } else {
         anyhow::bail!(errors.join("\n"))
     }
+}
+
+fn trim_snapshot_meta(snapshot: &mut Snapshot, rules: &[ComparablePackageRule]) {
+    let relevant = relevant_dep_names(snapshot, rules);
+    snapshot
+        .meta
+        .retain(|dep_name, _| relevant.contains(dep_name));
 }
 
 fn comparable_package_rule(rule: &serde_json::Value, idx: usize) -> Option<ComparablePackageRule> {
@@ -882,6 +898,47 @@ fn package_groups(snapshot: &Snapshot) -> BTreeMap<(String, Option<String>), BTr
             .insert(dep_name.clone());
     }
     groups
+}
+
+fn relevant_dep_names(snapshot: &Snapshot, rules: &[ComparablePackageRule]) -> BTreeSet<String> {
+    let mut relevant = BTreeSet::new();
+    let extracted_dep_names: BTreeSet<_> = snapshot
+        .files
+        .values()
+        .flat_map(|managers| managers.values())
+        .flatten()
+        .cloned()
+        .collect();
+
+    for rule in rules {
+        match &rule.matcher {
+            RuleMatcher::DepNames(names) => {
+                relevant.extend(
+                    names
+                        .iter()
+                        .filter(|dep_name| extracted_dep_names.contains(*dep_name))
+                        .cloned(),
+                );
+            }
+            RuleMatcher::PackageNames(names) => {
+                relevant.extend(snapshot.meta.iter().filter_map(|(dep_name, meta)| {
+                    meta.package_name
+                        .as_deref()
+                        .is_some_and(|package_name| names.contains(package_name))
+                        .then_some(dep_name.clone())
+                }));
+            }
+        }
+    }
+
+    let package_groups = package_groups(snapshot);
+    for deps in package_groups.values() {
+        if deps.iter().any(|dep_name| relevant.contains(dep_name)) {
+            relevant.extend(deps.iter().cloned());
+        }
+    }
+
+    relevant
 }
 
 #[cfg(test)]
@@ -1303,12 +1360,54 @@ mod tests {
             ],
         );
 
-        let err = validate_rule_coverage(&config_path, &snapshot).unwrap_err();
+        let rules = comparable_package_rules_for_config(&config_path).unwrap();
+        let err = validate_rule_coverage(&snapshot, &rules).unwrap_err();
         let msg = err.to_string();
 
         assert!(msg.contains("rhysd/actionlint"));
         assert!(msg.contains("matched [actionlint]"));
         assert!(msg.contains("unmatched [rhysd/actionlint]"));
+    }
+
+    #[test]
+    fn trim_snapshot_meta_keeps_only_rule_relevant_deps() {
+        let snapshot = snapshot(
+            &[
+                (
+                    "actionlint",
+                    Some("rhysd/actionlint"),
+                    Some("github-releases"),
+                ),
+                (
+                    "rhysd/actionlint",
+                    Some("rhysd/actionlint"),
+                    Some("github-releases"),
+                ),
+                (
+                    "Swatinem/rust-cache",
+                    Some("Swatinem/rust-cache"),
+                    Some("github-tags"),
+                ),
+            ],
+            &[
+                ("mise.toml", &[("mise", &["actionlint"])]),
+                (
+                    "src/init/scaffold.rs",
+                    &[("regex", &["Swatinem/rust-cache"])],
+                ),
+                ("README.md", &[("regex", &["rhysd/actionlint"])]),
+            ],
+        );
+        let rules = vec![ComparablePackageRule {
+            label: "group \"linters\"".to_string(),
+            matcher: RuleMatcher::DepNames(BTreeSet::from(["actionlint".to_string()])),
+        }];
+
+        let relevant = relevant_dep_names(&snapshot, &rules);
+
+        assert!(relevant.contains("actionlint"));
+        assert!(relevant.contains("rhysd/actionlint"));
+        assert!(!relevant.contains("Swatinem/rust-cache"));
     }
 
     #[test]

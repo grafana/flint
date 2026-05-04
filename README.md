@@ -200,7 +200,7 @@ Click a name in the table below for details. See the
 | [`ktlint`](docs/linters.md#ktlint)                             | Lint and format Kotlin code                                         | yes |
 | [`license-header`](docs/linters.md#license-header)             | Check source files have the required license header                 | —   |
 | [`lychee`](docs/linters.md#lychee)                             | Check for broken links                                              | —   |
-| [`renovate-deps`](docs/linters/renovate-deps.md)               | Verify Renovate dependency snapshot is up to date                   | yes |
+| [`renovate-deps`](docs/linters.md#renovate-deps)               | Verify Renovate dependency snapshot is up to date                   | yes |
 | [`ruff`](docs/linters.md#ruff)                                 | Lint Python code                                                    | yes |
 | [`ruff-format`](docs/linters.md#ruff-format)                   | Format Python code                                                  | yes |
 | [`rumdl`](docs/linters.md#rumdl)                               | Lint Markdown files for style and consistency                       | yes |

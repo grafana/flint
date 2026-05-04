@@ -889,10 +889,6 @@ fn summary_row(check: &Check) -> [String; 3] {
 }
 
 fn detail_link(check: &Check) -> String {
-    if check.name == "renovate-deps" {
-        return "docs/linters/renovate-deps.md".to_string();
-    }
-
     // docs/linters.md uses `## `<name>`` — GitHub strips backticks and
     // lowercases to produce the anchor `<name>`.
     format!("docs/linters.md#{}", check.name)

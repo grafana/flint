@@ -7,11 +7,6 @@ Flint is intentionally opinionated about config shape: when a linter supports an
 explicit config flag, Flint manages one canonical filename for it. Repos can
 still choose the config directory via `FLINT_CONFIG_DIR` where supported.
 
-Some checks have a separate deep-dive page when their behavior is more
-elaborate than the index entry here:
-
-- [`renovate-deps`](linters/renovate-deps.md)
-
 > [!NOTE]
 > Biome is the exception to `FLINT_CONFIG_DIR`: its real CLI does not work
 > reliably with a nested managed config, so Flint treats root `biome.jsonc` as

@@ -291,6 +291,7 @@ async fn run(
                 )
             {
                 finish_fix_outcomes(vec![setup_outcome], args.allow_fixed);
+                return Ok(());
             } else {
                 setup_fix_outcome = Some(setup_outcome);
             }

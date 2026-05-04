@@ -2,8 +2,8 @@
 
 `renovate-deps` does two related checks:
 
-1. It verifies that `.github/renovate-tracked-deps.json` matches what Renovate
-   currently extracts from the repo.
+1. It verifies that `renovate-tracked-deps.json` next to the active Renovate
+   config matches what Renovate currently extracts from the repo.
 2. It checks that extracted dependencies which resolve to the same upstream
    package are covered consistently by Renovate package rules.
 
@@ -78,8 +78,13 @@ packageNameTemplate: "koalaman/shellcheck",
 
 ## Snapshot shape
 
-`.github/renovate-tracked-deps.json` stores only the metadata Flint needs for
-these checks:
+The committed `renovate-tracked-deps.json` snapshot lives next to the active
+Renovate config:
+
+- `.github/renovate-tracked-deps.json` for `.github/renovate.json5`
+- `renovate-tracked-deps.json` for root-level configs such as `.renovaterc.json`
+
+It stores only the metadata Flint needs for these checks:
 
 - `files`: extracted dependency names by file and manager
 - `meta`: package metadata for deps relevant to rule-coverage validation

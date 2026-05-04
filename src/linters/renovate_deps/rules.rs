@@ -30,9 +30,11 @@ pub(crate) fn comparable_package_rules_for_config(
             rules
                 .iter()
                 .enumerate()
-                .filter_map(|(idx, rule)| comparable_package_rule(rule, idx))
-                .collect::<Vec<_>>()
+                .map(|(idx, rule)| comparable_package_rule(rule, idx))
+                .collect::<anyhow::Result<Vec<_>>>()
+                .map(|rules| rules.into_iter().flatten().collect::<Vec<_>>())
         })
+        .transpose()?
         .unwrap_or_default())
 }
 
@@ -91,19 +93,59 @@ pub(crate) fn trim_snapshot_meta(snapshot: &mut Snapshot, rules: &[ComparablePac
         .retain(|dep_name, _| relevant.contains(dep_name));
 }
 
-fn comparable_package_rule(rule: &serde_json::Value, idx: usize) -> Option<ComparablePackageRule> {
-    let extra_matchers = rule
+fn comparable_package_rule(
+    rule: &serde_json::Value,
+    idx: usize,
+) -> anyhow::Result<Option<ComparablePackageRule>> {
+    let extra_matchers: Vec<_> = rule
         .as_object()
         .into_iter()
         .flat_map(|obj| obj.keys())
         .filter(|key| key.starts_with("match"))
         .filter(|key| *key != "matchDepNames" && *key != "matchPackageNames")
-        .count();
-    if extra_matchers > 0 {
-        return None;
+        .cloned()
+        .collect();
+    let contextual_matchers: Vec<_> = extra_matchers
+        .iter()
+        .filter(|key| requires_contextual_matching(key))
+        .cloned()
+        .collect();
+
+    let dep_names = optional_matcher_values(rule, idx, "matchDepNames")?;
+    let package_names = optional_matcher_values(rule, idx, "matchPackageNames")?;
+
+    let label = rule_label(rule, idx);
+
+    match (&dep_names, &package_names) {
+        (Some(_), Some(_)) => {
+            anyhow::bail!(
+                "package rule {label} declares both matchDepNames and matchPackageNames; flint requires exactly one for rule-coverage checks"
+            );
+        }
+        (None, None) => return Ok(None),
+        _ => {}
     }
 
-    let label = rule["groupName"]
+    if !contextual_matchers.is_empty() {
+        anyhow::bail!(
+            "package rule {label} uses unsupported context-sensitive matchers [{}]; flint can only validate global matchDepNames or matchPackageNames rules",
+            contextual_matchers.join(", "),
+        );
+    }
+
+    let matcher = if let Some(names) = dep_names {
+        RuleMatcher::DepNames(names)
+    } else if let Some(names) = package_names {
+        RuleMatcher::PackageNames(names)
+    } else {
+        unreachable!("handled by the match above")
+    };
+
+    Ok(Some(ComparablePackageRule { label, matcher }))
+}
+
+fn rule_label(rule: &serde_json::Value, idx: usize) -> String {
+    rule["groupName"]
         .as_str()
         .map(|group| format!("group {group:?}"))
         .or_else(|| {
@@ -111,37 +153,44 @@ fn comparable_package_rule(rule: &serde_json::Value, idx: usize) -> Option<Compa
                 .as_str()
                 .map(|desc| format!("description {desc:?}"))
         })
-        .unwrap_or_else(|| format!("index {idx}"));
+        .unwrap_or_else(|| format!("index {idx}"))
+}
 
-    let matcher = if let Some(names) = rule.get("matchDepNames").and_then(|v| v.as_array()) {
-        RuleMatcher::DepNames(
-            names
-                .iter()
-                .map(|value| {
-                    value
-                        .as_str()
-                        .expect("package rule matchDepNames entries must be strings")
-                        .to_string()
-                })
-                .collect(),
-        )
-    } else if let Some(names) = rule.get("matchPackageNames").and_then(|v| v.as_array()) {
-        RuleMatcher::PackageNames(
-            names
-                .iter()
-                .map(|value| {
-                    value
-                        .as_str()
-                        .expect("package rule matchPackageNames entries must be strings")
-                        .to_string()
-                })
-                .collect(),
-        )
-    } else {
-        return None;
+fn optional_matcher_values(
+    rule: &serde_json::Value,
+    idx: usize,
+    key: &'static str,
+) -> anyhow::Result<Option<BTreeSet<String>>> {
+    let Some(value) = rule.get(key) else {
+        return Ok(None);
     };
 
-    Some(ComparablePackageRule { label, matcher })
+    let names = value.as_array().ok_or_else(|| {
+        anyhow::anyhow!("package rule index {idx} must declare {key} as an array")
+    })?;
+
+    let mut out = BTreeSet::new();
+    for (name_idx, value) in names.iter().enumerate() {
+        let name = value.as_str().ok_or_else(|| {
+            anyhow::anyhow!("package rule index {idx} must declare {key}[{name_idx}] as a string")
+        })?;
+        out.insert(name.to_string());
+    }
+    Ok(Some(out))
+}
+
+fn requires_contextual_matching(key: &str) -> bool {
+    matches!(
+        key,
+        "matchCategories"
+            | "matchDatasources"
+            | "matchDepTypes"
+            | "matchFileNames"
+            | "matchManagers"
+            | "matchPaths"
+            | "matchRepositories"
+            | "matchSourceUrls"
+    )
 }
 
 impl ComparablePackageRule {

@@ -428,8 +428,9 @@ fn check_renovate_deps() -> Check {
         .patterns(RENOVATE_CONFIG_PATTERNS)
         .desc("Verify Renovate dependency snapshot is up to date")
         .docs(
-            "Verifies `.github/renovate-tracked-deps.json` is up to date by running\n\
-            Renovate locally and comparing its output against the committed snapshot.\n\
+            "Verifies `renovate-tracked-deps.json` next to the active Renovate\n\
+            config is up to date by running Renovate locally and comparing its\n\
+            output against the committed snapshot.\n\
             It also checks that dependencies extracted from different files but\n\
             resolving to the same upstream package match the same Renovate\n\
             package rules. That catches config splits like `actionlint` vs\n\

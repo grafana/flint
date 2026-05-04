@@ -410,6 +410,49 @@ fn merge_missing_meta_from_committed_keeps_existing_details() {
 }
 
 #[test]
+fn maybe_reuse_committed_meta_merges_when_refresh_meta_is_disabled() {
+    let mut generated = snapshot(
+        &[("actionlint", None, Some("github-releases"))],
+        &[("mise.toml", &[("mise", &["actionlint"])])],
+    );
+    let committed = snapshot(
+        &[(
+            "actionlint",
+            Some("rhysd/actionlint"),
+            Some("github-releases"),
+        )],
+        &[("mise.toml", &[("mise", &["actionlint"])])],
+    );
+
+    maybe_reuse_committed_meta(&mut generated, Some(&committed), false);
+
+    assert_eq!(
+        generated.meta["actionlint"].package_name.as_deref(),
+        Some("rhysd/actionlint")
+    );
+}
+
+#[test]
+fn maybe_reuse_committed_meta_skips_merge_when_refresh_meta_is_enabled() {
+    let mut generated = snapshot(
+        &[("actionlint", None, Some("github-releases"))],
+        &[("mise.toml", &[("mise", &["actionlint"])])],
+    );
+    let committed = snapshot(
+        &[(
+            "actionlint",
+            Some("rhysd/actionlint"),
+            Some("github-releases"),
+        )],
+        &[("mise.toml", &[("mise", &["actionlint"])])],
+    );
+
+    maybe_reuse_committed_meta(&mut generated, Some(&committed), true);
+
+    assert_eq!(generated.meta["actionlint"].package_name, None);
+}
+
+#[test]
 fn validate_rule_coverage_flags_split_dep_names_for_same_package() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = dir.path().join("renovate.json5");
@@ -452,6 +495,109 @@ fn validate_rule_coverage_flags_split_dep_names_for_same_package() {
     assert!(msg.contains("rhysd/actionlint"));
     assert!(msg.contains("matched [actionlint]"));
     assert!(msg.contains("unmatched [rhysd/actionlint]"));
+}
+
+#[test]
+fn comparable_rules_reject_non_string_match_dep_names() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("renovate.json5");
+    std::fs::write(
+        &config_path,
+        r#"{
+  packageRules: [
+    {
+      groupName: "linters",
+      matchDepNames: ["actionlint", 42]
+    }
+  ]
+}
+"#,
+    )
+    .unwrap();
+
+    let err = comparable_package_rules_for_config(&config_path).unwrap_err();
+
+    assert!(
+        err.to_string()
+            .contains("package rule index 0 must declare matchDepNames[1] as a string")
+    );
+}
+
+#[test]
+fn comparable_rules_reject_non_string_match_package_names() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("renovate.json5");
+    std::fs::write(
+        &config_path,
+        r#"{
+  packageRules: [
+    {
+      description: "packages",
+      matchPackageNames: [false]
+    }
+  ]
+}
+"#,
+    )
+    .unwrap();
+
+    let err = comparable_package_rules_for_config(&config_path).unwrap_err();
+
+    assert!(
+        err.to_string()
+            .contains("package rule index 0 must declare matchPackageNames[0] as a string")
+    );
+}
+
+#[test]
+fn comparable_rules_reject_additional_match_constraints() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("renovate.json5");
+    std::fs::write(
+        &config_path,
+        r#"{
+  packageRules: [
+    {
+      groupName: "linters",
+      matchDepNames: ["actionlint"],
+      matchManagers: ["custom.regex"]
+    }
+  ]
+}
+"#,
+    )
+    .unwrap();
+
+    let err = comparable_package_rules_for_config(&config_path).unwrap_err();
+    let msg = err.to_string();
+
+    assert!(msg.contains("group \"linters\""));
+    assert!(msg.contains("matchManagers"));
+    assert!(msg.contains("unsupported context-sensitive matchers"));
+}
+
+#[test]
+fn comparable_rules_allow_non_contextual_match_constraints() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("renovate.json5");
+    std::fs::write(
+        &config_path,
+        r#"{
+  packageRules: [
+    {
+      description: "slim tags",
+      matchPackageNames: ["ghcr.io/super-linter/super-linter"],
+      matchCurrentValue: "/^slim-/"
+    }
+  ]
+}
+"#,
+    )
+    .unwrap();
+
+    let rules = comparable_package_rules_for_config(&config_path).unwrap();
+
+    assert_eq!(rules.len(), 1);
 }
 
 #[test]

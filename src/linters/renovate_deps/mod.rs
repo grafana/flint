@@ -418,11 +418,7 @@ async fn run_inner(
         None
     };
 
-    if let Some(committed) = committed.as_ref()
-        && !cfg.refresh_meta
-    {
-        merge_missing_meta_from_committed(&mut generated, committed);
-    }
+    maybe_reuse_committed_meta(&mut generated, committed.as_ref(), cfg.refresh_meta);
 
     validate_rule_coverage(&generated, &rules)?;
     trim_snapshot_meta(&mut generated, &rules);
@@ -566,6 +562,18 @@ fn merge_missing_meta_from_committed(generated: &mut Snapshot, committed: &Snaps
         if generated_meta.datasource.is_none() {
             generated_meta.datasource = committed_meta.datasource.clone();
         }
+    }
+}
+
+fn maybe_reuse_committed_meta(
+    generated: &mut Snapshot,
+    committed: Option<&Snapshot>,
+    refresh_meta: bool,
+) {
+    if let Some(committed) = committed
+        && !refresh_meta
+    {
+        merge_missing_meta_from_committed(generated, committed);
     }
 }
 

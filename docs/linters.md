@@ -237,7 +237,7 @@ Renovate locally and comparing its output against the committed snapshot.
 It also checks that dependencies extracted from different files but
 resolving to the same upstream package match the same Renovate
 package rules. That catches config splits like `actionlint` vs
-`rhysd/actionlint` before README snippets and managed versions drift.
+`rhysd/actionlint` before Renovate stops grouping them consistently.
 Requires `renovate` in `[tools]`.
 
 In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN`

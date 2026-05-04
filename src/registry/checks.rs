@@ -433,7 +433,7 @@ fn check_renovate_deps() -> Check {
             It also checks that dependencies extracted from different files but\n\
             resolving to the same upstream package match the same Renovate\n\
             package rules. That catches config splits like `actionlint` vs\n\
-            `rhysd/actionlint` before README snippets and managed versions drift.\n\
+            `rhysd/actionlint` before Renovate stops grouping them consistently.\n\
             Requires `renovate` in `[tools]`.\n\
             \n\
             In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN`\n\

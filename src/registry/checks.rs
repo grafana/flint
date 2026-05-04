@@ -430,6 +430,9 @@ fn check_renovate_deps() -> Check {
         .docs(
             "Verifies `.github/renovate-tracked-deps.json` is up to date by running\n\
             Renovate locally and comparing its output against the committed snapshot.\n\
+            It also validates that equivalent extracted dependencies resolve to the\n\
+            same Renovate package-rule coverage, which catches mismatched `depName`\n\
+            vs `packageName` setups before generated snippets drift.\n\
             Requires `renovate` in `[tools]`.\n\
             \n\
             In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN`\n\
@@ -441,6 +444,9 @@ fn check_renovate_deps() -> Check {
             legacy `RENOVATE_TRACKED_DEPS_EXCLUDE` values into `exclude_managers`.\n\
             \n\
             With `--fix`, automatically regenerates and commits the snapshot.\n\
+            For custom/regex managers, prefer canonical `depNameTemplate` values\n\
+            for grouping and explicit `packageNameTemplate` values for datasource\n\
+            lookups when those identities differ.\n\
             \n\
             Configure via `flint.toml`:\n\
             \n\

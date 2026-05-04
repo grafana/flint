@@ -229,6 +229,9 @@ check_all_local = true
 
 Verifies `.github/renovate-tracked-deps.json` is up to date by running
 Renovate locally and comparing its output against the committed snapshot.
+It also validates that equivalent extracted dependencies resolve to the
+same Renovate package-rule coverage, which catches mismatched `depName`
+vs `packageName` setups before generated snippets drift.
 Requires `renovate` in `[tools]`.
 
 In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN`
@@ -240,6 +243,9 @@ When `flint init` writes a new `flint.toml`, it includes this section if
 legacy `RENOVATE_TRACKED_DEPS_EXCLUDE` values into `exclude_managers`.
 
 With `--fix`, automatically regenerates and commits the snapshot.
+For custom/regex managers, prefer canonical `depNameTemplate` values
+for grouping and explicit `packageNameTemplate` values for datasource
+lookups when those identities differ.
 
 Configure via `flint.toml`:
 

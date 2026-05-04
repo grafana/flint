@@ -83,7 +83,7 @@ pub async fn run(
             setup_migration_version,
         ) {
             Ok(true) => {
-                setup_outcome = max_setup_outcome(setup_outcome, SetupOutcome::Blocking);
+                setup_outcome = setup_outcome.at_least(SetupOutcome::Blocking);
                 versioned_migrations_pending = true;
                 setup_drift_reported = true;
                 errors.push(format!(
@@ -103,7 +103,7 @@ pub async fn run(
     if !setup_drift_reported {
         match crate::init::detect_setup_drift(project_root, config_dir) {
             Ok(true) => {
-                setup_outcome = max_setup_outcome(setup_outcome, SetupOutcome::Blocking);
+                setup_outcome = setup_outcome.at_least(SetupOutcome::Blocking);
                 errors.push("Flint setup drift applies to this repo.".to_string());
             }
             Ok(false) => {}
@@ -118,13 +118,13 @@ pub async fn run(
 
     let mise_tools = crate::registry::read_mise_tools(project_root);
     if let Some((old, new)) = crate::registry::find_obsolete_key(&mise_tools) {
-        setup_outcome = max_setup_outcome(setup_outcome, SetupOutcome::Blocking);
+        setup_outcome = setup_outcome.at_least(SetupOutcome::Blocking);
         errors.push(format!(
             "obsolete tool key in mise.toml: {old:?} (replaced by {new:?})."
         ));
     }
     if let Some((old, hint)) = crate::registry::find_unsupported_key(&mise_tools) {
-        setup_outcome = max_setup_outcome(setup_outcome, SetupOutcome::Blocking);
+        setup_outcome = setup_outcome.at_least(SetupOutcome::Blocking);
         errors.push(format!(
             "unsupported legacy lint tool in mise.toml: {old:?}. Migration required: {hint}."
         ));
@@ -132,7 +132,7 @@ pub async fn run(
 
     match tools_section_needs_normalization(&path) {
         Ok(true) => {
-            setup_outcome = max_setup_outcome(setup_outcome, SetupOutcome::NonBlocking);
+            setup_outcome = setup_outcome.at_least(SetupOutcome::NonBlocking);
             errors.push("mise.toml [tools] entries are not in Flint's canonical order.".to_string())
         }
         Ok(false) => {}
@@ -209,17 +209,6 @@ pub async fn run(
         stdout: Vec::new(),
         stderr: Vec::new(),
         setup_outcome: Some(setup_outcome),
-    }
-}
-
-fn max_setup_outcome(current: SetupOutcome, next: SetupOutcome) -> SetupOutcome {
-    use SetupOutcome::{Blocking, Clean, Fatal, NonBlocking};
-
-    match (current, next) {
-        (Fatal, _) | (_, Fatal) => Fatal,
-        (Blocking, _) | (_, Blocking) => Blocking,
-        (NonBlocking, _) | (_, NonBlocking) => NonBlocking,
-        (Clean, Clean) => Clean,
     }
 }
 

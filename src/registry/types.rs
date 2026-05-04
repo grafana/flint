@@ -232,6 +232,17 @@ pub enum SetupOutcome {
     Fatal,
 }
 
+impl SetupOutcome {
+    pub fn at_least(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Fatal, _) | (_, Self::Fatal) => Self::Fatal,
+            (Self::Blocking, _) | (_, Self::Blocking) => Self::Blocking,
+            (Self::NonBlocking, _) | (_, Self::NonBlocking) => Self::NonBlocking,
+            (Self::Clean, Self::Clean) => Self::Clean,
+        }
+    }
+}
+
 pub trait CheckType: Sync + std::fmt::Debug {
     fn name(&self) -> &'static str;
     fn init_hook(&self) -> Option<InitHookFn> {

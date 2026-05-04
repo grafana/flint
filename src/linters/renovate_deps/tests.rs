@@ -488,8 +488,8 @@ fn validate_rule_coverage_flags_split_dep_names_for_same_package() {
         ],
     );
 
-    let rules = comparable_package_rules_for_config(&config_path).unwrap();
-    let err = validate_rule_coverage(&snapshot, &rules).unwrap_err();
+    let parsed = comparable_package_rules_for_config(&config_path).unwrap();
+    let err = validate_rule_coverage(&snapshot, &parsed.rules).unwrap_err();
     let msg = err.to_string();
 
     assert!(msg.contains("rhysd/actionlint"));
@@ -568,12 +568,13 @@ fn comparable_rules_reject_additional_match_constraints() {
     )
     .unwrap();
 
-    let err = comparable_package_rules_for_config(&config_path).unwrap_err();
-    let msg = err.to_string();
+    let parsed = comparable_package_rules_for_config(&config_path).unwrap();
 
-    assert!(msg.contains("group \"linters\""));
-    assert!(msg.contains("matchManagers"));
-    assert!(msg.contains("unsupported context-sensitive matchers"));
+    assert!(parsed.rules.is_empty());
+    assert_eq!(parsed.skipped_notes.len(), 1);
+    assert!(parsed.skipped_notes[0].contains("group \"linters\""));
+    assert!(parsed.skipped_notes[0].contains("matchManagers"));
+    assert!(parsed.skipped_notes[0].contains("skipped package rule"));
 }
 
 #[test]
@@ -595,9 +596,20 @@ fn comparable_rules_allow_non_contextual_match_constraints() {
     )
     .unwrap();
 
-    let rules = comparable_package_rules_for_config(&config_path).unwrap();
+    let parsed = comparable_package_rules_for_config(&config_path).unwrap();
 
-    assert_eq!(rules.len(), 1);
+    assert_eq!(parsed.rules.len(), 1);
+    assert!(parsed.skipped_notes.is_empty());
+}
+
+#[test]
+fn notes_output_formats_skipped_rule_messages() {
+    let out = notes_output(&[
+        "first skipped note".to_string(),
+        "second skipped note".to_string(),
+    ]);
+
+    assert_eq!(out, "first skipped note\nsecond skipped note\n");
 }
 
 #[test]

@@ -16,9 +16,15 @@ pub(crate) struct ComparablePackageRule {
     pub(crate) matcher: RuleMatcher,
 }
 
+#[derive(Debug)]
+pub(crate) struct ComparablePackageRules {
+    pub(crate) rules: Vec<ComparablePackageRule>,
+    pub(crate) skipped_notes: Vec<String>,
+}
+
 pub(crate) fn comparable_package_rules_for_config(
     config_path: &Path,
-) -> anyhow::Result<Vec<ComparablePackageRule>> {
+) -> anyhow::Result<ComparablePackageRules> {
     let config = std::fs::read_to_string(config_path)
         .with_context(|| format!("failed to read {}", config_path.display()))?;
     let parsed: serde_json::Value = json5::from_str(&config)
@@ -32,10 +38,26 @@ pub(crate) fn comparable_package_rules_for_config(
                 .enumerate()
                 .map(|(idx, rule)| comparable_package_rule(rule, idx))
                 .collect::<anyhow::Result<Vec<_>>>()
-                .map(|rules| rules.into_iter().flatten().collect::<Vec<_>>())
+                .map(|rules| {
+                    let mut comparable = Vec::new();
+                    let mut skipped_notes = Vec::new();
+                    for rule in rules.into_iter().flatten() {
+                        match rule {
+                            ComparableRuleOutcome::Comparable(rule) => comparable.push(rule),
+                            ComparableRuleOutcome::Skipped { note } => skipped_notes.push(note),
+                        }
+                    }
+                    ComparablePackageRules {
+                        rules: comparable,
+                        skipped_notes,
+                    }
+                })
         })
         .transpose()?
-        .unwrap_or_default())
+        .unwrap_or_else(|| ComparablePackageRules {
+            rules: Vec::new(),
+            skipped_notes: Vec::new(),
+        }))
 }
 
 pub(crate) fn validate_rule_coverage(
@@ -93,10 +115,15 @@ pub(crate) fn trim_snapshot_meta(snapshot: &mut Snapshot, rules: &[ComparablePac
         .retain(|dep_name, _| relevant.contains(dep_name));
 }
 
+enum ComparableRuleOutcome {
+    Comparable(ComparablePackageRule),
+    Skipped { note: String },
+}
+
 fn comparable_package_rule(
     rule: &serde_json::Value,
     idx: usize,
-) -> anyhow::Result<Option<ComparablePackageRule>> {
+) -> anyhow::Result<Option<ComparableRuleOutcome>> {
     let extra_matchers: Vec<_> = rule
         .as_object()
         .into_iter()
@@ -127,10 +154,12 @@ fn comparable_package_rule(
     }
 
     if !contextual_matchers.is_empty() {
-        anyhow::bail!(
-            "package rule {label} uses unsupported context-sensitive matchers [{}]; flint can only validate global matchDepNames or matchPackageNames rules",
-            contextual_matchers.join(", "),
-        );
+        return Ok(Some(ComparableRuleOutcome::Skipped {
+            note: format!(
+                "skipped package rule {label} for coverage validation because it uses context-sensitive matchers [{}]",
+                contextual_matchers.join(", "),
+            ),
+        }));
     }
 
     let matcher = if let Some(names) = dep_names {
@@ -141,7 +170,9 @@ fn comparable_package_rule(
         unreachable!("handled by the match above")
     };
 
-    Ok(Some(ComparablePackageRule { label, matcher }))
+    Ok(Some(ComparableRuleOutcome::Comparable(
+        ComparablePackageRule { label, matcher },
+    )))
 }
 
 fn rule_label(rule: &serde_json::Value, idx: usize) -> String {

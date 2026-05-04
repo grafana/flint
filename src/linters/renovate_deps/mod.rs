@@ -396,7 +396,9 @@ async fn run_inner(
     project_root: &Path,
 ) -> anyhow::Result<LinterOutput> {
     let config_path = resolve_renovate_config_path(project_root)?;
-    let rules = comparable_package_rules_for_config(&config_path)?;
+    let parsed_rules = comparable_package_rules_for_config(&config_path)?;
+    let rules = parsed_rules.rules;
+    let skipped_rule_notes = parsed_rules.skipped_notes;
     let committed_path = committed_path_for_config(&config_path);
     let committed_display = display_path(project_root, &committed_path);
 
@@ -426,9 +428,11 @@ async fn run_inner(
     if committed.is_none() {
         if fix {
             write_snapshot(&committed_path, &generated)?;
+            let mut stdout = notes_output(&skipped_rule_notes).into_bytes();
+            stdout.extend_from_slice(format!("{COMMITTED_FILE} has been created.\n").as_bytes());
             return Ok(LinterOutput {
                 ok: true,
-                stdout: format!("{COMMITTED_FILE} has been created.\n").into_bytes(),
+                stdout,
                 stderr: vec![],
             });
         }
@@ -440,9 +444,11 @@ async fn run_inner(
     let committed = committed.expect("checked above");
 
     if committed == generated {
+        let mut stdout = notes_output(&skipped_rule_notes).into_bytes();
+        stdout.extend_from_slice(format!("{COMMITTED_FILE} is up to date.\n").as_bytes());
         return Ok(LinterOutput {
             ok: true,
-            stdout: format!("{COMMITTED_FILE} is up to date.\n").into_bytes(),
+            stdout,
             stderr: vec![],
         });
     }
@@ -451,7 +457,8 @@ async fn run_inner(
 
     if fix {
         write_snapshot(&committed_path, &generated)?;
-        let mut stdout = diff.into_bytes();
+        let mut stdout = notes_output(&skipped_rule_notes).into_bytes();
+        stdout.extend_from_slice(diff.as_bytes());
         stdout.extend_from_slice(format!("{COMMITTED_FILE} has been updated.\n").as_bytes());
         return Ok(LinterOutput {
             ok: true,
@@ -468,6 +475,14 @@ async fn run_inner(
         )
         .into_bytes(),
     })
+}
+
+fn notes_output(notes: &[String]) -> String {
+    if notes.is_empty() {
+        return String::new();
+    }
+
+    format!("{}\n", notes.join("\n"))
 }
 
 /// Runs `renovate --platform=local` and returns the combined stdout+stderr log bytes.

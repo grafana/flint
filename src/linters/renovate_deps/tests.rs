@@ -383,6 +383,33 @@ fn write_snapshot_ends_with_newline() {
 }
 
 #[test]
+fn merge_missing_meta_from_committed_keeps_existing_details() {
+    let mut generated = snapshot(
+        &[("actionlint", None, Some("github-releases"))],
+        &[("mise.toml", &[("mise", &["actionlint"])])],
+    );
+    let committed = snapshot(
+        &[(
+            "actionlint",
+            Some("rhysd/actionlint"),
+            Some("github-releases"),
+        )],
+        &[("mise.toml", &[("mise", &["actionlint"])])],
+    );
+
+    merge_missing_meta_from_committed(&mut generated, &committed);
+
+    assert_eq!(
+        generated.meta["actionlint"].package_name.as_deref(),
+        Some("rhysd/actionlint")
+    );
+    assert_eq!(
+        generated.meta["actionlint"].datasource.as_deref(),
+        Some("github-releases")
+    );
+}
+
+#[test]
 fn validate_rule_coverage_flags_split_dep_names_for_same_package() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = dir.path().join("renovate.json5");

@@ -412,10 +412,22 @@ async fn run_inner(
         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
     }
 
+    let committed = if committed_path.exists() {
+        Some(read_snapshot(&std::fs::read_to_string(&committed_path)?)?)
+    } else {
+        None
+    };
+
+    if let Some(committed) = committed.as_ref()
+        && !cfg.refresh_meta
+    {
+        merge_missing_meta_from_committed(&mut generated, committed);
+    }
+
     validate_rule_coverage(&generated, &rules)?;
     trim_snapshot_meta(&mut generated, &rules);
 
-    if !committed_path.exists() {
+    if committed.is_none() {
         if fix {
             write_snapshot(&committed_path, &generated)?;
             return Ok(LinterOutput {
@@ -429,7 +441,7 @@ async fn run_inner(
         )));
     }
 
-    let committed = read_snapshot(&std::fs::read_to_string(&committed_path)?)?;
+    let committed = committed.expect("checked above");
 
     if committed == generated {
         return Ok(LinterOutput {
@@ -541,6 +553,20 @@ fn committed_path_for_config(config_path: &Path) -> PathBuf {
 
 fn display_path(project_root: &Path, path: &Path) -> String {
     normalize_path(path.strip_prefix(project_root).unwrap_or(path))
+}
+
+fn merge_missing_meta_from_committed(generated: &mut Snapshot, committed: &Snapshot) {
+    for (dep_name, generated_meta) in &mut generated.meta {
+        let Some(committed_meta) = committed.meta.get(dep_name) else {
+            continue;
+        };
+        if generated_meta.package_name.is_none() {
+            generated_meta.package_name = committed_meta.package_name.clone();
+        }
+        if generated_meta.datasource.is_none() {
+            generated_meta.datasource = committed_meta.datasource.clone();
+        }
+    }
 }
 
 #[cfg(test)]

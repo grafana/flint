@@ -95,6 +95,14 @@ If the snapshot is stale:
 flint run --fix renovate-deps
 ```
 
+If you want to force a fresh metadata rebuild instead of reusing any existing
+committed metadata for the same dep names, for example after changing Renovate
+grouping config or while debugging suspicious `meta` entries:
+
+```bash
+FLINT_RENOVATE_DEPS_REFRESH_META=1 flint run --fix renovate-deps
+```
+
 If rule coverage is inconsistent:
 
 - normalize equivalent deps to one canonical `depNameTemplate`

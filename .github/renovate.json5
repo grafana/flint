@@ -31,7 +31,8 @@
         "# Add whichever linters apply to your repo:\\n[\\s\\S]*?\"github:koalaman/shellcheck\"\\s*=\\s*\"(?<currentValue>[^\"]+)\"[\\s\\S]*?\\n```",
       ],
       datasourceTemplate: "github-releases",
-      depNameTemplate: "koalaman/shellcheck",
+      depNameTemplate: "github:koalaman/shellcheck",
+      packageNameTemplate: "koalaman/shellcheck",
     },
     {
       customType: "regex",
@@ -41,7 +42,8 @@
         "# Add whichever linters apply to your repo:\\n[\\s\\S]*?shfmt\\s*=\\s*\"(?<currentValue>[^\"]+)\"[\\s\\S]*?\\n```",
       ],
       datasourceTemplate: "github-releases",
-      depNameTemplate: "mvdan/sh",
+      depNameTemplate: "shfmt",
+      packageNameTemplate: "mvdan/sh",
     },
     {
       customType: "regex",
@@ -51,7 +53,8 @@
         "# Add whichever linters apply to your repo:\\n[\\s\\S]*?actionlint\\s*=\\s*\"(?<currentValue>[^\"]+)\"[\\s\\S]*?\\n```",
       ],
       datasourceTemplate: "github-releases",
-      depNameTemplate: "rhysd/actionlint",
+      depNameTemplate: "actionlint",
+      packageNameTemplate: "rhysd/actionlint",
     },
     {
       customType: "regex",
@@ -92,7 +95,7 @@
   ],
   packageRules: [
     {
-      matchPackageNames: [
+      matchDepNames: [
         "actionlint",
         "aqua:owenlamont/ryl",
         "biome",

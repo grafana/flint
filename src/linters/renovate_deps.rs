@@ -1,4 +1,5 @@
 use anyhow::Context;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -68,7 +69,29 @@ impl PreparedNativeCheck for PreparedRenovateDeps {
 }
 
 /// `{file_path: {manager: [dep_name, ...]}}` — all collections sorted.
-type DepMap = BTreeMap<String, BTreeMap<String, Vec<String>>>;
+type DepFiles = BTreeMap<String, BTreeMap<String, Vec<String>>>;
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+struct Snapshot {
+    meta: BTreeMap<String, DepMeta>,
+    files: DepFiles,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+struct DepMeta {
+    #[serde(rename = "packageName", skip_serializing_if = "Option::is_none")]
+    package_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    datasource: Option<String>,
+}
+
+impl Snapshot {
+    fn is_empty(&self) -> bool {
+        self.files.is_empty()
+    }
+}
 
 pub async fn run(cfg: &RenovateDepsConfig, fix: bool, project_root: &Path) -> LinterOutput {
     match validate_runtime_env() {
@@ -154,15 +177,15 @@ pub(crate) fn is_relevant(file_list: &FileList, project_root: &Path) -> bool {
         return true;
     }
 
-    let committed: DepMap = match std::fs::read_to_string(&committed_path)
+    let committed = match std::fs::read_to_string(&committed_path)
         .ok()
-        .and_then(|contents| serde_json::from_str(&contents).ok())
+        .and_then(|contents| read_snapshot(&contents).ok())
     {
         Some(committed) => committed,
         None => return true,
     };
 
-    committed.keys().any(|path| changed.contains(path))
+    committed.files.keys().any(|path| changed.contains(path))
 }
 
 fn changed_rel_paths(file_list: &FileList, project_root: &Path) -> HashSet<String> {
@@ -399,7 +422,7 @@ async fn run_inner(
 
     // Renovate occasionally produces empty packageFiles on the first run (transient
     // network or registry issue). Retry up to 3 times with a short delay.
-    let mut generated = DepMap::default();
+    let mut generated = Snapshot::default();
     for attempt in 1..=3u32 {
         let log_bytes = run_renovate(project_root, &config_path).await?;
         generated = extract_deps(&log_bytes, &cfg.exclude_managers)?;
@@ -408,6 +431,8 @@ async fn run_inner(
         }
         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
     }
+
+    validate_rule_coverage(&config_path, &generated)?;
 
     if !committed_path.exists() {
         if fix {
@@ -424,7 +449,7 @@ async fn run_inner(
         )));
     }
 
-    let committed: DepMap = serde_json::from_str(&std::fs::read_to_string(&committed_path)?)?;
+    let committed = read_snapshot(&std::fs::read_to_string(&committed_path)?)?;
 
     if committed == generated {
         return Ok(LinterOutput {
@@ -541,8 +566,19 @@ fn display_path(project_root: &Path, path: &Path) -> String {
     normalize_path(path.strip_prefix(project_root).unwrap_or(path))
 }
 
-/// Parses Renovate's NDJSON log and returns the dep map.
-fn extract_deps(log_bytes: &[u8], exclude_managers: &[String]) -> anyhow::Result<DepMap> {
+fn read_snapshot(contents: &str) -> anyhow::Result<Snapshot> {
+    let parsed: serde_json::Value = serde_json::from_str(contents)?;
+    if parsed.get("files").is_some() || parsed.get("meta").is_some() {
+        return Ok(serde_json::from_value(parsed)?);
+    }
+    Ok(Snapshot {
+        meta: BTreeMap::new(),
+        files: serde_json::from_value(parsed)?,
+    })
+}
+
+/// Parses Renovate's NDJSON log and returns the dependency snapshot.
+fn extract_deps(log_bytes: &[u8], exclude_managers: &[String]) -> anyhow::Result<Snapshot> {
     let log = std::str::from_utf8(log_bytes)?;
 
     let exclude: HashSet<&str> = exclude_managers.iter().map(String::as_str).collect();
@@ -573,6 +609,7 @@ fn extract_deps(log_bytes: &[u8], exclude_managers: &[String]) -> anyhow::Result
         .ok_or_else(|| anyhow::anyhow!("none of {:?} found in Renovate log", PACKAGE_FILES_MSGS))?;
 
     let mut deps_by_file: BTreeMap<String, BTreeMap<String, BTreeSet<String>>> = BTreeMap::new();
+    let mut meta_by_dep: BTreeMap<String, DepMeta> = BTreeMap::new();
 
     if let Some(obj) = config.as_object() {
         for (manager, manager_files) in obj {
@@ -599,6 +636,23 @@ fn extract_deps(log_bytes: &[u8], exclude_managers: &[String]) -> anyhow::Result
                     let Some(dep_name) = dep.get("depName").and_then(|v| v.as_str()) else {
                         continue;
                     };
+                    let next_meta = DepMeta {
+                        package_name: dep
+                            .get("packageName")
+                            .and_then(|v| v.as_str())
+                            .map(ToOwned::to_owned),
+                        datasource: dep
+                            .get("datasource")
+                            .and_then(|v| v.as_str())
+                            .map(ToOwned::to_owned),
+                    };
+                    merge_dep_meta(
+                        meta_by_dep.entry(dep_name.to_string()).or_default(),
+                        &next_meta,
+                    )
+                    .with_context(|| {
+                        format!("conflicting metadata extracted for dependency {dep_name:?}")
+                    })?;
                     deps_by_file
                         .entry(file_path.clone())
                         .or_default()
@@ -611,7 +665,7 @@ fn extract_deps(log_bytes: &[u8], exclude_managers: &[String]) -> anyhow::Result
     }
 
     // BTreeMap + BTreeSet already sorted; convert sets to vecs.
-    Ok(deps_by_file
+    let files = deps_by_file
         .into_iter()
         .map(|(file, managers)| {
             let managers = managers
@@ -620,16 +674,46 @@ fn extract_deps(log_bytes: &[u8], exclude_managers: &[String]) -> anyhow::Result
                 .collect();
             (file, managers)
         })
-        .collect())
+        .collect();
+
+    Ok(Snapshot {
+        meta: meta_by_dep,
+        files,
+    })
 }
 
-fn write_snapshot(path: &Path, deps: &DepMap) -> anyhow::Result<()> {
+fn merge_dep_meta(existing: &mut DepMeta, next: &DepMeta) -> anyhow::Result<()> {
+    merge_optional_field(
+        &mut existing.package_name,
+        &next.package_name,
+        "packageName",
+    )?;
+    merge_optional_field(&mut existing.datasource, &next.datasource, "datasource")?;
+    Ok(())
+}
+
+fn merge_optional_field(
+    existing: &mut Option<String>,
+    next: &Option<String>,
+    field: &str,
+) -> anyhow::Result<()> {
+    match (existing.as_deref(), next.as_deref()) {
+        (Some(left), Some(right)) if left != right => {
+            anyhow::bail!("conflicting {field}: {left:?} != {right:?}");
+        }
+        (None, Some(value)) => *existing = Some(value.to_string()),
+        _ => {}
+    }
+    Ok(())
+}
+
+fn write_snapshot(path: &Path, deps: &Snapshot) -> anyhow::Result<()> {
     let json = serde_json::to_string_pretty(deps)?;
     std::fs::write(path, json + "\n")?;
     Ok(())
 }
 
-fn unified_diff(old: &DepMap, new: &DepMap, committed_display: &str) -> String {
+fn unified_diff(old: &Snapshot, new: &Snapshot, committed_display: &str) -> String {
     let old_text = serde_json::to_string_pretty(old).unwrap_or_default() + "\n";
     let new_text = serde_json::to_string_pretty(new).unwrap_or_default() + "\n";
 
@@ -639,9 +723,172 @@ fn unified_diff(old: &DepMap, new: &DepMap, committed_display: &str) -> String {
         .to_string()
 }
 
+#[derive(Debug)]
+enum RuleMatcher {
+    DepNames(BTreeSet<String>),
+    PackageNames(BTreeSet<String>),
+}
+
+#[derive(Debug)]
+struct ComparablePackageRule {
+    label: String,
+    matcher: RuleMatcher,
+}
+
+fn validate_rule_coverage(config_path: &Path, snapshot: &Snapshot) -> anyhow::Result<()> {
+    let config = std::fs::read_to_string(config_path)
+        .with_context(|| format!("failed to read {}", config_path.display()))?;
+    let parsed: serde_json::Value = json5::from_str(&config)
+        .with_context(|| format!("failed to parse {}", config_path.display()))?;
+
+    let rules = parsed["packageRules"]
+        .as_array()
+        .map(|rules| {
+            rules
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, rule)| comparable_package_rule(rule, idx))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    let package_groups = package_groups(snapshot);
+    let mut errors = vec![];
+
+    for ((package_name, datasource), deps) in package_groups {
+        if deps.len() < 2 {
+            continue;
+        }
+        for rule in &rules {
+            let matched: Vec<_> = deps
+                .iter()
+                .filter(|dep| rule.matches(dep, snapshot))
+                .collect();
+            if matched.is_empty() || matched.len() == deps.len() {
+                continue;
+            }
+            let matched = matched
+                .into_iter()
+                .map(|dep| dep.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let unmatched = deps
+                .iter()
+                .filter(|dep| !rule.matches(dep, snapshot))
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+                .join(", ");
+            errors.push(format!(
+                "package rule {} matches package {} inconsistently: matched [{}], unmatched [{}] (datasource {})",
+                rule.label,
+                package_name,
+                matched,
+                unmatched,
+                datasource.as_deref().unwrap_or("unknown"),
+            ));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        anyhow::bail!(errors.join("\n"))
+    }
+}
+
+fn comparable_package_rule(rule: &serde_json::Value, idx: usize) -> Option<ComparablePackageRule> {
+    let extra_matchers = rule
+        .as_object()
+        .into_iter()
+        .flat_map(|obj| obj.keys())
+        .filter(|key| key.starts_with("match"))
+        .filter(|key| *key != "matchDepNames" && *key != "matchPackageNames")
+        .count();
+    if extra_matchers > 0 {
+        return None;
+    }
+
+    let label = rule["groupName"]
+        .as_str()
+        .map(|group| format!("group {group:?}"))
+        .or_else(|| {
+            rule["description"]
+                .as_str()
+                .map(|desc| format!("description {desc:?}"))
+        })
+        .unwrap_or_else(|| format!("index {idx}"));
+
+    let matcher = if let Some(names) = rule.get("matchDepNames").and_then(|v| v.as_array()) {
+        RuleMatcher::DepNames(
+            names
+                .iter()
+                .map(|value| {
+                    value
+                        .as_str()
+                        .expect("package rule matchDepNames entries must be strings")
+                        .to_string()
+                })
+                .collect(),
+        )
+    } else if let Some(names) = rule.get("matchPackageNames").and_then(|v| v.as_array()) {
+        RuleMatcher::PackageNames(
+            names
+                .iter()
+                .map(|value| {
+                    value
+                        .as_str()
+                        .expect("package rule matchPackageNames entries must be strings")
+                        .to_string()
+                })
+                .collect(),
+        )
+    } else {
+        return None;
+    };
+
+    Some(ComparablePackageRule { label, matcher })
+}
+
+impl ComparablePackageRule {
+    fn matches(&self, dep_name: &str, snapshot: &Snapshot) -> bool {
+        match &self.matcher {
+            RuleMatcher::DepNames(names) => names.contains(dep_name),
+            RuleMatcher::PackageNames(names) => snapshot
+                .meta
+                .get(dep_name)
+                .and_then(|meta| meta.package_name.as_deref())
+                .is_some_and(|package_name| names.contains(package_name)),
+        }
+    }
+}
+
+fn package_groups(snapshot: &Snapshot) -> BTreeMap<(String, Option<String>), BTreeSet<String>> {
+    let mut groups = BTreeMap::new();
+    for dep_name in snapshot
+        .files
+        .values()
+        .flat_map(|managers| managers.values())
+        .flatten()
+    {
+        let Some(meta) = snapshot.meta.get(dep_name) else {
+            continue;
+        };
+        let Some(package_name) = meta.package_name.as_ref() else {
+            continue;
+        };
+        groups
+            .entry((package_name.clone(), meta.datasource.clone()))
+            .or_insert_with(BTreeSet::new)
+            .insert(dep_name.clone());
+    }
+    groups
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    type FileManagers<'a> = [(&'a str, &'a [(&'a str, &'a [&'a str])])];
 
     fn log(config_json: &str) -> Vec<u8> {
         format!(r#"{{"msg":"Extracted dependencies","packageFiles":{config_json}}}"#).into_bytes()
@@ -651,8 +898,7 @@ mod tests {
         format!(r#"{{"msg":"packageFiles with updates","config":{config_json}}}"#).into_bytes()
     }
 
-    #[allow(clippy::type_complexity)]
-    fn dep_map(entries: &[(&str, &[(&str, &[&str])])]) -> DepMap {
+    fn dep_files(entries: &FileManagers<'_>) -> DepFiles {
         entries
             .iter()
             .map(|(file, managers)| {
@@ -668,6 +914,24 @@ mod tests {
                 (file.to_string(), m)
             })
             .collect()
+    }
+
+    fn snapshot(meta: &[(&str, Option<&str>, Option<&str>)], files: &FileManagers<'_>) -> Snapshot {
+        Snapshot {
+            meta: meta
+                .iter()
+                .map(|(dep, package_name, datasource)| {
+                    (
+                        dep.to_string(),
+                        DepMeta {
+                            package_name: package_name.map(ToOwned::to_owned),
+                            datasource: datasource.map(ToOwned::to_owned),
+                        },
+                    )
+                })
+                .collect(),
+            files: dep_files(files),
+        }
     }
 
     fn validate_env(vars: &[(&str, &str)]) -> Result<Option<String>, String> {
@@ -852,7 +1116,10 @@ mod tests {
         let result = extract_deps(&log, &[]).unwrap();
         assert_eq!(
             result,
-            dep_map(&[("package.json", &[("npm", &["express", "lodash"])])])
+            snapshot(
+                &[("express", None, None), ("lodash", None, None),],
+                &[("package.json", &[("npm", &["express", "lodash"])])],
+            )
         );
     }
 
@@ -864,7 +1131,10 @@ mod tests {
         let result = extract_deps(&log, &[]).unwrap();
         assert_eq!(
             result,
-            dep_map(&[("package.json", &[("npm", &["express", "lodash"])])])
+            snapshot(
+                &[("express", None, None), ("lodash", None, None),],
+                &[("package.json", &[("npm", &["express", "lodash"])])],
+            )
         );
     }
 
@@ -875,7 +1145,7 @@ mod tests {
         );
         let result = extract_deps(&log, &[]).unwrap();
         assert_eq!(
-            result["package.json"]["npm"],
+            result.files["package.json"]["npm"],
             vec!["alpha", "moose", "zebra"]
         );
     }
@@ -886,7 +1156,7 @@ mod tests {
             r#"{"npm":[{"packageFile":"package.json","deps":[{"depName":"keep"},{"depName":"bad1","skipReason":"contains-variable"},{"depName":"bad2","skipReason":"invalid-value"},{"depName":"bad3","skipReason":"invalid-version"}]}]}"#,
         );
         let result = extract_deps(&log, &[]).unwrap();
-        assert_eq!(result["package.json"]["npm"], vec!["keep"]);
+        assert_eq!(result.files["package.json"]["npm"], vec!["keep"]);
     }
 
     #[test]
@@ -895,7 +1165,7 @@ mod tests {
             r#"{"npm":[{"packageFile":"package.json","deps":[{"depName":"pinned","skipReason":"pinned-major-version"}]}]}"#,
         );
         let result = extract_deps(&log, &[]).unwrap();
-        assert_eq!(result["package.json"]["npm"], vec!["pinned"]);
+        assert_eq!(result.files["package.json"]["npm"], vec!["pinned"]);
     }
 
     #[test]
@@ -904,8 +1174,8 @@ mod tests {
             r#"{"npm":[{"packageFile":"package.json","deps":[{"depName":"express"}]}],"cargo":[{"packageFile":"Cargo.toml","deps":[{"depName":"tokio"}]}]}"#,
         );
         let result = extract_deps(&log, &["npm".to_string()]).unwrap();
-        assert!(!result.contains_key("package.json"));
-        assert_eq!(result["Cargo.toml"]["cargo"], vec!["tokio"]);
+        assert!(!result.files.contains_key("package.json"));
+        assert_eq!(result.files["Cargo.toml"]["cargo"], vec!["tokio"]);
     }
 
     #[test]
@@ -914,7 +1184,7 @@ mod tests {
             r#"{"npm":[{"packageFile":"package.json","deps":[{"version":"1.0.0"},{"depName":"valid"}]}]}"#,
         );
         let result = extract_deps(&log, &[]).unwrap();
-        assert_eq!(result["package.json"]["npm"], vec!["valid"]);
+        assert_eq!(result.files["package.json"]["npm"], vec!["valid"]);
     }
 
     #[test]
@@ -926,8 +1196,11 @@ mod tests {
         )
         .into_bytes();
         let result = extract_deps(&bytes, &[]).unwrap();
-        assert!(!result.contains_key("a.json"), "should use last entry");
-        assert!(result.contains_key("b.json"));
+        assert!(
+            !result.files.contains_key("a.json"),
+            "should use last entry"
+        );
+        assert!(result.files.contains_key("b.json"));
     }
 
     #[test]
@@ -935,7 +1208,7 @@ mod tests {
         let bytes =
             b"not json\n{\"msg\":\"Extracted dependencies\",\"packageFiles\":{\"npm\":[{\"packageFile\":\"p.json\",\"deps\":[{\"depName\":\"x\"}]}]}}\nmore garbage\n";
         let result = extract_deps(bytes, &[]).unwrap();
-        assert!(result.contains_key("p.json"));
+        assert!(result.files.contains_key("p.json"));
     }
 
     #[test]
@@ -950,29 +1223,104 @@ mod tests {
     fn write_and_read_snapshot_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("out.json");
-        let deps = dep_map(&[
-            ("Cargo.toml", &[("cargo", &["serde", "tokio"])]),
-            ("package.json", &[("npm", &["express", "lodash"])]),
-        ]);
+        let deps = snapshot(
+            &[
+                ("serde", None, None),
+                ("tokio", None, None),
+                ("express", None, None),
+                ("lodash", None, None),
+            ],
+            &[
+                ("Cargo.toml", &[("cargo", &["serde", "tokio"])]),
+                ("package.json", &[("npm", &["express", "lodash"])]),
+            ],
+        );
         write_snapshot(&path, &deps).unwrap();
-        let read_back: DepMap =
-            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let read_back = read_snapshot(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(deps, read_back);
+    }
+
+    #[test]
+    fn reads_legacy_snapshot_format() {
+        let legacy = r#"{
+  "package.json": {
+    "npm": [
+      "express"
+    ]
+  }
+}
+"#;
+        let snapshot = read_snapshot(legacy).unwrap();
+        assert!(snapshot.meta.is_empty());
+        assert_eq!(
+            snapshot.files,
+            dep_files(&[("package.json", &[("npm", &["express"])])])
+        );
     }
 
     #[test]
     fn write_snapshot_ends_with_newline() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("out.json");
-        write_snapshot(&path, &dep_map(&[])).unwrap();
+        write_snapshot(&path, &Snapshot::default()).unwrap();
         let contents = std::fs::read_to_string(&path).unwrap();
         assert!(contents.ends_with('\n'));
     }
 
     #[test]
+    fn validate_rule_coverage_flags_split_dep_names_for_same_package() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("renovate.json5");
+        std::fs::write(
+            &config_path,
+            r#"{
+  packageRules: [
+    {
+      groupName: "linters",
+      matchDepNames: ["actionlint"]
+    }
+  ]
+}
+"#,
+        )
+        .unwrap();
+        let snapshot = snapshot(
+            &[
+                (
+                    "actionlint",
+                    Some("rhysd/actionlint"),
+                    Some("github-releases"),
+                ),
+                (
+                    "rhysd/actionlint",
+                    Some("rhysd/actionlint"),
+                    Some("github-releases"),
+                ),
+            ],
+            &[
+                ("mise.toml", &[("mise", &["actionlint"])]),
+                ("README.md", &[("regex", &["rhysd/actionlint"])]),
+            ],
+        );
+
+        let err = validate_rule_coverage(&config_path, &snapshot).unwrap_err();
+        let msg = err.to_string();
+
+        assert!(msg.contains("rhysd/actionlint"));
+        assert!(msg.contains("matched [actionlint]"));
+        assert!(msg.contains("unmatched [rhysd/actionlint]"));
+    }
+
+    #[test]
     fn unified_diff_contains_added_and_removed_lines() {
-        let old = dep_map(&[("a.json", &[("npm", &["old-dep"])])]);
-        let new = dep_map(&[("a.json", &[("npm", &["new-dep"])])]);
+        let old = snapshot(
+            &[("old-dep", None, None)],
+            &[("a.json", &[("npm", &["old-dep"])])],
+        );
+        let new = snapshot(
+            &[("new-dep", None, None)],
+            &[("a.json", &[("npm", &["new-dep"])])],
+        );
         let diff = unified_diff(&old, &new, ".github/renovate-tracked-deps.json");
         assert!(diff.contains("-"), "should have removals");
         assert!(diff.contains("+"), "should have additions");
@@ -982,8 +1330,8 @@ mod tests {
 
     #[test]
     fn unified_diff_header_uses_display_path() {
-        let old = dep_map(&[("a.json", &[("npm", &["x"])])]);
-        let new = dep_map(&[("a.json", &[("npm", &["y"])])]);
+        let old = snapshot(&[("x", None, None)], &[("a.json", &[("npm", &["x"])])]);
+        let new = snapshot(&[("y", None, None)], &[("a.json", &[("npm", &["y"])])]);
         let diff = unified_diff(&old, &new, "renovate-tracked-deps.json");
         assert!(diff.contains("renovate-tracked-deps.json"));
     }
@@ -1095,7 +1443,10 @@ mod tests {
         std::fs::create_dir_all(dir.path().join(".github")).unwrap();
         write_snapshot(
             &dir.path().join(".github/renovate-tracked-deps.json"),
-            &dep_map(&[("package.json", &[("npm", &["express"])])]),
+            &snapshot(
+                &[("express", None, None)],
+                &[("package.json", &[("npm", &["express"])])],
+            ),
         )
         .unwrap();
 
@@ -1111,7 +1462,10 @@ mod tests {
         std::fs::create_dir_all(dir.path().join(".github")).unwrap();
         write_snapshot(
             &dir.path().join(".github/renovate-tracked-deps.json"),
-            &dep_map(&[("package.json", &[("npm", &["express"])])]),
+            &snapshot(
+                &[("express", None, None)],
+                &[("package.json", &[("npm", &["express"])])],
+            ),
         )
         .unwrap();
 
@@ -1131,7 +1485,10 @@ mod tests {
         std::fs::create_dir_all(dir.path().join(".github")).unwrap();
         write_snapshot(
             &dir.path().join(".github/renovate-tracked-deps.json"),
-            &dep_map(&[("package.json", &[("npm", &["express"])])]),
+            &snapshot(
+                &[("express", None, None)],
+                &[("package.json", &[("npm", &["express"])])],
+            ),
         )
         .unwrap();
 

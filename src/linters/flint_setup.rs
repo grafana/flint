@@ -6,7 +6,7 @@ use crate::init::write_setup_migration_version;
 use crate::linters::LinterOutput;
 use crate::registry::{
     CheckTypeDef, NativeCheckDef, NativePrepareContext, NativeRunContext, NativeRunFuture,
-    PreparedNativeCheck,
+    PreparedNativeCheck, SetupOutcome,
 };
 
 pub(crate) static CHECK_TYPE: CheckTypeDef = CheckTypeDef::native(
@@ -67,9 +67,11 @@ pub async fn run(
     let mut errors = vec![];
     let mut versioned_migrations_pending = false;
     let mut setup_drift_reported = false;
+    let mut setup_outcome = SetupOutcome::Clean;
 
     if flint_toml.exists() && setup_migration_version > crate::setup::LATEST_SUPPORTED_SETUP_VERSION
     {
+        setup_outcome = SetupOutcome::Fatal;
         errors.push(format!(
             "flint.toml setup_migration_version is {setup_migration_version}, but this flint only supports {}.",
             crate::setup::LATEST_SUPPORTED_SETUP_VERSION
@@ -81,6 +83,7 @@ pub async fn run(
             setup_migration_version,
         ) {
             Ok(true) => {
+                setup_outcome = max_setup_outcome(setup_outcome, SetupOutcome::Blocking);
                 versioned_migrations_pending = true;
                 setup_drift_reported = true;
                 errors.push(format!(
@@ -88,25 +91,40 @@ pub async fn run(
                 ));
             }
             Ok(false) => {}
-            Err(e) => return LinterOutput::err(format!("flint: flint-setup: {e}\n")),
+            Err(e) => {
+                return LinterOutput::setup_err(
+                    SetupOutcome::Fatal,
+                    format!("flint: flint-setup: {e}\n"),
+                );
+            }
         }
     }
 
     if !setup_drift_reported {
         match crate::init::detect_setup_drift(project_root, config_dir) {
-            Ok(true) => errors.push("Flint setup drift applies to this repo.".to_string()),
+            Ok(true) => {
+                setup_outcome = max_setup_outcome(setup_outcome, SetupOutcome::Blocking);
+                errors.push("Flint setup drift applies to this repo.".to_string());
+            }
             Ok(false) => {}
-            Err(e) => return LinterOutput::err(format!("flint: flint-setup: {e}\n")),
+            Err(e) => {
+                return LinterOutput::setup_err(
+                    SetupOutcome::Fatal,
+                    format!("flint: flint-setup: {e}\n"),
+                );
+            }
         }
     }
 
     let mise_tools = crate::registry::read_mise_tools(project_root);
     if let Some((old, new)) = crate::registry::find_obsolete_key(&mise_tools) {
+        setup_outcome = max_setup_outcome(setup_outcome, SetupOutcome::Blocking);
         errors.push(format!(
             "obsolete tool key in mise.toml: {old:?} (replaced by {new:?})."
         ));
     }
     if let Some((old, hint)) = crate::registry::find_unsupported_key(&mise_tools) {
+        setup_outcome = max_setup_outcome(setup_outcome, SetupOutcome::Blocking);
         errors.push(format!(
             "unsupported legacy lint tool in mise.toml: {old:?}. Migration required: {hint}."
         ));
@@ -114,10 +132,16 @@ pub async fn run(
 
     match tools_section_needs_normalization(&path) {
         Ok(true) => {
+            setup_outcome = max_setup_outcome(setup_outcome, SetupOutcome::NonBlocking);
             errors.push("mise.toml [tools] entries are not in Flint's canonical order.".to_string())
         }
         Ok(false) => {}
-        Err(e) => return LinterOutput::err(format!("flint: flint-setup: {e}\n")),
+        Err(e) => {
+            return LinterOutput::setup_err(
+                SetupOutcome::Fatal,
+                format!("flint: flint-setup: {e}\n"),
+            );
+        }
     }
 
     if errors.is_empty() {
@@ -125,30 +149,48 @@ pub async fn run(
             ok: true,
             stdout: Vec::new(),
             stderr: Vec::new(),
+            setup_outcome: Some(SetupOutcome::Clean),
         };
     }
 
     if !fix {
-        return LinterOutput::err(format!(
-            "ERROR: {}\nRun `flint run --fix flint-setup` to apply Flint setup migrations.\n",
-            errors.join("\nERROR: ")
-        ));
+        return LinterOutput {
+            ok: false,
+            stdout: Vec::new(),
+            stderr: format!(
+                "ERROR: {}\nRun `flint run --fix flint-setup` to apply Flint setup migrations.\n",
+                errors.join("\nERROR: ")
+            )
+            .into_bytes(),
+            setup_outcome: Some(setup_outcome),
+        };
     }
 
     if flint_toml.exists() && setup_migration_version > crate::setup::LATEST_SUPPORTED_SETUP_VERSION
     {
-        return LinterOutput::err(format!(
-            "ERROR: {}\nUpgrade flint before changing this repo setup.\n",
-            errors.join("\nERROR: ")
-        ));
+        return LinterOutput {
+            ok: false,
+            stdout: Vec::new(),
+            stderr: format!(
+                "ERROR: {}\nUpgrade flint before changing this repo setup.\n",
+                errors.join("\nERROR: ")
+            )
+            .into_bytes(),
+            setup_outcome: Some(SetupOutcome::Fatal),
+        };
     }
 
     let migrations_applied = match crate::init::apply_setup_migrations(project_root, config_dir) {
         Ok(applied) => applied,
-        Err(e) => return LinterOutput::err(format!("flint: flint-setup: {e}\n")),
+        Err(e) => {
+            return LinterOutput::setup_err(
+                SetupOutcome::Fatal,
+                format!("flint: flint-setup: {e}\n"),
+            );
+        }
     };
     if let Err(e) = normalize_tools_section(&path) {
-        return LinterOutput::err(format!("flint: flint-setup: {e}\n"));
+        return LinterOutput::setup_err(SetupOutcome::Fatal, format!("flint: flint-setup: {e}\n"));
     }
     if migrations_applied
         && versioned_migrations_pending
@@ -159,13 +201,25 @@ pub async fn run(
             crate::setup::LATEST_SUPPORTED_SETUP_VERSION,
         )
     {
-        return LinterOutput::err(format!("flint: flint-setup: {e}\n"));
+        return LinterOutput::setup_err(SetupOutcome::Fatal, format!("flint: flint-setup: {e}\n"));
     }
 
     LinterOutput {
         ok: true,
         stdout: Vec::new(),
         stderr: Vec::new(),
+        setup_outcome: Some(setup_outcome),
+    }
+}
+
+fn max_setup_outcome(current: SetupOutcome, next: SetupOutcome) -> SetupOutcome {
+    use SetupOutcome::{Blocking, Clean, Fatal, NonBlocking};
+
+    match (current, next) {
+        (Fatal, _) | (_, Fatal) => Fatal,
+        (Blocking, _) | (_, Blocking) => Blocking,
+        (NonBlocking, _) | (_, NonBlocking) => NonBlocking,
+        (Clean, Clean) => Clean,
     }
 }
 

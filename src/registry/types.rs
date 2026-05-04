@@ -201,6 +201,7 @@ pub struct LinterOutput {
     pub ok: bool,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
+    pub setup_outcome: Option<SetupOutcome>,
 }
 
 impl LinterOutput {
@@ -209,8 +210,26 @@ impl LinterOutput {
             ok: false,
             stdout: vec![],
             stderr: stderr.into(),
+            setup_outcome: None,
         }
     }
+
+    pub fn setup_err(setup_outcome: SetupOutcome, stderr: impl Into<Vec<u8>>) -> Self {
+        Self {
+            ok: false,
+            stdout: vec![],
+            stderr: stderr.into(),
+            setup_outcome: Some(setup_outcome),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SetupOutcome {
+    Clean,
+    NonBlocking,
+    Blocking,
+    Fatal,
 }
 
 pub trait CheckType: Sync + std::fmt::Debug {

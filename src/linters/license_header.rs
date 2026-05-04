@@ -88,6 +88,7 @@ pub async fn run(
         ok: all_ok,
         stdout: vec![],
         stderr,
+        setup_outcome: None,
     }
 }
 

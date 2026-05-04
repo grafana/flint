@@ -27,6 +27,7 @@ pub struct CheckResult {
     pub changed: bool,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
+    pub setup_outcome: Option<crate::registry::SetupOutcome>,
     pub duration: Duration,
 }
 
@@ -130,6 +131,7 @@ impl PreparedCheck {
             changed,
             stdout: out.stdout,
             stderr: out.stderr,
+            setup_outcome: out.setup_outcome,
             duration: start.elapsed(),
         }
     }
@@ -570,6 +572,7 @@ async fn run_invocations(
         ok: all_ok,
         stdout: combined_stdout,
         stderr: combined_stderr,
+        setup_outcome: None,
     }
 }
 

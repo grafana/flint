@@ -254,6 +254,7 @@ async fn run(
         out
     };
 
+    let mut setup_check_result = None;
     let mut setup_fix_outcome = None;
     let setup_check = active.iter().copied().find(|check| is_flint_setup(check));
     if let Some(check) = setup_check {
@@ -281,16 +282,21 @@ async fn run(
             .next()
             .expect("flint-setup preflight produced a result");
         if args.fix {
+            let stop_after_setup = setup_result_blocks_fix(&setup_result);
             let setup_outcome = classify_single_pass_fix(setup_result);
-            if matches!(
-                setup_outcome,
-                FixOutcome::Partial(_) | FixOutcome::Review(_)
-            ) {
+            if stop_after_setup
+                || matches!(
+                    setup_outcome,
+                    FixOutcome::Partial(_) | FixOutcome::Review(_)
+                )
+            {
                 finish_fix_outcomes(vec![setup_outcome], args.allow_fixed);
             } else {
                 setup_fix_outcome = Some(setup_outcome);
             }
-        } else if !setup_result.ok {
+        } else if setup_result.ok {
+            // Clean setup never affects later lint execution.
+        } else if setup_result_blocks_check(&setup_result) {
             let failed = [setup_result.name.as_str()];
             if args.short {
                 eprintln!("flint: 1 check failed — flint run --fix {}", failed[0]);
@@ -301,6 +307,8 @@ async fn run(
                 );
             }
             std::process::exit(1);
+        } else {
+            setup_check_result = Some(setup_result);
         }
     }
     let active: Vec<&registry::Check> = active
@@ -311,6 +319,9 @@ async fn run(
     if active.is_empty() {
         if let Some(outcome) = setup_fix_outcome {
             finish_fix_outcomes(vec![outcome], args.allow_fixed);
+        }
+        if let Some(setup_result) = setup_check_result {
+            finish_check_results(vec![setup_result], &active, args.short);
         }
         return Ok(());
     }
@@ -483,7 +494,7 @@ async fn run(
         return Ok(());
     }
 
-    let results = run_checks(
+    let mut results = run_checks(
         &active,
         &file_list,
         baseline_file_list.as_ref(),
@@ -498,41 +509,10 @@ async fn run(
     )
     .await?;
 
-    let failed: Vec<&str> = results
-        .iter()
-        .filter(|r| !r.ok)
-        .map(|r| r.name.as_str())
-        .collect();
-
-    if !failed.is_empty() {
-        let n = failed.len();
-        let noun = if n == 1 { "check" } else { "checks" };
-        if args.short {
-            // Partition by fixability. Emit the exact command for fixable checks
-            // so AI callers can act without a reasoning step.
-            let (fixable, reviewable): (Vec<&str>, Vec<&str>) = failed
-                .iter()
-                .copied()
-                .partition(|name| is_fixable(name, &active));
-            let mut segments = vec![];
-            if !fixable.is_empty() {
-                segments.push(format!("flint run --fix {}", fixable.join(" ")));
-            }
-            if !reviewable.is_empty() {
-                segments.push(format!("review: {}", reviewable.join(", ")));
-            }
-            eprintln!("flint: {n} {noun} failed — {}", segments.join(" | "));
-        } else {
-            eprintln!(
-                "\nflint: {n} {noun} failed ({names})",
-                names = failed.join(", ")
-            );
-            eprintln!(
-                "💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify."
-            );
-        }
-        std::process::exit(1);
+    if let Some(setup_result) = setup_check_result {
+        results.push(setup_result);
     }
+    finish_check_results(results, &active, args.short);
 
     Ok(())
 }
@@ -636,6 +616,47 @@ fn finish_fix_outcomes(outcomes: Vec<FixOutcome>, allow_fixed: bool) {
     }
 }
 
+fn finish_check_results(results: Vec<CheckResult>, active: &[&registry::Check], short: bool) {
+    let mut failed: Vec<&str> = results
+        .iter()
+        .filter(|r| !r.ok)
+        .map(|r| r.name.as_str())
+        .collect();
+    failed.sort();
+
+    if failed.is_empty() {
+        return;
+    }
+
+    let n = failed.len();
+    let noun = if n == 1 { "check" } else { "checks" };
+    if short {
+        // Partition by fixability. Emit the exact command for fixable checks
+        // so AI callers can act without a reasoning step.
+        let (fixable, reviewable): (Vec<&str>, Vec<&str>) = failed
+            .iter()
+            .copied()
+            .partition(|name| is_fixable(name, active));
+        let mut segments = vec![];
+        if !fixable.is_empty() {
+            segments.push(format!("flint run --fix {}", fixable.join(" ")));
+        }
+        if !reviewable.is_empty() {
+            segments.push(format!("review: {}", reviewable.join(", ")));
+        }
+        eprintln!("flint: {n} {noun} failed — {}", segments.join(" | "));
+    } else {
+        eprintln!(
+            "\nflint: {n} {noun} failed ({names})",
+            names = failed.join(", ")
+        );
+        eprintln!(
+            "💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify."
+        );
+    }
+    std::process::exit(1);
+}
+
 fn classify_single_pass_fix(result: CheckResult) -> FixOutcome {
     if result.ok {
         if result.changed {
@@ -648,6 +669,26 @@ fn classify_single_pass_fix(result: CheckResult) -> FixOutcome {
     } else {
         FixOutcome::Review(result)
     }
+}
+
+fn setup_result_kind(result: &CheckResult) -> registry::SetupOutcome {
+    result
+        .setup_outcome
+        .unwrap_or(registry::SetupOutcome::Fatal)
+}
+
+fn setup_result_blocks_check(result: &CheckResult) -> bool {
+    matches!(
+        setup_result_kind(result),
+        registry::SetupOutcome::Blocking | registry::SetupOutcome::Fatal
+    )
+}
+
+fn setup_result_blocks_fix(result: &CheckResult) -> bool {
+    matches!(
+        setup_result_kind(result),
+        registry::SetupOutcome::Blocking | registry::SetupOutcome::Fatal
+    )
 }
 
 fn is_flint_setup(check: &registry::Check) -> bool {
@@ -934,7 +975,7 @@ fn run_policy_label(run_policy: RunPolicy) -> &'static str {
 }
 
 fn is_fixable(name: &str, active: &[&registry::Check]) -> bool {
-    active.iter().any(|c| c.name == name && c.has_fix())
+    name == "flint-setup" || active.iter().any(|c| c.name == name && c.has_fix())
 }
 
 fn supports_single_pass_fix(check: &registry::Check) -> bool {

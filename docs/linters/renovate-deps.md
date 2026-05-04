@@ -12,11 +12,11 @@ separate Renovate PRs or README drift.
 
 ## What it catches
 
-Intent: `mise.toml` and `README.md` both refer to actionlint, so you expect
+Goal: `mise.toml` and `README.md` both refer to actionlint, so you want
 Renovate to treat them as the same dependency and keep them in the same group.
 
-A naive setup can break that intent by extracting different dependency names for
-the same upstream package:
+A setup can fail that goal by extracting different dependency names for the
+same upstream package:
 
 ```json5
 {

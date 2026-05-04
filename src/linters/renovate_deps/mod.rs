@@ -1,0 +1,547 @@
+use anyhow::Context;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
+
+use self::rules::{
+    comparable_package_rules_for_config, trim_snapshot_meta, validate_rule_coverage,
+};
+use self::snapshot::{Snapshot, extract_deps, read_snapshot, unified_diff, write_snapshot};
+use crate::config::RenovateDepsConfig;
+use crate::files::FileList;
+use crate::linters::LinterOutput;
+use crate::linters::env;
+use crate::registry::{
+    AdaptiveRelevanceContext, CheckTypeDef, InitHookContext, NativeCheckDef, NativePrepareContext,
+    NativeRunContext, NativeRunFuture, PreparedNativeCheck,
+};
+
+mod rules;
+mod snapshot;
+
+const COMMITTED_FILE: &str = "renovate-tracked-deps.json";
+pub(crate) const COMMITTED_PATHS: &[&str] = &[COMMITTED_FILE, ".github/renovate-tracked-deps.json"];
+pub(crate) const RENOVATE_CONFIG_PATTERNS: &[&str] = &[
+    "renovate.json",
+    "renovate.json5",
+    ".github/renovate.json",
+    ".github/renovate.json5",
+    ".renovaterc",
+    ".renovaterc.json",
+    ".renovaterc.json5",
+];
+const RENOVATE_GITHUB_TOKEN_DISPLAY: &str = "GITHUB_COM_TOKEN or GITHUB_TOKEN";
+
+pub(crate) static CHECK_TYPE: CheckTypeDef = CheckTypeDef::native_with_init_hook(
+    "renovate-deps",
+    NativeCheckDef::with_bin("renovate", prepare).with_fix(),
+    init,
+);
+
+#[derive(Debug)]
+struct PreparedRenovateDeps {
+    name: String,
+    cfg: RenovateDepsConfig,
+    tracked_files: Vec<PathBuf>,
+}
+
+fn prepare(ctx: NativePrepareContext<'_>) -> Option<Box<dyn PreparedNativeCheck>> {
+    Some(Box::new(PreparedRenovateDeps {
+        name: ctx.name.to_string(),
+        cfg: ctx.cfg.checks.renovate_deps.clone(),
+        tracked_files: COMMITTED_PATHS
+            .iter()
+            .map(|path| ctx.project_root.join(path))
+            .collect(),
+    }))
+}
+
+impl PreparedNativeCheck for PreparedRenovateDeps {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn tracked_files(&self) -> &[PathBuf] {
+        &self.tracked_files
+    }
+
+    fn run(self: Box<Self>, ctx: NativeRunContext) -> NativeRunFuture {
+        Box::pin(async move {
+            crate::linters::renovate_deps::run(&self.cfg, ctx.fix, &ctx.project_root).await
+        })
+    }
+}
+
+pub async fn run(cfg: &RenovateDepsConfig, fix: bool, project_root: &Path) -> LinterOutput {
+    match validate_runtime_env() {
+        Ok(Some(warning)) => eprintln!("{warning}"),
+        Ok(None) => {}
+        Err(stderr) => return LinterOutput::err(stderr),
+    }
+    match run_inner(cfg, fix, project_root).await {
+        Ok(out) => out,
+        Err(e) => LinterOutput::err(format!("flint: renovate-deps: {e}\n")),
+    }
+}
+
+pub(crate) fn init(ctx: &dyn InitHookContext) -> anyhow::Result<bool> {
+    let toml_path = ctx.config_dir().join("flint.toml");
+    let config_changed = if let Some(managers) = ctx.renovate_exclude_managers()
+        && !managers.is_empty()
+    {
+        configure_renovate_deps_config(&toml_path, Some(managers))?
+    } else if ctx.flint_toml_generated() {
+        configure_renovate_deps_config(&toml_path, None)?
+    } else {
+        false
+    };
+    let preset_changed = patch_renovate_preset(ctx.project_root())?;
+    Ok(config_changed || preset_changed)
+}
+
+fn validate_runtime_env() -> Result<Option<String>, String> {
+    validate_runtime_env_from(|name| std::env::var(name).ok())
+}
+
+fn validate_runtime_env_from<F>(env: F) -> Result<Option<String>, String>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    if env::renovate_github_token_available(&env) {
+        return Ok(None);
+    }
+    if env::is_ci_from(&env) {
+        return Err(format!(
+            "flint: renovate-deps: missing required CI environment variable: {token_display}\n  Set {github_token}, or set {github_com_token} directly, so Renovate can authenticate GitHub requests in CI.\n",
+            token_display = RENOVATE_GITHUB_TOKEN_DISPLAY,
+            github_com_token = env::GITHUB_COM_TOKEN_ENV,
+            github_token = env::GITHUB_TOKEN_ENV,
+        ));
+    }
+    Ok(Some(env::token_warning(
+        "renovate-deps",
+        RENOVATE_GITHUB_TOKEN_DISPLAY,
+    )))
+}
+
+pub(crate) fn is_relevant(file_list: &FileList, project_root: &Path) -> bool {
+    if file_list.full {
+        return true;
+    }
+
+    let changed = changed_rel_paths(file_list, project_root);
+
+    if changed.is_empty() {
+        return false;
+    }
+
+    if changed
+        .iter()
+        .any(|path| RENOVATE_CONFIG_PATTERNS.contains(&path.as_str()))
+    {
+        return true;
+    }
+
+    let committed_path = COMMITTED_PATHS
+        .iter()
+        .map(|path| project_root.join(path))
+        .find(|path| path.exists());
+
+    let Some(committed_path) = committed_path else {
+        return false;
+    };
+
+    let committed_rel = display_path(project_root, &committed_path);
+    if changed.contains(&committed_rel) {
+        return true;
+    }
+
+    let committed = match std::fs::read_to_string(&committed_path)
+        .ok()
+        .and_then(|contents| read_snapshot(&contents).ok())
+    {
+        Some(committed) => committed,
+        None => return true,
+    };
+
+    committed.files.keys().any(|path| changed.contains(path))
+}
+
+fn changed_rel_paths(file_list: &FileList, project_root: &Path) -> HashSet<String> {
+    if !file_list.changed_paths.is_empty() {
+        return file_list
+            .changed_paths
+            .iter()
+            .map(|path| {
+                let path = Path::new(path);
+                path.strip_prefix(project_root).unwrap_or(path)
+            })
+            .map(normalize_path)
+            .collect();
+    }
+
+    file_list
+        .files
+        .iter()
+        .filter_map(|path| path.strip_prefix(project_root).ok())
+        .map(normalize_path)
+        .collect()
+}
+
+fn normalize_path(path: &Path) -> String {
+    path.components()
+        .map(|component| component.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+pub(crate) fn adaptive_relevance(ctx: &dyn AdaptiveRelevanceContext) -> bool {
+    is_relevant(ctx.file_list(), ctx.project_root())
+}
+
+/// Ensures `flint.toml` has the Renovate check config requested by init.
+/// Returns `true` when the file was changed.
+fn configure_renovate_deps_config(
+    toml_path: &Path,
+    exclude_managers: Option<&[String]>,
+) -> anyhow::Result<bool> {
+    let content = std::fs::read_to_string(toml_path)
+        .with_context(|| format!("failed to read {}", toml_path.display()))?;
+    let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse flint.toml")?;
+    let Some(checks) = doc.get("checks").and_then(|item| item.as_table()) else {
+        return append_renovate_deps_config(toml_path, &content, exclude_managers);
+    };
+    let Some(table_key) = ["renovate-deps", "renovate_deps"]
+        .into_iter()
+        .find(|key| checks.contains_key(key))
+    else {
+        return append_renovate_deps_config(toml_path, &content, exclude_managers);
+    };
+
+    let Some(managers) = exclude_managers.filter(|managers| !managers.is_empty()) else {
+        return Ok(false);
+    };
+    let renovate = doc
+        .get_mut("checks")
+        .and_then(|item| item.as_table_mut())
+        .and_then(|checks| checks.get_mut(table_key))
+        .and_then(|item| item.as_table_mut())
+        .with_context(|| {
+            format!(
+                "[checks.{table_key}] is not a table in {}",
+                toml_path.display()
+            )
+        })?;
+    if renovate.contains_key("exclude_managers") {
+        return Ok(false);
+    }
+    renovate.insert("exclude_managers", toml_edit::value(string_array(managers)));
+    std::fs::write(toml_path, doc.to_string())
+        .with_context(|| format!("failed to write {}", toml_path.display()))?;
+    println!(
+        "  patched {} — added checks.renovate-deps.exclude_managers",
+        toml_path.display()
+    );
+    Ok(true)
+}
+
+fn append_renovate_deps_config(
+    toml_path: &Path,
+    content: &str,
+    exclude_managers: Option<&[String]>,
+) -> anyhow::Result<bool> {
+    let mut next = String::from(content);
+    if !next.ends_with('\n') {
+        next.push('\n');
+    }
+    next.push_str("\n[checks.renovate-deps]\n");
+    match exclude_managers {
+        Some(managers) if !managers.is_empty() => {
+            next.push_str(&format!("exclude_managers = {}\n", string_array(managers)));
+        }
+        _ => next.push_str("# exclude_managers = []\n"),
+    }
+    std::fs::write(toml_path, next)
+        .with_context(|| format!("failed to write {}", toml_path.display()))?;
+    println!(
+        "  patched {} — added checks.renovate-deps",
+        toml_path.display()
+    );
+    Ok(true)
+}
+
+fn string_array(values: &[String]) -> toml_edit::Array {
+    let mut array = toml_edit::Array::default();
+    for value in values {
+        array.push(value.as_str());
+    }
+    array
+}
+
+fn patch_renovate_preset(project_root: &Path) -> anyhow::Result<bool> {
+    let Some(path) = find_renovate_config(project_root) else {
+        return Ok(false);
+    };
+    let changed = patch_renovate_extends(&path)?;
+    if changed {
+        let rel = path.strip_prefix(project_root).unwrap_or(&path);
+        println!("  patched {} — added {}", rel.display(), flint_preset());
+    }
+    Ok(changed)
+}
+
+fn find_renovate_config(project_root: &Path) -> Option<PathBuf> {
+    RENOVATE_CONFIG_PATTERNS
+        .iter()
+        .map(|path| project_root.join(path))
+        .find(|path| path.exists())
+}
+
+/// Returns the renovate preset entry to inject, e.g. `github>grafana/flint#v0.9.2`.
+/// Pre-release suffixes are stripped so dev builds produce a valid tag reference.
+fn flint_preset() -> String {
+    let ver = env!("CARGO_PKG_VERSION");
+    let ver = ver.split('-').next().unwrap_or(ver);
+    format!("github>grafana/flint#v{ver}")
+}
+
+/// Adds the flint renovate preset to the `extends` array in a renovate config file.
+/// Works for both JSON and JSON5. If an unpinned or differently-pinned flint entry
+/// already exists, it is replaced in-place rather than duplicated.
+/// Returns `true` if the file was changed.
+fn patch_renovate_extends(path: &Path) -> anyhow::Result<bool> {
+    let entry = flint_preset();
+    let content = std::fs::read_to_string(path)?;
+
+    if content.contains(&entry) {
+        return Ok(false);
+    }
+
+    // If an existing flint entry (any pin) is present, replace it in-place.
+    const FLINT_ENTRY_PREFIX: &str = "\"github>grafana/flint";
+    let new_content = if let Some(pos) = content.find(FLINT_ENTRY_PREFIX) {
+        let after_open = pos + 1; // skip leading "
+        let close = content[after_open..]
+            .find('"')
+            .context("unclosed quote in existing flint preset entry")?;
+        let end = after_open + close + 1; // position after closing "
+        format!("{}\"{}\"{}", &content[..pos], entry, &content[end..])
+    } else {
+        add_to_extends(&content, &entry)
+            .with_context(|| format!("failed to patch extends in {}", path.display()))?
+    };
+
+    std::fs::write(path, new_content)?;
+    Ok(true)
+}
+
+/// Text-based insertion of `entry` into the `extends` array.
+/// Works for both JSON (`"extends": [`) and JSON5 (`extends: [`).
+fn add_to_extends(content: &str, entry: &str) -> anyhow::Result<String> {
+    let re = regex::Regex::new(r#"(?:"extends"|extends)\s*:\s*\["#).unwrap();
+
+    if let Some(m) = re.find(content) {
+        let bracket_pos = m.end() - 1; // index of '['
+        let inside_start = bracket_pos + 1;
+
+        let close_offset = content[inside_start..]
+            .find(']')
+            .context("extends array has no closing ]")?;
+        let close_pos = inside_start + close_offset;
+        let inside = &content[inside_start..close_pos];
+
+        if inside.contains('\n') {
+            // Multiline: detect indent from first non-empty line, insert at top
+            let indent = inside
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .map(|line| " ".repeat(line.len() - line.trim_start().len()))
+                .unwrap_or_else(|| "  ".to_string());
+            Ok(format!(
+                "{}\n{}\"{}\"{}{}",
+                &content[..inside_start],
+                indent,
+                entry,
+                ",",
+                &content[inside_start..]
+            ))
+        } else {
+            // Single-line (empty or not): prepend entry
+            let sep = if inside.trim().is_empty() { "" } else { ", " };
+            Ok(format!(
+                "{}\"{}\"{}{}",
+                &content[..inside_start],
+                entry,
+                sep,
+                &content[inside_start..]
+            ))
+        }
+    } else {
+        // No extends key — add after the opening {
+        let open = content
+            .find('{')
+            .context("no opening { in renovate config")?;
+        let (before, after) = content.split_at(open + 1);
+        let separator = if after.trim() == "}" { "" } else { "," };
+        Ok(format!(
+            "{}\n  \"extends\": [\"{}\"]{}{}",
+            before, entry, separator, after
+        ))
+    }
+}
+
+async fn run_inner(
+    cfg: &RenovateDepsConfig,
+    fix: bool,
+    project_root: &Path,
+) -> anyhow::Result<LinterOutput> {
+    let config_path = resolve_renovate_config_path(project_root)?;
+    let rules = comparable_package_rules_for_config(&config_path)?;
+    let committed_path = committed_path_for_config(&config_path);
+    let committed_display = display_path(project_root, &committed_path);
+
+    // Renovate occasionally produces empty packageFiles on the first run (transient
+    // network or registry issue). Retry up to 3 times with a short delay.
+    let mut generated = Snapshot::default();
+    for attempt in 1..=3u32 {
+        let log_bytes = run_renovate(project_root, &config_path).await?;
+        generated = extract_deps(&log_bytes, &cfg.exclude_managers)?;
+        if !generated.is_empty() || attempt == 3 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    }
+
+    validate_rule_coverage(&generated, &rules)?;
+    trim_snapshot_meta(&mut generated, &rules);
+
+    if !committed_path.exists() {
+        if fix {
+            write_snapshot(&committed_path, &generated)?;
+            return Ok(LinterOutput {
+                ok: true,
+                stdout: format!("{COMMITTED_FILE} has been created.\n").into_bytes(),
+                stderr: vec![],
+            });
+        }
+        return Ok(LinterOutput::err(format!(
+            "ERROR: {committed_display} does not exist.\nRun `flint run --fix renovate-deps` to create it.\n"
+        )));
+    }
+
+    let committed = read_snapshot(&std::fs::read_to_string(&committed_path)?)?;
+
+    if committed == generated {
+        return Ok(LinterOutput {
+            ok: true,
+            stdout: format!("{COMMITTED_FILE} is up to date.\n").into_bytes(),
+            stderr: vec![],
+        });
+    }
+
+    let diff = unified_diff(&committed, &generated, &committed_display);
+
+    if fix {
+        write_snapshot(&committed_path, &generated)?;
+        let mut stdout = diff.into_bytes();
+        stdout.extend_from_slice(format!("{COMMITTED_FILE} has been updated.\n").as_bytes());
+        return Ok(LinterOutput {
+            ok: true,
+            stdout,
+            stderr: vec![],
+        });
+    }
+
+    Ok(LinterOutput {
+        ok: false,
+        stdout: diff.into_bytes(),
+        stderr: format!(
+            "ERROR: {COMMITTED_FILE} is out of date.\nRun `flint run --fix renovate-deps` to update.\n"
+        )
+        .into_bytes(),
+    })
+}
+
+/// Runs `renovate --platform=local` and returns the combined stdout+stderr log bytes.
+async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result<Vec<u8>> {
+    // Forward env, setting Renovate-specific vars.
+    let mut env: Vec<(String, String)> = std::env::vars().collect();
+    // Override logging to get parseable JSON output.
+    env.retain(|(k, _)| k != "LOG_LEVEL" && k != "LOG_FORMAT" && k != "RENOVATE_CONFIG_FILE");
+    env.push(("LOG_LEVEL".into(), "debug".into()));
+    env.push(("LOG_FORMAT".into(), "json".into()));
+    env.push((
+        "RENOVATE_CONFIG_FILE".into(),
+        config_path.to_string_lossy().into_owned(),
+    ));
+    // Renovate uses GITHUB_COM_TOKEN for github.com API calls; fall back to GITHUB_TOKEN.
+    let has_com_token = std::env::var(env::GITHUB_COM_TOKEN_ENV)
+        .map(|v| !v.is_empty())
+        .unwrap_or(false);
+    if !has_com_token
+        && let Ok(token) = std::env::var(env::GITHUB_TOKEN_ENV)
+        && !token.is_empty()
+    {
+        env.push((env::GITHUB_COM_TOKEN_ENV.into(), token));
+    }
+
+    let out = super::spawn_command(
+        &[
+            "renovate".to_string(),
+            "--platform=local".to_string(),
+            "--require-config=ignored".to_string(),
+            "--dry-run=extract".to_string(),
+        ],
+        false,
+    )
+    .current_dir(project_root)
+    .envs(env)
+    .stdin(Stdio::null())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .output()
+    .await?;
+
+    // Combine stdout+stderr: Renovate writes JSON log lines to stdout, but
+    // some startup messages may appear on stderr.
+    let mut combined = out.stdout;
+    combined.extend_from_slice(&out.stderr);
+
+    if !out.status.success() {
+        let snippet = String::from_utf8_lossy(&combined);
+        anyhow::bail!(
+            "renovate exited with status {}: {}",
+            out.status.code().unwrap_or(-1),
+            snippet.lines().take(20).collect::<Vec<_>>().join("\n")
+        );
+    }
+
+    Ok(combined)
+}
+
+fn resolve_renovate_config_path(project_root: &Path) -> anyhow::Result<PathBuf> {
+    RENOVATE_CONFIG_PATTERNS
+        .iter()
+        .map(|path| project_root.join(path))
+        .find(|path| path.exists())
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "no supported Renovate config file found; tried: {}",
+                RENOVATE_CONFIG_PATTERNS.join(", ")
+            )
+        })
+}
+
+fn committed_path_for_config(config_path: &Path) -> PathBuf {
+    config_path
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .join(COMMITTED_FILE)
+}
+
+fn display_path(project_root: &Path, path: &Path) -> String {
+    normalize_path(path.strip_prefix(project_root).unwrap_or(path))
+}
+
+#[cfg(test)]
+mod tests;

@@ -9,6 +9,8 @@ stderr_contains = [
 [env]
 GITHUB_TOKEN = "token"
 
+# Fake Renovate output is enough here because the failure is in Flint's
+# post-extraction rule-coverage validation, not in invoking the real binary.
 [fake_bins]
 renovate = '''
 #!/bin/sh

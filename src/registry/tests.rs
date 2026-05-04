@@ -828,7 +828,8 @@ fn replace_section(haystack: &str, start_marker: &str, end_marker: &str, body: &
 
 fn generate_summary_table(registry: &[Check]) -> String {
     // Summary table: Name | Description | Fix — sorted alphabetically.
-    // Name column links to the matching detail section in docs/linters.md.
+    // Name column links to the matching detail section in docs/linters.md,
+    // except for checks with a dedicated guide page.
     let headers = ["Name", "Description", "Fix"];
     let mut sorted: Vec<&Check> = registry.iter().collect();
     sorted.sort_by_key(|c| c.name);
@@ -877,9 +878,7 @@ fn generate_linter_details(registry: &[Check]) -> String {
 }
 
 fn summary_row(check: &Check) -> [String; 3] {
-    // docs/linters.md uses `## `<name>`` — GitHub strips backticks and
-    // lowercases to produce the anchor `<name>`.
-    let name = format!("[`{0}`](docs/linters.md#{0})", check.name);
+    let name = format!("[`{}`]({})", check.name, detail_link(check));
     let desc = if check.desc.is_empty() {
         "—".to_string()
     } else {
@@ -887,6 +886,16 @@ fn summary_row(check: &Check) -> [String; 3] {
     };
     let fix = if check.has_fix() { "yes" } else { "—" }.to_string();
     [name, desc, fix]
+}
+
+fn detail_link(check: &Check) -> String {
+    if check.name == "renovate-deps" {
+        return "docs/linters/renovate-deps.md".to_string();
+    }
+
+    // docs/linters.md uses `## `<name>`` — GitHub strips backticks and
+    // lowercases to produce the anchor `<name>`.
+    format!("docs/linters.md#{}", check.name)
 }
 
 fn detail_table(check: &Check) -> String {

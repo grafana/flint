@@ -7,6 +7,11 @@ Flint is intentionally opinionated about config shape: when a linter supports an
 explicit config flag, Flint manages one canonical filename for it. Repos can
 still choose the config directory via `FLINT_CONFIG_DIR` where supported.
 
+Some checks have a separate deep-dive page when their behavior is more
+elaborate than the index entry here:
+
+- [`renovate-deps`](linters/renovate-deps.md)
+
 > [!NOTE]
 > Biome is the exception to `FLINT_CONFIG_DIR`: its real CLI does not work
 > reliably with a nested managed config, so Flint treats root `biome.jsonc` as
@@ -229,9 +234,10 @@ check_all_local = true
 
 Verifies `.github/renovate-tracked-deps.json` is up to date by running
 Renovate locally and comparing its output against the committed snapshot.
-It also validates that equivalent extracted dependencies resolve to the
-same Renovate package-rule coverage, which catches mismatched `depName`
-vs `packageName` setups before generated snippets drift.
+It also checks that dependencies extracted from different files but
+resolving to the same upstream package match the same Renovate
+package rules. That catches config splits like `actionlint` vs
+`rhysd/actionlint` before README snippets and managed versions drift.
 Requires `renovate` in `[tools]`.
 
 In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN`
@@ -246,6 +252,7 @@ With `--fix`, automatically regenerates and commits the snapshot.
 For custom/regex managers, prefer canonical `depNameTemplate` values
 for grouping and explicit `packageNameTemplate` values for datasource
 lookups when those identities differ.
+See [the renovate-deps guide](linters/renovate-deps.md) for examples.
 
 Configure via `flint.toml`:
 

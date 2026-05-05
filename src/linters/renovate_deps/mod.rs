@@ -434,6 +434,7 @@ async fn run_inner(
                 ok: true,
                 stdout,
                 stderr: vec![],
+                setup_outcome: None,
             });
         }
         return Ok(LinterOutput::err(format!(
@@ -450,6 +451,7 @@ async fn run_inner(
             ok: true,
             stdout,
             stderr: vec![],
+            setup_outcome: None,
         });
     }
 
@@ -464,6 +466,7 @@ async fn run_inner(
             ok: true,
             stdout,
             stderr: vec![],
+            setup_outcome: None,
         });
     }
 
@@ -474,6 +477,7 @@ async fn run_inner(
             "ERROR: {COMMITTED_FILE} is out of date.\nRun `flint run --fix renovate-deps` to update.\n"
         )
         .into_bytes(),
+        setup_outcome: None,
     })
 }
 

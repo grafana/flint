@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-const UNSUPPORTED_KEYS_TO_SETUP_VERSION_2: &[(&str, &str)] = &[
+const UNSUPPORTED_TOOL_KEYS: &[(&str, &str)] = &[
     (
         "npm:markdownlint-cli",
         "replace with rumdl and remove markdownlint-era config",
@@ -19,7 +19,7 @@ const OBSOLETE_KEYS: &[(&str, &str)] = &[("github:grafana/flint", "aqua:grafana/
 pub fn find_unsupported_key(
     mise_tools: &HashMap<String, String>,
 ) -> Option<(&'static str, &'static str)> {
-    UNSUPPORTED_KEYS_TO_SETUP_VERSION_2
+    UNSUPPORTED_TOOL_KEYS
         .iter()
         .find(|(old, _)| mise_tools.contains_key(*old))
         .copied()
@@ -30,7 +30,7 @@ pub fn obsolete_keys() -> Vec<(&'static str, &'static str)> {
 }
 
 pub fn unsupported_keys() -> Vec<(&'static str, &'static str)> {
-    UNSUPPORTED_KEYS_TO_SETUP_VERSION_2.to_vec()
+    UNSUPPORTED_TOOL_KEYS.to_vec()
 }
 
 #[cfg(test)]
@@ -48,7 +48,7 @@ mod tests {
                 "duplicate obsolete setup migration key: {old}"
             );
         }
-        for (old, _) in UNSUPPORTED_KEYS_TO_SETUP_VERSION_2 {
+        for (old, _) in UNSUPPORTED_TOOL_KEYS {
             assert!(
                 unsupported_seen.insert(*old),
                 "duplicate unsupported setup migration key: {old}"

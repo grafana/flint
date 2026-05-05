@@ -50,8 +50,8 @@ jobs:
       - name: Setup mise
         uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
         with:
-          version: v2026.4.28
-          sha256: 9655492db554e8f70a69830f54307ac0f4681d6c42f9844e862528b7853d09d1
+          version: v2026.5.0
+          sha256: 12ad77d915e2846ebc1a7ca939ff5d124f414704b3c69155e731bb7c49eadc19
 {rust_steps}
       - name: Lint
         env:

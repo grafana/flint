@@ -73,7 +73,7 @@ Add the linting tools your project needs alongside the `flint` binary itself:
 # Add whichever linters apply to your repo:
 "github:koalaman/shellcheck" = "0.11.0"
 shfmt                   = "v3.13.1"
-actionlint              = "1.7.10"
+actionlint              = "1.7.12"
 ```
 
 Then wire up lint tasks:

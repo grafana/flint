@@ -9,7 +9,7 @@ use super::types::Check;
 /// Also registers normalized aliases for backend-prefixed tools so that checks
 /// can match by their bare package/binary name. For example:
 /// - `"aqua:owenlamont/ryl"` → also registers `"ryl"`
-/// - `"github:google/google-java-format"` → also registers `"google-java-format"`
+/// - `"aqua:jonwiggins/xmloxide"` → also registers `"xmloxide"`
 ///
 /// The original key is always preserved; aliases only fill in missing entries.
 pub fn read_mise_tools(project_root: &Path) -> HashMap<String, String> {
@@ -118,7 +118,8 @@ fn flint_tool_identity(tools: &HashMap<String, String>) -> Option<String> {
 }
 
 fn is_flint_tool_key(key: &str) -> bool {
-    key == "github:grafana/flint"
+    key == "aqua:grafana/flint"
+        || key == "github:grafana/flint"
         || key == "cargo:https://github.com/grafana/flint"
         || key == "cargo:https://github.com/grafana/flint.git"
 }

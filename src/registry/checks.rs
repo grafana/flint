@@ -76,7 +76,7 @@ const RUFF_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
 /// Prefer the user-facing binary or native command name:
 /// - `shellcheck` → `shellcheck`
 /// - `aqua:owenlamont/ryl` → `ryl`
-/// - `github:jonwiggins/xmloxide` → `xmllint`
+/// - `aqua:jonwiggins/xmloxide` → `xmllint`
 ///
 /// Exceptions are explicit and should stay rare:
 /// - clearer package-facing names such as `editorconfig-checker` over `ec`
@@ -191,8 +191,8 @@ fn check_hadolint() -> Check {
 
 fn check_xmllint() -> Check {
     Check::files("xmllint", "xmllint --noout {FILES}", &["*.xml"])
-        .mise_tool("github:jonwiggins/xmloxide")
-        .migrate_tool_keys(&["cargo:xmloxide"])
+        .mise_tool("aqua:jonwiggins/xmloxide")
+        .migrate_tool_keys(&["cargo:xmloxide", "github:jonwiggins/xmloxide"])
         .desc("Validate XML files are well-formed")
 }
 
@@ -343,14 +343,17 @@ fn check_google_java_format() -> Check {
         &["*.java"],
     )
     .fix("google-java-format -i {FILES}")
-    .mise_tool("github:google/google-java-format")
+    .mise_tool("google-java-format")
     .formatter()
     .editorconfig_line_length_off(
         &["*.java"],
         "Java line length is handled by google-java-format",
         Some(EditorconfigDirectiveStyle::Slash),
     )
-    .migrate_tool_keys(&["ubi:google/google-java-format"])
+    .migrate_tool_keys(&[
+        "ubi:google/google-java-format",
+        "github:google/google-java-format",
+    ])
     .desc("Format Java code")
     .lang()
 }

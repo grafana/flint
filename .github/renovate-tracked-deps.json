@@ -4,6 +4,10 @@
       "packageName": "rhysd/actionlint",
       "datasource": "github-releases"
     },
+    "aqua:jonwiggins/xmloxide": {
+      "packageName": "jonwiggins/xmloxide",
+      "datasource": "github-tags"
+    },
     "aqua:owenlamont/ryl": {
       "packageName": "owenlamont/ryl",
       "datasource": "github-tags"
@@ -15,21 +19,13 @@
       "packageName": "editorconfig-checker/editorconfig-checker",
       "datasource": "github-releases"
     },
-    "github:google/google-java-format": {
-      "packageName": "google/google-java-format",
-      "datasource": "github-releases"
-    },
-    "github:jonwiggins/xmloxide": {
-      "packageName": "jonwiggins/xmloxide",
-      "datasource": "github-releases"
-    },
-    "shellcheck": {
-      "packageName": "koalaman/shellcheck",
-      "datasource": "github-releases"
-    },
     "golangci-lint": {
       "packageName": "golangci/golangci-lint",
       "datasource": "github-tags"
+    },
+    "google-java-format": {
+      "packageName": "google-java-format",
+      "datasource": "github-releases"
     },
     "hadolint": {
       "packageName": "hadolint/hadolint",
@@ -61,6 +57,10 @@
     },
     "rumdl": {
       "packageName": "rvben/rumdl",
+      "datasource": "github-releases"
+    },
+    "shellcheck": {
+      "packageName": "koalaman/shellcheck",
       "datasource": "github-releases"
     },
     "shfmt": {
@@ -103,14 +103,14 @@
     "mise.toml": {
       "mise": [
         "actionlint",
+        "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",
         "dotnet",
         "editorconfig-checker",
-        "github:google/google-java-format",
-        "github:jonwiggins/xmloxide",
         "go",
         "golangci-lint",
+        "google-java-format",
         "hadolint",
         "ktlint",
         "lychee",

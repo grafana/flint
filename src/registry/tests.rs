@@ -75,7 +75,7 @@ fn check_owned_tool_migrations_are_always_actionable() {
     assert!(obsolete.contains(&("pipx:ruff", "ruff")));
     assert!(obsolete.contains(&("github:astral-sh/ruff", "ruff")));
     assert!(obsolete.contains(&("github:koalaman/shellcheck", "shellcheck")));
-    assert!(obsolete.contains(&("cargo:xmloxide", "github:jonwiggins/xmloxide")));
+    assert!(obsolete.contains(&("cargo:xmloxide", "aqua:jonwiggins/xmloxide")));
 }
 
 #[test]
@@ -517,8 +517,9 @@ fn linter_keys_include_mise_and_bare_tool_names() {
     let keys = linter_keys();
     assert!(keys.contains("aqua:owenlamont/ryl"));
     assert!(keys.contains("ryl"));
-    assert!(keys.contains("github:jonwiggins/xmloxide"));
+    assert!(keys.contains("aqua:jonwiggins/xmloxide"));
     assert!(keys.contains("xmllint"));
+    assert!(keys.contains("aqua:grafana/flint"));
     assert!(keys.contains("github:grafana/flint"));
     assert!(keys.contains("cargo:https://github.com/grafana/flint"));
     assert!(keys.contains("cargo:https://github.com/grafana/flint.git"));
@@ -540,7 +541,7 @@ fn flint_version_changed_detects_cargo_prerelease_rev_changes() {
 
 #[test]
 fn flint_version_changed_detects_release_to_cargo_backend_switch() {
-    let previous = HashMap::from([("github:grafana/flint".to_string(), "0.20.4".to_string())]);
+    let previous = HashMap::from([("aqua:grafana/flint".to_string(), "0.20.4".to_string())]);
     let current = HashMap::from([(
         "cargo:https://github.com/grafana/flint".to_string(),
         "rev:bbbb".to_string(),
@@ -691,7 +692,7 @@ fn readme_quickstart_tools_snippets_stay_current() {
         .expect("README install block must contain [tools]");
     assert_eq!(
         install_tools
-            .get("github:grafana/flint")
+            .get("aqua:grafana/flint")
             .and_then(toml::Value::as_str),
         Some(env!("CARGO_PKG_VERSION")),
         "README install snippet must pin the current flint release"
@@ -713,13 +714,13 @@ fn readme_quickstart_tools_snippets_stay_current() {
     let expected = toml_tool_versions_from_table(repo_tools, readme_snippets::QUICKSTART_KEYS)
         .into_iter()
         .chain(std::iter::once((
-            "github:grafana/flint".to_string(),
+            "aqua:grafana/flint".to_string(),
             env!("CARGO_PKG_VERSION").to_string(),
         )))
         .collect::<std::collections::BTreeMap<_, _>>();
     let actual = toml_tool_versions_from_table(
         quickstart_tools,
-        &["github:grafana/flint", "shellcheck", "shfmt", "actionlint"],
+        &["aqua:grafana/flint", "shellcheck", "shfmt", "actionlint"],
     );
 
     assert_eq!(

@@ -97,12 +97,12 @@
     {
       matchDepNames: [
         "actionlint",
+        "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",
         "editorconfig-checker",
-        "github:google/google-java-format",
-        "github:jonwiggins/xmloxide",
         "golangci-lint",
+        "google-java-format",
         "hadolint",
         "ktlint",
         "lychee",

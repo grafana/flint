@@ -50,7 +50,7 @@ A check runs against all matching files when:
 - the check is newly active because its tool was added to `mise.toml`
 - the check's tool version changed in `mise.toml`
 - the pinned Flint tool changed in `mise.toml`, either released
-  `github:grafana/flint` or a cargo-backed prerelease revision, which expands
+  `aqua:grafana/flint` or a cargo-backed prerelease revision, which expands
   all active checks
 - the check's flint-managed config file changed, such as `.shellcheckrc` or
   `.yamllint.yml` in `FLINT_CONFIG_DIR`

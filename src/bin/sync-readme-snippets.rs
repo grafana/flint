@@ -21,7 +21,7 @@ fn main() -> Result<()> {
         .context("mise.toml must contain [tools]")?;
 
     let install_block = format!(
-        "[tools]\n\"github:grafana/flint\" = \"{}\"",
+        "[tools]\n\"aqua:grafana/flint\" = \"{}\"",
         env!("CARGO_PKG_VERSION")
     );
     replace_fenced_block(
@@ -69,7 +69,7 @@ fn render_quickstart_tools(table: &toml::Table) -> Result<String> {
     let versions = tool_versions(table, readme_snippets::QUICKSTART_KEYS)?;
     Ok(format!(
         "[tools]\n\
-\"github:grafana/flint\" = \"{flint}\"\n\
+\"aqua:grafana/flint\" = \"{flint}\"\n\
 \n\
 # Add whichever linters apply to your repo:\n\
 shellcheck              = \"{shellcheck}\"\n\

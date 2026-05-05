@@ -16,7 +16,6 @@ const UNSUPPORTED_KEYS_TO_SETUP_VERSION_2: &[(&str, &str)] = &[
 ];
 
 const OBSOLETE_KEYS: &[(&str, &str)] = &[("github:grafana/flint", "aqua:grafana/flint")];
-
 pub fn find_unsupported_key(
     mise_tools: &HashMap<String, String>,
 ) -> Option<(&'static str, &'static str)> {

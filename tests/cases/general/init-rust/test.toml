@@ -56,7 +56,6 @@ rules:
 '''
 ".github/config/flint.toml" = '''
 [settings]
-setup_migration_version = 2
 # exclude = ["CHANGELOG\\.md"]
 '''
 ".github/config/rustfmt.toml" = '''

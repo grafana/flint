@@ -15,8 +15,6 @@ mod scaffold;
 mod ui;
 mod v1;
 
-pub(crate) use config_files::write_setup_migration_version;
-
 use config_files::{
     disable_editorconfig_line_length_for_patterns, generate_editorconfig, generate_flint_toml,
 };
@@ -32,7 +30,7 @@ use migrations::{
     apply_repo_migrations, selected_editorconfig_cleanup_sections,
     selected_editorconfig_line_length_sections,
 };
-pub(crate) use migrations::{apply_setup_migrations, detect_setup_drift, detect_setup_migrations};
+pub(crate) use migrations::{apply_setup_migrations, detect_setup_migrations};
 use scaffold::{apply_env_and_tasks, generate_lint_workflow, maybe_install_hook};
 use ui::{interactive_select_linters, select_categories_arrow};
 
@@ -373,11 +371,7 @@ Add and stage your source files before running init so the detection is accurate
 
     let base_branch = detect_base_branch(project_root);
     let config_dir_path = project_root.join(&config_dir_rel);
-    let toml_generated = generate_flint_toml(
-        &config_dir_path,
-        &base_branch,
-        crate::setup::LATEST_SUPPORTED_SETUP_VERSION,
-    )?;
+    let toml_generated = generate_flint_toml(&config_dir_path, &base_branch)?;
     let needs_rust_components = selected_checks
         .iter()
         .any(|check| check.workflow_setup == Some(WorkflowSetup::RustComponents));

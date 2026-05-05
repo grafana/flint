@@ -82,6 +82,7 @@ pub async fn run(
                 ok: false,
                 stdout: Vec::new(),
                 stderr: stderr.into_bytes(),
+                setup_outcome: None,
             };
         }
     }
@@ -104,6 +105,7 @@ pub async fn run(
                 ok: false,
                 stdout: Vec::new(),
                 stderr: format!("flint: links: failed to collect files: {e}\n").into_bytes(),
+                setup_outcome: None,
             };
         }
     };
@@ -199,6 +201,7 @@ pub async fn run(
         ok: all_ok,
         stdout: combined_stdout,
         stderr: combined_stderr,
+        setup_outcome: None,
     }
 }
 
@@ -347,12 +350,14 @@ async fn run_lychee_cmd(
                 ok: out.status.success(),
                 stdout,
                 stderr: out.stderr,
+                setup_outcome: None,
             }
         }
         Err(e) => LinterOutput {
             ok: false,
             stdout,
             stderr: format!("flint: links: failed to spawn lychee: {e}\n").into_bytes(),
+            setup_outcome: None,
         },
     }
 }
@@ -783,7 +788,6 @@ mod tests {
             &Settings {
                 base_branch: "main".to_string(),
                 exclude: vec!["tests/cases/**".to_string()],
-                setup_migration_version: crate::setup::V2_BASELINE_SETUP_VERSION,
             },
         )
         .unwrap();

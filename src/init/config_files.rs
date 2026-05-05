@@ -7,11 +7,7 @@ use crate::registry::EditorconfigDirectiveStyle;
 
 /// Writes a skeleton `flint.toml` in `config_dir`. Creates the directory if needed.
 /// Returns `true` if the file was written, `false` if it already existed.
-pub(super) fn generate_flint_toml(
-    config_dir: &Path,
-    base_branch: &str,
-    setup_migration_version: u32,
-) -> Result<bool> {
+pub(super) fn generate_flint_toml(config_dir: &Path, base_branch: &str) -> Result<bool> {
     let toml_path = config_dir.join("flint.toml");
     if toml_path.exists() {
         return Ok(false);
@@ -21,48 +17,9 @@ pub(super) fn generate_flint_toml(
     if base_branch != "main" {
         content.push_str(&format!("base_branch = \"{base_branch}\"\n"));
     }
-    content.push_str(&format!(
-        "setup_migration_version = {setup_migration_version}\n"
-    ));
     content.push_str("# exclude = [\"CHANGELOG\\\\.md\"]\n");
     std::fs::write(&toml_path, &content)?;
     println!("  wrote {}", toml_path.display());
-    Ok(true)
-}
-
-pub(crate) fn write_setup_migration_version(
-    config_dir: &Path,
-    base_branch: &str,
-    version: u32,
-) -> Result<bool> {
-    let toml_path = config_dir.join("flint.toml");
-    if !toml_path.exists() {
-        return generate_flint_toml(config_dir, base_branch, version);
-    }
-
-    let content = std::fs::read_to_string(&toml_path)
-        .with_context(|| format!("failed to read {}", toml_path.display()))?;
-    let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse flint.toml")?;
-    if doc.get("settings").is_none() {
-        doc["settings"] = toml_edit::table();
-    }
-    let Some(settings) = doc.get_mut("settings").and_then(|item| item.as_table_mut()) else {
-        anyhow::bail!("[settings] is not a table in {}", toml_path.display());
-    };
-    let current = settings
-        .get("setup_migration_version")
-        .and_then(|item| item.as_value())
-        .and_then(|value| value.as_integer())
-        .and_then(|value| u32::try_from(value).ok());
-    if current == Some(version) {
-        return Ok(false);
-    }
-    settings.insert(
-        "setup_migration_version",
-        toml_edit::value(i64::from(version)),
-    );
-    std::fs::write(&toml_path, doc.to_string())
-        .with_context(|| format!("failed to write {}", toml_path.display()))?;
     Ok(true)
 }
 
@@ -88,19 +45,6 @@ pub(super) fn remove_legacy_lint_files(
         removed.push(rel);
     }
     Ok(removed)
-}
-
-pub(super) fn existing_legacy_lint_files(project_root: &Path, config_dir: &Path) -> Vec<String> {
-    legacy_lint_files(project_root, config_dir)
-        .into_iter()
-        .filter(|path| path.exists())
-        .map(|path| {
-            path.strip_prefix(project_root)
-                .unwrap_or(&path)
-                .display()
-                .to_string()
-        })
-        .collect()
 }
 
 fn legacy_lint_files(project_root: &Path, config_dir: &Path) -> Vec<std::path::PathBuf> {
@@ -133,16 +77,6 @@ pub(super) fn remove_stale_markdownlint_line_length_directives(
         changed_files.push(rel.to_string());
     }
     Ok(changed_files)
-}
-
-pub(super) fn stale_markdownlint_line_length_directive_files(
-    project_root: &Path,
-) -> Result<Vec<String>> {
-    stale_transformed_files(
-        project_root,
-        &[&["*.md"]],
-        strip_stale_markdownlint_md013_directives,
-    )
 }
 
 fn tracked_files_for_patterns(project_root: &Path, patterns: &[&[&str]]) -> Result<Vec<String>> {
@@ -194,45 +128,6 @@ pub(super) fn remove_stale_editorconfig_checker_directives(
     }
     changed_files.sort();
     changed_files.dedup();
-    Ok(changed_files)
-}
-
-pub(super) fn stale_editorconfig_checker_directive_files(
-    project_root: &Path,
-    delegated_sections: &[(&[&str], EditorconfigDirectiveStyle)],
-) -> Result<Vec<String>> {
-    let mut changed_files = vec![];
-    for (patterns, directive_style) in delegated_sections {
-        changed_files.extend(stale_transformed_files(
-            project_root,
-            &[*patterns],
-            |content| strip_stale_editorconfig_checker_directives(content, *directive_style),
-        )?);
-    }
-    changed_files.sort();
-    changed_files.dedup();
-    Ok(changed_files)
-}
-
-fn stale_transformed_files<F>(
-    project_root: &Path,
-    patterns: &[&[&str]],
-    transform: F,
-) -> Result<Vec<String>>
-where
-    F: Fn(&str) -> String,
-{
-    let tracked_files = tracked_files_for_patterns(project_root, patterns)?;
-    let mut changed_files = vec![];
-    for rel in tracked_files {
-        let path = project_root.join(rel.as_str());
-        let Ok(content) = std::fs::read_to_string(&path) else {
-            continue;
-        };
-        if transform(&content) != content {
-            changed_files.push(rel);
-        }
-    }
     Ok(changed_files)
 }
 

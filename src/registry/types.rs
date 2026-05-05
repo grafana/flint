@@ -182,7 +182,6 @@ pub enum EditorconfigLineLengthPolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ToolKeyMigration {
-    pub after_setup_migration_version: u32,
     pub old_key: &'static str,
 }
 
@@ -201,6 +200,7 @@ pub struct LinterOutput {
     pub ok: bool,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
+    pub setup_outcome: Option<SetupOutcome>,
 }
 
 impl LinterOutput {
@@ -209,6 +209,35 @@ impl LinterOutput {
             ok: false,
             stdout: vec![],
             stderr: stderr.into(),
+            setup_outcome: None,
+        }
+    }
+
+    pub fn setup_err(setup_outcome: SetupOutcome, stderr: impl Into<Vec<u8>>) -> Self {
+        Self {
+            ok: false,
+            stdout: vec![],
+            stderr: stderr.into(),
+            setup_outcome: Some(setup_outcome),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SetupOutcome {
+    Clean,
+    NonBlocking,
+    Blocking,
+    Fatal,
+}
+
+impl SetupOutcome {
+    pub fn at_least(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Fatal, _) | (_, Self::Fatal) => Self::Fatal,
+            (Self::Blocking, _) | (_, Self::Blocking) => Self::Blocking,
+            (Self::NonBlocking, _) | (_, Self::NonBlocking) => Self::NonBlocking,
+            (Self::Clean, Self::Clean) => Self::Clean,
         }
     }
 }
@@ -923,19 +952,11 @@ impl Check {
         self
     }
 
-    /// Old mise tool keys that should migrate to this check's current install
-    /// key when the repo setup migration version is at or before
-    /// `after_setup_migration_version`.
-    pub fn migrate_tool_keys_after(
-        mut self,
-        after_setup_migration_version: u32,
-        old_keys: &'static [&'static str],
-    ) -> Self {
+    /// Old mise tool keys that should always migrate to this check's current
+    /// install key when encountered in `mise.toml`.
+    pub fn migrate_tool_keys(mut self, old_keys: &'static [&'static str]) -> Self {
         self.tool_key_migrations
-            .extend(old_keys.iter().map(|old_key| ToolKeyMigration {
-                after_setup_migration_version,
-                old_key,
-            }));
+            .extend(old_keys.iter().map(|old_key| ToolKeyMigration { old_key }));
         self
     }
 }

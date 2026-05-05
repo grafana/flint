@@ -5,9 +5,8 @@ use std::path::Path;
 use crate::registry::{Check, EditorconfigDirectiveStyle, EditorconfigLineLengthPolicy, builtin};
 
 use super::config_files::{
-    existing_legacy_lint_files, remove_legacy_lint_files,
-    remove_stale_editorconfig_checker_directives, remove_stale_markdownlint_line_length_directives,
-    stale_editorconfig_checker_directive_files, stale_markdownlint_line_length_directive_files,
+    remove_legacy_lint_files, remove_stale_editorconfig_checker_directives,
+    remove_stale_markdownlint_line_length_directives,
 };
 use super::detection::parse_tool_keys;
 use super::generation;
@@ -25,7 +24,6 @@ pub(super) struct RepoMigrationSummary {
 
 struct MigrationInputs {
     tool_keys: HashSet<String>,
-    delegated_sections: Vec<(&'static [&'static str], EditorconfigDirectiveStyle)>,
     mise_content: String,
 }
 
@@ -62,26 +60,35 @@ impl RepoMigrationSummary {
 }
 
 pub(crate) fn apply_setup_migrations(project_root: &Path, config_dir: &Path) -> Result<bool> {
-    let mise_path = project_root.join("mise.toml");
-    let current_content = std::fs::read_to_string(&mise_path).unwrap_or_default();
-    let current_tool_keys = parse_tool_keys(&current_content);
-    let delegated_sections = active_editorconfig_cleanup_sections(&current_tool_keys);
-    let migration_summary = apply_repo_migrations(project_root, config_dir, &delegated_sections)?;
+    let inputs = migration_inputs(project_root)?;
+    let obsolete_keys = crate::registry::obsolete_keys();
+    let unsupported_keys = crate::registry::unsupported_keys();
+    let delegated_sections = if legacy_markdownlint_stack_active(&inputs.tool_keys) {
+        active_editorconfig_cleanup_sections(&inputs.tool_keys)
+    } else {
+        vec![]
+    };
+    let migration_summary = apply_repo_migrations_with_keys(
+        project_root,
+        config_dir,
+        &delegated_sections,
+        &obsolete_keys,
+        &unsupported_keys,
+        legacy_markdownlint_stack_active(&inputs.tool_keys),
+    )?;
     Ok(!migration_summary.is_noop())
 }
 
-pub(crate) fn detect_setup_migrations(
-    project_root: &Path,
-    config_dir: &Path,
-    setup_migration_version: u32,
-) -> Result<bool> {
-    let migration_summary =
-        detect_setup_migrations_after(project_root, config_dir, setup_migration_version)?;
-    Ok(!migration_summary.is_noop())
-}
-
-pub(crate) fn detect_setup_drift(project_root: &Path, config_dir: &Path) -> Result<bool> {
-    let migration_summary = detect_repo_migrations(project_root, config_dir)?;
+pub(crate) fn detect_setup_migrations(project_root: &Path) -> Result<bool> {
+    let inputs = migration_inputs(project_root)?;
+    let obsolete_keys = crate::registry::obsolete_keys();
+    let unsupported_keys = crate::registry::unsupported_keys();
+    let migration_summary = detect_setup_migrations_with_keys(
+        &obsolete_keys,
+        &unsupported_keys,
+        &inputs.tool_keys,
+        &inputs.mise_content,
+    );
     Ok(!migration_summary.is_noop())
 }
 
@@ -174,43 +181,7 @@ pub(super) fn apply_repo_migrations(
         delegated_sections,
         &obsolete_keys,
         &unsupported_keys,
-    )
-}
-
-pub(crate) fn detect_repo_migrations(
-    project_root: &Path,
-    config_dir: &Path,
-) -> Result<RepoMigrationSummary> {
-    let inputs = migration_inputs(project_root)?;
-    let obsolete_keys = crate::registry::obsolete_keys();
-    let unsupported_keys = crate::registry::unsupported_keys();
-    detect_repo_migrations_with_keys(
-        project_root,
-        config_dir,
-        &inputs.delegated_sections,
-        &obsolete_keys,
-        &unsupported_keys,
-        &inputs.tool_keys,
-        &inputs.mise_content,
-    )
-}
-
-pub(crate) fn detect_setup_migrations_after(
-    project_root: &Path,
-    config_dir: &Path,
-    setup_migration_version: u32,
-) -> Result<RepoMigrationSummary> {
-    let inputs = migration_inputs(project_root)?;
-    let obsolete_keys = crate::registry::obsolete_keys_after(setup_migration_version);
-    let unsupported_keys = crate::setup::unsupported_keys_after(setup_migration_version);
-    detect_repo_migrations_with_keys(
-        project_root,
-        config_dir,
-        &inputs.delegated_sections,
-        &obsolete_keys,
-        &unsupported_keys,
-        &inputs.tool_keys,
-        &inputs.mise_content,
+        true,
     )
 }
 
@@ -218,23 +189,18 @@ fn migration_inputs(project_root: &Path) -> Result<MigrationInputs> {
     let mise_path = project_root.join("mise.toml");
     let current_content = std::fs::read_to_string(&mise_path).unwrap_or_default();
     let current_tool_keys = parse_tool_keys(&current_content);
-    let delegated_sections = active_editorconfig_cleanup_sections(&current_tool_keys);
     Ok(MigrationInputs {
         tool_keys: current_tool_keys,
-        delegated_sections,
         mise_content: current_content,
     })
 }
 
-fn detect_repo_migrations_with_keys(
-    project_root: &Path,
-    config_dir: &Path,
-    delegated_sections: &[(&'static [&'static str], EditorconfigDirectiveStyle)],
+fn detect_setup_migrations_with_keys(
     obsolete_keys: &[(&'static str, &'static str)],
     unsupported_keys: &[(&'static str, &'static str)],
     tool_keys: &HashSet<String>,
     mise_content: &str,
-) -> Result<RepoMigrationSummary> {
+) -> RepoMigrationSummary {
     let replaced_obsolete = obsolete_keys
         .iter()
         .filter(|(old_key, _)| tool_keys.contains(*old_key))
@@ -246,17 +212,50 @@ fn detect_repo_migrations_with_keys(
         .map(|(old_key, _)| (*old_key).to_string())
         .collect();
     let node_added = needs_node_for_npm(mise_content);
-    let legacy_files_removed = existing_legacy_lint_files(project_root, config_dir);
-    let stale_md013_comments_removed = if delegated_patterns_include(delegated_sections, "*.md") {
-        stale_markdownlint_line_length_directive_files(project_root)?
+    RepoMigrationSummary {
+        replaced_obsolete,
+        removed_unsupported,
+        node_added,
+        legacy_files_removed: vec![],
+        stale_md013_comments_removed: vec![],
+        stale_editorconfig_checker_comments_removed: vec![],
+    }
+}
+
+fn apply_repo_migrations_with_keys(
+    project_root: &Path,
+    config_dir: &Path,
+    delegated_sections: &[(&'static [&'static str], EditorconfigDirectiveStyle)],
+    obsolete_keys: &[(&'static str, &'static str)],
+    unsupported_keys: &[(&'static str, &'static str)],
+    include_repo_cleanup: bool,
+) -> Result<RepoMigrationSummary> {
+    let replaced_obsolete = generation::replace_obsolete_keys(project_root, obsolete_keys)?;
+    let removed_unsupported = remove_tool_keys(
+        project_root,
+        &unsupported_keys
+            .iter()
+            .map(|(old_key, _)| *old_key)
+            .collect::<Vec<_>>(),
+    )?;
+    let node_added = ensure_node_for_npm(project_root)?;
+    let legacy_files_removed = if include_repo_cleanup {
+        remove_legacy_lint_files(project_root, config_dir)?
     } else {
         vec![]
     };
-    let stale_editorconfig_checker_comments_removed = if delegated_sections.is_empty() {
-        vec![]
-    } else {
-        stale_editorconfig_checker_directive_files(project_root, delegated_sections)?
-    };
+    let stale_md013_comments_removed =
+        if include_repo_cleanup && delegated_patterns_include(delegated_sections, "*.md") {
+            remove_stale_markdownlint_line_length_directives(project_root)?
+        } else {
+            vec![]
+        };
+    let stale_editorconfig_checker_comments_removed =
+        if include_repo_cleanup && !delegated_sections.is_empty() {
+            remove_stale_editorconfig_checker_directives(project_root, delegated_sections)?
+        } else {
+            vec![]
+        };
 
     Ok(RepoMigrationSummary {
         replaced_obsolete,
@@ -268,42 +267,16 @@ fn detect_repo_migrations_with_keys(
     })
 }
 
-fn apply_repo_migrations_with_keys(
-    project_root: &Path,
-    config_dir: &Path,
-    delegated_sections: &[(&'static [&'static str], EditorconfigDirectiveStyle)],
-    obsolete_keys: &[(&'static str, &'static str)],
-    unsupported_keys: &[(&'static str, &'static str)],
-) -> Result<RepoMigrationSummary> {
-    let replaced_obsolete = generation::replace_obsolete_keys(project_root, obsolete_keys)?;
-    let removed_unsupported = remove_tool_keys(
-        project_root,
-        &unsupported_keys
-            .iter()
-            .map(|(old_key, _)| *old_key)
-            .collect::<Vec<_>>(),
-    )?;
-    let node_added = ensure_node_for_npm(project_root)?;
-    let legacy_files_removed = remove_legacy_lint_files(project_root, config_dir)?;
-    let stale_md013_comments_removed = if delegated_patterns_include(delegated_sections, "*.md") {
-        remove_stale_markdownlint_line_length_directives(project_root)?
-    } else {
-        vec![]
-    };
-    let stale_editorconfig_checker_comments_removed = if delegated_sections.is_empty() {
-        vec![]
-    } else {
-        remove_stale_editorconfig_checker_directives(project_root, delegated_sections)?
-    };
+fn legacy_markdownlint_stack_active(tool_keys: &HashSet<String>) -> bool {
+    const MARKDOWNLINT_STACK_KEYS: &[&str] = &[
+        "npm:markdownlint-cli",
+        "npm:markdownlint-cli2",
+        "npm:prettier",
+    ];
 
-    Ok(RepoMigrationSummary {
-        replaced_obsolete,
-        removed_unsupported,
-        node_added,
-        legacy_files_removed,
-        stale_md013_comments_removed,
-        stale_editorconfig_checker_comments_removed,
-    })
+    MARKDOWNLINT_STACK_KEYS
+        .iter()
+        .any(|key| tool_keys.contains(*key))
 }
 
 fn delegated_patterns_include(

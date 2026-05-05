@@ -1,0 +1,56 @@
+[expected]
+args = "run --full"
+exit = 1
+stderr = '''
+[flint-setup]
+ERROR: mise.toml [tools] entries are not in Flint's canonical order.
+Run `flint run --fix flint-setup` to apply Flint setup migrations.
+[shfmt]
+diff "<REPO>/script.sh.orig" "<REPO>/script.sh"
+--- "<REPO>/script.sh.orig"
++++ "<REPO>/script.sh"
+@@ -1,4 +1,4 @@
+ #!/bin/sh
+ if true; then
+-echo "hello"
++	echo "hello"
+ fi
+
+flint: 2 checks failed (flint-setup, shfmt)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''
+
+[fake_bins]
+shfmt = '''
+#!/bin/sh
+set -eu
+
+case "${1:-}" in
+  -d)
+    cat <<EOF
+diff "$2.orig" "$2"
+--- "$2.orig"
++++ "$2"
+@@ -1,4 +1,4 @@
+ #!/bin/sh
+ if true; then
+-echo "hello"
++	echo "hello"
+ fi
+EOF
+    exit 1
+    ;;
+  -w)
+    cat >"$2" <<'EOF'
+#!/bin/sh
+if true; then
+	echo "hello"
+fi
+EOF
+    ;;
+  *)
+    echo "unexpected shfmt invocation: $*" >&2
+    exit 1
+    ;;
+esac
+'''

@@ -101,7 +101,7 @@ flint run --fix renovate-deps
 ```
 
 If you want to force a fresh metadata rebuild instead of reusing any existing
-committed metadata for the same dep names, for example after changing Renovate
+committed metadata for the same dependency names, for example after changing Renovate
 grouping config or while debugging suspicious `meta` entries:
 
 ```bash
@@ -113,4 +113,4 @@ If rule coverage is inconsistent:
 - normalize equivalent deps to one canonical `depNameTemplate`
 - keep `packageNameTemplate` explicit when datasource lookup needs a different
   identifier
-- make sure the intended `packageRules` matcher covers that canonical dep name
+- make sure the intended `packageRules` matcher covers that canonical dependency name

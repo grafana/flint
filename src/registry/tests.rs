@@ -396,7 +396,7 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
         .find(|rule| rule["groupName"].as_str() == Some("linters"))
         .expect("default.json must define a packageRules entry with groupName 'linters'");
 
-    let actual = package_names(linters_rule);
+    let actual = dep_names(linters_rule);
     let expected: Vec<&str> = builtin()
         .into_iter()
         .filter(|check| check.uses_binary())
@@ -412,8 +412,8 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
     );
     assert_eq!(
         actual,
-        sorted_package_names(linters_rule),
-        "default.json weekly linters rule matchPackageNames must be sorted"
+        sorted_dep_names(linters_rule),
+        "default.json weekly linters rule matchDepNames must be sorted"
     );
 
     assert_eq!(
@@ -478,14 +478,19 @@ fn repo_renovate_config_stays_aligned_with_shared_preset_contract() {
             "package rule {group_name:?} separateMajorMinor in .github/renovate.json5 drifted from default.json"
         );
         assert_eq!(
-            package_names(default_rule),
-            package_names(repo_rule),
-            "package rule {group_name:?} matchPackageNames in .github/renovate.json5 drifted from default.json"
+            rule_name_field(default_rule),
+            rule_name_field(repo_rule),
+            "package rule {group_name:?} matcher field in .github/renovate.json5 drifted from default.json"
         );
         assert_eq!(
-            package_names(repo_rule),
-            sorted_package_names(repo_rule),
-            "package rule {group_name:?} matchPackageNames in .github/renovate.json5 must be sorted"
+            rule_names(default_rule),
+            rule_names(repo_rule),
+            "package rule {group_name:?} package matcher in .github/renovate.json5 drifted from default.json"
+        );
+        assert_eq!(
+            rule_names(repo_rule),
+            sorted_rule_names(repo_rule),
+            "package rule {group_name:?} package matcher in .github/renovate.json5 must be sorted"
         );
     }
 
@@ -574,8 +579,51 @@ fn package_names(rule: &serde_json::Value) -> Vec<&str> {
         .collect()
 }
 
-fn sorted_package_names(rule: &serde_json::Value) -> Vec<&str> {
-    let mut names = package_names(rule);
+fn dep_names(rule: &serde_json::Value) -> Vec<&str> {
+    rule["matchDepNames"]
+        .as_array()
+        .expect("package rule must declare matchDepNames")
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .expect("package rule matchDepNames entries must be strings")
+        })
+        .collect()
+}
+
+fn sorted_dep_names(rule: &serde_json::Value) -> Vec<&str> {
+    let mut names = dep_names(rule);
+    names.sort_unstable();
+    names
+}
+
+fn rule_name_field(rule: &serde_json::Value) -> &'static str {
+    match (
+        rule.get("matchDepNames").is_some(),
+        rule.get("matchPackageNames").is_some(),
+    ) {
+        (true, false) => "matchDepNames",
+        (false, true) => "matchPackageNames",
+        (true, true) => {
+            panic!("package rule must not declare both matchDepNames and matchPackageNames")
+        }
+        (false, false) => {
+            panic!("package rule must declare matchDepNames or matchPackageNames")
+        }
+    }
+}
+
+fn rule_names(rule: &serde_json::Value) -> Vec<&str> {
+    match rule_name_field(rule) {
+        "matchDepNames" => dep_names(rule),
+        "matchPackageNames" => package_names(rule),
+        _ => unreachable!("unexpected rule_name_field result"),
+    }
+}
+
+fn sorted_rule_names(rule: &serde_json::Value) -> Vec<&str> {
+    let mut names = rule_names(rule);
     names.sort_unstable();
     names
 }
@@ -780,7 +828,8 @@ fn replace_section(haystack: &str, start_marker: &str, end_marker: &str, body: &
 
 fn generate_summary_table(registry: &[Check]) -> String {
     // Summary table: Name | Description | Fix — sorted alphabetically.
-    // Name column links to the matching detail section in docs/linters.md.
+    // Name column links to the matching detail section in docs/linters.md,
+    // except for checks with a dedicated guide page.
     let headers = ["Name", "Description", "Fix"];
     let mut sorted: Vec<&Check> = registry.iter().collect();
     sorted.sort_by_key(|c| c.name);
@@ -829,9 +878,7 @@ fn generate_linter_details(registry: &[Check]) -> String {
 }
 
 fn summary_row(check: &Check) -> [String; 3] {
-    // docs/linters.md uses `## `<name>`` — GitHub strips backticks and
-    // lowercases to produce the anchor `<name>`.
-    let name = format!("[`{0}`](docs/linters.md#{0})", check.name);
+    let name = format!("[`{}`]({})", check.name, detail_link(check));
     let desc = if check.desc.is_empty() {
         "—".to_string()
     } else {
@@ -839,6 +886,12 @@ fn summary_row(check: &Check) -> [String; 3] {
     };
     let fix = if check.has_fix() { "yes" } else { "—" }.to_string();
     [name, desc, fix]
+}
+
+fn detail_link(check: &Check) -> String {
+    // docs/linters.md uses `## `<name>`` — GitHub strips backticks and
+    // lowercases to produce the anchor `<name>`.
+    format!("docs/linters.md#{}", check.name)
 }
 
 fn detail_table(check: &Check) -> String {

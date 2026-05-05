@@ -1,7 +1,10 @@
 {
-  "package.json": {
-    "npm": [
-      "old-dep"
-    ]
+  "meta": {},
+  "files": {
+    "package.json": {
+      "npm": [
+        "old-dep"
+      ]
+    }
   }
 }

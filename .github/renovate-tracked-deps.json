@@ -1,63 +1,138 @@
 {
-  ".github/workflows/lint.yml": {
-    "regex": [
-      "mise"
-    ]
+  "meta": {
+    "actionlint": {
+      "packageName": "rhysd/actionlint",
+      "datasource": "github-releases"
+    },
+    "aqua:owenlamont/ryl": {
+      "packageName": "owenlamont/ryl",
+      "datasource": "github-tags"
+    },
+    "biome": {
+      "packageName": "biome"
+    },
+    "editorconfig-checker": {
+      "packageName": "editorconfig-checker/editorconfig-checker",
+      "datasource": "github-releases"
+    },
+    "github:google/google-java-format": {
+      "packageName": "google/google-java-format",
+      "datasource": "github-releases"
+    },
+    "github:jonwiggins/xmloxide": {
+      "packageName": "jonwiggins/xmloxide",
+      "datasource": "github-releases"
+    },
+    "github:koalaman/shellcheck": {
+      "packageName": "koalaman/shellcheck",
+      "datasource": "github-releases"
+    },
+    "golangci-lint": {
+      "packageName": "golangci/golangci-lint",
+      "datasource": "github-tags"
+    },
+    "hadolint": {
+      "packageName": "hadolint/hadolint",
+      "datasource": "github-tags"
+    },
+    "ktlint": {
+      "packageName": "pinterest/ktlint",
+      "datasource": "github-releases"
+    },
+    "lychee": {
+      "packageName": "lycheeverse/lychee",
+      "datasource": "github-releases"
+    },
+    "mise": {
+      "packageName": "jdx/mise",
+      "datasource": "github-release-attachments"
+    },
+    "npm:renovate": {
+      "packageName": "renovate",
+      "datasource": "npm"
+    },
+    "pipx:codespell": {
+      "packageName": "codespell",
+      "datasource": "pypi"
+    },
+    "ruff": {
+      "packageName": "astral-sh/ruff",
+      "datasource": "github-releases"
+    },
+    "rumdl": {
+      "packageName": "rvben/rumdl",
+      "datasource": "github-releases"
+    },
+    "shfmt": {
+      "packageName": "mvdan/sh",
+      "datasource": "github-releases"
+    },
+    "taplo": {
+      "packageName": "tamasfe/taplo",
+      "datasource": "github-releases"
+    }
   },
-  ".github/workflows/release-assets.yml": {
-    "regex": [
-      "mise"
-    ]
-  },
-  ".github/workflows/release-plz.yml": {
-    "regex": [
-      "mise"
-    ]
-  },
-  ".github/workflows/test.yml": {
-    "regex": [
-      "mise"
-    ]
-  },
-  "README.md": {
-    "regex": [
-      "koalaman/shellcheck",
-      "mvdan/sh",
-      "rhysd/actionlint"
-    ]
-  },
-  "mise.toml": {
-    "mise": [
-      "actionlint",
-      "aqua:owenlamont/ryl",
-      "biome",
-      "dotnet",
-      "editorconfig-checker",
-      "github:google/google-java-format",
-      "github:jonwiggins/xmloxide",
-      "github:koalaman/shellcheck",
-      "go",
-      "golangci-lint",
-      "hadolint",
-      "ktlint",
-      "lychee",
-      "node",
-      "npm:renovate",
-      "pipx:codespell",
-      "release-plz",
-      "ruff",
-      "rumdl",
-      "rust",
-      "shfmt",
-      "taplo"
-    ]
-  },
-  "src/init/scaffold.rs": {
-    "regex": [
-      "Swatinem/rust-cache",
-      "actions/checkout",
-      "jdx/mise-action",
-      "mise"
-    ]
+  "files": {
+    ".github/workflows/lint.yml": {
+      "regex": [
+        "mise"
+      ]
+    },
+    ".github/workflows/release-assets.yml": {
+      "regex": [
+        "mise"
+      ]
+    },
+    ".github/workflows/release-plz.yml": {
+      "regex": [
+        "mise"
+      ]
+    },
+    ".github/workflows/test.yml": {
+      "regex": [
+        "mise"
+      ]
+    },
+    "README.md": {
+      "regex": [
+        "actionlint",
+        "github:koalaman/shellcheck",
+        "shfmt"
+      ]
+    },
+    "mise.toml": {
+      "mise": [
+        "actionlint",
+        "aqua:owenlamont/ryl",
+        "biome",
+        "dotnet",
+        "editorconfig-checker",
+        "github:google/google-java-format",
+        "github:jonwiggins/xmloxide",
+        "github:koalaman/shellcheck",
+        "go",
+        "golangci-lint",
+        "hadolint",
+        "ktlint",
+        "lychee",
+        "node",
+        "npm:renovate",
+        "pipx:codespell",
+        "release-plz",
+        "ruff",
+        "rumdl",
+        "rust",
+        "shfmt",
+        "taplo"
+      ]
+    },
+    "src/init/scaffold.rs": {
+      "regex": [
+        "Swatinem/rust-cache",
+        "actions/checkout",
+        "jdx/mise-action",
+        "mise"
+      ]
+    }
   }
 }

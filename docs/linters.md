@@ -227,8 +227,13 @@ check_all_local = true
 | Patterns    | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
 | Run policy  | adaptive — runs in `--fast-only` only when relevant                                                                        |
 
-Verifies `.github/renovate-tracked-deps.json` is up to date by running
-Renovate locally and comparing its output against the committed snapshot.
+Verifies `renovate-tracked-deps.json` next to the active Renovate
+config is up to date by running Renovate locally and comparing its
+output against the committed snapshot.
+It also checks that dependencies extracted from different files but
+resolving to the same upstream package match the same Renovate
+package rules. That catches config splits like `actionlint` vs
+`rhysd/actionlint` before Renovate stops grouping them consistently.
 Requires `renovate` in `[tools]`.
 
 In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN`
@@ -240,6 +245,10 @@ When `flint init` writes a new `flint.toml`, it includes this section if
 legacy `RENOVATE_TRACKED_DEPS_EXCLUDE` values into `exclude_managers`.
 
 With `--fix`, automatically regenerates and commits the snapshot.
+For custom/regex managers, prefer canonical `depNameTemplate` values
+for grouping and explicit `packageNameTemplate` values for datasource
+lookups when those identities differ.
+See [the renovate-deps guide](linters/renovate-deps.md) for examples.
 
 Configure via `flint.toml`:
 

@@ -1,0 +1,18 @@
+[expected]
+args = "run --full renovate-deps"
+exit = 1
+stderr_contains = [
+  "flint: renovate-deps: package rule group \"linters\" matches package rhysd/actionlint inconsistently",
+  "matched [actionlint], unmatched [rhysd/actionlint]",
+]
+
+[env]
+GITHUB_TOKEN = "token"
+
+# Fake Renovate output is enough here because the failure is in Flint's
+# post-extraction rule-coverage validation, not in invoking the real binary.
+[fake_bins]
+renovate = '''
+#!/bin/sh
+printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"mise":[{"packageFile":"mise.toml","deps":[{"depName":"actionlint","packageName":"rhysd/actionlint","datasource":"github-releases"}]}],"regex":[{"packageFile":"README.md","deps":[{"depName":"rhysd/actionlint","packageName":"rhysd/actionlint","datasource":"github-releases"}]}]}}'
+'''

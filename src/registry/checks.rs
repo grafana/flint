@@ -428,8 +428,13 @@ fn check_renovate_deps() -> Check {
         .patterns(RENOVATE_CONFIG_PATTERNS)
         .desc("Verify Renovate dependency snapshot is up to date")
         .docs(
-            "Verifies `.github/renovate-tracked-deps.json` is up to date by running\n\
-            Renovate locally and comparing its output against the committed snapshot.\n\
+            "Verifies `renovate-tracked-deps.json` next to the active Renovate\n\
+            config is up to date by running Renovate locally and comparing its\n\
+            output against the committed snapshot.\n\
+            It also checks that dependencies extracted from different files but\n\
+            resolving to the same upstream package match the same Renovate\n\
+            package rules. That catches config splits like `actionlint` vs\n\
+            `rhysd/actionlint` before Renovate stops grouping them consistently.\n\
             Requires `renovate` in `[tools]`.\n\
             \n\
             In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN`\n\
@@ -441,6 +446,10 @@ fn check_renovate_deps() -> Check {
             legacy `RENOVATE_TRACKED_DEPS_EXCLUDE` values into `exclude_managers`.\n\
             \n\
             With `--fix`, automatically regenerates and commits the snapshot.\n\
+            For custom/regex managers, prefer canonical `depNameTemplate` values\n\
+            for grouping and explicit `packageNameTemplate` values for datasource\n\
+            lookups when those identities differ.\n\
+            See [the renovate-deps guide](linters/renovate-deps.md) for examples.\n\
             \n\
             Configure via `flint.toml`:\n\
             \n\

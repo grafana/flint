@@ -11,16 +11,19 @@ GITHUB_TOKEN = "token"
 [expected.files]
 ".github/renovate-tracked-deps.json" = """
 {
-  "mise.toml": {
-    "mise": [
-      "npm:renovate"
-    ]
-  },
-  "package.json": {
-    "npm": [
-      "express",
-      "lodash"
-    ]
+  "meta": {},
+  "files": {
+    "mise.toml": {
+      "mise": [
+        "npm:renovate"
+      ]
+    },
+    "package.json": {
+      "npm": [
+        "express",
+        "lodash"
+      ]
+    }
   }
 }
 """

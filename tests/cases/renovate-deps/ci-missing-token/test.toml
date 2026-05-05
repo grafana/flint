@@ -1,0 +1,14 @@
+[expected]
+args = "run --full renovate-deps"
+exit = 1
+stderr_contains = ["flint: renovate-deps: missing required CI environment variable: GITHUB_COM_TOKEN or GITHUB_TOKEN", "Set GITHUB_TOKEN, or set GITHUB_COM_TOKEN directly"]
+
+[env]
+CI = "true"
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+echo "renovate should not run without token on CI" >&2
+exit 1
+'''

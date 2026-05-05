@@ -1,0 +1,9 @@
+[expected]
+args = "run lychee"
+exit = 1
+stderr_contains = ["flint: links: missing required CI environment variables: GITHUB_REPOSITORY, GITHUB_BASE_REF, GITHUB_HEAD_REF, PR_HEAD_REPO", "PR link remaps in CI require GitHub PR metadata"]
+
+[env]
+CI = "true"
+GITHUB_EVENT_NAME = "pull_request"
+GITHUB_TOKEN = "token"

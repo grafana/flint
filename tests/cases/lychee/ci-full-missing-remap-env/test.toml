@@ -1,0 +1,14 @@
+[expected]
+args = "run --full lychee"
+exit = 0
+
+[env]
+CI = "true"
+GITHUB_EVENT_NAME = "pull_request"
+GITHUB_TOKEN = "token"
+
+[fake_bins]
+lychee = '''
+#!/bin/sh
+exit 0
+'''

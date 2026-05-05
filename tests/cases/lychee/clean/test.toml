@@ -4,4 +4,11 @@ exit = 0
 
 
 [env]
+GITHUB_TOKEN = "token"
 LYCHEE_SKIP_GITHUB_REMAPS = "true"
+
+[fake_bins]
+lychee = '''
+#!/bin/sh
+exit 0
+'''

@@ -21,7 +21,6 @@ pub struct Config {
 pub struct Settings {
     pub base_branch: String,
     pub exclude: Vec<String>,
-    pub setup_migration_version: u32,
 }
 
 impl Default for Settings {
@@ -29,7 +28,6 @@ impl Default for Settings {
         Self {
             base_branch: "main".to_string(),
             exclude: vec![],
-            setup_migration_version: crate::setup::V2_BASELINE_SETUP_VERSION,
         }
     }
 }
@@ -58,6 +56,8 @@ pub struct LycheeConfig {
 pub struct RenovateDepsConfig {
     // Env var: FLINT_RENOVATE_DEPS_EXCLUDE_MANAGERS (JSON array, e.g. '["npm"]')
     pub exclude_managers: Vec<String>,
+    // Env var: FLINT_RENOVATE_DEPS_REFRESH_META
+    pub refresh_meta: bool,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -110,7 +110,7 @@ pub fn load(config_dir: &Path) -> Result<Config> {
         //   FLINT_BASE_BRANCH, FLINT_EXCLUDE          → settings.*
         //   FLINT_LYCHEE_CONFIG, FLINT_LYCHEE_*       → checks.lychee.*
         //   FLINT_RENOVATE_DEPS_EXCLUDE_MANAGERS       → checks.renovate_deps.*
-        // New Special checks added to the registry get env support automatically.
+        // New native checks added to the registry get env support automatically.
         .merge(Env::prefixed("FLINT_").map(move |k| {
             let k = k.as_str();
             for (prefix, namespace) in &sections {
@@ -122,22 +122,4 @@ pub fn load(config_dir: &Path) -> Result<Config> {
         }))
         .extract()?;
     Ok(cfg)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn missing_setup_migration_version_defaults_to_v2_baseline() {
-        let tmp = tempfile::TempDir::new().unwrap();
-        std::fs::write(tmp.path().join("flint.toml"), "[settings]\n").unwrap();
-
-        let cfg = load(tmp.path()).unwrap();
-
-        assert_eq!(
-            cfg.settings.setup_migration_version,
-            crate::setup::V2_BASELINE_SETUP_VERSION
-        );
-    }
 }

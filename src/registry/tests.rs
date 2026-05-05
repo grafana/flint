@@ -67,8 +67,8 @@ fn shellcheck_github_backend_is_obsolete_even_when_bare_key_exists() {
 }
 
 #[test]
-fn check_owned_tool_migrations_apply_after_v2_baseline() {
-    let obsolete = obsolete_keys_after(crate::setup::V2_BASELINE_SETUP_VERSION);
+fn check_owned_tool_migrations_are_always_actionable() {
+    let obsolete = obsolete_keys();
 
     assert!(obsolete.contains(&("cargo:yaml-lint", "aqua:owenlamont/ryl")));
     assert!(obsolete.contains(&("github:owenlamont/ryl", "aqua:owenlamont/ryl")));
@@ -76,7 +76,6 @@ fn check_owned_tool_migrations_apply_after_v2_baseline() {
     assert!(obsolete.contains(&("github:astral-sh/ruff", "ruff")));
     assert!(obsolete.contains(&("github:koalaman/shellcheck", "shellcheck")));
     assert!(obsolete.contains(&("cargo:xmloxide", "github:jonwiggins/xmloxide")));
-    assert!(obsolete_keys_after(crate::setup::LATEST_SUPPORTED_SETUP_VERSION).is_empty());
 }
 
 #[test]
@@ -181,7 +180,7 @@ fn normalized_command_prefix(check: &Check) -> Option<String> {
                 *check_cmd
             }
         }
-        crate::registry::CheckKind::Special(_) => return None,
+        crate::registry::CheckKind::Native(_) => return None,
     };
 
     let mut words = vec![];
@@ -208,7 +207,7 @@ fn names_prefer_binary_or_native_command() {
     let violations: Vec<String> = builtin()
         .into_iter()
         .filter(|check| check.uses_binary())
-        .filter(|check| check.kind.special_kind().is_none())
+        .filter(|check| !check.kind.is_native())
         .filter_map(|check| {
             let allowed = ALLOWED_ALIASES
                 .iter()
@@ -358,6 +357,29 @@ fn editorconfig_checker_json_is_optional_not_generated_baseline() {
         check.baseline_config.is_none(),
         ".editorconfig-checker.json should not be treated as generated baseline config"
     );
+    assert!(
+        check
+            .baseline_triggers
+            .iter()
+            .any(|config| config.path == ".editorconfig"),
+        ".editorconfig changes should trigger an all-files editorconfig-checker baseline"
+    );
+}
+
+#[test]
+fn adaptive_checks_declare_relevance_hooks() {
+    let missing: Vec<_> = builtin()
+        .into_iter()
+        .filter(|check| check.run_policy == RunPolicy::Adaptive)
+        .filter(|check| check.adaptive_relevance.is_none())
+        .map(|check| check.name)
+        .collect();
+
+    assert!(
+        missing.is_empty(),
+        "adaptive checks missing relevance hooks: {}",
+        missing.join(", ")
+    );
 }
 
 #[test]
@@ -377,7 +399,7 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
         .find(|rule| rule["groupName"].as_str() == Some("linters"))
         .expect("default.json must define a packageRules entry with groupName 'linters'");
 
-    let actual = package_names(linters_rule);
+    let actual = dep_names(linters_rule);
     let expected: Vec<&str> = builtin()
         .into_iter()
         .filter(|check| check.uses_binary())
@@ -393,8 +415,8 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
     );
     assert_eq!(
         actual,
-        sorted_package_names(linters_rule),
-        "default.json weekly linters rule matchPackageNames must be sorted"
+        sorted_dep_names(linters_rule),
+        "default.json weekly linters rule matchDepNames must be sorted"
     );
 
     assert_eq!(
@@ -403,6 +425,16 @@ fn default_renovate_preset_covers_all_linter_tools_weekly() {
             "before 4am on Monday".to_string()
         )]),
         "linters package rule must remain on the weekly Monday schedule"
+    );
+    assert_eq!(
+        linters_rule["commitMessageTopic"].as_str(),
+        Some("flint-managed linter updates"),
+        "linters package rule must keep the grouped PR title readable"
+    );
+    assert_eq!(
+        linters_rule["separateMajorMinor"].as_bool(),
+        Some(false),
+        "linters package rule must keep major and non-major updates in one Monday PR"
     );
     assert!(
         !actual.contains(&"node"),
@@ -441,26 +473,43 @@ fn repo_renovate_config_stays_aligned_with_shared_preset_contract() {
             "package rule {group_name:?} schedule in .github/renovate.json5 drifted from default.json"
         );
         assert_eq!(
-            package_names(default_rule),
-            package_names(repo_rule),
-            "package rule {group_name:?} matchPackageNames in .github/renovate.json5 drifted from default.json"
+            default_rule["commitMessageTopic"], repo_rule["commitMessageTopic"],
+            "package rule {group_name:?} commitMessageTopic in .github/renovate.json5 drifted from default.json"
         );
         assert_eq!(
-            package_names(repo_rule),
-            sorted_package_names(repo_rule),
-            "package rule {group_name:?} matchPackageNames in .github/renovate.json5 must be sorted"
+            default_rule["separateMajorMinor"], repo_rule["separateMajorMinor"],
+            "package rule {group_name:?} separateMajorMinor in .github/renovate.json5 drifted from default.json"
+        );
+        assert_eq!(
+            rule_name_field(default_rule),
+            rule_name_field(repo_rule),
+            "package rule {group_name:?} matcher field in .github/renovate.json5 drifted from default.json"
+        );
+        assert_eq!(
+            rule_names(default_rule),
+            rule_names(repo_rule),
+            "package rule {group_name:?} package matcher in .github/renovate.json5 drifted from default.json"
+        );
+        assert_eq!(
+            rule_names(repo_rule),
+            sorted_rule_names(repo_rule),
+            "package rule {group_name:?} package matcher in .github/renovate.json5 must be sorted"
         );
     }
 
-    let description = "Update mise version in GitHub Actions workflows";
-    let default_manager = custom_manager_by_description(&default_parsed, description)
-        .unwrap_or_else(|| panic!("default.json missing custom manager {description:?}"));
-    let repo_manager = custom_manager_by_description(&repo_parsed, description)
-        .unwrap_or_else(|| panic!(".github/renovate.json5 missing custom manager {description:?}"));
-    assert_eq!(
-        default_manager, repo_manager,
-        "custom manager {description:?} in .github/renovate.json5 drifted from default.json"
-    );
+    {
+        let description = "Update mise version in GitHub Actions workflows";
+        let default_manager = custom_manager_by_description(&default_parsed, description)
+            .unwrap_or_else(|| panic!("default.json missing custom manager {description:?}"));
+        let repo_manager =
+            custom_manager_by_description(&repo_parsed, description).unwrap_or_else(|| {
+                panic!(".github/renovate.json5 missing custom manager {description:?}")
+            });
+        assert_eq!(
+            default_manager, repo_manager,
+            "custom manager {description:?} in .github/renovate.json5 drifted from default.json"
+        );
+    }
 }
 
 #[test]
@@ -533,8 +582,51 @@ fn package_names(rule: &serde_json::Value) -> Vec<&str> {
         .collect()
 }
 
-fn sorted_package_names(rule: &serde_json::Value) -> Vec<&str> {
-    let mut names = package_names(rule);
+fn dep_names(rule: &serde_json::Value) -> Vec<&str> {
+    rule["matchDepNames"]
+        .as_array()
+        .expect("package rule must declare matchDepNames")
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .expect("package rule matchDepNames entries must be strings")
+        })
+        .collect()
+}
+
+fn sorted_dep_names(rule: &serde_json::Value) -> Vec<&str> {
+    let mut names = dep_names(rule);
+    names.sort_unstable();
+    names
+}
+
+fn rule_name_field(rule: &serde_json::Value) -> &'static str {
+    match (
+        rule.get("matchDepNames").is_some(),
+        rule.get("matchPackageNames").is_some(),
+    ) {
+        (true, false) => "matchDepNames",
+        (false, true) => "matchPackageNames",
+        (true, true) => {
+            panic!("package rule must not declare both matchDepNames and matchPackageNames")
+        }
+        (false, false) => {
+            panic!("package rule must declare matchDepNames or matchPackageNames")
+        }
+    }
+}
+
+fn rule_names(rule: &serde_json::Value) -> Vec<&str> {
+    match rule_name_field(rule) {
+        "matchDepNames" => dep_names(rule),
+        "matchPackageNames" => package_names(rule),
+        _ => unreachable!("unexpected rule_name_field result"),
+    }
+}
+
+fn sorted_rule_names(rule: &serde_json::Value) -> Vec<&str> {
+    let mut names = rule_names(rule);
     names.sort_unstable();
     names
 }
@@ -625,24 +717,9 @@ fn readme_quickstart_tools_snippets_stay_current() {
             env!("CARGO_PKG_VERSION").to_string(),
         )))
         .collect::<std::collections::BTreeMap<_, _>>();
-
     let actual = toml_tool_versions_from_table(
         quickstart_tools,
-        &[
-            "github:grafana/flint",
-            "shellcheck",
-            "shfmt",
-            "actionlint",
-            "rumdl",
-            "ruff",
-            "aqua:owenlamont/ryl",
-            "taplo",
-            "biome",
-            "rust",
-            "go",
-            "lychee",
-            "npm:renovate",
-        ],
+        &["github:grafana/flint", "shellcheck", "shfmt", "actionlint"],
     );
 
     assert_eq!(
@@ -749,7 +826,8 @@ fn replace_section(haystack: &str, start_marker: &str, end_marker: &str, body: &
 
 fn generate_summary_table(registry: &[Check]) -> String {
     // Summary table: Name | Description | Fix — sorted alphabetically.
-    // Name column links to the matching detail section in docs/linters.md.
+    // Name column links to the matching detail section in docs/linters.md,
+    // except for checks with a dedicated guide page.
     let headers = ["Name", "Description", "Fix"];
     let mut sorted: Vec<&Check> = registry.iter().collect();
     sorted.sort_by_key(|c| c.name);
@@ -798,9 +876,7 @@ fn generate_linter_details(registry: &[Check]) -> String {
 }
 
 fn summary_row(check: &Check) -> [String; 3] {
-    // docs/linters.md uses `## `<name>`` — GitHub strips backticks and
-    // lowercases to produce the anchor `<name>`.
-    let name = format!("[`{0}`](docs/linters.md#{0})", check.name);
+    let name = format!("[`{}`]({})", check.name, detail_link(check));
     let desc = if check.desc.is_empty() {
         "—".to_string()
     } else {
@@ -808,6 +884,12 @@ fn summary_row(check: &Check) -> [String; 3] {
     };
     let fix = if check.has_fix() { "yes" } else { "—" }.to_string();
     [name, desc, fix]
+}
+
+fn detail_link(check: &Check) -> String {
+    // docs/linters.md uses `## `<name>`` — GitHub strips backticks and
+    // lowercases to produce the anchor `<name>`.
+    format!("docs/linters.md#{}", check.name)
 }
 
 fn detail_table(check: &Check) -> String {
@@ -860,8 +942,8 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     match check.linter_config.as_ref() {
         Some(config) => rows.push(("Config", format!("`{}`", config.display_name()))),
         None => {
-            if check.kind.is_special_kind(SpecialKind::Links) {
-                rows.push(("Config", "via `[checks.links]` in flint.toml".to_string()));
+            if let Some(config) = check.kind.native_config_display() {
+                rows.push(("Config", config.to_string()));
             }
         }
     }

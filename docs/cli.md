@@ -57,7 +57,7 @@ A check runs against all matching files when:
 - another supported baseline config for the check changed, such as
   `.editorconfig` for `editorconfig-checker`
 - `flint.toml` changed under `[settings]`
-- `flint.toml` changed the check-specific config for a special check, such as
+- `flint.toml` changed the check-specific config for a native check, such as
   `[checks.links]` or `[checks.renovate-deps]`
 
 `--full` is still the explicit whole-repo mode. The automatic baseline behavior

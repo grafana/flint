@@ -61,6 +61,23 @@ Examples:
 - `editorconfig-checker` defers to active formatters for file types where the
   formatter should be authoritative
 
+### Formatter Deferral And `.editorconfig`
+
+Formatter-owned file types still need one shared source of truth for editors
+and for `editorconfig-checker`. Flint handles that in two layers:
+
+- The formatter remains authoritative for formatting when it is active.
+- `editorconfig-checker` skips file types owned by active formatters instead of
+  reporting conflicting style failures.
+- Flint writes matching `.editorconfig` line-length carve-outs such as
+  `[*.rs] max_line_length = off` when a formatter owns line width, so editors
+  and `editorconfig-checker` do not keep enforcing a stale numeric line
+  length.
+
+This is intentionally narrow. Flint does not try to copy every formatter rule
+into `.editorconfig`; it only aligns the overlapping settings that would
+otherwise create contradictory behavior.
+
 ## AI-friendly
 
 `--fix` fixes what's fixable silently, prints output only for issues needing

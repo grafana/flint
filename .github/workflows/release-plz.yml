@@ -27,8 +27,8 @@ jobs:
       - name: Setup mise
         uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151  # v4.0.1
         with:
-          version: v2026.4.18
-          sha256: 6ae2d5f0f23a2f2149bc5d9bf264fe0922a1da843f1903e453516c462b23cc1f
+          version: v2026.4.28
+          sha256: 9655492db554e8f70a69830f54307ac0f4681d6c42f9844e862528b7853d09d1
       - name: Create release metadata
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -57,8 +57,8 @@ jobs:
       - name: Setup mise
         uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151  # v4.0.1
         with:
-          version: v2026.4.18
-          sha256: 6ae2d5f0f23a2f2149bc5d9bf264fe0922a1da843f1903e453516c462b23cc1f
+          version: v2026.4.28
+          sha256: 9655492db554e8f70a69830f54307ac0f4681d6c42f9844e862528b7853d09d1
       - name: Update release PR
         run: mise run release:pr
         env:

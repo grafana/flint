@@ -1,0 +1,10 @@
+[expected]
+args = "run --full renovate-deps"
+exit = 1
+stderr_contains = ["flint: warning: GITHUB_COM_TOKEN or GITHUB_TOKEN is not set; renovate-deps GitHub requests may be rate limited", "ERROR: renovate-tracked-deps.json does not exist."]
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"mise":[{"packageFile":"mise.toml","deps":[{"depName":"npm:renovate"}]}]}}'
+'''

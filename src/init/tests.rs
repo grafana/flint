@@ -1,10 +1,22 @@
 use super::*;
+use crate::registry::CheckTypeDef;
 use config_files::generate_flint_toml;
 use detection::entry_components_differ;
 use generation::{
     apply_changes, get_existing_config_dir, has_slow_selected, normalize_tools_section,
 };
 use scaffold::{apply_env_and_tasks, generate_lint_workflow};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static CHECK_TYPE_INIT_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+fn counting_check_type_init(_: &dyn InitHookContext) -> anyhow::Result<bool> {
+    CHECK_TYPE_INIT_CALLS.fetch_add(1, Ordering::SeqCst);
+    Ok(true)
+}
+
+static COUNTING_CHECK_TYPE: CheckTypeDef =
+    CheckTypeDef::with_init_hook("shared-hook", counting_check_type_init);
 
 #[test]
 fn detect_obsolete_keys_finds_known_stale_key() {
@@ -42,6 +54,26 @@ fn all_registry_checks_have_install_key_or_none() {
             );
         }
     }
+}
+
+#[test]
+fn apply_check_type_init_hooks_runs_shared_hook_once() {
+    CHECK_TYPE_INIT_CALLS.store(0, Ordering::SeqCst);
+    let first = Check::file("first", "first {FILE}", &["*"]).check_type(&COUNTING_CHECK_TYPE);
+    let second = Check::file("second", "second {FILE}", &["*"]).check_type(&COUNTING_CHECK_TYPE);
+    let tmp = tempfile::TempDir::new().unwrap();
+    let changed = apply_check_type_init_hooks(
+        &[&first, &second],
+        tmp.path(),
+        tmp.path(),
+        DEFAULT_LINE_LENGTH,
+        false,
+        None,
+    )
+    .unwrap();
+
+    assert!(changed);
+    assert_eq!(CHECK_TYPE_INIT_CALLS.load(Ordering::SeqCst), 1);
 }
 
 #[test]
@@ -336,10 +368,10 @@ fn get_existing_config_dir_absent() {
 
 #[test]
 fn generate_rumdl_config_writes_file() {
-    use config_files::generate_rumdl_config;
+    use crate::linters::rumdl::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
-    let written = generate_rumdl_config(tmp.path(), &config_dir, DEFAULT_LINE_LENGTH).unwrap();
+    let written = generate_config(tmp.path(), &config_dir, DEFAULT_LINE_LENGTH).unwrap();
     assert!(written);
     let content = std::fs::read_to_string(config_dir.join(".rumdl.toml")).unwrap();
     assert!(content.contains("line-length = 120"));
@@ -351,12 +383,12 @@ fn generate_rumdl_config_writes_file() {
 
 #[test]
 fn generate_rumdl_config_skips_when_target_exists() {
-    use config_files::generate_rumdl_config;
+    use crate::linters::rumdl::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     std::fs::create_dir_all(&config_dir).unwrap();
     std::fs::write(config_dir.join(".rumdl.toml"), "existing").unwrap();
-    let written = generate_rumdl_config(tmp.path(), &config_dir, DEFAULT_LINE_LENGTH).unwrap();
+    let written = generate_config(tmp.path(), &config_dir, DEFAULT_LINE_LENGTH).unwrap();
     assert!(!written);
     let content = std::fs::read_to_string(config_dir.join(".rumdl.toml")).unwrap();
     assert_eq!(content, "existing");
@@ -364,11 +396,11 @@ fn generate_rumdl_config_skips_when_target_exists() {
 
 #[test]
 fn generate_rumdl_config_replaces_legacy_json() {
-    use config_files::generate_rumdl_config;
+    use crate::linters::rumdl::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     std::fs::write(tmp.path().join(".markdownlint.json"), r#"{"MD013":false}"#).unwrap();
-    let written = generate_rumdl_config(tmp.path(), &config_dir, DEFAULT_LINE_LENGTH).unwrap();
+    let written = generate_config(tmp.path(), &config_dir, DEFAULT_LINE_LENGTH).unwrap();
     assert!(written);
     assert!(!tmp.path().join(".markdownlint.json").exists());
     let content = std::fs::read_to_string(config_dir.join(".rumdl.toml")).unwrap();
@@ -378,7 +410,7 @@ fn generate_rumdl_config_replaces_legacy_json() {
 
 #[test]
 fn generate_rumdl_config_converts_legacy_yaml() {
-    use config_files::generate_rumdl_config;
+    use crate::linters::rumdl::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     std::fs::write(
@@ -399,7 +431,7 @@ MD041: false
 "#,
     )
     .unwrap();
-    let written = generate_rumdl_config(tmp.path(), &config_dir, DEFAULT_LINE_LENGTH).unwrap();
+    let written = generate_config(tmp.path(), &config_dir, DEFAULT_LINE_LENGTH).unwrap();
     assert!(written);
     assert!(!tmp.path().join(".markdownlint.yaml").exists());
     let content = std::fs::read_to_string(config_dir.join(".rumdl.toml")).unwrap();
@@ -562,6 +594,52 @@ fn disable_editorconfig_line_length_for_patterns_updates_editorconfig() {
 }
 
 #[test]
+fn disable_editorconfig_line_length_for_patterns_overrides_existing_section_line_length() {
+    use config_files::disable_editorconfig_line_length_for_patterns;
+    let tmp = tempfile::TempDir::new().unwrap();
+    std::fs::write(
+        tmp.path().join(".editorconfig"),
+        "root = true\n\n[*]\nmax_line_length = 120\n\n[*.rs]\nindent_size = 4\nmax_line_length = 100\ntrim_trailing_whitespace = false\n",
+    )
+    .unwrap();
+    let changed = disable_editorconfig_line_length_for_patterns(
+        tmp.path(),
+        &[(&["*.rs"], "Rust line length is handled by rustfmt")],
+    )
+    .unwrap();
+    assert_eq!(changed, vec!["[*.rs]".to_string()]);
+    let content = std::fs::read_to_string(tmp.path().join(".editorconfig")).unwrap();
+    assert!(content.contains(
+        "[*.rs]\nindent_size = 4\n# Rust line length is handled by rustfmt\nmax_line_length = off\ntrim_trailing_whitespace = false\n"
+    ));
+    assert!(!content.contains("max_line_length = 100"));
+}
+
+#[test]
+fn disable_editorconfig_line_length_for_patterns_removes_duplicate_line_lengths() {
+    use config_files::disable_editorconfig_line_length_for_patterns;
+    let tmp = tempfile::TempDir::new().unwrap();
+    std::fs::write(
+        tmp.path().join(".editorconfig"),
+        "root = true\n\n[*]\nmax_line_length = 120\n\n[*.rs]\nindent_size = 4\nmax_line_length = 100\ntrim_trailing_whitespace = false\nmax_line_length = 90\n",
+    )
+    .unwrap();
+    let changed = disable_editorconfig_line_length_for_patterns(
+        tmp.path(),
+        &[(&["*.rs"], "Rust line length is handled by rustfmt")],
+    )
+    .unwrap();
+    assert_eq!(changed, vec!["[*.rs]".to_string()]);
+    let content = std::fs::read_to_string(tmp.path().join(".editorconfig")).unwrap();
+    assert!(content.contains(
+        "[*.rs]\nindent_size = 4\n# Rust line length is handled by rustfmt\nmax_line_length = off\ntrim_trailing_whitespace = false\n"
+    ));
+    assert_eq!(content.matches("max_line_length = off").count(), 1);
+    assert!(!content.contains("max_line_length = 100"));
+    assert!(!content.contains("max_line_length = 90"));
+}
+
+#[test]
 fn disable_editorconfig_line_length_for_patterns_is_idempotent() {
     use config_files::disable_editorconfig_line_length_for_patterns;
     let tmp = tempfile::TempDir::new().unwrap();
@@ -580,10 +658,10 @@ fn disable_editorconfig_line_length_for_patterns_is_idempotent() {
 
 #[test]
 fn generate_yamllint_config_writes_file() {
-    use config_files::generate_yamllint_config;
+    use crate::linters::yamllint::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
-    let written = generate_yamllint_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
+    let written = generate_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
     assert!(written);
     let content = std::fs::read_to_string(config_dir.join(".yamllint.yml")).unwrap();
     assert_eq!(
@@ -594,10 +672,10 @@ fn generate_yamllint_config_writes_file() {
 
 #[test]
 fn generate_taplo_config_writes_file() {
-    use config_files::generate_taplo_config;
+    use crate::linters::taplo::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
-    let written = generate_taplo_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
+    let written = generate_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
     assert!(written);
     let content = std::fs::read_to_string(config_dir.join(".taplo.toml")).unwrap();
     assert!(content.contains("[formatting]"));
@@ -607,12 +685,12 @@ fn generate_taplo_config_writes_file() {
 
 #[test]
 fn generate_taplo_config_skips_existing_supported_file() {
-    use config_files::generate_taplo_config;
+    use crate::linters::taplo::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     std::fs::create_dir_all(&config_dir).unwrap();
     std::fs::write(config_dir.join(".taplo.toml"), "existing").unwrap();
-    let written = generate_taplo_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
+    let written = generate_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
     assert!(!written);
     let content = std::fs::read_to_string(config_dir.join(".taplo.toml")).unwrap();
     assert_eq!(content, "existing");
@@ -620,22 +698,22 @@ fn generate_taplo_config_skips_existing_supported_file() {
 
 #[test]
 fn generate_taplo_config_skips_existing_legacy_name() {
-    use config_files::generate_taplo_config;
+    use crate::linters::taplo::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     std::fs::create_dir_all(&config_dir).unwrap();
     std::fs::write(config_dir.join("taplo.toml"), "existing").unwrap();
-    let written = generate_taplo_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
+    let written = generate_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
     assert!(!written);
     assert!(!config_dir.join(".taplo.toml").exists());
 }
 
 #[test]
 fn generate_rustfmt_config_writes_file() {
-    use config_files::generate_rustfmt_config;
+    use crate::linters::rustfmt::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
-    let written = generate_rustfmt_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
+    let written = generate_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
     assert!(written);
     let content = std::fs::read_to_string(config_dir.join("rustfmt.toml")).unwrap();
     assert_eq!(content, "max_width = 120\n");
@@ -643,12 +721,12 @@ fn generate_rustfmt_config_writes_file() {
 
 #[test]
 fn generate_rustfmt_config_skips_existing_file() {
-    use config_files::generate_rustfmt_config;
+    use crate::linters::rustfmt::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     let config_dir = tmp.path().join(".github/config");
     std::fs::create_dir_all(&config_dir).unwrap();
     std::fs::write(config_dir.join("rustfmt.toml"), "existing").unwrap();
-    let written = generate_rustfmt_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
+    let written = generate_config(&config_dir, DEFAULT_LINE_LENGTH).unwrap();
     assert!(!written);
     let content = std::fs::read_to_string(config_dir.join("rustfmt.toml")).unwrap();
     assert_eq!(content, "existing");
@@ -656,9 +734,9 @@ fn generate_rustfmt_config_skips_existing_file() {
 
 #[test]
 fn generate_biome_config_writes_file() {
-    use config_files::generate_biome_config;
+    use crate::linters::biome::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
-    let written = generate_biome_config(tmp.path()).unwrap();
+    let written = generate_config(tmp.path()).unwrap();
     assert!(written);
     let content = std::fs::read_to_string(tmp.path().join("biome.jsonc")).unwrap();
     assert!(content.contains("\"indentStyle\": \"space\""));
@@ -667,10 +745,10 @@ fn generate_biome_config_writes_file() {
 
 #[test]
 fn generate_biome_config_skips_existing_jsonc() {
-    use config_files::generate_biome_config;
+    use crate::linters::biome::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     std::fs::write(tmp.path().join("biome.jsonc"), "existing").unwrap();
-    let written = generate_biome_config(tmp.path()).unwrap();
+    let written = generate_config(tmp.path()).unwrap();
     assert!(!written);
     let content = std::fs::read_to_string(tmp.path().join("biome.jsonc")).unwrap();
     assert_eq!(content, "existing");
@@ -678,10 +756,10 @@ fn generate_biome_config_skips_existing_jsonc() {
 
 #[test]
 fn generate_biome_config_migrates_legacy_supported_json_name() {
-    use config_files::generate_biome_config;
+    use crate::linters::biome::generate_config;
     let tmp = tempfile::TempDir::new().unwrap();
     std::fs::write(tmp.path().join("biome.json"), "existing").unwrap();
-    let written = generate_biome_config(tmp.path()).unwrap();
+    let written = generate_config(tmp.path()).unwrap();
     assert!(written);
     assert!(!tmp.path().join("biome.json").exists());
     let content = std::fs::read_to_string(tmp.path().join("biome.jsonc")).unwrap();
@@ -692,14 +770,7 @@ fn generate_biome_config_migrates_legacy_supported_json_name() {
 fn generate_flint_toml_writes_skeleton() {
     let tmp = tempfile::TempDir::new().unwrap();
     let dir = tmp.path().join("config");
-    let written = generate_flint_toml(
-        &dir,
-        "main",
-        crate::setup::V2_BASELINE_SETUP_VERSION,
-        false,
-        None,
-    )
-    .unwrap();
+    let written = generate_flint_toml(&dir, "main").unwrap();
     assert!(written);
     let content = std::fs::read_to_string(dir.join("flint.toml")).unwrap();
     assert!(content.contains("[settings]"));
@@ -710,68 +781,17 @@ fn generate_flint_toml_writes_skeleton() {
 #[test]
 fn generate_flint_toml_non_main_branch() {
     let tmp = tempfile::TempDir::new().unwrap();
-    let written = generate_flint_toml(
-        tmp.path(),
-        "master",
-        crate::setup::V2_BASELINE_SETUP_VERSION,
-        false,
-        None,
-    )
-    .unwrap();
+    let written = generate_flint_toml(tmp.path(), "master").unwrap();
     assert!(written);
     let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
     assert!(content.contains("base_branch = \"master\""));
 }
 
 #[test]
-fn generate_flint_toml_with_renovate_placeholder() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    generate_flint_toml(
-        tmp.path(),
-        "main",
-        crate::setup::V2_BASELINE_SETUP_VERSION,
-        true,
-        None,
-    )
-    .unwrap();
-    let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
-    assert!(content.contains("[checks.renovate-deps]"));
-    assert!(content.contains("# exclude_managers ="));
-}
-
-#[test]
-fn generate_flint_toml_with_renovate_managers() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let managers = vec!["github-actions".to_string(), "cargo".to_string()];
-    generate_flint_toml(
-        tmp.path(),
-        "main",
-        crate::setup::V2_BASELINE_SETUP_VERSION,
-        true,
-        Some(&managers),
-    )
-    .unwrap();
-    let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
-    assert!(content.contains("[checks.renovate-deps]"));
-    assert!(
-        content.contains("exclude_managers = [\"github-actions\", \"cargo\"]"),
-        "managers written uncommented: {content}"
-    );
-    assert!(!content.contains("# exclude_managers"));
-}
-
-#[test]
 fn generate_flint_toml_skips_existing() {
     let tmp = tempfile::TempDir::new().unwrap();
     std::fs::write(tmp.path().join("flint.toml"), "existing content").unwrap();
-    let written = generate_flint_toml(
-        tmp.path(),
-        "main",
-        crate::setup::V2_BASELINE_SETUP_VERSION,
-        false,
-        None,
-    )
-    .unwrap();
+    let written = generate_flint_toml(tmp.path(), "main").unwrap();
     assert!(!written);
     let content = std::fs::read_to_string(tmp.path().join("flint.toml")).unwrap();
     assert_eq!(content, "existing content");
@@ -796,6 +816,7 @@ fn generate_lint_workflow_writes_file() {
     ));
     assert!(!content.contains("GITHUB_HEAD_SHA"));
     assert!(content.contains("github.token"));
+    assert!(content.contains("pull_request.head.repo.full_name"));
     assert!(!content.contains("rust-cache"));
     assert!(!content.contains("rustup component"));
 }

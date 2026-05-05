@@ -106,7 +106,7 @@ still choose the config directory via `FLINT_CONFIG_DIR` where supported.
 | Description | Keep Flint setup current and mise.toml lint tooling canonical |
 | Fix         | yes                                                           |
 | Binary      | (built-in)                                                    |
-| Scope       | [special](#scope-special)                                     |
+| Scope       | [native](#scope-native)                                       |
 | Patterns    | `mise.toml`                                                   |
 
 Checks the repo's Flint-managed setup state and `mise.toml` layout.
@@ -120,8 +120,8 @@ This verifies and fixes Flint-managed setup:
 - keep lint-managed tool entries under the `# Linters` header
 - keep runtime, SDK, and unknown tool entries above that header
 
-With `--fix`, rewrites Flint-managed config in place and advances
-`settings.setup_migration_version` when a migration applies.
+With `--fix`, rewrites Flint-managed config in place and applies any
+currently actionable setup migration.
 
 ## `gofmt`
 
@@ -182,7 +182,7 @@ With `--fix`, rewrites Flint-managed config in place and advances
 | Description | Check source files have the required license header |
 | Fix         | no                                                  |
 | Binary      | (built-in)                                          |
-| Scope       | [special](#scope-special)                           |
+| Scope       | [native](#scope-native)                             |
 
 ## `lychee`
 
@@ -191,7 +191,7 @@ With `--fix`, rewrites Flint-managed config in place and advances
 | Description | Check for broken links             |
 | Fix         | no                                 |
 | Binary      | `lychee`                           |
-| Scope       | [special](#scope-special)          |
+| Scope       | [native](#scope-native)            |
 | Config      | via `[checks.links]` in flint.toml |
 
 Orchestrates [lychee](https://lychee.cli.rs/) for link checking. Requires `lychee` in `[tools]`.
@@ -200,6 +200,13 @@ Default behavior: checks all links in changed files. When
 `check_all_local = true` in `flint.toml`, adds a second pass over local links
 in all files — useful when broken internal links from unchanged files also
 matter.
+
+In CI, `lychee` requires `GITHUB_TOKEN` so GitHub link checks can authenticate.
+On GitHub Actions PR runs in changed-file mode, link remaps also require
+`GITHUB_REPOSITORY`, `GITHUB_BASE_REF`, `GITHUB_HEAD_REF`, and `PR_HEAD_REPO`.
+GitHub Actions provides the first three; set `PR_HEAD_REPO` from
+`github.event.pull_request.head.repo.full_name`. `--full` does not require
+the PR remap metadata.
 
 Configure via `flint.toml`:
 
@@ -216,15 +223,32 @@ check_all_local = true
 | Description | Verify Renovate dependency snapshot is up to date                                                                          |
 | Fix         | yes                                                                                                                        |
 | Binary      | `renovate`                                                                                                                 |
-| Scope       | [special](#scope-special)                                                                                                  |
+| Scope       | [native](#scope-native)                                                                                                    |
 | Patterns    | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
 | Run policy  | adaptive — runs in `--fast-only` only when relevant                                                                        |
 
-Verifies `.github/renovate-tracked-deps.json` is up to date by running
-Renovate locally and comparing its output against the committed snapshot.
+Verifies `renovate-tracked-deps.json` next to the active Renovate
+config is up to date by running Renovate locally and comparing its
+output against the committed snapshot.
+It also checks that dependencies extracted from different files but
+resolving to the same upstream package match the same Renovate
+package rules. That catches config splits like `actionlint` vs
+`rhysd/actionlint` before Renovate stops grouping them consistently.
 Requires `renovate` in `[tools]`.
 
+In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN`
+so Renovate can authenticate GitHub requests. If `GITHUB_COM_TOKEN` is
+unset, flint forwards `GITHUB_TOKEN` to Renovate as `GITHUB_COM_TOKEN`.
+
+When `flint init` writes a new `flint.toml`, it includes this section if
+`renovate-deps` is selected. During v1 setup migration it also carries
+legacy `RENOVATE_TRACKED_DEPS_EXCLUDE` values into `exclude_managers`.
+
 With `--fix`, automatically regenerates and commits the snapshot.
+For custom/regex managers, prefer canonical `depNameTemplate` values
+for grouping and explicit `packageNameTemplate` values for datasource
+lookups when those identities differ.
+See [the renovate-deps guide](linters/renovate-deps.md) for examples.
 
 Configure via `flint.toml`:
 
@@ -347,7 +371,7 @@ Invoked once with no file args; for checks with patterns set (e.g.
 whole project when it does run. `golangci-lint` is the exception — it uses
 `--new-from-rev` to scope analysis to changed code even within the project run.
 
-### Scope: special
+### Scope: native
 
 Implemented in-process rather than via a command template. These checks may run
 without file arguments or use custom orchestration logic.
@@ -369,4 +393,6 @@ files itself.
 length**: today that means `rumdl` for `*.md`, `rustfmt` for `*.rs`, and
 `google-java-format` for `*.java`. Those sections use
 `max_line_length = off` so editors and `editorconfig-checker` share the same
-intent instead of relying on checker-specific JSON excludes.
+intent instead of relying on checker-specific JSON excludes. If a matching
+section already exists, `flint init` rewrites its `max_line_length` to `off`
+instead of leaving a formatter-conflicting numeric value in place.

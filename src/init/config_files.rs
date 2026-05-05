@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use serde::Deserialize;
 use std::io;
 use std::path::Path;
 use std::process::Command;
@@ -8,17 +7,7 @@ use crate::registry::EditorconfigDirectiveStyle;
 
 /// Writes a skeleton `flint.toml` in `config_dir`. Creates the directory if needed.
 /// Returns `true` if the file was written, `false` if it already existed.
-///
-/// `exclude_managers`: when `Some`, populates `exclude_managers` in `[checks.renovate-deps]`
-/// with the given list (migrated from `RENOVATE_TRACKED_DEPS_EXCLUDE`). When `None` and
-/// `has_renovate` is true, writes a commented-out placeholder instead.
-pub(super) fn generate_flint_toml(
-    config_dir: &Path,
-    base_branch: &str,
-    setup_migration_version: u32,
-    has_renovate: bool,
-    exclude_managers: Option<&[String]>,
-) -> Result<bool> {
+pub(super) fn generate_flint_toml(config_dir: &Path, base_branch: &str) -> Result<bool> {
     let toml_path = config_dir.join("flint.toml");
     if toml_path.exists() {
         return Ok(false);
@@ -28,310 +17,10 @@ pub(super) fn generate_flint_toml(
     if base_branch != "main" {
         content.push_str(&format!("base_branch = \"{base_branch}\"\n"));
     }
-    content.push_str(&format!(
-        "setup_migration_version = {setup_migration_version}\n"
-    ));
     content.push_str("# exclude = [\"CHANGELOG\\\\.md\"]\n");
-    if has_renovate {
-        content.push_str("\n[checks.renovate-deps]\n");
-        match exclude_managers {
-            Some(managers) if !managers.is_empty() => {
-                let list = managers
-                    .iter()
-                    .map(|m| format!("\"{m}\""))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                content.push_str(&format!("exclude_managers = [{list}]\n"));
-            }
-            _ => content.push_str("# exclude_managers = []\n"),
-        }
-    }
     std::fs::write(&toml_path, &content)?;
     println!("  wrote {}", toml_path.display());
     Ok(true)
-}
-
-pub(crate) fn write_setup_migration_version(
-    config_dir: &Path,
-    base_branch: &str,
-    version: u32,
-) -> Result<bool> {
-    let toml_path = config_dir.join("flint.toml");
-    if !toml_path.exists() {
-        return generate_flint_toml(config_dir, base_branch, version, false, None);
-    }
-
-    let content = std::fs::read_to_string(&toml_path)
-        .with_context(|| format!("failed to read {}", toml_path.display()))?;
-    let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse flint.toml")?;
-    if doc.get("settings").is_none() {
-        doc["settings"] = toml_edit::table();
-    }
-    let Some(settings) = doc.get_mut("settings").and_then(|item| item.as_table_mut()) else {
-        anyhow::bail!("[settings] is not a table in {}", toml_path.display());
-    };
-    let current = settings
-        .get("setup_migration_version")
-        .and_then(|item| item.as_value())
-        .and_then(|value| value.as_integer())
-        .and_then(|value| u32::try_from(value).ok());
-    if current == Some(version) {
-        return Ok(false);
-    }
-    settings.insert(
-        "setup_migration_version",
-        toml_edit::value(i64::from(version)),
-    );
-    std::fs::write(&toml_path, doc.to_string())
-        .with_context(|| format!("failed to write {}", toml_path.display()))?;
-    Ok(true)
-}
-
-/// Generates `.rumdl.toml` in the flint config dir when rumdl is being set up.
-/// Returns `true` if the file was written (or an older markdownlint variant was replaced).
-pub(super) fn generate_rumdl_config(
-    project_root: &Path,
-    config_dir: &Path,
-    line_length: u16,
-) -> Result<bool> {
-    const LEGACY_CONFIG_NAMES: &[&str] = &[
-        ".markdownlint.json",
-        ".markdownlint.jsonc",
-        ".markdownlint.yaml",
-        ".markdownlint.yml",
-        ".markdownlint-cli2.jsonc",
-        ".markdownlint-cli2.yaml",
-        ".markdownlint-cli2.yml",
-        ".markdownlint-cli2.cjs",
-        ".markdownlint-cli2.mjs",
-    ];
-    let target = config_dir.join(".rumdl.toml");
-    if target.exists() {
-        return Ok(false);
-    }
-    if let Some(parent) = target.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    let content = converted_legacy_markdownlint_config(project_root)?
-        .unwrap_or_else(|| default_rumdl_config(line_length));
-    for name in LEGACY_CONFIG_NAMES {
-        let legacy = project_root.join(name);
-        if legacy.exists() {
-            std::fs::remove_file(&legacy)?;
-            println!("  removed {} (replaced by .rumdl.toml)", legacy.display());
-        }
-    }
-    std::fs::write(&target, content)?;
-    println!("  wrote {}", target.display());
-    Ok(true)
-}
-
-fn default_rumdl_config(line_length: u16) -> String {
-    format!(
-        "[MD013]\n\
-         enabled = true\n\
-         line-length = {line_length}\n\
-         code-blocks = false\n\
-         tables = false\n\
-         \n\
-         [MD060]\n\
-         enabled = true\n\
-         style = \"aligned\"\n",
-    )
-}
-
-fn converted_legacy_markdownlint_config(project_root: &Path) -> Result<Option<String>> {
-    const LEGACY_CONFIG_NAMES: &[&str] = &[
-        ".markdownlint.json",
-        ".markdownlint.jsonc",
-        ".markdownlint.yaml",
-        ".markdownlint.yml",
-        ".markdownlint-cli2.jsonc",
-        ".markdownlint-cli2.yaml",
-        ".markdownlint-cli2.yml",
-        ".markdownlint-cli2.cjs",
-        ".markdownlint-cli2.mjs",
-    ];
-
-    for name in LEGACY_CONFIG_NAMES {
-        let path = project_root.join(name);
-        if !path.exists() {
-            continue;
-        }
-        if let Some(config) = parse_legacy_markdownlint_config(&path)? {
-            return Ok(Some(render_rumdl_config_from_legacy(&config)));
-        }
-    }
-
-    Ok(None)
-}
-
-#[derive(Debug, Default, Deserialize)]
-struct LegacyMarkdownlintConfig {
-    #[serde(rename = "line-length", alias = "MD013")]
-    line_length: Option<LegacyRuleSetting<LegacyLineLengthRule>>,
-    #[serde(rename = "ul-style", alias = "MD004")]
-    ul_style: Option<LegacyRuleSetting<EmptyRule>>,
-    #[serde(rename = "no-duplicate-heading", alias = "MD024")]
-    no_duplicate_heading: Option<LegacyRuleSetting<LegacyNoDuplicateHeadingRule>>,
-    #[serde(rename = "ol-prefix", alias = "MD029")]
-    ol_prefix: Option<LegacyRuleSetting<LegacyOlPrefixRule>>,
-    #[serde(rename = "no-inline-html", alias = "MD033")]
-    no_inline_html: Option<LegacyRuleSetting<EmptyRule>>,
-    #[serde(rename = "fenced-code-language", alias = "MD040")]
-    fenced_code_language: Option<LegacyRuleSetting<EmptyRule>>,
-    #[serde(rename = "no-trailing-punctuation", alias = "MD026")]
-    no_trailing_punctuation: Option<LegacyRuleSetting<LegacyNoTrailingPunctuationRule>>,
-    #[serde(rename = "MD041")]
-    md041: Option<LegacyRuleSetting<EmptyRule>>,
-    #[serde(rename = "MD059")]
-    md059: Option<LegacyRuleSetting<EmptyRule>>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum LegacyRuleSetting<T> {
-    Bool(bool),
-    Config(T),
-}
-
-#[derive(Debug, Default, Deserialize)]
-struct EmptyRule {}
-
-#[derive(Debug, Default, Deserialize)]
-struct LegacyLineLengthRule {
-    #[serde(rename = "line_length")]
-    line_length: Option<u16>,
-    #[serde(rename = "code_blocks")]
-    code_blocks: Option<bool>,
-    tables: Option<bool>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-struct LegacyNoDuplicateHeadingRule {
-    #[serde(rename = "siblings_only")]
-    siblings_only: Option<bool>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-struct LegacyOlPrefixRule {
-    style: Option<String>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-struct LegacyNoTrailingPunctuationRule {
-    punctuation: Option<String>,
-}
-
-fn parse_legacy_markdownlint_config(path: &Path) -> Result<Option<LegacyMarkdownlintConfig>> {
-    let content = std::fs::read_to_string(path)
-        .with_context(|| format!("failed to read {}", path.display()))?;
-    let ext = path
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .unwrap_or_default();
-
-    let parsed = match ext {
-        "json" | "jsonc" => json5::from_str::<LegacyMarkdownlintConfig>(&content).ok(),
-        "yaml" | "yml" => serde_yaml::from_str::<LegacyMarkdownlintConfig>(&content).ok(),
-        _ => None,
-    };
-    Ok(parsed)
-}
-
-fn render_rumdl_config_from_legacy(config: &LegacyMarkdownlintConfig) -> String {
-    let mut out = String::new();
-    let mut global_disable = vec![];
-
-    append_global_disable(&mut global_disable, "line-length", &config.line_length);
-    append_global_disable(&mut global_disable, "ul-style", &config.ul_style);
-    append_global_disable(
-        &mut global_disable,
-        "no-inline-html",
-        &config.no_inline_html,
-    );
-    append_global_disable(
-        &mut global_disable,
-        "fenced-code-language",
-        &config.fenced_code_language,
-    );
-    append_global_disable(&mut global_disable, "MD041", &config.md041);
-    append_global_disable(&mut global_disable, "MD059", &config.md059);
-
-    if !global_disable.is_empty() {
-        out.push_str("[global]\n");
-        out.push_str("disable = [");
-        out.push_str(
-            &global_disable
-                .iter()
-                .map(|rule| format!("\"{rule}\""))
-                .collect::<Vec<_>>()
-                .join(", "),
-        );
-        out.push_str("]\n");
-    }
-
-    if let Some(LegacyRuleSetting::Config(rule)) = &config.line_length {
-        if !out.is_empty() {
-            out.push('\n');
-        }
-        out.push_str("[MD013]\n");
-        if let Some(line_length) = rule.line_length {
-            out.push_str("enabled = true\n");
-            out.push_str(&format!("line-length = {line_length}\n"));
-        }
-        if let Some(code_blocks) = rule.code_blocks {
-            out.push_str(&format!("code-blocks = {code_blocks}\n"));
-        }
-        if let Some(tables) = rule.tables {
-            out.push_str(&format!("tables = {tables}\n"));
-        }
-    }
-
-    if let Some(LegacyRuleSetting::Config(rule)) = &config.no_duplicate_heading
-        && rule.siblings_only.is_some()
-    {
-        if !out.is_empty() {
-            out.push('\n');
-        }
-        out.push_str("[no-duplicate-heading]\n");
-        out.push_str(&format!(
-            "siblings-only = {}\n",
-            rule.siblings_only.unwrap_or(false)
-        ));
-    }
-
-    if let Some(LegacyRuleSetting::Config(rule)) = &config.no_trailing_punctuation
-        && let Some(punctuation) = &rule.punctuation
-    {
-        if !out.is_empty() {
-            out.push('\n');
-        }
-        out.push_str("[no-trailing-punctuation]\n");
-        out.push_str(&format!("punctuation = \"{punctuation}\"\n"));
-    }
-
-    if let Some(LegacyRuleSetting::Config(rule)) = &config.ol_prefix
-        && let Some(style) = &rule.style
-    {
-        if !out.is_empty() {
-            out.push('\n');
-        }
-        out.push_str("[ol-prefix]\n");
-        out.push_str(&format!("style = \"{style}\"\n"));
-    }
-
-    out
-}
-
-fn append_global_disable<T>(
-    global_disable: &mut Vec<&'static str>,
-    rule_name: &'static str,
-    setting: &Option<LegacyRuleSetting<T>>,
-) {
-    if matches!(setting, Some(LegacyRuleSetting::Bool(false))) {
-        global_disable.push(rule_name);
-    }
 }
 
 /// Removes stale v1/super-linter-era files that flint v2 no longer uses.
@@ -356,19 +45,6 @@ pub(super) fn remove_legacy_lint_files(
         removed.push(rel);
     }
     Ok(removed)
-}
-
-pub(super) fn existing_legacy_lint_files(project_root: &Path, config_dir: &Path) -> Vec<String> {
-    legacy_lint_files(project_root, config_dir)
-        .into_iter()
-        .filter(|path| path.exists())
-        .map(|path| {
-            path.strip_prefix(project_root)
-                .unwrap_or(&path)
-                .display()
-                .to_string()
-        })
-        .collect()
 }
 
 fn legacy_lint_files(project_root: &Path, config_dir: &Path) -> Vec<std::path::PathBuf> {
@@ -401,16 +77,6 @@ pub(super) fn remove_stale_markdownlint_line_length_directives(
         changed_files.push(rel.to_string());
     }
     Ok(changed_files)
-}
-
-pub(super) fn stale_markdownlint_line_length_directive_files(
-    project_root: &Path,
-) -> Result<Vec<String>> {
-    stale_transformed_files(
-        project_root,
-        &[&["*.md"]],
-        strip_stale_markdownlint_md013_directives,
-    )
 }
 
 fn tracked_files_for_patterns(project_root: &Path, patterns: &[&[&str]]) -> Result<Vec<String>> {
@@ -462,45 +128,6 @@ pub(super) fn remove_stale_editorconfig_checker_directives(
     }
     changed_files.sort();
     changed_files.dedup();
-    Ok(changed_files)
-}
-
-pub(super) fn stale_editorconfig_checker_directive_files(
-    project_root: &Path,
-    delegated_sections: &[(&[&str], EditorconfigDirectiveStyle)],
-) -> Result<Vec<String>> {
-    let mut changed_files = vec![];
-    for (patterns, directive_style) in delegated_sections {
-        changed_files.extend(stale_transformed_files(
-            project_root,
-            &[*patterns],
-            |content| strip_stale_editorconfig_checker_directives(content, *directive_style),
-        )?);
-    }
-    changed_files.sort();
-    changed_files.dedup();
-    Ok(changed_files)
-}
-
-fn stale_transformed_files<F>(
-    project_root: &Path,
-    patterns: &[&[&str]],
-    transform: F,
-) -> Result<Vec<String>>
-where
-    F: Fn(&str) -> String,
-{
-    let tracked_files = tracked_files_for_patterns(project_root, patterns)?;
-    let mut changed_files = vec![];
-    for rel in tracked_files {
-        let path = project_root.join(rel.as_str());
-        let Ok(content) = std::fs::read_to_string(&path) else {
-            continue;
-        };
-        if transform(&content) != content {
-            changed_files.push(rel);
-        }
-    }
     Ok(changed_files)
 }
 
@@ -718,19 +345,46 @@ pub(super) fn disable_editorconfig_line_length_for_patterns(
                 })
                 .unwrap_or(lines.len());
             let section_lines = &lines[section_start + 1..section_end];
-            if section_lines
+            let existing_line_lengths: Vec<usize> = section_lines
                 .iter()
-                .any(|line| line.trim_start().starts_with("max_line_length"))
-            {
+                .enumerate()
+                .filter_map(|(idx, line)| {
+                    is_editorconfig_max_line_length(line).then_some(section_start + 1 + idx)
+                })
+                .collect();
+            let has_comment = section_lines.iter().any(|line| line.trim() == comment_line);
+            let Some(mut line_idx) = existing_line_lengths.first().copied() else {
+                let mut insert = vec![];
+                if !has_comment {
+                    insert.push(comment_line);
+                }
+                insert.push("max_line_length = off".to_string());
+                lines.splice(section_end..section_end, insert);
+                changed_sections.push(header);
                 continue;
+            };
+
+            let mut changed = false;
+            let mut section_end = section_end;
+            if !has_comment {
+                lines.insert(line_idx, comment_line);
+                line_idx += 1;
+                section_end += 1;
+                changed = true;
             }
-            let mut insert = vec![];
-            if !section_lines.iter().any(|line| line.trim() == comment_line) {
-                insert.push(comment_line);
+            if lines[line_idx].trim() != "max_line_length = off" {
+                lines[line_idx] = "max_line_length = off".to_string();
+                changed = true;
             }
-            insert.push("max_line_length = off".to_string());
-            lines.splice(section_end..section_end, insert);
-            changed_sections.push(header);
+            for idx in (line_idx + 1..section_end).rev() {
+                if is_editorconfig_max_line_length(&lines[idx]) {
+                    lines.remove(idx);
+                    changed = true;
+                }
+            }
+            if changed {
+                changed_sections.push(header);
+            }
             continue;
         }
 
@@ -762,105 +416,8 @@ fn editorconfig_section_header(patterns: &[&str]) -> String {
         format!("[{{{}}}]", patterns.join(","))
     }
 }
-
-/// Generates `.yamllint.yml` in the flint config dir when ryl is being set up.
-pub(super) fn generate_yamllint_config(config_dir: &Path, line_length: u16) -> Result<bool> {
-    let target = config_dir.join(".yamllint.yml");
-    if target.exists() {
-        return Ok(false);
-    }
-    if let Some(parent) = target.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    let content = [
-        "extends: relaxed",
-        "",
-        "rules:",
-        "  document-start: disable",
-        "  line-length:",
-        &format!("    max: {line_length}"),
-        "  indentation: enable",
-        "",
-    ]
-    .join("\n");
-    std::fs::write(&target, content)?;
-    println!("  wrote {}", target.display());
-    Ok(true)
-}
-
-/// Generates `.taplo.toml` in the flint config dir when taplo is being set up.
-pub(super) fn generate_taplo_config(config_dir: &Path, line_length: u16) -> Result<bool> {
-    const SUPPORTED_CONFIG_NAMES: &[&str] = &[".taplo.toml"];
-    const LEGACY_CONFIG_NAMES: &[&str] = &["taplo.toml"];
-    if SUPPORTED_CONFIG_NAMES
-        .iter()
-        .map(|name| config_dir.join(name))
-        .any(|path| path.exists())
-        || LEGACY_CONFIG_NAMES
-            .iter()
-            .map(|name| config_dir.join(name))
-            .any(|path| path.exists())
-    {
-        return Ok(false);
-    }
-    let target = config_dir.join(".taplo.toml");
-    if let Some(parent) = target.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    let content = [
-        "[formatting]".to_string(),
-        format!("column_width = {line_length}"),
-        "indent_string = \"  \"".to_string(),
-    ]
-    .join("\n")
-        + "\n";
-    std::fs::write(&target, content)?;
-    println!("  wrote {}", target.display());
-    Ok(true)
-}
-
-/// Generates `rustfmt.toml` in the flint config dir when cargo-fmt is being set up.
-pub(super) fn generate_rustfmt_config(config_dir: &Path, line_length: u16) -> Result<bool> {
-    let target = config_dir.join("rustfmt.toml");
-    if target.exists() {
-        return Ok(false);
-    }
-    if let Some(parent) = target.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    let content = format!("max_width = {line_length}\n");
-    std::fs::write(&target, content)?;
-    println!("  wrote {}", target.display());
-    Ok(true)
-}
-
-/// Generates root `biome.jsonc` when biome is being set up and no
-/// existing supported config is present.
-///
-/// Flint writes explicit space indentation to avoid Biome's default tab
-/// formatting surprising consumers during rollout.
-pub(super) fn generate_biome_config(project_root: &Path) -> Result<bool> {
-    let target = project_root.join("biome.jsonc");
-    if target.exists() {
-        return Ok(false);
-    }
-    let legacy = project_root.join("biome.json");
-    if legacy.exists() {
-        std::fs::rename(&legacy, &target)?;
-        println!("  moved {} -> {}", legacy.display(), target.display());
-        return Ok(true);
-    }
-    let content = [
-        "{",
-        "  \"formatter\": {",
-        "    \"indentStyle\": \"space\",",
-        "    \"indentWidth\": 2",
-        "  }",
-        "}",
-        "",
-    ]
-    .join("\n");
-    std::fs::write(&target, content)?;
-    println!("  wrote {}", target.display());
-    Ok(true)
+fn is_editorconfig_max_line_length(line: &str) -> bool {
+    line.trim_start()
+        .split_once('=')
+        .is_some_and(|(key, _)| key.trim() == "max_line_length")
 }

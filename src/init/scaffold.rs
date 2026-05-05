@@ -51,7 +51,7 @@ jobs:
         uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
         with:
           version: v2026.5.0
-          sha256: 12ad77d915e2846ebc1a7ca939ff5d124f414704b3c69155e731bb7c49eadc19
+          sha256: 7db5db7a36d28203eb8329140d98fb26b41f5efea32d762f69a1e4b369e1e1a8
 {rust_steps}
       - name: Lint
         env:

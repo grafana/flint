@@ -9,7 +9,7 @@ max_retries = 2
 max_concurrency = 4
 
 # Check link anchors
-include_fragments = true
+include_fragments = "anchor-only"
 
 remap = [
   # GitHub blob URL fragment workaround (lychee#1729) is handled by

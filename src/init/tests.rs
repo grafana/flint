@@ -3,7 +3,8 @@ use crate::registry::CheckTypeDef;
 use config_files::generate_flint_toml;
 use detection::entry_components_differ;
 use generation::{
-    apply_changes, get_existing_config_dir, has_slow_selected, normalize_tools_section,
+    apply_changes, ensure_node_for_npm, get_existing_config_dir, has_slow_selected,
+    normalize_tools_section,
 };
 use scaffold::{apply_env_and_tasks, generate_lint_workflow};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -217,6 +218,34 @@ protoc = "34.1"
         "only explicitly managed linter keys belong below the header:\n{result}"
     );
     assert_eq!(result.matches("# Linters").count(), 1, "single header");
+}
+
+#[test]
+fn node_added_for_npm_tools_is_normalized_above_linters_header() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("mise.toml");
+    let content = "[tools]\n";
+    std::fs::write(&path, content).unwrap();
+
+    apply_changes(
+        &path,
+        content,
+        &[("npm:renovate".to_string(), None)],
+        &[],
+        &[],
+    )
+    .unwrap();
+    assert!(ensure_node_for_npm(dir.path()).unwrap());
+    normalize_tools_section(&path).unwrap();
+
+    let result = std::fs::read_to_string(&path).unwrap();
+    let node_pos = result.find("node =").expect("node present");
+    let header_pos = result.find("# Linters").expect("header present");
+    let renovate_pos = result.find("\"npm:renovate\"").expect("renovate present");
+    assert!(
+        node_pos < header_pos && header_pos < renovate_pos,
+        "node runtime must stay above the linter block:\n{result}"
+    );
 }
 
 #[test]

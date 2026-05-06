@@ -1,10 +1,12 @@
 use super::types::{Check, ConfigFile, EditorconfigDirectiveStyle, WorkflowSetup};
 use crate::linters::{
     biome, flint_setup, license_header, lychee, renovate_deps,
-    renovate_deps::RENOVATE_CONFIG_PATTERNS, rumdl, rustfmt, taplo, yamllint,
+    renovate_deps::RENOVATE_CONFIG_PATTERNS, rumdl, rustfmt, taplo, typos, yamllint,
 };
 const TOOL_RUMDL: &[&str] = &["tool", "rumdl"];
-const TOOL_CODESPELL: &[&str] = &["tool", "codespell"];
+const TOOL_TYPOS: &[&str] = &["tool", "typos"];
+const WORKSPACE_METADATA_TYPOS: &[&str] = &["workspace", "metadata", "typos"];
+const PACKAGE_METADATA_TYPOS: &[&str] = &["package", "metadata", "typos"];
 const TOOL_RUFF: &[&str] = &["tool", "ruff"];
 
 const SHELLCHECK_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
@@ -37,9 +39,16 @@ const HADOLINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir(".hadolint.yml"),
     ConfigFile::project(".hadolint.yml"),
 ];
-const CODESPELL_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
-    ConfigFile::project_ini_section("setup.cfg", "codespell"),
-    ConfigFile::project_toml_section("pyproject.toml", TOOL_CODESPELL),
+const TYPOS_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
+    ConfigFile::config_dir("typos.toml"),
+    ConfigFile::config_dir(".typos.toml"),
+    ConfigFile::project(".codespellrc"),
+    ConfigFile::project("typos.toml"),
+    ConfigFile::project("_typos.toml"),
+    ConfigFile::project(".typos.toml"),
+    ConfigFile::project_toml_section("pyproject.toml", TOOL_TYPOS),
+    ConfigFile::project_toml_section("Cargo.toml", WORKSPACE_METADATA_TYPOS),
+    ConfigFile::project_toml_section("Cargo.toml", PACKAGE_METADATA_TYPOS),
 ];
 const EDITORCONFIG_CHECKER_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir(".ecrc"),
@@ -196,14 +205,16 @@ fn check_xmllint() -> Check {
         .desc("Validate XML files are well-formed")
 }
 
-fn check_codespell() -> Check {
-    Check::files("codespell", "codespell {FILES}", &["*"])
-        .fix("codespell --write-changes {FILES}")
-        .linter_config(".codespellrc", "--config")
-        .baseline_config(ConfigFile::config_dir(".codespellrc"))
-        .unsupported_configs(CODESPELL_UNSUPPORTED_CONFIGS)
+fn check_typos() -> Check {
+    Check::files("typos", "typos --force-exclude {FILES}", &["*"])
+        .fix("typos --write-changes --force-exclude {FILES}")
+        .linter_config("_typos.toml", "--config")
+        .baseline_config(ConfigFile::config_dir("_typos.toml"))
+        .unsupported_configs(TYPOS_UNSUPPORTED_CONFIGS)
+        .check_type(&typos::CHECK_TYPE)
+        .migrate_tool_keys(&["codespell", "pipx:codespell"])
         .desc("Check for common spelling mistakes")
-        .mise_tool("pipx:codespell")
+        .mise_tool("aqua:crate-ci/typos")
 }
 
 fn check_editorconfig_checker() -> Check {
@@ -501,7 +512,7 @@ pub fn builtin() -> Vec<Check> {
         check_actionlint(),
         check_hadolint(),
         check_xmllint(),
-        check_codespell(),
+        check_typos(),
         check_editorconfig_checker(),
         check_golangci_lint(),
         check_ruff(),

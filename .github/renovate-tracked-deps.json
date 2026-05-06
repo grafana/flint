@@ -4,6 +4,10 @@
       "packageName": "rhysd/actionlint",
       "datasource": "github-releases"
     },
+    "aqua:crate-ci/typos": {
+      "packageName": "crate-ci/typos",
+      "datasource": "github-tags"
+    },
     "aqua:jonwiggins/xmloxide": {
       "packageName": "jonwiggins/xmloxide",
       "datasource": "github-tags"
@@ -46,10 +50,6 @@
     "npm:renovate": {
       "packageName": "renovate",
       "datasource": "npm"
-    },
-    "pipx:codespell": {
-      "packageName": "codespell",
-      "datasource": "pypi"
     },
     "ruff": {
       "packageName": "astral-sh/ruff",
@@ -103,6 +103,7 @@
     "mise.toml": {
       "mise": [
         "actionlint",
+        "aqua:crate-ci/typos",
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",
@@ -116,7 +117,6 @@
         "lychee",
         "node",
         "npm:renovate",
-        "pipx:codespell",
         "release-plz",
         "ruff",
         "rumdl",

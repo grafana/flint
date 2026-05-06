@@ -841,7 +841,7 @@ fn not_relevant_for_untracked_change() {
 }
 
 #[test]
-fn relevant_when_snapshot_is_unparseable() {
+fn relevant_when_snapshot_is_unparsable() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join(".github")).unwrap();
     std::fs::write(

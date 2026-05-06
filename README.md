@@ -189,7 +189,6 @@ Click a name in the table below for details. See the
 | [`biome-format`](docs/linters.md#biome-format)                 | Format JS/TS/JSON files                                             | yes |
 | [`cargo-clippy`](docs/linters.md#cargo-clippy)                 | Lint Rust code; runs on all .rs files, not just changed             | yes |
 | [`cargo-fmt`](docs/linters.md#cargo-fmt)                       | Format Rust code; runs on all .rs files, not just changed           | yes |
-| [`codespell`](docs/linters.md#codespell)                       | Check for common spelling mistakes                                  | yes |
 | [`dotnet-format`](docs/linters.md#dotnet-format)               | Format C# code                                                      | yes |
 | [`editorconfig-checker`](docs/linters.md#editorconfig-checker) | Check files comply with EditorConfig settings                       | —   |
 | [`flint-setup`](docs/linters.md#flint-setup)                   | Keep Flint setup current and mise.toml lint tooling canonical       | yes |
@@ -208,6 +207,7 @@ Click a name in the table below for details. See the
 | [`shellcheck`](docs/linters.md#shellcheck)                     | Lint shell scripts for common mistakes                              | —   |
 | [`shfmt`](docs/linters.md#shfmt)                               | Format shell scripts                                                | yes |
 | [`taplo`](docs/linters.md#taplo)                               | Format TOML files                                                   | yes |
+| [`typos`](docs/linters.md#typos)                               | Check for common spelling mistakes                                  | yes |
 | [`xmllint`](docs/linters.md#xmllint)                           | Validate XML files are well-formed                                  | —   |
 
 <!-- registry-table-end -->

@@ -97,6 +97,7 @@
     {
       matchDepNames: [
         "actionlint",
+        "aqua:crate-ci/typos",
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",
@@ -107,7 +108,6 @@
         "ktlint",
         "lychee",
         "npm:renovate",
-        "pipx:codespell",
         "ruff",
         "rumdl",
         "shellcheck",

@@ -1152,7 +1152,7 @@ shfmt = "v3.13.1"
 actionlint = "1.7.10"
 editorconfig-checker = "v3.6.1"
 ruff = "0.15.0"
-"pipx:codespell" = "2.4.1"
+"aqua:crate-ci/typos" = "1.46.0"
 rumdl = "0.1.78"
 rust = { version = "1.94.1", components = "clippy,rustfmt" }
 "#,
@@ -1162,7 +1162,7 @@ rust = { version = "1.94.1", components = "clippy,rustfmt" }
             "actionlint",
             "biome",
             "cargo-clippy",
-            "codespell",
+            "typos",
             "ec",
             "lychee",
             "renovate",
@@ -1192,7 +1192,7 @@ taplo                 taplo               active         fast      yes  Format T
 actionlint            actionlint          active         fast      no   Lint GitHub Actions workflow files                                   .github/workflows/*.yml .github/workflows/*.yaml
 hadolint              hadolint            missing        fast      no   Lint Dockerfiles                                                     Dockerfile Dockerfile.* *.dockerfile
 xmllint               xmllint             missing        fast      no   Validate XML files are well-formed                                   *.xml
-codespell             codespell           active         fast      yes  Check for common spelling mistakes                                   *
+typos                 typos               active         fast      yes  Check for common spelling mistakes                                   *
 editorconfig-checker  ec                  active         fast      no   Check files comply with EditorConfig settings                        *
 golangci-lint         golangci-lint       missing        fast      no   Lint Go code; uses --new-from-rev to scope analysis to changed code  *.go
 ruff                  ruff                active         fast      yes  Lint Python code                                                     *.py

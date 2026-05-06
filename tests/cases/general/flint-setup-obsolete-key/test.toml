@@ -1,7 +1,7 @@
 [expected]
 args = "run --fix flint-setup"
 exit = 1
-stdout = "  normalized [tools] in <REPO>/mise.toml\n"
+stdout = "  replaced \"pipx:ruff\" → \"ruff\"\n  normalized [tools] in <REPO>/mise.toml\n"
 stderr = "flint: fixed: flint-setup — commit before pushing\n"
 
 [expected.files]

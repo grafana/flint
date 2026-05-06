@@ -2,6 +2,7 @@ use anyhow::Result;
 use std::collections::HashSet;
 use std::path::Path;
 
+use crate::linters::typos::MigrationResult as TyposMigrationResult;
 use crate::registry::{Check, EditorconfigDirectiveStyle, EditorconfigLineLengthPolicy, builtin};
 
 use super::config_files::{
@@ -20,6 +21,7 @@ pub(super) struct RepoMigrationSummary {
     legacy_files_removed: Vec<String>,
     stale_md013_comments_removed: Vec<String>,
     stale_editorconfig_checker_comments_removed: Vec<String>,
+    typos_migration: TyposMigrationResult,
 }
 
 struct MigrationInputs {
@@ -35,6 +37,7 @@ impl RepoMigrationSummary {
             && self.legacy_files_removed.is_empty()
             && self.stale_md013_comments_removed.is_empty()
             && self.stale_editorconfig_checker_comments_removed.is_empty()
+            && !self.typos_migration.changed()
     }
 
     pub(super) fn print_messages(&self) {
@@ -56,6 +59,7 @@ impl RepoMigrationSummary {
         for rel in &self.stale_editorconfig_checker_comments_removed {
             println!("  removed stale editorconfig-checker directives from <REPO>/{rel}");
         }
+        self.typos_migration.print_messages();
     }
 }
 
@@ -76,6 +80,7 @@ pub(crate) fn apply_setup_migrations(project_root: &Path, config_dir: &Path) -> 
         &unsupported_keys,
         legacy_markdownlint_stack_active(&inputs.tool_keys),
     )?;
+    migration_summary.print_messages();
     Ok(!migration_summary.is_noop())
 }
 
@@ -83,12 +88,15 @@ pub(crate) fn detect_setup_migrations(project_root: &Path) -> Result<bool> {
     let inputs = migration_inputs(project_root)?;
     let obsolete_keys = crate::registry::obsolete_keys();
     let unsupported_keys = crate::registry::unsupported_keys();
-    let migration_summary = detect_setup_migrations_with_keys(
+    let mut migration_summary = detect_setup_migrations_with_keys(
         &obsolete_keys,
         &unsupported_keys,
         &inputs.tool_keys,
         &inputs.mise_content,
     );
+    if crate::linters::typos::legacy_config_present(project_root) {
+        migration_summary.typos_migration.wrote_target = true;
+    }
     Ok(!migration_summary.is_noop())
 }
 
@@ -219,6 +227,7 @@ fn detect_setup_migrations_with_keys(
         legacy_files_removed: vec![],
         stale_md013_comments_removed: vec![],
         stale_editorconfig_checker_comments_removed: vec![],
+        typos_migration: TyposMigrationResult::default(),
     }
 }
 
@@ -256,6 +265,7 @@ fn apply_repo_migrations_with_keys(
         } else {
             vec![]
         };
+    let typos_migration = crate::linters::typos::migrate_legacy_config(project_root, config_dir)?;
 
     Ok(RepoMigrationSummary {
         replaced_obsolete,
@@ -264,6 +274,7 @@ fn apply_repo_migrations_with_keys(
         legacy_files_removed,
         stale_md013_comments_removed,
         stale_editorconfig_checker_comments_removed,
+        typos_migration,
     })
 }
 

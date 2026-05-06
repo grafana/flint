@@ -295,7 +295,7 @@ fn compute_desired_tools_lang_profile() {
     assert!(!tools.contains_key("shellcheck"));
     assert!(!tools.contains_key("shfmt"));
     assert!(tools.contains_key("rust"));
-    assert!(!tools.contains_key("pipx:codespell"));
+    assert!(!tools.contains_key("aqua:crate-ci/typos"));
 }
 
 #[test]

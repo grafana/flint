@@ -410,6 +410,14 @@ async fn run(
             )
             .await?;
 
+            outcomes.extend(
+                check_results
+                    .iter()
+                    .filter(|r| r.ok)
+                    .cloned()
+                    .map(FixOutcome::Clean),
+            );
+
             let (fixable, reviewable): (Vec<CheckResult>, Vec<CheckResult>) = check_results
                 .into_iter()
                 .filter(|r| !r.ok)
@@ -443,6 +451,8 @@ async fn run(
                         if let Some(check) = legacy_checks.iter().find(|c| c.name == r.name) {
                             if check.fix_behavior() == registry::FixBehavior::PartialNeedsVerify {
                                 to_verify.push(r.name);
+                            } else if matches!(check.kind, CheckKind::Native(_)) {
+                                outcomes.push(classify_single_pass_fix(r));
                             } else {
                                 outcomes.push(FixOutcome::Fixed(r));
                             }

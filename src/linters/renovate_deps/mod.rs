@@ -5,7 +5,7 @@ use std::process::Stdio;
 
 use self::install_patch::configure_extract_workaround_env;
 use self::rules::{
-    comparable_package_rules_for_config, needs_metadata_lookup, trim_snapshot_meta,
+    comparable_package_rules_for_config, metadata_lookup_reason, trim_snapshot_meta,
     validate_rule_coverage,
 };
 use self::snapshot::{Snapshot, extract_deps, read_snapshot, unified_diff, write_snapshot};
@@ -45,6 +45,7 @@ pub(crate) static CHECK_TYPE: CheckTypeDef = CheckTypeDef::native_with_init_hook
 struct PreparedRenovateDeps {
     name: String,
     cfg: RenovateDepsConfig,
+    config_changed: bool,
     tracked_files: Vec<PathBuf>,
 }
 
@@ -56,6 +57,7 @@ fn prepare(ctx: NativePrepareContext<'_>) -> Option<Box<dyn PreparedNativeCheck>
     Some(Box::new(PreparedRenovateDeps {
         name: ctx.name.to_string(),
         cfg: ctx.cfg.checks.renovate_deps.clone(),
+        config_changed: config_changed(ctx.file_list, ctx.project_root),
         tracked_files: COMMITTED_PATHS
             .iter()
             .map(|path| ctx.project_root.join(path))
@@ -74,18 +76,31 @@ impl PreparedNativeCheck for PreparedRenovateDeps {
 
     fn run(self: Box<Self>, ctx: NativeRunContext) -> NativeRunFuture {
         Box::pin(async move {
-            crate::linters::renovate_deps::run(&self.cfg, ctx.fix, &ctx.project_root).await
+            crate::linters::renovate_deps::run(
+                &self.cfg,
+                self.config_changed,
+                ctx.fix,
+                ctx.verbose,
+                &ctx.project_root,
+            )
+            .await
         })
     }
 }
 
-pub async fn run(cfg: &RenovateDepsConfig, fix: bool, project_root: &Path) -> LinterOutput {
+pub async fn run(
+    cfg: &RenovateDepsConfig,
+    config_changed: bool,
+    fix: bool,
+    verbose: bool,
+    project_root: &Path,
+) -> LinterOutput {
     match validate_runtime_env() {
         Ok(Some(warning)) => eprintln!("{warning}"),
         Ok(None) => {}
         Err(stderr) => return LinterOutput::err(stderr),
     }
-    match run_inner(cfg, fix, project_root).await {
+    match run_inner(cfg, config_changed, fix, verbose, project_root).await {
         Ok(out) => out,
         Err(e) => LinterOutput::err(format!("flint: renovate-deps: {e}\n")),
     }
@@ -193,6 +208,16 @@ fn changed_rel_paths(file_list: &FileList, project_root: &Path) -> HashSet<Strin
         .filter_map(|path| path.strip_prefix(project_root).ok())
         .map(normalize_path)
         .collect()
+}
+
+fn config_changed(file_list: &FileList, project_root: &Path) -> bool {
+    if file_list.full {
+        return false;
+    }
+    let changed = changed_rel_paths(file_list, project_root);
+    changed
+        .iter()
+        .any(|path| RENOVATE_CONFIG_PATTERNS.contains(&path.as_str()))
 }
 
 fn normalize_path(path: &Path) -> String {
@@ -399,7 +424,9 @@ fn add_to_extends(content: &str, entry: &str) -> anyhow::Result<String> {
 
 async fn run_inner(
     cfg: &RenovateDepsConfig,
+    config_changed: bool,
     fix: bool,
+    verbose: bool,
     project_root: &Path,
 ) -> anyhow::Result<LinterOutput> {
     let config_path = resolve_renovate_config_path(project_root)?;
@@ -414,14 +441,31 @@ async fn run_inner(
         None
     };
 
-    let mut generated =
+    let extracted =
         generate_snapshot(project_root, &config_path, &cfg.exclude_managers, "extract").await?;
-    maybe_reuse_committed_meta(&mut generated, committed.as_ref(), cfg.refresh_meta);
+    let mut generated = extracted.clone();
+    maybe_reuse_committed_meta(&mut generated, committed.as_ref());
 
-    if needs_metadata_lookup(&generated, &rules) {
+    let lookup_reason = metadata_lookup_reason(&generated, &rules);
+    if verbose && let Some(reason) = lookup_reason.as_deref() {
+        if config_changed || fix {
+            eprintln!("flint: renovate-deps: lookup required: {reason}");
+        } else {
+            eprintln!(
+                "flint: renovate-deps: lookup skipped because Renovate config is unchanged: {reason}"
+            );
+        }
+    }
+
+    if !fix && !config_changed && lookup_reason.is_some() {
+        anyhow::bail!(
+            "dependency metadata is out of date for rule-coverage validation.\nRun `flint run --fix renovate-deps` to refresh metadata."
+        );
+    }
+
+    if lookup_reason.is_some() && (config_changed || fix) {
         generated =
             generate_snapshot(project_root, &config_path, &cfg.exclude_managers, "lookup").await?;
-        maybe_reuse_committed_meta(&mut generated, committed.as_ref(), cfg.refresh_meta);
     }
 
     validate_rule_coverage(&generated, &rules)?;
@@ -610,14 +654,8 @@ fn merge_missing_meta_from_committed(generated: &mut Snapshot, committed: &Snaps
     }
 }
 
-fn maybe_reuse_committed_meta(
-    generated: &mut Snapshot,
-    committed: Option<&Snapshot>,
-    refresh_meta: bool,
-) {
-    if let Some(committed) = committed
-        && !refresh_meta
-    {
+fn maybe_reuse_committed_meta(generated: &mut Snapshot, committed: Option<&Snapshot>) {
+    if let Some(committed) = committed {
         merge_missing_meta_from_committed(generated, committed);
     }
 }

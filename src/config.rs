@@ -56,8 +56,6 @@ pub struct LycheeConfig {
 pub struct RenovateDepsConfig {
     // Env var: FLINT_RENOVATE_DEPS_EXCLUDE_MANAGERS (JSON array, e.g. '["npm"]')
     pub exclude_managers: Vec<String>,
-    // Env var: FLINT_RENOVATE_DEPS_REFRESH_META
-    pub refresh_meta: bool,
 }
 
 #[derive(Debug, Deserialize, Clone)]

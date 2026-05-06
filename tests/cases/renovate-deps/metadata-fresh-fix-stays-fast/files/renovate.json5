@@ -1,0 +1,8 @@
+{
+  packageRules: [
+    {
+      groupName: "mise",
+      matchPackageNames: ["jdx/mise"]
+    }
+  ]
+}

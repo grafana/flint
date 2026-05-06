@@ -21,6 +21,7 @@ pub struct RunOptions {
     pub time: bool,
 }
 
+#[derive(Clone)]
 pub struct CheckResult {
     pub name: String,
     pub ok: bool,
@@ -117,6 +118,7 @@ impl PreparedCheck {
                 let out = native
                     .run(crate::registry::NativeRunContext {
                         fix,
+                        verbose,
                         project_root: project_root.to_path_buf(),
                     })
                     .await;

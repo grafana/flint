@@ -100,13 +100,9 @@ If the snapshot is stale:
 flint run --fix renovate-deps
 ```
 
-If you want to force a fresh metadata rebuild instead of reusing any existing
-committed metadata for the same dependency names, for example after changing Renovate
-grouping config or while debugging suspicious `meta` entries:
-
-```bash
-FLINT_RENOVATE_DEPS_REFRESH_META=1 flint run --fix renovate-deps
-```
+`--fix` keeps the normal fast extract path, but if rule-coverage validation
+actually needs package metadata it will do one lookup-backed refresh and write
+the updated snapshot.
 
 If rule coverage is inconsistent:
 

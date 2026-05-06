@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "mise": {
+      "packageName": "jdx/mise",
+      "datasource": "github-release-attachments"
+    }
+  },
+  "files": {
+    "mise.toml": {
+      "mise": [
+        "mise"
+      ]
+    },
+    "src/init/scaffold.rs": {
+      "regex": [
+        "Swatinem/rust-cache"
+      ]
+    }
+  }
+}

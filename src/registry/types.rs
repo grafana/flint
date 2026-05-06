@@ -262,6 +262,7 @@ pub struct NativePrepareContext<'a> {
 
 pub struct NativeRunContext {
     pub fix: bool,
+    pub verbose: bool,
     pub project_root: PathBuf,
 }
 

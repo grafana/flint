@@ -1,0 +1,15 @@
+{
+  "meta": {},
+  "files": {
+    "mise.toml": {
+      "mise": [
+        "mise"
+      ]
+    },
+    "src/init/scaffold.rs": {
+      "regex": [
+        "Swatinem/rust-cache"
+      ]
+    }
+  }
+}

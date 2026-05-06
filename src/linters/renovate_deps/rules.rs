@@ -129,48 +129,95 @@ pub(crate) fn trim_snapshot_meta(snapshot: &mut Snapshot, rules: &[ComparablePac
         .retain(|dep_name, _| relevant.contains(dep_name));
 }
 
-pub(crate) fn needs_metadata_lookup(snapshot: &Snapshot, rules: &[ComparablePackageRule]) -> bool {
+pub(crate) fn metadata_lookup_reason(
+    snapshot: &Snapshot,
+    rules: &[ComparablePackageRule],
+) -> Option<String> {
     if rules.is_empty() {
-        return false;
+        return None;
     }
 
-    let extracted_dep_names: BTreeSet<_> = snapshot
+    for dep_name in extracted_dep_names(snapshot) {
+        if snapshot
+            .meta
+            .get(&dep_name)
+            .and_then(|meta| meta.package_name.as_deref())
+            .is_some()
+        {
+            continue;
+        }
+
+        if let Some(reason) = dep_metadata_lookup_reason(&dep_name, snapshot, rules) {
+            return Some(reason);
+        }
+    }
+
+    None
+}
+
+fn dep_metadata_lookup_reason(
+    dep_name: &str,
+    snapshot: &Snapshot,
+    rules: &[ComparablePackageRule],
+) -> Option<String> {
+    for rule in rules {
+        match &rule.matcher {
+            RuleMatcher::DepNames(names) if names.contains(dep_name) => {
+                return Some(format!(
+                    "dep {dep_name:?} is matched by {} via matchDepNames but is missing packageName metadata",
+                    rule.label
+                ));
+            }
+            RuleMatcher::PackageNames(names)
+                if package_name_rule_dep_candidates(snapshot, names).contains(dep_name) =>
+            {
+                let packages = names.iter().cloned().collect::<Vec<_>>().join(", ");
+                return Some(format!(
+                    "dep {dep_name:?} is considered for {} via matchPackageNames [{packages}] but is missing packageName metadata",
+                    rule.label
+                ));
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn extracted_dep_names(snapshot: &Snapshot) -> BTreeSet<String> {
+    snapshot
         .files
         .values()
         .flat_map(|managers| managers.values())
         .flatten()
         .cloned()
+        .collect()
+}
+
+fn package_name_rule_dep_candidates(
+    snapshot: &Snapshot,
+    package_names: &BTreeSet<String>,
+) -> BTreeSet<String> {
+    let mut candidates: BTreeSet<_> = snapshot
+        .meta
+        .iter()
+        .filter_map(|(dep_name, meta)| {
+            meta.package_name
+                .as_deref()
+                .filter(|package_name| package_names.contains(*package_name))
+                .map(|_| dep_name.clone())
+        })
         .collect();
 
-    for rule in rules {
-        match &rule.matcher {
-            RuleMatcher::DepNames(names) => {
-                if names.iter().any(|dep_name| {
-                    extracted_dep_names.contains(dep_name)
-                        && snapshot
-                            .meta
-                            .get(dep_name)
-                            .and_then(|meta| meta.package_name.as_deref())
-                            .is_none()
-                }) {
-                    return true;
-                }
-            }
-            RuleMatcher::PackageNames(_) => {
-                if extracted_dep_names.iter().any(|dep_name| {
-                    snapshot
-                        .meta
-                        .get(dep_name)
-                        .and_then(|meta| meta.package_name.as_deref())
-                        .is_none()
-                }) {
-                    return true;
-                }
-            }
-        }
+    if candidates.is_empty() {
+        candidates.extend(
+            package_names
+                .iter()
+                .filter_map(|package_name| package_name.rsplit('/').next())
+                .map(ToOwned::to_owned),
+        );
     }
 
-    false
+    candidates
 }
 
 enum ComparableRuleOutcome {

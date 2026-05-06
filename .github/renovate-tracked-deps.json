@@ -24,8 +24,7 @@
       "datasource": "github-tags"
     },
     "google-java-format": {
-      "packageName": "google-java-format",
-      "datasource": "github-releases"
+      "packageName": "google-java-format"
     },
     "hadolint": {
       "packageName": "hadolint/hadolint",

@@ -63,7 +63,7 @@
       datasourceTemplate: "github-release-attachments",
       packageNameTemplate: "jdx/mise",
       depNameTemplate: "mise",
-      matchStrings: ["jdx/mise-action.*\\n\\s*with:\\s*\\n\\s*version: [\"']?(?<currentValue>v[.\\d]+)[\"']?\\s*\\n\\s*sha256: [\"']?(?<currentDigest>\\w+)[\"']?"],
+      matchStrings: ["jdx/mise-action.*\\n\\s*with:\\s*\\n\\s*version: [\"']?(?<currentValue>v[.\\d]+)[\"']?\\s*\\n\\s*sha256:\\s*(?:(?:[>|][-+]?)\\s*\\n\\s*)?[\"']?(?<currentDigest>[a-f0-9]{64})[\"']?"],
     },
     {
       customType: "regex",
@@ -90,7 +90,7 @@
       datasourceTemplate: "github-release-attachments",
       packageNameTemplate: "jdx/mise",
       depNameTemplate: "mise",
-      matchStrings: ["jdx/mise-action.*\\n\\s*with:\\s*\\n\\s*version: [\"']?(?<currentValue>v[.\\d]+)[\"']?\\s*\\n\\s*sha256: [\"']?(?<currentDigest>\\w+)[\"']?"],
+      matchStrings: ["jdx/mise-action.*\\n\\s*with:\\s*\\n\\s*version: [\"']?(?<currentValue>v[.\\d]+)[\"']?\\s*\\n\\s*sha256:\\s*(?:(?:[>|][-+]?)\\s*\\n\\s*)?[\"']?(?<currentDigest>[a-f0-9]{64})[\"']?"],
     },
   ],
   packageRules: [

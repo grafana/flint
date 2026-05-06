@@ -181,7 +181,10 @@ fn merge_typos_config(target: &Path, words: &BTreeSet<String>) -> Result<()> {
 }
 
 fn normalize_rendered_typos_config(rendered: String) -> String {
-    rendered.replace("[default]\n\n[default.extend-words]\n", "[default.extend-words]\n")
+    rendered.replace(
+        "[default]\n\n[default.extend-words]\n",
+        "[default.extend-words]\n",
+    )
 }
 
 fn ensure_table<'a>(parent: &'a mut toml_edit::Table, key: &str) -> &'a mut toml_edit::Table {
@@ -239,7 +242,7 @@ mod tests {
             "[codespell]\nignore-words-list = ratatui\nignore-words = .codespellignore\nskip = .git,target\ncheck-hidden =\n",
         )
         .unwrap();
-        std::fs::write(tmp.path().join(".codespellignore"), "flate\n").unwrap();
+        std::fs::write(tmp.path().join(".codespellignore"), "flat\n").unwrap();
 
         let result = migrate_legacy_config(tmp.path(), &config_dir).unwrap();
         assert!(result.changed());
@@ -248,7 +251,7 @@ mod tests {
 
         let content = std::fs::read_to_string(config_dir.join("_typos.toml")).unwrap();
         assert!(content.contains("ratatui = \"ratatui\""));
-        assert!(content.contains("flate = \"flate\""));
+        assert!(content.contains("flat = \"flat\""));
         assert!(!content.contains("extend-exclude"));
         assert!(!content.contains("ignore-hidden"));
         assert!(!content.contains("[default]\n\n[default.extend-words]"));

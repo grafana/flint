@@ -7,7 +7,7 @@ use super::types::Check;
 /// tool name → declared version string.
 ///
 /// Also registers normalized aliases for backend-prefixed tools so that checks
-/// can match by their bare package/binary name. For example:
+/// can match by their bare package key. For example:
 /// - `"aqua:owenlamont/ryl"` → also registers `"ryl"`
 /// - `"aqua:jonwiggins/xmloxide"` → also registers `"xmloxide"`
 ///

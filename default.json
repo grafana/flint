@@ -48,12 +48,12 @@
         "ktlint",
         "lychee",
         "npm:renovate",
-        "pipx:codespell",
         "ruff",
         "rumdl",
         "shellcheck",
         "shfmt",
-        "taplo"
+        "taplo",
+        "typos"
       ],
       "groupName": "linters",
       "commitMessageTopic": "flint-managed linter updates",

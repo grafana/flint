@@ -1,0 +1,21 @@
+[expected]
+args = "run --fix flint-setup"
+exit = 0
+stdout = '''
+  wrote .github/config/_typos.toml
+  removed <REPO>/.codespellrc (replaced by _typos.toml)
+  removed <REPO>/.codespellignore (replaced by _typos.toml)
+'''
+stderr = ""
+
+[env]
+FLINT_CONFIG_DIR = ".github/config"
+
+[expected.files]
+".github/config/_typos.toml" = '''
+[default.extend-words]
+atMost = "atMost"
+errorprone = "errorprone"
+flate = "flate"
+ratatui = "ratatui"
+'''

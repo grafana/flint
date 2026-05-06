@@ -1,0 +1,15 @@
+[expected]
+args = "run --full typos"
+exit = 1
+stderr_contains = [
+  "[typos]",
+  "error: `teh` should be `the`",
+  "<REPO>/README.md:1:1",
+  "teh typo lives here.",
+  "flint: 1 check failed (typos)",
+  "💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.",
+]
+
+
+[env]
+FLINT_CONFIG_DIR = ".github/config"

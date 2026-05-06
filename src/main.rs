@@ -1129,8 +1129,9 @@ fn display_binary(check: &registry::Check) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{display_binary, linter_status, render_linters_table};
+    use super::{display_binary, linter_status, render_linters_table, unsupported_config};
     use crate::{config, registry};
+    use std::path::Path;
 
     fn mise_tools_from(content: &str) -> std::collections::HashMap<String, String> {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -1152,7 +1153,7 @@ shfmt = "v3.13.1"
 actionlint = "1.7.10"
 editorconfig-checker = "v3.6.1"
 ruff = "0.15.0"
-"pipx:codespell" = "2.4.1"
+typos = "1.46.0"
 rumdl = "0.1.78"
 rust = { version = "1.94.1", components = "clippy,rustfmt" }
 "#,
@@ -1162,7 +1163,7 @@ rust = { version = "1.94.1", components = "clippy,rustfmt" }
             "actionlint",
             "biome",
             "cargo-clippy",
-            "codespell",
+            "typos",
             "ec",
             "lychee",
             "renovate",
@@ -1192,7 +1193,7 @@ taplo                 taplo               active         fast      yes  Format T
 actionlint            actionlint          active         fast      no   Lint GitHub Actions workflow files                                   .github/workflows/*.yml .github/workflows/*.yaml
 hadolint              hadolint            missing        fast      no   Lint Dockerfiles                                                     Dockerfile Dockerfile.* *.dockerfile
 xmllint               xmllint             missing        fast      no   Validate XML files are well-formed                                   *.xml
-codespell             codespell           active         fast      yes  Check for common spelling mistakes                                   *
+typos                 typos               active         fast      yes  Check for common spelling mistakes                                   *
 editorconfig-checker  ec                  active         fast      no   Check files comply with EditorConfig settings                        *
 golangci-lint         golangci-lint       missing        fast      no   Lint Go code; uses --new-from-rev to scope analysis to changed code  *.go
 ruff                  ruff                active         fast      yes  Lint Python code                                                     *.py
@@ -1248,5 +1249,19 @@ license-header        (built-in)          not configured  fast      no   Check s
             .find(|check| check.name == "license-header")
             .expect("license-header check");
         assert_eq!(display_binary(&license_header), "(built-in)");
+    }
+
+    #[test]
+    fn typos_supported_root_config_is_not_flagged_when_config_dir_is_project_root() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("_typos.toml"), "[default.extend-words]\n").unwrap();
+        let typos = registry::builtin()
+            .into_iter()
+            .find(|check| check.name == "typos")
+            .expect("typos check");
+
+        let found = unsupported_config(&typos, dir.path(), Path::new("."));
+
+        assert_eq!(found, None);
     }
 }

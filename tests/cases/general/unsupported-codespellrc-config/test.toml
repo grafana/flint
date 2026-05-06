@@ -1,0 +1,7 @@
+[expected]
+args = "run typos"
+exit = 1
+stderr = '''
+flint: unsupported typos config file found: .codespellrc
+  Flint only supports FLINT_CONFIG_DIR/_typos.toml for typos. Move the config to the supported location or remove the alternate file.
+'''

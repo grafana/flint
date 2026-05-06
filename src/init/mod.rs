@@ -41,7 +41,7 @@ const DEFAULT_LINE_LENGTH: u16 = 120;
 pub enum Profile {
     /// Primary language linters only (ruff, cargo-clippy, golangci-lint, …).
     Lang,
-    /// Lang + supplementary checks + fast general tools (shellcheck, rumdl, codespell, …).
+    /// Lang + supplementary checks + fast general tools (shellcheck, rumdl, typos, …).
     Default,
     /// Default + slow linters (renovate-deps).
     Comprehensive,
@@ -206,7 +206,7 @@ fn default_category_items() -> Vec<CategoryItem> {
         CategoryItem {
             selected: true,
             category: Category::Default,
-            label: "general — general tools (codespell, ec, lychee, …)",
+            label: "general — general tools (typos, ec, lychee, …)",
         },
         CategoryItem {
             selected: false,

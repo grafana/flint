@@ -405,6 +405,12 @@ fn check_lychee() -> Check {
             in all files — useful when broken internal links from unchanged files also\n\
             matter.\n\
             \n\
+            Outside CI, flint also enables a local lychee request cache by default to\n\
+            speed up repeated runs. Flint stores that cache under `.lychee_cache/` and\n\
+            creates the directory on first use. Set `FLINT_LYCHEE_SKIP_LOCAL_CACHE=true`\n\
+            to opt out. If your lychee config already sets `cache = true`, flint leaves\n\
+            caching to lychee instead.\n\
+            \n\
             In CI, `lychee` requires `GITHUB_TOKEN` so GitHub link checks can authenticate.\n\
             On GitHub Actions PR runs in changed-file mode, link remaps also require\n\
             `GITHUB_REPOSITORY`, `GITHUB_BASE_REF`, `GITHUB_HEAD_REF`, and `PR_HEAD_REPO`.\n\

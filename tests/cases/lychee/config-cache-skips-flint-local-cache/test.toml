@@ -1,0 +1,29 @@
+[expected]
+args = "run --full lychee"
+exit = 1
+stderr = """
+[lychee]
+==> Checking all links in all files
+PWD=<REPO>
+ARGS: --config <REPO>/lychee.toml -- README.md
+
+flint: 1 check failed (lychee)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+"""
+
+[env]
+GITHUB_TOKEN = "token"
+LYCHEE_SKIP_GITHUB_REMAPS = "true"
+
+[fake_bins]
+lychee = '''
+#!/bin/sh
+set -eu
+printf 'PWD=%s\n' "$PWD"
+printf 'ARGS:'
+for arg in "$@"; do
+	printf ' %s' "$arg"
+done
+printf '\n'
+exit 1
+'''

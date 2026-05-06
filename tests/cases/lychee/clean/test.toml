@@ -1,7 +1,9 @@
 [expected]
 args = "run --full lychee"
 exit = 0
-
+stderr = '''
+flint: links: created local lychee cache dir at .lychee_cache; opt out globally with `mise set --global FLINT_LYCHEE_SKIP_LOCAL_CACHE=true`.
+'''
 
 [env]
 GITHUB_TOKEN = "token"

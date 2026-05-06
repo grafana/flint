@@ -46,7 +46,7 @@ Add `flint` to your repo's `mise.toml`:
 
 ```toml
 [tools]
-"github:grafana/flint" = "0.21.0"
+"aqua:grafana/flint" = "0.21.0"
 ```
 
 Bootstrap a repo with `flint init` (scaffolds config). Install a
@@ -68,10 +68,10 @@ Add the linting tools your project needs alongside the `flint` binary itself:
 
 ```toml
 [tools]
-"github:grafana/flint" = "0.21.0"
+"aqua:grafana/flint" = "0.21.0"
 
 # Add whichever linters apply to your repo:
-"github:koalaman/shellcheck" = "0.11.0"
+shellcheck              = "0.11.0"
 shfmt                   = "v3.13.1"
 actionlint              = "1.7.10"
 ```

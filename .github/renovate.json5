@@ -28,10 +28,10 @@
       description: "Update shellcheck version in README quickstart example",
       managerFilePatterns: ["/^README\\.md$/"],
       matchStrings: [
-        "# Add whichever linters apply to your repo:\\n[\\s\\S]*?\"github:koalaman/shellcheck\"\\s*=\\s*\"(?<currentValue>[^\"]+)\"[\\s\\S]*?\\n```",
+        "# Add whichever linters apply to your repo:\\n[\\s\\S]*?shellcheck\\s*=\\s*\"(?<currentValue>[^\"]+)\"[\\s\\S]*?\\n```",
       ],
       datasourceTemplate: "github-releases",
-      depNameTemplate: "github:koalaman/shellcheck",
+      depNameTemplate: "shellcheck",
       packageNameTemplate: "koalaman/shellcheck",
     },
     {
@@ -97,13 +97,12 @@
     {
       matchDepNames: [
         "actionlint",
+        "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",
         "editorconfig-checker",
-        "github:google/google-java-format",
-        "github:jonwiggins/xmloxide",
-        "github:koalaman/shellcheck",
         "golangci-lint",
+        "google-java-format",
         "hadolint",
         "ktlint",
         "lychee",
@@ -111,6 +110,7 @@
         "pipx:codespell",
         "ruff",
         "rumdl",
+        "shellcheck",
         "shfmt",
         "taplo",
       ],

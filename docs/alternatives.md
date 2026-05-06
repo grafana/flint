@@ -99,7 +99,7 @@ instead of being entangled with compile or test phases, so repos can reason
 about ownership and failures more cleanly.
 
 To migrate: remove `spotless-maven-plugin` from `pom.xml` (and any
-`spotless.skip` properties), add `"github:google/google-java-format"` to
+`spotless.skip` properties), add `"google-java-format"` to
 `[tools]` in `mise.toml`, and run `flint run --fix` once to confirm the repo is
 clean.
 

@@ -73,7 +73,7 @@ fn ensure_node_for_npm_with(
     Ok(true)
 }
 
-/// Pins `github:grafana/flint` in mise.toml at the calling binary's version so
+/// Pins `aqua:grafana/flint` in mise.toml at the calling binary's version so
 /// contributors all run the same flint release. Skips when the key already
 /// exists (any pin — never overwrite the user's explicit choice). Pre-release
 /// suffixes are stripped to match the Renovate preset tag format.
@@ -88,7 +88,7 @@ fn ensure_flint_self_pin_with(
     flint_rev: Option<&str>,
     runner: impl FnMut(&Path, &str, &str),
 ) -> Result<bool> {
-    const RELEASE_KEY: &str = "github:grafana/flint";
+    const RELEASE_KEY: &str = "aqua:grafana/flint";
     const CARGO_KEY: &str = "cargo:https://github.com/grafana/flint";
     let mise_path = project_root.join("mise.toml");
     let content = std::fs::read_to_string(&mise_path).unwrap_or_default();
@@ -173,7 +173,8 @@ fn should_remove_existing_flint_pin(
 }
 
 fn is_flint_tool_key(key: &str) -> bool {
-    key == "github:grafana/flint"
+    key == "aqua:grafana/flint"
+        || key == "github:grafana/flint"
         || key.starts_with("cargo:https://github.com/grafana/flint")
         || key.starts_with("cargo:https://github.com/grafana/flint.git")
 }
@@ -486,7 +487,7 @@ mod tests {
     fn noop_without_npm_tools() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mise.toml");
-        let original = "[tools]\n\"github:koalaman/shellcheck\" = \"v0.11.0\"\n";
+        let original = "[tools]\nshellcheck = \"v0.11.0\"\n";
         std::fs::write(&path, original).unwrap();
 
         let added = ensure_node_for_npm(dir.path()).unwrap();
@@ -549,7 +550,7 @@ mod tests {
         let result = std::fs::read_to_string(&path).unwrap();
 
         assert!(changed);
-        assert!(result.contains("\"github:grafana/flint\""));
+        assert!(result.contains("\"aqua:grafana/flint\""));
         assert!(!result.contains("cargo:https://github.com/grafana/flint"));
         assert!(result.contains("FLINT_CONFIG_DIR = \".github/config\""));
     }
@@ -560,7 +561,7 @@ mod tests {
         let path = dir.path().join("mise.toml");
         std::fs::write(
             &path,
-            "[tools]\n\"github:grafana/flint\" = \"0.20.5\"\n\n[env]\nFLINT_CONFIG_DIR = \".github/config\"\n",
+            "[tools]\n\"aqua:grafana/flint\" = \"0.20.5\"\n\n[env]\nFLINT_CONFIG_DIR = \".github/config\"\n",
         )
         .unwrap();
 
@@ -569,7 +570,7 @@ mod tests {
 
         assert!(changed);
         assert!(result.contains("\"cargo:https://github.com/grafana/flint\" = \"rev:deadbeef\""));
-        assert!(!result.contains("\"github:grafana/flint\""));
+        assert!(!result.contains("\"aqua:grafana/flint\""));
         assert!(result.contains("FLINT_CONFIG_DIR = \".github/config\""));
     }
 
@@ -580,12 +581,12 @@ mod tests {
         std::fs::write(&path, "[tools]\nrust = \"1.95.0\"\n").unwrap();
 
         let changed = ensure_flint_self_pin_with(dir.path(), None, |project_root, key, version| {
-            assert_eq!(key, "github:grafana/flint");
+            assert_eq!(key, "aqua:grafana/flint");
             assert_eq!(version, env!("CARGO_PKG_VERSION"));
             let version = env!("CARGO_PKG_VERSION");
             std::fs::write(
                 project_root.join("mise.toml"),
-                format!("[tools]\nrust = \"1.95.0\"\n\"github:grafana/flint\" = \"{version}\"\n"),
+                format!("[tools]\nrust = \"1.95.0\"\n\"aqua:grafana/flint\" = \"{version}\"\n"),
             )
             .unwrap();
         })
@@ -594,7 +595,7 @@ mod tests {
         assert!(changed);
         let result = std::fs::read_to_string(&path).unwrap();
         assert!(result.contains(&format!(
-            "\"github:grafana/flint\" = \"{}\"",
+            "\"aqua:grafana/flint\" = \"{}\"",
             env!("CARGO_PKG_VERSION")
         )));
         assert!(!result.contains(&format!("version = \"{}\"", env!("CARGO_PKG_VERSION"))));

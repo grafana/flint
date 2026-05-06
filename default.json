@@ -38,13 +38,12 @@
     {
       "matchDepNames": [
         "actionlint",
+        "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",
         "editorconfig-checker",
-        "github:google/google-java-format",
-        "github:jonwiggins/xmloxide",
-        "github:koalaman/shellcheck",
         "golangci-lint",
+        "google-java-format",
         "hadolint",
         "ktlint",
         "lychee",
@@ -52,6 +51,7 @@
         "pipx:codespell",
         "ruff",
         "rumdl",
+        "shellcheck",
         "shfmt",
         "taplo"
       ],

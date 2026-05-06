@@ -1,0 +1,10 @@
+{
+  "meta": {},
+  "files": {
+    "mise.toml": {
+      "mise": [
+        "actionlint"
+      ]
+    }
+  }
+}

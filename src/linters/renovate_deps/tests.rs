@@ -1,4 +1,4 @@
-use super::rules::{ComparablePackageRule, RuleMatcher, relevant_dep_names};
+use super::rules::{ComparablePackageRule, RuleMatcher, needs_metadata_lookup, relevant_dep_names};
 use super::snapshot::{DepFiles, DepMeta};
 use super::*;
 use std::collections::BTreeSet;
@@ -450,6 +450,62 @@ fn maybe_reuse_committed_meta_skips_merge_when_refresh_meta_is_enabled() {
     maybe_reuse_committed_meta(&mut generated, Some(&committed), true);
 
     assert_eq!(generated.meta["actionlint"].package_name, None);
+}
+
+#[test]
+fn metadata_lookup_not_needed_without_comparable_rules() {
+    let generated = snapshot(
+        &[("actionlint", None, Some("github-releases"))],
+        &[("mise.toml", &[("mise", &["actionlint"])])],
+    );
+
+    assert!(!needs_metadata_lookup(&generated, &[]));
+}
+
+#[test]
+fn metadata_lookup_needed_for_dep_name_rule_when_package_name_missing() {
+    let generated = snapshot(
+        &[("actionlint", None, Some("github-releases"))],
+        &[("mise.toml", &[("mise", &["actionlint"])])],
+    );
+    let rules = vec![ComparablePackageRule {
+        label: "group \"linters\"".to_string(),
+        matcher: RuleMatcher::DepNames(BTreeSet::from(["actionlint".to_string()])),
+    }];
+
+    assert!(needs_metadata_lookup(&generated, &rules));
+}
+
+#[test]
+fn metadata_lookup_not_needed_for_dep_name_rule_when_cached_package_name_present() {
+    let generated = snapshot(
+        &[(
+            "actionlint",
+            Some("rhysd/actionlint"),
+            Some("github-releases"),
+        )],
+        &[("mise.toml", &[("mise", &["actionlint"])])],
+    );
+    let rules = vec![ComparablePackageRule {
+        label: "group \"linters\"".to_string(),
+        matcher: RuleMatcher::DepNames(BTreeSet::from(["actionlint".to_string()])),
+    }];
+
+    assert!(!needs_metadata_lookup(&generated, &rules));
+}
+
+#[test]
+fn metadata_lookup_needed_for_package_name_rule_when_any_extracted_dep_lacks_package_name() {
+    let generated = snapshot(
+        &[("actionlint", None, Some("github-releases"))],
+        &[("mise.toml", &[("mise", &["actionlint"])])],
+    );
+    let rules = vec![ComparablePackageRule {
+        label: "group \"linters\"".to_string(),
+        matcher: RuleMatcher::PackageNames(BTreeSet::from(["rhysd/actionlint".to_string()])),
+    }];
+
+    assert!(needs_metadata_lookup(&generated, &rules));
 }
 
 #[test]

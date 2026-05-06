@@ -1,0 +1,13 @@
+[expected]
+args = "run"
+exit = 0
+
+[env]
+GITHUB_TOKEN = "token"
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+echo "renovate should not run for unrelated changes" >&2
+exit 1
+'''

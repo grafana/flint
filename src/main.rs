@@ -290,7 +290,13 @@ async fn run(
                     FixOutcome::Partial(_) | FixOutcome::Review(_)
                 )
             {
-                finish_fix_outcomes(vec![setup_outcome], args.allow_fixed);
+                finish_fix_outcomes(
+                    vec![setup_outcome],
+                    args.allow_fixed,
+                    args.short,
+                    args.verbose,
+                    args.time,
+                );
                 return Ok(());
             } else {
                 setup_fix_outcome = Some(setup_outcome);
@@ -319,7 +325,13 @@ async fn run(
 
     if active.is_empty() {
         if let Some(outcome) = setup_fix_outcome {
-            finish_fix_outcomes(vec![outcome], args.allow_fixed);
+            finish_fix_outcomes(
+                vec![outcome],
+                args.allow_fixed,
+                args.short,
+                args.verbose,
+                args.time,
+            );
         }
         if let Some(setup_result) = setup_check_result {
             finish_check_results(vec![setup_result], &active, args.short);
@@ -432,7 +444,7 @@ async fn run(
                             if check.fix_behavior() == registry::FixBehavior::PartialNeedsVerify {
                                 to_verify.push(r.name);
                             } else {
-                                outcomes.push(FixOutcome::Fixed(r.name));
+                                outcomes.push(FixOutcome::Fixed(r));
                             }
                         }
                     } else {
@@ -463,7 +475,7 @@ async fn run(
                 .await?;
                 for r in verify_results {
                     if r.ok {
-                        outcomes.push(FixOutcome::Fixed(r.name));
+                        outcomes.push(FixOutcome::Fixed(r));
                     } else {
                         outcomes.push(FixOutcome::Partial(r));
                     }
@@ -491,7 +503,13 @@ async fn run(
             }
         }
 
-        finish_fix_outcomes(outcomes, args.allow_fixed);
+        finish_fix_outcomes(
+            outcomes,
+            args.allow_fixed,
+            args.short,
+            args.verbose,
+            args.time,
+        );
         return Ok(());
     }
 
@@ -552,8 +570,8 @@ impl registry::StatusContext for LinterStatusContext<'_> {
 }
 
 enum FixOutcome {
-    Clean,
-    Fixed(String),
+    Clean(CheckResult),
+    Fixed(CheckResult),
     Partial(CheckResult),
     Review(CheckResult),
 }
@@ -561,22 +579,34 @@ enum FixOutcome {
 impl FixOutcome {
     fn result(&self) -> Option<&CheckResult> {
         match self {
-            Self::Partial(result) | Self::Review(result) => Some(result),
-            Self::Clean | Self::Fixed(_) => None,
+            Self::Clean(result)
+            | Self::Fixed(result)
+            | Self::Partial(result)
+            | Self::Review(result) => Some(result),
         }
     }
 }
 
-fn finish_fix_outcomes(outcomes: Vec<FixOutcome>, allow_fixed: bool) {
-    // Emit linter output for checks that need manual review so the caller has
-    // the failure details without a second flint invocation.
-    for r in outcomes.iter().filter_map(FixOutcome::result) {
-        eprintln!("[{}]", r.name);
-        if !r.stdout.is_empty() {
-            eprint!("{}", String::from_utf8_lossy(&r.stdout));
-        }
-        if !r.stderr.is_empty() {
-            eprint!("{}", String::from_utf8_lossy(&r.stderr));
+fn finish_fix_outcomes(
+    outcomes: Vec<FixOutcome>,
+    allow_fixed: bool,
+    short: bool,
+    verbose: bool,
+    time: bool,
+) {
+    if !short {
+        for r in outcomes.iter().filter_map(FixOutcome::result) {
+            if verbose || !r.ok || time {
+                eprintln!("[{}]{}", r.name, format_duration_suffix(time, r.duration));
+            }
+            if verbose || !r.ok {
+                if !r.stdout.is_empty() {
+                    eprint!("{}", String::from_utf8_lossy(&r.stdout));
+                }
+                if !r.stderr.is_empty() {
+                    eprint!("{}", String::from_utf8_lossy(&r.stderr));
+                }
+            }
         }
     }
 
@@ -585,8 +615,8 @@ fn finish_fix_outcomes(outcomes: Vec<FixOutcome>, allow_fixed: bool) {
     let mut review = vec![];
     for outcome in outcomes {
         match outcome {
-            FixOutcome::Clean => {}
-            FixOutcome::Fixed(name) => fixed.push(name),
+            FixOutcome::Clean(_) => {}
+            FixOutcome::Fixed(result) => fixed.push(result.name),
             FixOutcome::Partial(result) => partial.push(result.name),
             FixOutcome::Review(result) => review.push(result.name),
         }
@@ -661,9 +691,9 @@ fn finish_check_results(results: Vec<CheckResult>, active: &[&registry::Check], 
 fn classify_single_pass_fix(result: CheckResult) -> FixOutcome {
     if result.ok {
         if result.changed {
-            FixOutcome::Fixed(result.name)
+            FixOutcome::Fixed(result)
         } else {
-            FixOutcome::Clean
+            FixOutcome::Clean(result)
         }
     } else if result.changed {
         FixOutcome::Partial(result)
@@ -989,6 +1019,18 @@ fn supports_single_pass_fix(check: &registry::Check) -> bool {
                 ..
             }
         )
+}
+
+fn format_duration_suffix(time: bool, duration: std::time::Duration) -> String {
+    if !time {
+        return String::new();
+    }
+    let ms = duration.as_millis();
+    if ms < 1000 {
+        format!(" {ms}ms")
+    } else {
+        format!(" {:.1}s", duration.as_secs_f64())
+    }
 }
 
 fn print_linters(

@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 use self::rules::{
-    comparable_package_rules_for_config, trim_snapshot_meta, validate_rule_coverage,
+    comparable_package_rules_for_config, needs_metadata_lookup, trim_snapshot_meta,
+    validate_rule_coverage,
 };
 use self::snapshot::{Snapshot, extract_deps, read_snapshot, unified_diff, write_snapshot};
 use crate::config::RenovateDepsConfig;
@@ -46,6 +47,10 @@ struct PreparedRenovateDeps {
 }
 
 fn prepare(ctx: NativePrepareContext<'_>) -> Option<Box<dyn PreparedNativeCheck>> {
+    if !is_relevant(ctx.file_list, ctx.project_root) {
+        return None;
+    }
+
     Some(Box::new(PreparedRenovateDeps {
         name: ctx.name.to_string(),
         cfg: ctx.cfg.checks.renovate_deps.clone(),
@@ -401,26 +406,21 @@ async fn run_inner(
     let skipped_rule_notes = parsed_rules.skipped_notes;
     let committed_path = committed_path_for_config(&config_path);
     let committed_display = display_path(project_root, &committed_path);
-
-    // Renovate occasionally produces empty packageFiles on the first run (transient
-    // network or registry issue). Retry up to 3 times with a short delay.
-    let mut generated = Snapshot::default();
-    for attempt in 1..=3u32 {
-        let log_bytes = run_renovate(project_root, &config_path).await?;
-        generated = extract_deps(&log_bytes, &cfg.exclude_managers)?;
-        if !generated.is_empty() || attempt == 3 {
-            break;
-        }
-        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-    }
-
     let committed = if committed_path.exists() {
         Some(read_snapshot(&std::fs::read_to_string(&committed_path)?)?)
     } else {
         None
     };
 
+    let mut generated =
+        generate_snapshot(project_root, &config_path, &cfg.exclude_managers, "extract").await?;
     maybe_reuse_committed_meta(&mut generated, committed.as_ref(), cfg.refresh_meta);
+
+    if needs_metadata_lookup(&generated, &rules) {
+        generated =
+            generate_snapshot(project_root, &config_path, &cfg.exclude_managers, "lookup").await?;
+        maybe_reuse_committed_meta(&mut generated, committed.as_ref(), cfg.refresh_meta);
+    }
 
     validate_rule_coverage(&generated, &rules)?;
     trim_snapshot_meta(&mut generated, &rules);
@@ -489,8 +489,32 @@ fn notes_output(notes: &[String]) -> String {
     format!("{}\n", notes.join("\n"))
 }
 
+async fn generate_snapshot(
+    project_root: &Path,
+    config_path: &Path,
+    exclude_managers: &[String],
+    dry_run: &str,
+) -> anyhow::Result<Snapshot> {
+    // Renovate occasionally produces empty packageFiles on the first run (transient
+    // package cache, registry, or startup issue). Retry up to 3 times with a short delay.
+    let mut generated = Snapshot::default();
+    for attempt in 1..=3u32 {
+        let log_bytes = run_renovate(project_root, config_path, dry_run).await?;
+        generated = extract_deps(&log_bytes, exclude_managers)?;
+        if !generated.is_empty() || attempt == 3 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    }
+    Ok(generated)
+}
+
 /// Runs `renovate --platform=local` and returns the combined stdout+stderr log bytes.
-async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result<Vec<u8>> {
+async fn run_renovate(
+    project_root: &Path,
+    config_path: &Path,
+    dry_run: &str,
+) -> anyhow::Result<Vec<u8>> {
     // Forward env, setting Renovate-specific vars.
     let mut env: Vec<(String, String)> = std::env::vars().collect();
     // Override logging to get parseable JSON output.
@@ -517,7 +541,7 @@ async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result
             "renovate".to_string(),
             "--platform=local".to_string(),
             "--require-config=ignored".to_string(),
-            "--dry-run=extract".to_string(),
+            format!("--dry-run={dry_run}"),
         ],
         false,
     )

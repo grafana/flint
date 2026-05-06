@@ -129,6 +129,50 @@ pub(crate) fn trim_snapshot_meta(snapshot: &mut Snapshot, rules: &[ComparablePac
         .retain(|dep_name, _| relevant.contains(dep_name));
 }
 
+pub(crate) fn needs_metadata_lookup(snapshot: &Snapshot, rules: &[ComparablePackageRule]) -> bool {
+    if rules.is_empty() {
+        return false;
+    }
+
+    let extracted_dep_names: BTreeSet<_> = snapshot
+        .files
+        .values()
+        .flat_map(|managers| managers.values())
+        .flatten()
+        .cloned()
+        .collect();
+
+    for rule in rules {
+        match &rule.matcher {
+            RuleMatcher::DepNames(names) => {
+                if names.iter().any(|dep_name| {
+                    extracted_dep_names.contains(dep_name)
+                        && snapshot
+                            .meta
+                            .get(dep_name)
+                            .and_then(|meta| meta.package_name.as_deref())
+                            .is_none()
+                }) {
+                    return true;
+                }
+            }
+            RuleMatcher::PackageNames(_) => {
+                if extracted_dep_names.iter().any(|dep_name| {
+                    snapshot
+                        .meta
+                        .get(dep_name)
+                        .and_then(|meta| meta.package_name.as_deref())
+                        .is_none()
+                }) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
 enum ComparableRuleOutcome {
     Comparable(ComparablePackageRule),
     Skipped { note: String },

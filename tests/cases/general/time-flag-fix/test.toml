@@ -1,0 +1,20 @@
+[expected]
+args = "run --full --fix --time shfmt shellcheck"
+exit = 1
+stderr = '''
+[shellcheck] Xms
+lint error
+[shfmt] Xms
+flint: review: shellcheck
+'''
+
+[fake_bins]
+shellcheck = '''
+#!/bin/sh
+printf '%s\n' 'lint error' >&2
+exit 1
+'''
+shfmt = '''
+#!/bin/sh
+exit 0
+'''

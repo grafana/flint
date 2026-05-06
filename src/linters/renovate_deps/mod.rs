@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
+use self::install_patch::configure_extract_workaround_env;
 use self::rules::{
     comparable_package_rules_for_config, needs_metadata_lookup, trim_snapshot_meta,
     validate_rule_coverage,
@@ -17,6 +18,7 @@ use crate::registry::{
     NativeRunContext, NativeRunFuture, PreparedNativeCheck,
 };
 
+mod install_patch;
 mod rules;
 mod snapshot;
 
@@ -517,6 +519,7 @@ async fn run_renovate(
 ) -> anyhow::Result<Vec<u8>> {
     // Forward env, setting Renovate-specific vars.
     let mut env: Vec<(String, String)> = std::env::vars().collect();
+    configure_extract_workaround_env(&mut env, dry_run)?;
     // Override logging to get parseable JSON output.
     env.retain(|(k, _)| k != "LOG_LEVEL" && k != "LOG_FORMAT" && k != "RENOVATE_CONFIG_FILE");
     env.push(("LOG_LEVEL".into(), "debug".into()));
@@ -569,7 +572,6 @@ async fn run_renovate(
 
     Ok(combined)
 }
-
 fn resolve_renovate_config_path(project_root: &Path) -> anyhow::Result<PathBuf> {
     RENOVATE_CONFIG_PATTERNS
         .iter()

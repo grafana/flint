@@ -1,3 +1,4 @@
+use super::install_patch::configure_extract_workaround_env;
 use super::rules::{ComparablePackageRule, RuleMatcher, needs_metadata_lookup, relevant_dep_names};
 use super::snapshot::{DepFiles, DepMeta};
 use super::*;
@@ -96,6 +97,35 @@ fn configure_renovate_deps_keeps_existing_managers() {
     let result = std::fs::read_to_string(tmp.path()).unwrap();
     assert!(result.contains("exclude_managers = [\"npm\"]"));
     assert!(!result.contains("github-actions"));
+}
+
+#[test]
+fn configure_extract_workaround_env_adds_node_import() {
+    let mut env = vec![];
+
+    configure_extract_workaround_env(&mut env, "extract").unwrap();
+
+    let node_options = env
+        .iter()
+        .find(|(key, _)| key == "NODE_OPTIONS")
+        .map(|(_, value)| value)
+        .unwrap();
+    assert!(node_options.contains("--import="));
+}
+
+#[test]
+fn configure_extract_workaround_env_preserves_existing_node_options() {
+    let mut env = vec![("NODE_OPTIONS".to_string(), "--trace-warnings".to_string())];
+
+    configure_extract_workaround_env(&mut env, "extract").unwrap();
+
+    let node_options = env
+        .iter()
+        .find(|(key, _)| key == "NODE_OPTIONS")
+        .map(|(_, value)| value)
+        .unwrap();
+    assert!(node_options.contains("--trace-warnings"));
+    assert!(node_options.contains("--import="));
 }
 
 #[test]

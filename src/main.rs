@@ -1152,7 +1152,7 @@ shfmt = "v3.13.1"
 actionlint = "1.7.10"
 editorconfig-checker = "v3.6.1"
 ruff = "0.15.0"
-"aqua:crate-ci/typos" = "1.46.0"
+typos = "1.46.0"
 rumdl = "0.1.78"
 rust = { version = "1.94.1", components = "clippy,rustfmt" }
 "#,

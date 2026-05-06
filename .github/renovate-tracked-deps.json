@@ -4,10 +4,6 @@
       "packageName": "rhysd/actionlint",
       "datasource": "github-releases"
     },
-    "aqua:crate-ci/typos": {
-      "packageName": "crate-ci/typos",
-      "datasource": "github-tags"
-    },
     "aqua:jonwiggins/xmloxide": {
       "packageName": "jonwiggins/xmloxide",
       "datasource": "github-tags"
@@ -70,6 +66,10 @@
     "taplo": {
       "packageName": "tamasfe/taplo",
       "datasource": "github-releases"
+    },
+    "typos": {
+      "packageName": "crate-ci/typos",
+      "datasource": "github-releases"
     }
   },
   "files": {
@@ -103,7 +103,6 @@
     "mise.toml": {
       "mise": [
         "actionlint",
-        "aqua:crate-ci/typos",
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",
@@ -123,7 +122,8 @@
         "rust",
         "shellcheck",
         "shfmt",
-        "taplo"
+        "taplo",
+        "typos"
       ]
     },
     "src/init/scaffold.rs": {

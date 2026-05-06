@@ -10,7 +10,6 @@ rust = { version = "1.95.0", components = "clippy,rustfmt" }
 
 # Linters
 actionlint = "1.7.10"
-"aqua:crate-ci/typos" = "1.46.0"
 "aqua:jonwiggins/xmloxide" = "v0.4.2"
 "aqua:owenlamont/ryl" = "0.8.0"
 biome = "2.4.12"
@@ -26,6 +25,7 @@ rumdl = "0.1.78"
 shellcheck = "0.11.0"
 shfmt = "v3.13.1"
 taplo = "0.10.0"
+typos = "1.46.0"
 
 [tasks."setup:update-super-linter-versions"]
 description = "Generate super-linter version mapping from the super-linter repo"

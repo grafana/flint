@@ -212,9 +212,9 @@ fn check_typos() -> Check {
         .baseline_config(ConfigFile::config_dir("_typos.toml"))
         .unsupported_configs(TYPOS_UNSUPPORTED_CONFIGS)
         .check_type(&typos::CHECK_TYPE)
-        .migrate_tool_keys(&["codespell", "pipx:codespell"])
+        .migrate_tool_keys(&["codespell", "pipx:codespell", "aqua:crate-ci/typos"])
         .desc("Check for common spelling mistakes")
-        .mise_tool("aqua:crate-ci/typos")
+        .mise_tool("typos")
 }
 
 fn check_editorconfig_checker() -> Check {

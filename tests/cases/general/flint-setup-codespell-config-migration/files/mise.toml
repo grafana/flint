@@ -1,7 +1,7 @@
 [tools]
 
 # Linters
-"aqua:crate-ci/typos" = "1.46.0"
+typos = "1.46.0"
 
 [env]
 FLINT_CONFIG_DIR = ".github/config"

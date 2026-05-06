@@ -97,7 +97,7 @@
     {
       matchDepNames: [
         "actionlint",
-        "aqua:crate-ci/typos",
+        "typos",
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",

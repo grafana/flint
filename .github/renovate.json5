@@ -97,7 +97,6 @@
     {
       matchDepNames: [
         "actionlint",
-        "typos",
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",
@@ -113,6 +112,7 @@
         "shellcheck",
         "shfmt",
         "taplo",
+        "typos",
       ],
       groupName: "linters",
       commitMessageTopic: "flint-managed linter updates",

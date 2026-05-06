@@ -131,14 +131,9 @@ All settings have defaults.
 [settings]
 # base_branch = "dev"                   # branch to diff against; defaults to "main"
 exclude = ["CHANGELOG.md", "vendor/**"] # glob patterns — exclude matching files
-
-[checks.links]
-config = ".github/config/lychee.toml" # lychee config path
-check_all_local = true                # second pass: local links in all files
-
-[checks.renovate-deps]
-exclude_managers = ["github-actions", "cargo"] # skip these Renovate managers
 ```
+
+See [linters](docs/linters.md) for per-linter configuration.
 
 ### `FLINT_CONFIG_DIR`
 

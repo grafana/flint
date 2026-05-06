@@ -15,6 +15,10 @@ const GITHUB_BASE_REF_ENV: &str = "GITHUB_BASE_REF";
 const GITHUB_EVENT_NAME_ENV: &str = "GITHUB_EVENT_NAME";
 const GITHUB_HEAD_REF_ENV: &str = "GITHUB_HEAD_REF";
 const GITHUB_REPOSITORY_ENV: &str = "GITHUB_REPOSITORY";
+const LOCAL_CACHE_DIR: &str = ".lychee_cache";
+const LOCAL_CACHE_GITIGNORE: &str = "# Automatically created by flint for lychee local cache.\n*\n";
+const LOCAL_CACHE_OPT_OUT_COMMAND: &str = "mise set --global FLINT_LYCHEE_SKIP_LOCAL_CACHE=true";
+const LOCAL_CACHE_OPT_OUT_ENV: &str = "FLINT_LYCHEE_SKIP_LOCAL_CACHE";
 const PR_HEAD_REPO_ENV: &str = "PR_HEAD_REPO";
 const PR_LINK_REMAP_ENV_VARS: &[&str] = &[
     GITHUB_REPOSITORY_ENV,
@@ -28,6 +32,17 @@ pub(crate) static CHECK_TYPE: CheckTypeDef = CheckTypeDef::native(
     NativeCheckDef::with_bin("lychee", prepare)
         .with_config_display("via `[checks.links]` in flint.toml"),
 );
+
+#[derive(Debug)]
+struct CachePlan {
+    working_dir: PathBuf,
+    add_cache_flag: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CachePreference {
+    allowed: bool,
+}
 
 #[derive(Debug)]
 struct PreparedLychee {
@@ -88,14 +103,8 @@ pub async fn run(
     }
 
     let lychee_cfg_raw = cfg.config.as_deref().unwrap_or("lychee.toml");
-    let lychee_cfg = if Path::new(lychee_cfg_raw).is_relative() {
-        config_dir
-            .join(lychee_cfg_raw)
-            .to_string_lossy()
-            .into_owned()
-    } else {
-        lychee_cfg_raw.to_string()
-    };
+    let lychee_cfg = resolve_lychee_config_path(project_root, config_dir, lychee_cfg_raw);
+    let cache_preference = cache_preference(&lychee_cfg);
 
     let remap_args = build_remap_args(project_root).await;
     let checkable_all_files = match lychee_checkable_files(project_root, settings) {
@@ -109,8 +118,12 @@ pub async fn run(
             };
         }
     };
-    let checkable_all_file_refs: Vec<&str> =
-        checkable_all_files.iter().map(String::as_str).collect();
+    let checkable_all_file_inputs =
+        lychee_input_paths(&checkable_all_files, project_root, cache_preference.allowed);
+    let checkable_all_file_refs: Vec<&str> = checkable_all_file_inputs
+        .iter()
+        .map(String::as_str)
+        .collect();
 
     // Full mode: no merge base (shallow clone or --full flag)
     if file_list.merge_base.is_none() {
@@ -121,6 +134,7 @@ pub async fn run(
             &checkable_all_file_refs,
             false,
             project_root,
+            cache_preference,
         )
         .await;
     }
@@ -139,6 +153,7 @@ pub async fn run(
             &checkable_all_file_refs,
             false,
             project_root,
+            cache_preference,
         )
         .await;
         let mut stderr = b"Config changes detected, falling back to full check.\n".to_vec();
@@ -159,13 +174,14 @@ pub async fn run(
                 .into_owned()
         })
         .collect();
+    let checkable_inputs = lychee_input_paths(&checkable, project_root, cache_preference.allowed);
 
     let mut all_ok = true;
     let mut combined_stdout = Vec::new();
     let mut combined_stderr = Vec::new();
 
-    if !checkable.is_empty() {
-        let file_refs: Vec<&str> = checkable.iter().map(String::as_str).collect();
+    if !checkable_inputs.is_empty() {
+        let file_refs: Vec<&str> = checkable_inputs.iter().map(String::as_str).collect();
         let out = run_lychee_cmd(
             "Checking all links in modified files",
             &lychee_cfg,
@@ -173,6 +189,7 @@ pub async fn run(
             &file_refs,
             false,
             project_root,
+            cache_preference,
         )
         .await;
         all_ok &= out.ok;
@@ -190,6 +207,7 @@ pub async fn run(
             &checkable_all_file_refs,
             true,
             project_root,
+            cache_preference,
         )
         .await;
         all_ok &= out.ok;
@@ -318,12 +336,18 @@ async fn run_lychee_cmd(
     files: &[&str],
     local_only: bool,
     project_root: &Path,
+    cache_preference: CachePreference,
 ) -> LinterOutput {
+    let cache_plan = prepare_cache_plan(project_root, cache_preference);
     let mut argv: Vec<String> = vec![
         "lychee".to_string(),
         "--config".to_string(),
         lychee_cfg.to_string(),
     ];
+
+    if cache_plan.plan.add_cache_flag {
+        argv.push("--cache".to_string());
+    }
 
     if local_only {
         argv.push("--scheme".to_string());
@@ -338,7 +362,7 @@ async fn run_lychee_cmd(
     let mut stdout = format!("==> {description}\n").into_bytes();
 
     let result = super::spawn_command(&argv, false)
-        .current_dir(project_root)
+        .current_dir(&cache_plan.plan.working_dir)
         .stdin(Stdio::null())
         .output()
         .await;
@@ -360,6 +384,115 @@ async fn run_lychee_cmd(
             setup_outcome: None,
         },
     }
+}
+
+fn lychee_input_paths(
+    files: &[String],
+    project_root: &Path,
+    use_absolute_inputs: bool,
+) -> Vec<String> {
+    if use_absolute_inputs {
+        files
+            .iter()
+            .map(|file| project_root.join(file).to_string_lossy().into_owned())
+            .collect()
+    } else {
+        files.to_vec()
+    }
+}
+
+#[derive(Debug)]
+struct PreparedCachePlan {
+    plan: CachePlan,
+}
+
+fn resolve_lychee_config_path(
+    project_root: &Path,
+    config_dir: &Path,
+    lychee_cfg_raw: &str,
+) -> String {
+    let raw = Path::new(lychee_cfg_raw);
+    if raw.is_absolute() {
+        return lychee_cfg_raw.to_string();
+    }
+
+    let project_relative = project_root.join(raw);
+    if project_relative.exists() {
+        return project_relative.to_string_lossy().into_owned();
+    }
+
+    let config_relative = if config_dir.is_absolute() {
+        config_dir.join(raw)
+    } else {
+        project_root.join(config_dir).join(raw)
+    };
+    config_relative.to_string_lossy().into_owned()
+}
+
+fn cache_preference(lychee_cfg: &str) -> CachePreference {
+    let allowed = !(env::is_ci_from(|name| std::env::var(name).ok())
+        || env::env_truthy(&|name| std::env::var(name).ok(), LOCAL_CACHE_OPT_OUT_ENV)
+        || lychee_config_enables_cache(lychee_cfg));
+    CachePreference { allowed }
+}
+
+fn prepare_cache_plan(project_root: &Path, preference: CachePreference) -> PreparedCachePlan {
+    if !preference.allowed {
+        return PreparedCachePlan {
+            plan: CachePlan {
+                working_dir: project_root.to_path_buf(),
+                add_cache_flag: false,
+            },
+        };
+    }
+
+    match initialize_cache_dir(project_root) {
+        Ok(created) => {
+            if created {
+                eprintln!(
+                    "flint: links: created local lychee cache dir at {LOCAL_CACHE_DIR}; opt out globally with `{LOCAL_CACHE_OPT_OUT_COMMAND}`."
+                );
+            }
+            PreparedCachePlan {
+                plan: CachePlan {
+                    working_dir: project_root.join(LOCAL_CACHE_DIR),
+                    add_cache_flag: true,
+                },
+            }
+        }
+        Err(e) => {
+            eprintln!(
+                "flint: warning: failed to initialize lychee local cache; continuing without cache: {e}"
+            );
+            PreparedCachePlan {
+                plan: CachePlan {
+                    working_dir: project_root.to_path_buf(),
+                    add_cache_flag: false,
+                },
+            }
+        }
+    }
+}
+
+fn initialize_cache_dir(project_root: &Path) -> anyhow::Result<bool> {
+    let cache_dir = project_root.join(LOCAL_CACHE_DIR);
+    let existed = cache_dir.exists();
+    std::fs::create_dir_all(&cache_dir)?;
+    let gitignore = cache_dir.join(".gitignore");
+    if !gitignore.exists() {
+        std::fs::write(&gitignore, LOCAL_CACHE_GITIGNORE)?;
+    }
+    Ok(!existed)
+}
+
+fn lychee_config_enables_cache(lychee_cfg: &str) -> bool {
+    let Ok(content) = std::fs::read_to_string(lychee_cfg) else {
+        return false;
+    };
+    let Ok(doc) = toml::from_str::<toml::Value>(&content) else {
+        return false;
+    };
+    doc.get("cache").and_then(toml::Value::as_bool) == Some(true)
 }
 
 /// Returns the GitHub server URL from `GITHUB_SERVER_URL`, defaulting to `https://github.com`.
@@ -659,6 +792,102 @@ mod tests {
         let warning = validate_env(false, true, &[]).unwrap().unwrap();
 
         assert!(warning.contains("GITHUB_TOKEN"));
+    }
+
+    #[test]
+    fn lychee_config_cache_true_enables_config_cache_detection() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let cfg = tmp.path().join("lychee.toml");
+        std::fs::write(&cfg, "cache = true\n").unwrap();
+
+        assert!(lychee_config_enables_cache(&cfg.to_string_lossy()));
+    }
+
+    #[test]
+    fn lychee_config_cache_false_does_not_enable_config_cache_detection() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let cfg = tmp.path().join("lychee.toml");
+        std::fs::write(&cfg, "cache = false\n").unwrap();
+
+        assert!(!lychee_config_enables_cache(&cfg.to_string_lossy()));
+    }
+
+    #[test]
+    fn cache_preference_skips_flint_local_cache_in_ci() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let cfg = tmp.path().join("lychee.toml");
+        std::fs::write(&cfg, "timeout = 20\n").unwrap();
+        unsafe {
+            std::env::set_var("CI", "true");
+        }
+
+        let preference = cache_preference(&cfg.to_string_lossy());
+
+        assert!(!preference.allowed);
+
+        unsafe {
+            std::env::remove_var("CI");
+        }
+    }
+
+    #[test]
+    fn cache_preference_skips_flint_local_cache_when_opted_out() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let cfg = tmp.path().join("lychee.toml");
+        std::fs::write(&cfg, "timeout = 20\n").unwrap();
+        unsafe {
+            std::env::set_var(LOCAL_CACHE_OPT_OUT_ENV, "true");
+        }
+
+        let preference = cache_preference(&cfg.to_string_lossy());
+
+        assert!(!preference.allowed);
+
+        unsafe {
+            std::env::remove_var(LOCAL_CACHE_OPT_OUT_ENV);
+        }
+    }
+
+    #[test]
+    fn prepare_cache_plan_falls_back_without_cache_on_init_failure() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(tmp.path().join(LOCAL_CACHE_DIR), "not a dir").unwrap();
+
+        let prepared = prepare_cache_plan(tmp.path(), CachePreference { allowed: true });
+
+        assert_eq!(prepared.plan.working_dir, tmp.path());
+        assert!(!prepared.plan.add_cache_flag);
+    }
+
+    #[test]
+    fn resolve_lychee_config_path_prefers_project_relative_file() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        let project_cfg = tmp.path().join(".github/config/lychee.toml");
+        std::fs::write(&project_cfg, "cache = true\n").unwrap();
+
+        let resolved = resolve_lychee_config_path(
+            tmp.path(),
+            Path::new(".github/config"),
+            ".github/config/lychee.toml",
+        );
+
+        assert_eq!(resolved, project_cfg.to_string_lossy());
+    }
+
+    #[test]
+    fn resolve_lychee_config_path_falls_back_to_config_dir_relative_file() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let config_dir = tmp.path().join(".github/config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        let config_cfg = config_dir.join("lychee.toml");
+        std::fs::write(&config_cfg, "cache = true\n").unwrap();
+
+        let resolved =
+            resolve_lychee_config_path(tmp.path(), Path::new(".github/config"), "lychee.toml");
+
+        assert_eq!(resolved, config_cfg.to_string_lossy());
     }
 
     #[test]

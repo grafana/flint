@@ -39,7 +39,7 @@ pub(crate) fn token_warning(check_name: &str, token_names: &str) -> String {
     )
 }
 
-fn env_truthy<F>(env: &F, name: &str) -> bool
+pub(crate) fn env_truthy<F>(env: &F, name: &str) -> bool
 where
     F: Fn(&str) -> Option<String>,
 {

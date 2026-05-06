@@ -6,7 +6,12 @@ use generation::{
     apply_changes, get_existing_config_dir, has_slow_selected, normalize_tools_section,
 };
 use scaffold::{apply_env_and_tasks, generate_lint_workflow};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{
+    Mutex, OnceLock,
+    atomic::{AtomicUsize, Ordering},
+};
+
+static PATH_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
 
 static CHECK_TYPE_INIT_CALLS: AtomicUsize = AtomicUsize::new(0);
 
@@ -17,6 +22,52 @@ fn counting_check_type_init(_: &dyn InitHookContext) -> anyhow::Result<bool> {
 
 static COUNTING_CHECK_TYPE: CheckTypeDef =
     CheckTypeDef::with_init_hook("shared-hook", counting_check_type_init);
+
+fn init_git_repo(path: &Path) {
+    let status = std::process::Command::new("git")
+        .args(["init", "-b", "main"])
+        .current_dir(path)
+        .status()
+        .unwrap();
+    assert!(status.success(), "git init failed");
+}
+
+fn with_fake_mise<R>(body: impl FnOnce() -> R) -> R {
+    let _path_guard = PATH_MUTEX.get_or_init(|| Mutex::new(())).lock().unwrap();
+    let temp = tempfile::TempDir::new().unwrap();
+    let fake_mise = temp.path().join("mise");
+    std::fs::write(&fake_mise, "#!/bin/sh\nexit 1\n").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&fake_mise).unwrap().permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&fake_mise, perms).unwrap();
+    }
+
+    let original_path = std::env::var_os("PATH");
+    let mut paths = vec![temp.path().to_path_buf()];
+    paths.extend(std::env::split_paths(
+        &original_path.clone().unwrap_or_default(),
+    ));
+    let joined = std::env::join_paths(paths).unwrap();
+
+    // PATH updates are process-global; serialize tests that shadow `mise`.
+    unsafe {
+        std::env::set_var("PATH", &joined);
+    }
+
+    let result = body();
+
+    unsafe {
+        match original_path {
+            Some(path) => std::env::set_var("PATH", path),
+            None => std::env::remove_var("PATH"),
+        }
+    }
+
+    result
+}
 
 #[test]
 fn detect_obsolete_keys_finds_known_stale_key() {
@@ -215,6 +266,37 @@ shellcheck = "0.11.0"
         "only explicitly managed linter keys belong below the header:\n{result}"
     );
     assert_eq!(result.matches("# Linters").count(), 1, "single header");
+}
+
+#[test]
+fn init_run_normalizes_node_added_for_existing_npm_tool() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("mise.toml");
+    init_git_repo(dir.path());
+    std::fs::write(
+        &path,
+        "[tools]\n\n# Linters\n\"npm:renovate\" = \"43.0.0\"\n",
+    )
+    .unwrap();
+
+    with_fake_mise(|| {
+        run(
+            dir.path(),
+            Some(Profile::Comprehensive),
+            true,
+            Some("rev:test"),
+        )
+        .unwrap();
+    });
+
+    let result = std::fs::read_to_string(&path).unwrap();
+    let node_pos = result.find("node =").expect("node present");
+    let header_pos = result.find("# Linters").expect("header present");
+    let renovate_pos = result.find("\"npm:renovate\"").expect("renovate present");
+    assert!(
+        node_pos < header_pos && header_pos < renovate_pos,
+        "init::run must keep node above the linter block:\n{result}"
+    );
 }
 
 #[test]

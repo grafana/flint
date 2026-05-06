@@ -44,7 +44,6 @@ const TYPOS_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir(".typos.toml"),
     ConfigFile::project(".codespellrc"),
     ConfigFile::project("typos.toml"),
-    ConfigFile::project("_typos.toml"),
     ConfigFile::project(".typos.toml"),
     ConfigFile::project_toml_section("pyproject.toml", TOOL_TYPOS),
     ConfigFile::project_toml_section("Cargo.toml", WORKSPACE_METADATA_TYPOS),

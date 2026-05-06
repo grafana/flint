@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use std::collections::BTreeSet;
+use std::path::Component;
 use std::path::{Path, PathBuf};
 
 use crate::registry::{CheckTypeDef, InitHookContext};
@@ -60,7 +61,9 @@ pub(crate) fn migrate_legacy_config(
     }
 
     let legacy = parse_codespell_config(&codespell_path)?;
-    let imported_words = load_ignore_words(project_root, legacy.ignore_words_file.as_deref())?;
+    let ignore_words_path =
+        resolve_ignore_words_path(project_root, legacy.ignore_words_file.as_deref())?;
+    let imported_words = load_ignore_words(ignore_words_path.as_deref())?;
     let mut all_words = legacy.ignore_words_list;
     all_words.extend(imported_words);
 
@@ -71,13 +74,12 @@ pub(crate) fn migrate_legacy_config(
     std::fs::remove_file(&codespell_path)
         .with_context(|| format!("failed to remove {}", codespell_path.display()))?;
     removed_files.push(codespell_path);
-    if let Some(ignore_file) = legacy.ignore_words_file {
-        let path = project_root.join(ignore_file);
-        if path.exists() {
-            std::fs::remove_file(&path)
-                .with_context(|| format!("failed to remove {}", path.display()))?;
-            removed_files.push(path);
-        }
+    if let Some(path) = ignore_words_path
+        && path.exists()
+    {
+        std::fs::remove_file(&path)
+            .with_context(|| format!("failed to remove {}", path.display()))?;
+        removed_files.push(path);
     }
 
     Ok(MigrationResult {
@@ -133,15 +135,38 @@ fn parse_csv_list(input: &str) -> Vec<String> {
         .collect()
 }
 
-fn load_ignore_words(project_root: &Path, path: Option<&Path>) -> Result<BTreeSet<String>> {
+fn resolve_ignore_words_path(project_root: &Path, path: Option<&Path>) -> Result<Option<PathBuf>> {
     let Some(path) = path else {
+        return Ok(None);
+    };
+    if path.is_absolute() {
+        anyhow::bail!(
+            "legacy .codespellrc ignore-words path must stay within the repository: {}",
+            path.display()
+        );
+    }
+    for component in path.components() {
+        if matches!(
+            component,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        ) {
+            anyhow::bail!(
+                "legacy .codespellrc ignore-words path must stay within the repository: {}",
+                path.display()
+            );
+        }
+    }
+    Ok(Some(project_root.join(path)))
+}
+
+fn load_ignore_words(path: Option<&Path>) -> Result<BTreeSet<String>> {
+    let Some(absolute) = path else {
         return Ok(BTreeSet::new());
     };
-    let absolute = project_root.join(path);
     if !absolute.exists() {
         return Ok(BTreeSet::new());
     }
-    let content = std::fs::read_to_string(&absolute)
+    let content = std::fs::read_to_string(absolute)
         .with_context(|| format!("failed to read {}", absolute.display()))?;
     Ok(content
         .lines()
@@ -152,7 +177,13 @@ fn load_ignore_words(project_root: &Path, path: Option<&Path>) -> Result<BTreeSe
 }
 
 fn merge_typos_config(target: &Path, words: &BTreeSet<String>) -> Result<()> {
-    let content = std::fs::read_to_string(target).unwrap_or_default();
+    let content = match std::fs::read_to_string(target) {
+        Ok(content) => content,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(err) => {
+            return Err(err).with_context(|| format!("failed to read {}", target.display()));
+        }
+    };
     let mut doc: toml_edit::DocumentMut = if content.is_empty() {
         toml_edit::DocumentMut::new()
     } else {
@@ -199,7 +230,11 @@ fn ensure_table<'a>(parent: &'a mut toml_edit::Table, key: &str) -> &'a mut toml
 
 #[cfg(test)]
 mod tests {
-    use super::{load_ignore_words, migrate_legacy_config, parse_codespell_config};
+    use super::{
+        load_ignore_words, merge_typos_config, migrate_legacy_config, parse_codespell_config,
+        resolve_ignore_words_path,
+    };
+    use std::collections::BTreeSet;
 
     #[test]
     fn parse_codespell_config_reads_common_fields() {
@@ -226,8 +261,10 @@ mod tests {
         let path = tmp.path().join(".codespellignore");
         std::fs::write(&path, "# comment\nratatui\n\nre-use\n").unwrap();
 
-        let words =
-            load_ignore_words(tmp.path(), Some(std::path::Path::new(".codespellignore"))).unwrap();
+        let absolute =
+            resolve_ignore_words_path(tmp.path(), Some(std::path::Path::new(".codespellignore")))
+                .unwrap();
+        let words = load_ignore_words(absolute.as_deref()).unwrap();
         assert!(words.contains("ratatui"));
         assert!(words.contains("re-use"));
         assert_eq!(words.len(), 2);
@@ -255,5 +292,35 @@ mod tests {
         assert!(!content.contains("extend-exclude"));
         assert!(!content.contains("ignore-hidden"));
         assert!(!content.contains("[default]\n\n[default.extend-words]"));
+    }
+
+    #[test]
+    fn migrate_legacy_config_rejects_parent_dir_ignore_words_path() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(
+            tmp.path().join(".codespellrc"),
+            "[codespell]\nignore-words = ../outside\n",
+        )
+        .unwrap();
+
+        let err = migrate_legacy_config(tmp.path(), tmp.path()).unwrap_err();
+
+        assert!(
+            err.to_string().contains("must stay within the repository"),
+            "{err:#}"
+        );
+        assert!(tmp.path().join(".codespellrc").exists());
+        assert!(!tmp.path().join("_typos.toml").exists());
+    }
+
+    #[test]
+    fn merge_typos_config_fails_on_unreadable_existing_target() {
+        let tmp = tempfile::tempdir().unwrap();
+        let target = tmp.path().join("_typos.toml");
+        std::fs::create_dir(&target).unwrap();
+
+        let err = merge_typos_config(&target, &BTreeSet::new()).unwrap_err();
+
+        assert!(err.to_string().contains("failed to read"));
     }
 }

@@ -1129,8 +1129,9 @@ fn display_binary(check: &registry::Check) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{display_binary, linter_status, render_linters_table};
+    use super::{display_binary, linter_status, render_linters_table, unsupported_config};
     use crate::{config, registry};
+    use std::path::Path;
 
     fn mise_tools_from(content: &str) -> std::collections::HashMap<String, String> {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -1248,5 +1249,19 @@ license-header        (built-in)          not configured  fast      no   Check s
             .find(|check| check.name == "license-header")
             .expect("license-header check");
         assert_eq!(display_binary(&license_header), "(built-in)");
+    }
+
+    #[test]
+    fn typos_supported_root_config_is_not_flagged_when_config_dir_is_project_root() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("_typos.toml"), "[default.extend-words]\n").unwrap();
+        let typos = registry::builtin()
+            .into_iter()
+            .find(|check| check.name == "typos")
+            .expect("typos check");
+
+        let found = unsupported_config(&typos, dir.path(), Path::new("."));
+
+        assert_eq!(found, None);
     }
 }

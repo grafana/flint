@@ -122,10 +122,6 @@ pub async fn run(fix: bool, project_root: &Path, config_dir: &Path) -> LinterOut
         };
     }
 
-    if setup_migrations_pending {
-        setup_outcome = setup_outcome.at_least(SetupOutcome::Blocking);
-    }
-
     let _migrations_applied = match crate::init::apply_setup_migrations(project_root, config_dir) {
         Ok(applied) => applied,
         Err(e) => {

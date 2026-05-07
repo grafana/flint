@@ -113,6 +113,7 @@ fn configure_extract_workaround_env_adds_node_import() {
         .map(|(_, value)| value)
         .unwrap();
     assert!(node_options.contains("--import="));
+    assert!(node_options.contains("file://"));
 }
 
 #[test]
@@ -128,6 +129,7 @@ fn configure_extract_workaround_env_preserves_existing_node_options() {
         .unwrap();
     assert!(node_options.contains("--trace-warnings"));
     assert!(node_options.contains("--import="));
+    assert!(node_options.contains("file://"));
 }
 
 #[test]

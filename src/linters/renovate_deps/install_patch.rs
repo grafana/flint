@@ -34,7 +34,7 @@ fn ensure_loader_files(dir: &Path) -> anyhow::Result<PathBuf> {
 }
 
 fn append_node_import(env: &mut Vec<(String, String)>, register_path: &Path) {
-    let import_opt = format!("--import={}", register_path.display());
+    let import_opt = format!("--import={}", file_url(register_path));
     let Some((_, node_options)) = env.iter_mut().find(|(key, _)| key == "NODE_OPTIONS") else {
         env.push(("NODE_OPTIONS".into(), import_opt));
         return;
@@ -75,12 +75,30 @@ export async function load(url, context, defaultLoad) {{\n\
     )
 }
 
+fn file_url(path: &Path) -> String {
+    let absolute = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let raw = absolute.to_string_lossy().replace('\\', "/");
+    let mut out = String::from("file://");
+    if !raw.starts_with('/') {
+        out.push('/');
+    }
+    for b in raw.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'/' | b':' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
 fn register_source(loader_path: &Path) -> String {
     format!(
         "import {{ register }} from 'node:module';\n\
 import {{ pathToFileURL }} from 'node:url';\n\
 \n\
-register(pathToFileURL({}).href, pathToFileURL('./'));\n",
+register(pathToFileURL({}).href, import.meta.url);\n",
         serde_json::to_string(&loader_path.display().to_string()).unwrap(),
     )
 }

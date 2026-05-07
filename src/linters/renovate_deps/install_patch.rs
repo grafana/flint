@@ -1,4 +1,5 @@
 use anyhow::Context;
+use dunce::canonicalize;
 use std::path::{Path, PathBuf};
 
 const FLINT_PATCH_DIR: &str = "flint/renovate-local-dry-run";
@@ -76,8 +77,13 @@ export async function load(url, context, defaultLoad) {{\n\
 }
 
 fn file_url(path: &Path) -> String {
-    let absolute = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-    let raw = absolute.to_string_lossy().replace('\\', "/");
+    let absolute = canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let mut raw = absolute.to_string_lossy().replace('\\', "/");
+    if let Some(stripped) = raw.strip_prefix("//?/UNC/") {
+        raw = format!("//{stripped}");
+    } else if let Some(stripped) = raw.strip_prefix("//?/") {
+        raw = stripped.to_string();
+    }
     let mut out = String::from("file://");
     if !raw.starts_with('/') {
         out.push('/');
@@ -99,6 +105,6 @@ fn register_source(loader_path: &Path) -> String {
 import {{ pathToFileURL }} from 'node:url';\n\
 \n\
 register(pathToFileURL({}).href, import.meta.url);\n",
-        serde_json::to_string(&loader_path.display().to_string()).unwrap(),
+        serde_json::to_string(&loader_path.to_string_lossy().to_string()).unwrap(),
     )
 }

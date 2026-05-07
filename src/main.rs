@@ -292,10 +292,12 @@ async fn run(
             {
                 finish_fix_outcomes(
                     vec![setup_outcome],
-                    args.allow_fixed,
-                    args.short,
-                    args.verbose,
-                    args.time,
+                    FixSummaryOptions {
+                        allow_fixed: args.allow_fixed,
+                        short: args.short,
+                        verbose: args.verbose,
+                        time: args.time,
+                    },
                 );
                 return Ok(());
             } else {
@@ -327,10 +329,12 @@ async fn run(
         if let Some(outcome) = setup_fix_outcome {
             finish_fix_outcomes(
                 vec![outcome],
-                args.allow_fixed,
-                args.short,
-                args.verbose,
-                args.time,
+                FixSummaryOptions {
+                    allow_fixed: args.allow_fixed,
+                    short: args.short,
+                    verbose: args.verbose,
+                    time: args.time,
+                },
             );
         }
         if let Some(setup_result) = setup_check_result {
@@ -392,6 +396,12 @@ async fn run(
                 .copied()
                 .partition(|c| supports_single_pass_fix(c));
 
+        let fix_summary = FixSummaryOptions {
+            allow_fixed: args.allow_fixed,
+            short: args.short,
+            verbose: args.verbose,
+            time: args.time,
+        };
         let mut outcomes = setup_fix_outcome.into_iter().collect::<Vec<_>>();
 
         if !legacy_checks.is_empty() {
@@ -513,13 +523,7 @@ async fn run(
             }
         }
 
-        finish_fix_outcomes(
-            outcomes,
-            args.allow_fixed,
-            args.short,
-            args.verbose,
-            args.time,
-        );
+        finish_fix_outcomes(outcomes, fix_summary);
         return Ok(());
     }
 
@@ -552,6 +556,14 @@ struct RunContext<'a> {
     project_root: &'a Path,
     cfg: &'a config::Config,
     config_dir: &'a Path,
+}
+
+#[derive(Clone, Copy)]
+struct FixSummaryOptions {
+    allow_fixed: bool,
+    short: bool,
+    verbose: bool,
+    time: bool,
 }
 
 struct AdaptiveRunContext<'a> {
@@ -597,13 +609,13 @@ impl FixOutcome {
     }
 }
 
-fn finish_fix_outcomes(
-    outcomes: Vec<FixOutcome>,
-    allow_fixed: bool,
-    short: bool,
-    verbose: bool,
-    time: bool,
-) {
+fn finish_fix_outcomes(outcomes: Vec<FixOutcome>, opts: FixSummaryOptions) {
+    let FixSummaryOptions {
+        allow_fixed,
+        short,
+        verbose,
+        time,
+    } = opts;
     if !short {
         for r in outcomes.iter().filter_map(FixOutcome::result) {
             if verbose || !r.ok || time {

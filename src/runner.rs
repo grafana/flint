@@ -21,6 +21,16 @@ pub struct RunOptions {
     pub time: bool,
 }
 
+#[derive(Clone, Copy)]
+pub struct RunContext<'a> {
+    pub active_checks: &'a [&'a Check],
+    pub file_list: &'a FileList,
+    pub filtered_run_policy: bool,
+    pub project_root: &'a Path,
+    pub cfg: &'a Config,
+    pub config_dir: &'a Path,
+}
+
 #[derive(Clone)]
 pub struct CheckResult {
     pub name: String,
@@ -141,12 +151,8 @@ impl PreparedCheck {
 
 pub async fn run(
     checks: &[&Check],
-    active_checks: &[&Check],
-    file_list: &FileList,
+    ctx: RunContext<'_>,
     opts: RunOptions,
-    project_root: &Path,
-    cfg: &Config,
-    config_dir: &Path,
 ) -> Result<Vec<CheckResult>> {
     let RunOptions {
         fix,
@@ -159,12 +165,13 @@ pub async fn run(
         .filter_map(|&check| {
             prepare(
                 check,
-                file_list,
+                ctx.file_list,
+                ctx.filtered_run_policy,
                 fix,
-                project_root,
-                active_checks,
-                cfg,
-                config_dir,
+                ctx.project_root,
+                ctx.active_checks,
+                ctx.cfg,
+                ctx.config_dir,
             )
         })
         .collect();
@@ -172,7 +179,7 @@ pub async fn run(
     if fix {
         let mut results = vec![];
         for task in prepared {
-            let r = task.execute(fix, verbose, project_root).await;
+            let r = task.execute(fix, verbose, ctx.project_root).await;
             if !short && (verbose || !r.ok) {
                 eprintln!("[{}]{}", r.name, format_duration_suffix(time, r.duration));
                 flush_output(&r.stdout, &r.stderr);
@@ -184,7 +191,7 @@ pub async fn run(
 
     let mut set: JoinSet<CheckResult> = JoinSet::new();
     for task in prepared {
-        let root = project_root.to_path_buf();
+        let root = ctx.project_root.to_path_buf();
         set.spawn(async move { task.execute(false, verbose, &root).await });
     }
 
@@ -214,6 +221,7 @@ pub async fn run(
 fn prepare(
     check: &Check,
     file_list: &FileList,
+    filtered_run_policy: bool,
     fix: bool,
     project_root: &Path,
     active_checks: &[&Check],
@@ -251,6 +259,7 @@ fn prepare(
             .prepare(NativePrepareContext {
                 name: check.name,
                 file_list,
+                filtered_run_policy,
                 project_root,
                 cfg,
                 config_dir,

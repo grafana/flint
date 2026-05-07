@@ -1016,12 +1016,16 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     match check.run_policy {
         crate::registry::RunPolicy::Fast => {}
         crate::registry::RunPolicy::Slow => {
-            rows.push(("Run policy", "slow — skipped by `--fast-only`".to_string()));
+            rows.push((
+                "Run policy",
+                "slow — skipped in local default runs and by `--fast-only`".to_string(),
+            ));
         }
         crate::registry::RunPolicy::Adaptive => {
             rows.push((
                 "Run policy",
-                "adaptive — runs in `--fast-only` only when relevant".to_string(),
+                "adaptive — runs in local default runs and `--fast-only` only when relevant"
+                    .to_string(),
             ));
         }
     }

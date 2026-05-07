@@ -16,7 +16,8 @@ Linter runner built for speed, consistency, and low setup friction:
 - **Fast** — native execution (no Docker), parallel, diff-aware
   (changed files only), opt-in (undeclared tools don't run), small binary
   cached by mise
-- **Local == CI** — one binary, one config, identical behavior
+- **Local + CI aligned** — one binary, one config model, local defaults tuned
+  for day-to-day work and broader coverage in CI
 - **Sensible defaults** — `flint init` scaffolds a working setup quickly, and most
   repos can stick with the generated defaults
 - **Opinionated config** — Flint chooses canonical config filenames per linter,
@@ -87,6 +88,19 @@ run = "flint run"
 description = "Auto-fix lint issues"
 run = "flint run --fix"
 ```
+
+Execution defaults:
+
+| Invocation           | Local (non-CI)               | CI                                                  |
+| -------------------- | ---------------------------- | --------------------------------------------------- |
+| `flint run`          | Linters triggered by changes | All active linters, still diff-aware where possible |
+| `flint run --full`   | All active linters           | All active linters                                  |
+| `flint run <linter>` | Run that linter explicitly   | Run that linter explicitly                          |
+
+This means some failures may show up only in CI. When that happens, flint tells
+you which command to run locally, usually `--full` or the linter name. That is
+a reasonable default for day-to-day work: local runs stay focused on what you
+changed, while CI runs linters based on changed files where possible.
 
 ### CI setup
 

@@ -4,7 +4,7 @@ use std::process::Command;
 
 const HOOK_CONTENT: &str = "#!/bin/sh\n\
 # Installed by flint — run `flint hook install` to reinstall\n\
-mise exec -- flint run --fix --fast-only\n";
+mise exec -- flint run --fix\n";
 
 /// Returns the repository-local pre-commit hook path for this git checkout.
 pub(crate) fn pre_commit_path(project_root: &Path) -> Result<PathBuf> {

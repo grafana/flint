@@ -50,7 +50,7 @@ struct PreparedRenovateDeps {
 }
 
 fn prepare(ctx: NativePrepareContext<'_>) -> Option<Box<dyn PreparedNativeCheck>> {
-    if !is_relevant(ctx.file_list, ctx.project_root) {
+    if ctx.filtered_run_policy && !is_relevant(ctx.file_list, ctx.project_root) {
         return None;
     }
 

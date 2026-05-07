@@ -1,0 +1,11 @@
+{
+  "meta": {},
+  "files": {
+    "package.json": {
+      "npm": [
+        "express",
+        "lodash"
+      ]
+    }
+  }
+}

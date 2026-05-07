@@ -231,7 +231,7 @@ check_all_local = true
 | Binary      | `renovate`                                                                                                                 |
 | Scope       | [native](#scope-native)                                                                                                    |
 | Patterns    | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
-| Run policy  | adaptive — runs in `--fast-only` only when relevant                                                                        |
+| Run policy  | adaptive — runs in local default runs and `--fast-only` only when relevant                                                 |
 
 Verifies `renovate-tracked-deps.json` next to the active Renovate
 config is up to date by running Renovate locally and comparing its
@@ -384,11 +384,12 @@ without file arguments or use custom orchestration logic.
 
 Checks use one of three run policies:
 
-- `fast` — always runs, including in `--fast-only`
-- `slow` — skipped by `--fast-only`
-- `adaptive` — runs in `--fast-only` only when the changed files are relevant
+- `fast` — always runs, including in local default runs and `--fast-only`
+- `slow` — skipped in local default runs and by `--fast-only`
+- `adaptive` — runs in local default runs and `--fast-only` only when the changed files are relevant
 
-Use `--fast-only` for local/pre-push feedback and the full set in CI.
+Local `flint run` already uses the filtered policy by default. Use `--full`,
+an explicit linter name, or CI to run the broader set.
 
 **`editorconfig-checker` defers to formatters**: `editorconfig-checker` runs on
 all files, but automatically skips file types owned by an active formatter. If

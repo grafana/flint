@@ -1,0 +1,17 @@
+[expected]
+args = "run"
+exit = 0
+
+[expected.files]
+".renovate-ran" = """
+"""
+
+[env]
+GITHUB_TOKEN = "token"
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+touch .renovate-ran
+printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"npm":[{"packageFile":"package.json","deps":[{"depName":"express"},{"depName":"lodash"}]}]}}'
+'''

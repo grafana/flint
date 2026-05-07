@@ -19,12 +19,14 @@ This is the primary goal; everything else serves it.
 - Small binary, cached by mise
 - Diff-aware by default: changed files only unless `--full` is requested
 - Opt-in activation: undeclared tools are skipped entirely
-- Slow checks can be skipped via `--fast-only`
+- Local runs skip slower checks by default unless you use `--full` or name the
+  linter explicitly
 
-## Local same as CI
+## Local and CI stay aligned
 
-One binary, one config model, identical behavior. There is no "native mode
-subset" distinction. If it passes locally, it passes in CI.
+One binary, one config model, and the same pinned tools in both environments.
+Local runs default to the change-triggered subset for day-to-day speed, while
+CI activates the full linter set.
 
 ## Predictable and updatable linter versions
 

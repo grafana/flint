@@ -255,6 +255,7 @@ pub trait CheckType: Sync + std::fmt::Debug {
 pub struct NativePrepareContext<'a> {
     pub name: &'static str,
     pub file_list: &'a FileList,
+    pub filtered_run_policy: bool,
     pub project_root: &'a Path,
     pub cfg: &'a Config,
     pub config_dir: &'a Path,

@@ -18,7 +18,7 @@ it do not need to re-learn the interface.
 | -------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `--fix`              | Fix what's fixable, report `clean` / `fixed` / `partial` / `review` outcomes; exit non-zero if anything needs action |
 | `--full`             | Lint all files instead of only changed files                                                                         |
-| `--fast-only`        | Skip checks tagged as slow in the registry. Overridden by explicit linter names.                                     |
+| `--fast-only`        | Force the filtered local run policy explicitly. Overridden by explicit linter names and `--full`.                    |
 | `--short`            | Compact summary output, no per-check noise                                                                           |
 | `--verbose`          | Show all linter output, not just failures                                                                            |
 | `--new-from-rev REV` | Diff base (default: merge base with base branch)                                                                     |
@@ -31,15 +31,17 @@ Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`, `FLINT_FAST_ONL
 
 | Context                      | Command                                | Why                                                               |
 | ---------------------------- | -------------------------------------- | ----------------------------------------------------------------- |
-| Interactive development      | `flint run` or `flint run --fast-only` | Full output so you can read the details                           |
+| Interactive development      | `flint run`                            | Full output so you can read the details                           |
 | Human wanting a summary      | `flint run --short`                    | Compact output, no per-check noise                                |
-| Pre-push hook (CC / agentic) | `flint run --fix --fast-only`          | Fixes what it can silently, surfaces only what needs human review |
+| Pre-push hook (CC / agentic) | `flint run --fix`                      | Fixes what it can silently, surfaces only what needs human review |
 | CI                           | `flint run`                            | Full output for humans reading CI logs                            |
 
 ## Changed-file and baseline runs
 
-By default, `flint run` checks only files changed relative to the merge base.
-Use `--full` to check every matching file explicitly.
+By default, local `flint run` checks linters triggered by changes relative to
+the merge base. In CI, `flint run` activates the full linter set while still
+keeping diff-aware scoping where each linter supports it. Use `--full` to
+check every matching file explicitly.
 
 Some changed-file runs intentionally expand one or more affected checks to all
 matching files. This establishes a baseline when lint coverage changes, while

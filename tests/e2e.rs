@@ -168,7 +168,7 @@ fn cases() {
 // marks it executable with Unix permissions.
 #[cfg(unix)]
 #[test]
-fn renovate_deps_fast_only_runs_for_deleted_tracked_file() {
+fn renovate_deps_local_default_runs_for_deleted_tracked_file() {
     let repo = git_repo();
 
     std::fs::create_dir_all(repo.path().join(".github")).unwrap();
@@ -250,11 +250,7 @@ printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"mise":[{"package
         fake_bin_dir.path().display(),
         std::env::var("PATH").unwrap_or_default()
     );
-    let out = flint_with_env(
-        &["run", "--fast-only"],
-        repo.path(),
-        &[("PATH", &fake_path)],
-    );
+    let out = flint_with_env(&["run"], repo.path(), &[("PATH", &fake_path)]);
 
     assert!(
         repo.path().join(".renovate-ran").exists(),

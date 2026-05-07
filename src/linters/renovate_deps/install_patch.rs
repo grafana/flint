@@ -16,6 +16,8 @@ pub(crate) fn configure_extract_workaround_env(
         return Ok(());
     }
 
+    // Temporary workaround until the upstream Renovate fix is released:
+    // https://github.com/renovatebot/renovate/pull/43129
     let register_path = ensure_loader_files(&std::env::temp_dir().join(FLINT_PATCH_DIR))?;
     append_node_import(env, &register_path);
     Ok(())

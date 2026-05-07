@@ -116,6 +116,17 @@ struct RunArgs {
     linters: Vec<String>,
 }
 
+impl From<&RunArgs> for FixSummaryOptions {
+    fn from(args: &RunArgs) -> Self {
+        Self {
+            allow_fixed: args.allow_fixed,
+            short: args.short,
+            verbose: args.verbose,
+            time: args.time,
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -290,15 +301,7 @@ async fn run(
                     FixOutcome::Partial(_) | FixOutcome::Review(_)
                 )
             {
-                finish_fix_outcomes(
-                    vec![setup_outcome],
-                    FixSummaryOptions {
-                        allow_fixed: args.allow_fixed,
-                        short: args.short,
-                        verbose: args.verbose,
-                        time: args.time,
-                    },
-                );
+                finish_fix_outcomes(vec![setup_outcome], (&args).into());
                 return Ok(());
             } else {
                 setup_fix_outcome = Some(setup_outcome);
@@ -327,15 +330,7 @@ async fn run(
 
     if active.is_empty() {
         if let Some(outcome) = setup_fix_outcome {
-            finish_fix_outcomes(
-                vec![outcome],
-                FixSummaryOptions {
-                    allow_fixed: args.allow_fixed,
-                    short: args.short,
-                    verbose: args.verbose,
-                    time: args.time,
-                },
-            );
+            finish_fix_outcomes(vec![outcome], (&args).into());
         }
         if let Some(setup_result) = setup_check_result {
             finish_check_results(vec![setup_result], &active, args.short);
@@ -396,12 +391,7 @@ async fn run(
                 .copied()
                 .partition(|c| supports_single_pass_fix(c));
 
-        let fix_summary = FixSummaryOptions {
-            allow_fixed: args.allow_fixed,
-            short: args.short,
-            verbose: args.verbose,
-            time: args.time,
-        };
+        let fix_summary: FixSummaryOptions = (&args).into();
         let mut outcomes = setup_fix_outcome.into_iter().collect::<Vec<_>>();
 
         if !legacy_checks.is_empty() {

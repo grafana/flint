@@ -7,6 +7,7 @@ pub mod renovate_deps;
 pub mod rumdl;
 pub mod rustfmt;
 pub mod taplo;
+pub mod typos;
 pub mod yamllint;
 
 pub use crate::registry::LinterOutput;

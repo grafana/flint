@@ -998,11 +998,14 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     }
 
     if check.adaptive_relevance.is_some() {
-        rows.push((
-            "Run policy",
+        let label = if check.name == "renovate-deps" {
+            "adaptive — see [when does this run?](linters/renovate-deps.md#when-does-this-run)"
+                .to_string()
+        } else {
             "adaptive — runs on local default runs only when changed files are relevant"
-                .to_string(),
-        ));
+                .to_string()
+        };
+        rows.push(("Run policy", label));
     }
 
     rows

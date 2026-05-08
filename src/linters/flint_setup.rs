@@ -86,6 +86,20 @@ pub async fn run(fix: bool, project_root: &Path, config_dir: &Path) -> LinterOut
         }
     }
 
+    let setup_migrations_pending = match crate::init::detect_setup_migrations(project_root) {
+        Ok(pending) => pending,
+        Err(e) => {
+            return LinterOutput::setup_err(
+                SetupOutcome::Fatal,
+                format!("flint: flint-setup: {e}\n"),
+            );
+        }
+    };
+    if setup_migrations_pending {
+        setup_outcome = setup_outcome.at_least(SetupOutcome::Blocking);
+        errors.push("legacy Flint setup files or config need migration.".to_string());
+    }
+
     if errors.is_empty() {
         return LinterOutput {
             ok: true,
@@ -106,19 +120,6 @@ pub async fn run(fix: bool, project_root: &Path, config_dir: &Path) -> LinterOut
             .into_bytes(),
             setup_outcome: Some(setup_outcome),
         };
-    }
-
-    let setup_migrations_pending = match crate::init::detect_setup_migrations(project_root) {
-        Ok(pending) => pending,
-        Err(e) => {
-            return LinterOutput::setup_err(
-                SetupOutcome::Fatal,
-                format!("flint: flint-setup: {e}\n"),
-            );
-        }
-    };
-    if setup_migrations_pending {
-        setup_outcome = setup_outcome.at_least(SetupOutcome::Blocking);
     }
 
     let _migrations_applied = match crate::init::apply_setup_migrations(project_root, config_dir) {

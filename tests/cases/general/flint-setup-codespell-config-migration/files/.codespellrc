@@ -1,0 +1,5 @@
+[codespell]
+ignore-words-list = ratatui,errorprone
+ignore-words = .codespellignore
+skip = .git,target,docs/_build
+check-hidden =

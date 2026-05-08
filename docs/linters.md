@@ -67,17 +67,6 @@ still choose the config directory via `FLINT_CONFIG_DIR` where supported.
 | Patterns    | `*.rs`                                                    |
 | Config      | `rustfmt.toml`                                            |
 
-## `codespell`
-
-|             |                                    |
-| ----------- | ---------------------------------- |
-| Description | Check for common spelling mistakes |
-| Fix         | yes                                |
-| Binary      | `codespell`                        |
-| Scope       | [files](#scope-files)              |
-| Patterns    | `*`                                |
-| Config      | `.codespellrc`                     |
-
 ## `dotnet-format`
 
 |             |                       |
@@ -347,6 +336,17 @@ flint's existing formatter-style checks.
 
 Current caveat: Taplo's published docs currently advertise TOML 1.0.0
 support, so treat this check as TOML 1.0-oriented for now.
+
+## `typos`
+
+|             |                                    |
+| ----------- | ---------------------------------- |
+| Description | Check for common spelling mistakes |
+| Fix         | yes                                |
+| Binary      | `typos`                            |
+| Scope       | [files](#scope-files)              |
+| Patterns    | `*`                                |
+| Config      | `_typos.toml`                      |
 
 ## `xmllint`
 

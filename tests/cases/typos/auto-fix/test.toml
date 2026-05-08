@@ -1,0 +1,15 @@
+[expected]
+args = "run --full --fix typos"
+exit = 1
+stderr = '''
+flint: fixed: typos — commit before pushing
+'''
+
+[expected.files]
+"README.md" = '''
+the typo is fixed now.
+'''
+
+
+[env]
+FLINT_CONFIG_DIR = ".github/config"

@@ -46,10 +46,6 @@
       "packageName": "renovate",
       "datasource": "npm"
     },
-    "pipx:codespell": {
-      "packageName": "codespell",
-      "datasource": "pypi"
-    },
     "ruff": {
       "packageName": "astral-sh/ruff",
       "datasource": "github-releases"
@@ -68,6 +64,10 @@
     },
     "taplo": {
       "packageName": "tamasfe/taplo",
+      "datasource": "github-releases"
+    },
+    "typos": {
+      "packageName": "crate-ci/typos",
       "datasource": "github-releases"
     }
   },
@@ -115,14 +115,14 @@
         "lychee",
         "node",
         "npm:renovate",
-        "pipx:codespell",
         "release-plz",
         "ruff",
         "rumdl",
         "rust",
         "shellcheck",
         "shfmt",
-        "taplo"
+        "taplo",
+        "typos"
       ]
     },
     "src/init/scaffold.rs": {

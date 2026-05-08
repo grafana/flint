@@ -41,7 +41,7 @@ const DEFAULT_LINE_LENGTH: u16 = 120;
 pub enum Profile {
     /// Primary language linters only (ruff, cargo-clippy, golangci-lint, …).
     Lang,
-    /// Lang + supplementary checks + fast general tools (shellcheck, rumdl, codespell, …).
+    /// Lang + supplementary checks + fast general tools (shellcheck, rumdl, typos, …).
     Default,
     /// Default + slow linters (renovate-deps).
     Comprehensive,
@@ -206,7 +206,7 @@ fn default_category_items() -> Vec<CategoryItem> {
         CategoryItem {
             selected: true,
             category: Category::Default,
-            label: "general — general tools (codespell, ec, lychee, …)",
+            label: "general — general tools (typos, ec, lychee, …)",
         },
         CategoryItem {
             selected: false,
@@ -367,6 +367,10 @@ Add and stage your source files before running init so the detection is accurate
 
     let meta_changed =
         apply_env_and_tasks(&mise_path, &config_dir_rel, has_slow, &v1.removed_tasks)?;
+    let node_added = ensure_node_for_npm(project_root)?;
+    if node_added {
+        println!("  added node (LTS) — required by npm: backend tools");
+    }
     let tools_normalized = normalize_tools_section(&mise_path)?;
 
     let base_branch = detect_base_branch(project_root);
@@ -411,6 +415,7 @@ Add and stage your source files before running init so the detection is accurate
         && v1.removed_tasks.is_empty()
         && !v1.removed_renovate_env
         && !meta_changed
+        && !node_added
         && !tools_normalized
         && !toml_generated
         && !workflow_generated

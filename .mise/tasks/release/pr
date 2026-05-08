@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 #MISE description="Open or update the release PR"
-#MISE depends=["release:update"]
 #USAGE flag "--git-token <token>" help="GitHub token used by release-plz"
 
 set -euo pipefail

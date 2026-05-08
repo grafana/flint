@@ -1,24 +1,18 @@
 #!/usr/bin/env bash
 #MISE description="Create git tags and GitHub releases when a release PR was merged"
-#USAGE arg "[args]" var=#true help="Additional arguments passed to release-plz release"
+#USAGE flag "--git-token <token>" help="GitHub token used by release-plz and gh"
 
 set -euo pipefail
 
-if [ -z "${GITHUB_TOKEN:-}" ]; then
-	echo "GITHUB_TOKEN environment variable is not set. Exiting."
+if [ -z "${usage_git_token:-}" ]; then
+	echo "--git-token is required" >&2
 	exit 1
 fi
 
 tmp_json="$(mktemp)"
 trap 'rm -f "${tmp_json}"' EXIT
 
-release_args=()
-if [ -n "${usage_args:-}" ]; then
-	# Mise provides variadic args as a shell-escaped string.
-	eval "release_args=(${usage_args})"
-fi
-
-release-plz release -o json "${release_args[@]}" >"${tmp_json}"
+release-plz release --git-token "${usage_git_token}" --forge github -o json >"${tmp_json}"
 
 jq -e '.releases and (.releases | type == "array")' "${tmp_json}" >/dev/null
 
@@ -27,9 +21,7 @@ if ! jq -e '.releases | length > 0' "${tmp_json}" >/dev/null; then
 	exit 0
 fi
 
-if [ -z "${GH_TOKEN:-}" ]; then
-	export GH_TOKEN="${GITHUB_TOKEN}"
-fi
+export GH_TOKEN="${usage_git_token}"
 
 tag="$(jq -r '.releases[0].tag' "${tmp_json}")"
 

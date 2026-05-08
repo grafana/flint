@@ -32,7 +32,7 @@ jobs:
       - name: Create release metadata
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: mise run release:create
+        run: mise run release:create --git-token "$GITHUB_TOKEN"
 
   release-pr:
     # Runs on every push to main. Keeps an open PR that bumps Cargo.toml version
@@ -60,6 +60,6 @@ jobs:
           version: v2026.5.0
           sha256: 7db5db7a36d28203eb8329140d98fb26b41f5efea32d762f69a1e4b369e1e1a8
       - name: Update release PR
-        run: mise run release:pr
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mise run release:pr --git-token "$GITHUB_TOKEN"

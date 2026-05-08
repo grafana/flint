@@ -600,15 +600,24 @@ fn extract_failure_snippet(log: &str) -> String {
             if level < 40 {
                 return None;
             }
-            let msg = value.get("msg").and_then(|v| v.as_str()).unwrap_or("");
+            let msg = value
+                .get("msg")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty());
             let err = value
                 .get("err")
                 .and_then(|v| v.get("message"))
                 .and_then(|v| v.as_str());
-            Some(match err {
-                Some(e) => format!("level={level} {msg}: {e}"),
-                None => format!("level={level} {msg}"),
-            })
+            let mut out = format!("level={level}");
+            if let Some(m) = msg {
+                out.push(' ');
+                out.push_str(m);
+            }
+            if let Some(e) = err {
+                out.push_str(if msg.is_some() { ": " } else { " " });
+                out.push_str(e);
+            }
+            Some(out)
         })
         .collect();
 

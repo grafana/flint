@@ -944,6 +944,16 @@ fn extract_failure_snippet_prefers_error_lines() {
 }
 
 #[test]
+fn extract_failure_snippet_handles_missing_msg() {
+    let log = "\
+{\"level\":50,\"err\":{\"message\":\"boom\"}}\n\
+{\"level\":60,\"msg\":\"\",\"err\":{\"message\":\"fatal\"}}\n\
+{\"level\":40,\"msg\":\"warn only\"}\n";
+    let snippet = extract_failure_snippet(log);
+    assert_eq!(snippet, "level=50 boom\nlevel=60 fatal\nlevel=40 warn only");
+}
+
+#[test]
 fn extract_failure_snippet_falls_back_to_tail() {
     let mut log = String::new();
     for i in 0..30 {

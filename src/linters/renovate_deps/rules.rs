@@ -130,12 +130,15 @@ pub(crate) fn trim_snapshot_meta(snapshot: &mut Snapshot, rules: &[ComparablePac
 }
 
 /// Returns the first dep whose meta is incomplete relative to the configured
-/// package rules. A meta entry is complete only when both `packageName` and
-/// `datasource` are populated; lookup-mode generation guarantees both fields,
-/// extract-mode does not.
+/// package rules:
 ///
-/// In non-fix mode, callers use this to bail with a "run --fix" hint instead
-/// of silently writing partial meta.
+/// - any rule that references the dep requires `packageName`
+/// - rules using `matchPackageNames` additionally require `datasource` (so
+///   Renovate's `(packageName, datasource)` grouping is deterministic)
+///
+/// `matchDepNames` rules don't need `datasource` — Renovate matches deps by
+/// name there, and bare-key mise tools like `biome` don't always surface a
+/// datasource even in lookup-mode output.
 pub(crate) fn incomplete_meta_for_rules(
     snapshot: &Snapshot,
     rules: &[ComparablePackageRule],
@@ -146,73 +149,38 @@ pub(crate) fn incomplete_meta_for_rules(
 
     for dep_name in extracted_dep_names(snapshot) {
         let meta = snapshot.meta.get(&dep_name);
-        let has_package_name = meta.and_then(|m| m.package_name.as_deref()).is_some();
-        let has_datasource = meta.and_then(|m| m.datasource.as_deref()).is_some();
-        if has_package_name && has_datasource {
-            continue;
-        }
+        let pn = meta.and_then(|m| m.package_name.as_deref());
+        let ds = meta.and_then(|m| m.datasource.as_deref());
 
-        if let Some(reason) = dep_meta_gap_reason(&dep_name, snapshot, rules, meta) {
-            return Some(reason);
-        }
-    }
-
-    None
-}
-
-/// Strict post-trim check: any meta entry left in the snapshot after trimming
-/// must have both packageName and datasource. Used as a sanity check after
-/// fix-mode lookup regeneration.
-pub(crate) fn missing_meta_field(snapshot: &Snapshot) -> Option<String> {
-    for (dep_name, meta) in &snapshot.meta {
-        match (meta.package_name.as_deref(), meta.datasource.as_deref()) {
-            (Some(_), Some(_)) => {}
-            (None, _) => {
-                return Some(format!("dep {dep_name:?} is missing packageName"));
-            }
-            (Some(_), None) => {
-                return Some(format!("dep {dep_name:?} is missing datasource"));
-            }
-        }
-    }
-    None
-}
-
-fn dep_meta_gap_reason(
-    dep_name: &str,
-    snapshot: &Snapshot,
-    rules: &[ComparablePackageRule],
-    meta: Option<&super::snapshot::DepMeta>,
-) -> Option<String> {
-    let missing_field = match (
-        meta.and_then(|m| m.package_name.as_deref()),
-        meta.and_then(|m| m.datasource.as_deref()),
-    ) {
-        (Some(_), Some(_)) => return None,
-        (None, _) => "packageName",
-        (Some(_), None) => "datasource",
-    };
-
-    for rule in rules {
-        match &rule.matcher {
-            RuleMatcher::DepNames(names) if names.contains(dep_name) => {
+        for rule in rules {
+            let (label, needs_datasource) = match &rule.matcher {
+                RuleMatcher::DepNames(names) if names.contains(&dep_name) => {
+                    (format!("matchDepNames in {}", rule.label), false)
+                }
+                RuleMatcher::PackageNames(names)
+                    if package_name_rule_dep_candidates(snapshot, names).contains(&dep_name) =>
+                {
+                    let packages = names.iter().cloned().collect::<Vec<_>>().join(", ");
+                    (
+                        format!("matchPackageNames [{packages}] in {}", rule.label),
+                        true,
+                    )
+                }
+                _ => continue,
+            };
+            if pn.is_none() {
                 return Some(format!(
-                    "dep {dep_name:?} is matched by {} via matchDepNames but is missing {missing_field}",
-                    rule.label
+                    "dep {dep_name:?} is matched by {label} but is missing packageName"
                 ));
             }
-            RuleMatcher::PackageNames(names)
-                if package_name_rule_dep_candidates(snapshot, names).contains(dep_name) =>
-            {
-                let packages = names.iter().cloned().collect::<Vec<_>>().join(", ");
+            if needs_datasource && ds.is_none() {
                 return Some(format!(
-                    "dep {dep_name:?} is considered for {} via matchPackageNames [{packages}] but is missing {missing_field}",
-                    rule.label
+                    "dep {dep_name:?} is matched by {label} but is missing datasource"
                 ));
             }
-            _ => {}
         }
     }
+
     None
 }
 

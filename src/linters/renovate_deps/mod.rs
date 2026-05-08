@@ -5,8 +5,8 @@ use std::process::Stdio;
 
 use self::install_patch::configure_extract_workaround_env;
 use self::rules::{
-    comparable_package_rules_for_config, incomplete_meta_for_rules, missing_meta_field,
-    trim_snapshot_meta, validate_rule_coverage,
+    comparable_package_rules_for_config, incomplete_meta_for_rules, trim_snapshot_meta,
+    validate_rule_coverage,
 };
 use self::snapshot::{Snapshot, extract_deps, read_snapshot, unified_diff, write_snapshot};
 use crate::config::RenovateDepsConfig;
@@ -429,21 +429,21 @@ async fn run_inner(
         generate_snapshot(project_root, &config_path, &cfg.exclude_managers, dry_run).await?;
     if !fix {
         maybe_reuse_committed_meta(&mut generated, committed.as_ref());
-        if let Some(reason) = incomplete_meta_for_rules(&generated, &rules) {
+    }
+
+    if let Some(reason) = incomplete_meta_for_rules(&generated, &rules) {
+        if fix {
             anyhow::bail!(
-                "dependency metadata is out of date: {reason}.\nRun `flint run --fix renovate-deps` to refresh metadata."
+                "lookup did not populate required metadata: {reason}.\nThis is a renovate-deps bug — please report."
             );
         }
+        anyhow::bail!(
+            "dependency metadata is out of date: {reason}.\nRun `flint run --fix renovate-deps` to refresh metadata."
+        );
     }
 
     validate_rule_coverage(&generated, &rules)?;
     trim_snapshot_meta(&mut generated, &rules);
-
-    if let Some(reason) = missing_meta_field(&generated) {
-        anyhow::bail!(
-            "lookup did not populate required metadata: {reason}.\nThis is a renovate-deps bug — please report."
-        );
-    }
 
     if let Some(committed) = committed.as_ref()
         && *committed == generated

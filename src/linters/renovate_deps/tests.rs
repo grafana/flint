@@ -1,5 +1,7 @@
 use super::install_patch::configure_extract_workaround_env;
-use super::rules::{ComparablePackageRule, RuleMatcher, missing_meta_field, relevant_dep_names};
+use super::rules::{
+    ComparablePackageRule, RuleMatcher, incomplete_meta_for_rules, relevant_dep_names,
+};
 use super::snapshot::{DepFiles, DepMeta};
 use super::*;
 use std::collections::BTreeSet;
@@ -465,7 +467,7 @@ fn maybe_reuse_committed_meta_merges_missing_fields() {
 }
 
 #[test]
-fn missing_meta_field_passes_when_all_entries_have_packagename_and_datasource() {
+fn incomplete_meta_for_rules_passes_when_meta_is_complete() {
     let snap = snapshot(
         &[(
             "actionlint",
@@ -474,29 +476,56 @@ fn missing_meta_field_passes_when_all_entries_have_packagename_and_datasource() 
         )],
         &[("mise.toml", &[("mise", &["actionlint"])])],
     );
-    assert!(missing_meta_field(&snap).is_none());
+    let rules = vec![ComparablePackageRule {
+        label: "group \"linters\"".to_string(),
+        matcher: RuleMatcher::DepNames(BTreeSet::from(["actionlint".to_string()])),
+    }];
+    assert!(incomplete_meta_for_rules(&snap, &rules).is_none());
 }
 
 #[test]
-fn missing_meta_field_flags_missing_datasource() {
+fn incomplete_meta_for_rules_dep_name_rule_tolerates_missing_datasource() {
+    // matchDepNames doesn't need datasource — Renovate doesn't always surface
+    // one for bare-key mise tools (e.g. biome) and grouping isn't affected.
     let snap = snapshot(
-        &[("actionlint", Some("rhysd/actionlint"), None)],
-        &[("mise.toml", &[("mise", &["actionlint"])])],
+        &[("biome", Some("biome"), None)],
+        &[("mise.toml", &[("mise", &["biome"])])],
     );
-    let reason = missing_meta_field(&snap).unwrap();
-    assert!(reason.contains("actionlint"));
-    assert!(reason.contains("datasource"));
+    let rules = vec![ComparablePackageRule {
+        label: "group \"linters\"".to_string(),
+        matcher: RuleMatcher::DepNames(BTreeSet::from(["biome".to_string()])),
+    }];
+    assert!(incomplete_meta_for_rules(&snap, &rules).is_none());
 }
 
 #[test]
-fn missing_meta_field_flags_missing_packagename() {
+fn incomplete_meta_for_rules_dep_name_rule_flags_missing_packagename() {
     let snap = snapshot(
         &[("actionlint", None, Some("github-releases"))],
         &[("mise.toml", &[("mise", &["actionlint"])])],
     );
-    let reason = missing_meta_field(&snap).unwrap();
+    let rules = vec![ComparablePackageRule {
+        label: "group \"linters\"".to_string(),
+        matcher: RuleMatcher::DepNames(BTreeSet::from(["actionlint".to_string()])),
+    }];
+    let reason = incomplete_meta_for_rules(&snap, &rules).unwrap();
     assert!(reason.contains("actionlint"));
     assert!(reason.contains("packageName"));
+}
+
+#[test]
+fn incomplete_meta_for_rules_package_name_rule_requires_datasource() {
+    let snap = snapshot(
+        &[("mise", Some("jdx/mise"), None)],
+        &[("mise.toml", &[("mise", &["mise"])])],
+    );
+    let rules = vec![ComparablePackageRule {
+        label: "group \"mise\"".to_string(),
+        matcher: RuleMatcher::PackageNames(BTreeSet::from(["jdx/mise".to_string()])),
+    }];
+    let reason = incomplete_meta_for_rules(&snap, &rules).unwrap();
+    assert!(reason.contains("mise"));
+    assert!(reason.contains("datasource"));
 }
 
 #[test]

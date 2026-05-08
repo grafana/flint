@@ -118,10 +118,15 @@ flint run --fix renovate-deps
 ```
 
 Verification (plain `flint run`) uses Renovate's cheap `--dry-run=extract`
-plus the committed snapshot's metadata. `--fix` always regenerates via
-`--dry-run=lookup` so every meta entry written carries both `packageName`
-and `datasource` — this avoids partial metadata in the committed snapshot,
-which would silently drift Renovate's grouping behavior.
+plus the committed snapshot's metadata. `--fix` regenerates via
+`--dry-run=lookup` so meta is authoritative.
+
+The linter requires every dep referenced by a `packageRule` to have
+`packageName`; deps matched via `matchPackageNames` additionally require
+`datasource` so Renovate's `(packageName, datasource)` grouping is
+deterministic. `matchDepNames` rules don't require datasource — bare-key
+mise tools like `biome` don't always surface one even in lookup-mode
+output, and Renovate matches them by name regardless.
 
 If rule coverage is inconsistent:
 

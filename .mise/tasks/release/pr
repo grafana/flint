@@ -39,5 +39,6 @@ git -c user.name='github-actions[bot]' \
 	-c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
 	commit -am "chore: sync README snippets"
 
-git push "https://x-access-token:${usage_git_token}@github.com/${GITHUB_REPOSITORY:-grafana/flint}.git" \
-	"HEAD:${release_branch}"
+repo="${GITHUB_REPOSITORY:-grafana/flint}"
+remote_url="https://x-access-token:${usage_git_token}@github.com/${repo}.git"
+git push "${remote_url}" "HEAD:${release_branch}"

@@ -1,8 +1,8 @@
 use anyhow::Context;
 use dunce::canonicalize;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
-const FLINT_PATCH_DIR: &str = "flint/renovate-local-dry-run";
 const FLINT_LOADER_FILE: &str = "loader.mjs";
 const FLINT_REGISTER_FILE: &str = "register.mjs";
 pub(crate) const RENOVATE_LOCAL_PATCH_SENTINEL: &str = r#"dryRun: _params.dryRun ?? "lookup","#;
@@ -18,13 +18,29 @@ pub(crate) fn configure_extract_workaround_env(
 
     // Temporary workaround until the upstream Renovate fix is released:
     // https://github.com/renovatebot/renovate/pull/43129
-    let register_path = ensure_loader_files(&std::env::temp_dir().join(FLINT_PATCH_DIR))?;
-    append_node_import(env, &register_path);
+    let register_path = register_path()?;
+    append_node_import(env, register_path);
     Ok(())
 }
 
-fn ensure_loader_files(dir: &Path) -> anyhow::Result<PathBuf> {
-    std::fs::create_dir_all(dir).with_context(|| format!("failed to create {}", dir.display()))?;
+// One private temp dir per flint process, lazily created. tempfile randomizes
+// the directory name and creates it with `O_EXCL`, so a local attacker can't
+// pre-create a symlink at the path we'll write to.
+fn register_path() -> anyhow::Result<&'static Path> {
+    static REGISTER_PATH: OnceLock<PathBuf> = OnceLock::new();
+    if let Some(path) = REGISTER_PATH.get() {
+        return Ok(path);
+    }
+    let path = create_loader_files()?;
+    Ok(REGISTER_PATH.get_or_init(|| path))
+}
+
+fn create_loader_files() -> anyhow::Result<PathBuf> {
+    let dir = tempfile::Builder::new()
+        .prefix("flint-renovate-loader-")
+        .tempdir()
+        .context("failed to create renovate loader temp dir")?
+        .keep();
 
     let loader_path = dir.join(FLINT_LOADER_FILE);
     let register_path = dir.join(FLINT_REGISTER_FILE);

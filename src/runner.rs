@@ -658,7 +658,7 @@ fn fingerprint_files(files: &[PathBuf]) -> u64 {
     hasher.finish()
 }
 
-fn format_duration_suffix(time: bool, duration: Duration) -> String {
+pub(crate) fn format_duration_suffix(time: bool, duration: Duration) -> String {
     if !time {
         return String::new();
     }

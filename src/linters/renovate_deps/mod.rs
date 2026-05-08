@@ -437,9 +437,8 @@ async fn run_inner(
         None
     };
 
-    let extracted =
+    let mut generated =
         generate_snapshot(project_root, &config_path, &cfg.exclude_managers, "extract").await?;
-    let mut generated = extracted.clone();
     maybe_reuse_committed_meta(&mut generated, committed.as_ref());
 
     let lookup_reason = metadata_lookup_reason(&generated, &rules);

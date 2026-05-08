@@ -609,7 +609,7 @@ fn finish_fix_outcomes(outcomes: Vec<FixOutcome>, opts: FixSummaryOptions) {
     if !short {
         for r in outcomes.iter().filter_map(FixOutcome::result) {
             if verbose || !r.ok || time {
-                eprintln!("[{}]{}", r.name, format_duration_suffix(time, r.duration));
+                eprintln!("[{}]{}", r.name, runner::format_duration_suffix(time, r.duration));
             }
             if verbose || !r.ok {
                 if !r.stdout.is_empty() {
@@ -1037,18 +1037,6 @@ fn supports_single_pass_fix(check: &registry::Check) -> bool {
                 ..
             }
         )
-}
-
-fn format_duration_suffix(time: bool, duration: std::time::Duration) -> String {
-    if !time {
-        return String::new();
-    }
-    let ms = duration.as_millis();
-    if ms < 1000 {
-        format!(" {ms}ms")
-    } else {
-        format!(" {:.1}s", duration.as_secs_f64())
-    }
 }
 
 fn print_linters(

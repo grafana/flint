@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.22.0](https://github.com/grafana/flint/compare/v0.21.0...v0.22.0) - 2026-05-08
+
+### Added
+
+- replace codespell with typos ([#269](https://github.com/grafana/flint/pull/269))
+- *(lychee)* add local cache for local runs ([#268](https://github.com/grafana/flint/pull/268))
+
+### Fixed
+
+- *(ci)* drop double release-plz update from release:pr ([#276](https://github.com/grafana/flint/pull/276))
+- *(init)* normalize node runtime before linters ([#267](https://github.com/grafana/flint/pull/267))
+- *(renovate)* support block-scalar mise sha256 values ([#266](https://github.com/grafana/flint/pull/266))
+- *(mise)* migrate flint-managed tools to supported backends ([#258](https://github.com/grafana/flint/pull/258))
+- validate renovate dependency rule coverage ([#263](https://github.com/grafana/flint/pull/263))
+- make flint-setup state-based ([#252](https://github.com/grafana/flint/pull/252))
+- *(init)* let rustfmt own Rust line length ([#250](https://github.com/grafana/flint/pull/250))
+- run renovate-deps for deleted tracked files ([#247](https://github.com/grafana/flint/pull/247))
+- validate CI env and isolate check types ([#253](https://github.com/grafana/flint/pull/253))
+- *(init)* remove stale head sha from CI snippets ([#248](https://github.com/grafana/flint/pull/248))
+- *(init)* enable yamllint indentation rule ([#251](https://github.com/grafana/flint/pull/251))
+
+### Other
+
+- pass git-token and forge to release-plz ([#274](https://github.com/grafana/flint/pull/274))
+- *(deps)* update taiki-e/install-action digest to 3fa6878 ([#275](https://github.com/grafana/flint/pull/275))
+- *(deps)* bump renovate to 43.150.0 ([#273](https://github.com/grafana/flint/pull/273))
+- [**breaking**] drop --fast-only flag and tighten renovate-deps timing ([#270](https://github.com/grafana/flint/pull/270))
+- *(deps)* update rust crate tokio to v1.52.2 ([#272](https://github.com/grafana/flint/pull/272))
+- upgrade lychee to v0.24.2 ([#265](https://github.com/grafana/flint/pull/265))
+- *(deps)* update taiki-e/install-action digest to cca35ed ([#254](https://github.com/grafana/flint/pull/254))
+- *(deps)* update dependency aqua:owenlamont/ryl to v0.8.0 ([#261](https://github.com/grafana/flint/pull/261))
+- *(deps)* update dependency mise to v2026.4.28 ([#262](https://github.com/grafana/flint/pull/262))
+- *(deps)* update dependency golangci-lint to v2.12.1 ([#264](https://github.com/grafana/flint/pull/264))
+- *(deps)* update dependency aqua:owenlamont/ryl to v0.7.0 ([#259](https://github.com/grafana/flint/pull/259))
+- *(renovate)* simplify quickstart and batch weekly linter updates ([#257](https://github.com/grafana/flint/pull/257))
+- *(deps)* update dependency npm:renovate to v43.141.6 ([#255](https://github.com/grafana/flint/pull/255))
+- expand positioning and comparisons ([#239](https://github.com/grafana/flint/pull/239))
+- *(deps)* update taiki-e/install-action digest to 1f2425c ([#246](https://github.com/grafana/flint/pull/246))
+- move release-plz flow into mise tasks ([#234](https://github.com/grafana/flint/pull/234))
+- *(deps)* update taiki-e/install-action digest to 481c34c ([#231](https://github.com/grafana/flint/pull/231))
+- *(deps)* update dependency ruff to v0.15.12 ([#245](https://github.com/grafana/flint/pull/245))
+- *(deps)* update dependency npm:renovate to v43.141.5 ([#244](https://github.com/grafana/flint/pull/244))
+
 ## [0.21.0](https://github.com/grafana/flint/compare/v0.20.4...v0.21.0) - 2026-04-27
 
 ### Added

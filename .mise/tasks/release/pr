@@ -11,9 +11,8 @@ fi
 
 release-plz release-pr --git-token "${usage_git_token}" --forge github
 
-# release-plz pushed (or updated) a release branch with bumped Cargo.toml +
-# CHANGELOG. Sync README snippets on that branch to the new version and
-# push as an additional commit so the release PR stays consistent.
+# Sync README pin to the new version on the release branch as a follow-up
+# commit; release-plz won't include this change itself.
 git fetch origin '+refs/heads/release-plz-*:refs/remotes/origin/release-plz-*'
 
 release_branch="$(git for-each-ref \

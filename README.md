@@ -232,9 +232,9 @@ CI is unaffected — it always runs the full set.
 
 Affected linters:
 
-| Linter                                                              | Skipped locally when…                                                |
-| ------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| [`renovate-deps`](docs/linters/renovate-deps.md#when-does-this-run) | No change to Renovate config, the snapshot, or any tracked file     |
+| Linter                                                              | Skipped locally when…                                           |
+| ------------------------------------------------------------------- | --------------------------------------------------------------- |
+| [`renovate-deps`](docs/linters/renovate-deps.md#when-does-this-run) | No change to Renovate config, the snapshot, or any tracked file |
 
 To force a local run of a skipped linter:
 

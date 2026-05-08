@@ -8,7 +8,7 @@ the main [why/principles page](why.md).
 Ratings are relative and intentionally coarse. The sections below explain the
 "why" behind each row in more detail.
 
-| Tool / approach           | Speed                 | Setup effort                  | Cross-platform  | Cross-language | Autofix support        | Delta / diff-aware | Predictable and updatable linter versions | Local == CI               |
+| Tool / approach           | Speed                 | Setup effort                  | Cross-platform  | Cross-language | Autofix support        | Delta / diff-aware | Predictable and updatable linter versions | Local + CI aligned        |
 | ------------------------- | --------------------- | ----------------------------- | --------------- | -------------- | ---------------------- | ------------------ | ----------------------------------------- | ------------------------- |
 | flint                     | high                  | low                           | yes             | yes            | yes, where supported   | yes                | yes                                       | yes                       |
 | pre-commit                | medium                | medium                        | yes             | yes            | mixed                  | mixed              | mixed                                     | mixed                     |
@@ -19,7 +19,7 @@ Ratings are relative and intentionally coarse. The sections below explain the
 Use these sections as relative comparisons against Flint on a few recurring
 dimensions: speed, setup effort, cross-platform support, cross-language scope,
 autofix support, delta/diff awareness, predictable and updatable linter
-versions, and how closely local behavior matches CI.
+versions, and how closely local and CI behavior stay aligned.
 
 ## Flint
 
@@ -41,7 +41,7 @@ linter or formatter should govern each domain.
 | Autofix support                           | yes, where supported | `flint run --fix` uses each tool's fixer when one exists and reports what still needs review.                                                                                  |
 | Delta / diff-aware                        | yes                  | Changed-file execution is the default model, with baseline expansion only when coverage changes require it.                                                                    |
 | Predictable and updatable linter versions | yes                  | Linter versions are pinned by the repo, so behavior stays stable until the repo intentionally updates to a newer version, for example through Renovate updates to `mise.toml`. |
-| Local == CI                               | yes                  | The same binary, config model, and pinned tools are used in both environments.                                                                                                 |
+| Local + CI aligned                        | yes                  | The same binary, config model, and pinned tools are used in both environments, with local defaults tuned for changed-file feedback and CI activating the full linter set.      |
 
 ## pre-commit
 
@@ -66,7 +66,7 @@ lives in hook wiring rather than in a single built-in policy.
 | Autofix support                           | mixed  | Some hooks fix in place, some only report, and behavior depends on the chosen hooks.                                                                                                                    |
 | Delta / diff-aware                        | mixed  | Hook-based runs are often scoped to staged files, but broader CI parity and baseline behavior depend on how each hook is configured.                                                                    |
 | Predictable and updatable linter versions | mixed  | Hook revisions can be pinned, but version management lives in separate hook configuration instead of flowing through Renovate updates to `mise.toml`.                                                   |
-| Local == CI                               | mixed  | Teams often use pre-commit locally but a different command or environment in CI.                                                                                                                        |
+| Local + CI aligned                        | mixed  | Teams often use pre-commit locally but a different command or environment in CI.                                                                                                                        |
 
 ## Husky
 
@@ -86,7 +86,7 @@ with no install step and no language runtime dependency.
 | Autofix support                           | hook-dependent                           | Whether fixes are available depends entirely on the commands wired into the hooks.                                                                                        |
 | Delta / diff-aware                        | hook-dependent                           | It can run on changed or staged files, but only if the hook commands are written that way.                                                                                |
 | Predictable and updatable linter versions | hook-dependent                           | Husky only runs whatever commands the repo wires into hooks, so version stability depends on those underlying tools and how the repo manages them.                        |
-| Local == CI                               | mixed                                    | Husky is usually local-hook infrastructure, while CI often uses separate scripts or commands.                                                                             |
+| Local + CI aligned                        | mixed                                    | Husky is usually local-hook infrastructure, while CI often uses separate scripts or commands.                                                                             |
 
 ## Spotless and formatter plugins
 
@@ -112,7 +112,7 @@ clean.
 | Autofix support                           | yes, formatter-focused        | Formatter plugins are usually good at in-place fixes.                                                                                                                     |
 | Delta / diff-aware                        | usually no                    | They commonly run at project or module scope rather than being natively optimized around changed-file diffs.                                                              |
 | Predictable and updatable linter versions | usually yes in that ecosystem | Build plugins and formatter versions are often pinned through the build system, but the model is tied to that ecosystem rather than being a general lint-runner property. |
-| Local == CI                               | usually yes in that build     | Reusing the same build plugin in local and CI is straightforward when the repo already standardizes on that build system.                                                 |
+| Local + CI aligned                        | usually yes in that build     | Reusing the same build plugin in local and CI is straightforward when the repo already standardizes on that build system.                                                 |
 
 ## MegaLinter and super-linter
 
@@ -134,4 +134,4 @@ explicit style ownership instead of a broad kitchen-sink layer.
 | Autofix support                           | mixed           | Some integrated tools can fix in place, but support varies across the bundled linter set and may be awkward in container workflows.                   |
 | Delta / diff-aware                        | limited / mixed | Some support changed-file or PR-oriented modes, but the model is usually broader and less native than a runner built around git diffs.                |
 | Predictable and updatable linter versions | mixed           | The wrapper itself is versioned predictably, but the bundled linter set and containerized execution model can still make upgrades feel more indirect. |
-| Local == CI                               | mixed           | CI often uses the canonical containerized flow, while local usage may be slower, less common, or configured differently.                              |
+| Local + CI aligned                        | mixed           | CI often uses the canonical containerized flow, while local usage may be slower, less common, or configured differently.                              |

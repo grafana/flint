@@ -1,0 +1,33 @@
+[expected]
+args = "run --full --fix renovate-deps"
+exit = 0
+
+[env]
+GITHUB_TOKEN = "token"
+
+[expected.files]
+".reno-mode" = "extract\n"
+".reno-modes" = "extract\n"
+".reno-count" = "1\n"
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+set -eu
+
+mode=""
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run=*) mode="${arg#--dry-run=}" ;;
+  esac
+done
+printf '%s\n' "$mode" > .reno-mode
+printf '%s\n' "$mode" >> .reno-modes
+count=0
+if [ -f .reno-count ]; then
+  count=$(cat .reno-count)
+fi
+count=$((count + 1))
+printf '%s\n' "$count" > .reno-count
+printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"regex":[{"packageFile":"src/init/scaffold.rs","deps":[{"depName":"Swatinem/rust-cache"}]}],"mise":[{"packageFile":"mise.toml","deps":[{"depName":"mise"}]}]}}'
+'''

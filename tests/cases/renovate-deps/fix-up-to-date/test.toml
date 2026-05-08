@@ -1,0 +1,6 @@
+[expected]
+args = "run --full --fix renovate-deps"
+exit = 0
+
+[env]
+GITHUB_TOKEN = "token"

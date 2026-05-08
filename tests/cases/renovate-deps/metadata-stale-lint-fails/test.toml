@@ -1,0 +1,28 @@
+[expected]
+args = "run --full renovate-deps"
+exit = 1
+stderr_contains = [
+  "flint: renovate-deps: dependency metadata is out of date",
+  "Run `flint run --fix renovate-deps` to refresh metadata.",
+]
+
+[env]
+GITHUB_TOKEN = "token"
+
+[expected.files]
+".reno-mode" = "extract\n"
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+set -eu
+
+mode=""
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run=*) mode="${arg#--dry-run=}" ;;
+  esac
+done
+printf '%s\n' "$mode" > .reno-mode
+printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"regex":[{"packageFile":"src/init/scaffold.rs","deps":[{"depName":"Swatinem/rust-cache"}]}],"mise":[{"packageFile":"mise.toml","deps":[{"depName":"mise"}]}]}}'
+'''

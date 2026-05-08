@@ -182,9 +182,7 @@ pub(super) fn maybe_install_hook(project_root: &Path, yes: bool) -> Result<()> {
     let install = if yes {
         true
     } else {
-        print!(
-            "Install pre-commit hook (runs `flint run --fix --fast-only` before each commit)? [Y/n] "
-        );
+        print!("Install pre-commit hook (runs `flint run --fix` before each commit)? [Y/n] ");
         io::stdout().flush()?;
         let mut input = String::new();
         io::stdin().lock().read_line(&mut input)?;

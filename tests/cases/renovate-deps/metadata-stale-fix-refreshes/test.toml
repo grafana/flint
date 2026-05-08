@@ -1,0 +1,65 @@
+[expected]
+args = "run --full --fix renovate-deps"
+exit = 1
+stderr = '''
+flint: fixed: renovate-deps — commit before pushing
+'''
+
+[env]
+GITHUB_TOKEN = "token"
+
+[expected.files]
+".reno-mode" = "lookup\n"
+".reno-modes" = """
+extract
+lookup
+"""
+".reno-count" = "2\n"
+"renovate-tracked-deps.json" = """
+{
+  "meta": {
+    "mise": {
+      "packageName": "jdx/mise",
+      "datasource": "github-release-attachments"
+    }
+  },
+  "files": {
+    "mise.toml": {
+      "mise": [
+        "mise"
+      ]
+    },
+    "src/init/scaffold.rs": {
+      "regex": [
+        "Swatinem/rust-cache"
+      ]
+    }
+  }
+}
+"""
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+set -eu
+
+mode=""
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run=*) mode="${arg#--dry-run=}" ;;
+  esac
+done
+printf '%s\n' "$mode" > .reno-mode
+printf '%s\n' "$mode" >> .reno-modes
+count=0
+if [ -f .reno-count ]; then
+  count=$(cat .reno-count)
+fi
+count=$((count + 1))
+printf '%s\n' "$count" > .reno-count
+if [ "$mode" = "lookup" ]; then
+  printf '%s\n' '{"msg":"packageFiles with updates","config":{"regex":[{"packageFile":"src/init/scaffold.rs","deps":[{"depName":"Swatinem/rust-cache","packageName":"Swatinem/rust-cache","datasource":"github-tags"}]}],"mise":[{"packageFile":"mise.toml","deps":[{"depName":"mise","packageName":"jdx/mise","datasource":"github-release-attachments"}]}]}}'
+else
+  printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"regex":[{"packageFile":"src/init/scaffold.rs","deps":[{"depName":"Swatinem/rust-cache"}]}],"mise":[{"packageFile":"mise.toml","deps":[{"depName":"mise"}]}]}}'
+fi
+'''

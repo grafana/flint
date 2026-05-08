@@ -1,0 +1,8 @@
+{
+  packageRules: [
+    {
+      groupName: "linters",
+      matchDepNames: ["actionlint"]
+    }
+  ]
+}

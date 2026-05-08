@@ -1,4 +1,7 @@
-use super::rules::{ComparablePackageRule, RuleMatcher, relevant_dep_names};
+use super::install_patch::configure_extract_workaround_env;
+use super::rules::{
+    ComparablePackageRule, RuleMatcher, incomplete_meta_for_rules, relevant_dep_names,
+};
 use super::snapshot::{DepFiles, DepMeta};
 use super::*;
 use std::collections::BTreeSet;
@@ -96,6 +99,37 @@ fn configure_renovate_deps_keeps_existing_managers() {
     let result = std::fs::read_to_string(tmp.path()).unwrap();
     assert!(result.contains("exclude_managers = [\"npm\"]"));
     assert!(!result.contains("github-actions"));
+}
+
+#[test]
+fn configure_extract_workaround_env_adds_node_import() {
+    let mut env = vec![];
+
+    configure_extract_workaround_env(&mut env, "extract").unwrap();
+
+    let node_options = env
+        .iter()
+        .find(|(key, _)| key == "NODE_OPTIONS")
+        .map(|(_, value)| value)
+        .unwrap();
+    assert!(node_options.contains("--import="));
+    assert!(node_options.contains("file://"));
+}
+
+#[test]
+fn configure_extract_workaround_env_preserves_existing_node_options() {
+    let mut env = vec![("NODE_OPTIONS".to_string(), "--trace-warnings".to_string())];
+
+    configure_extract_workaround_env(&mut env, "extract").unwrap();
+
+    let node_options = env
+        .iter()
+        .find(|(key, _)| key == "NODE_OPTIONS")
+        .map(|(_, value)| value)
+        .unwrap();
+    assert!(node_options.contains("--trace-warnings"));
+    assert!(node_options.contains("--import="));
+    assert!(node_options.contains("file://"));
 }
 
 #[test]
@@ -410,7 +444,7 @@ fn merge_missing_meta_from_committed_keeps_existing_details() {
 }
 
 #[test]
-fn maybe_reuse_committed_meta_merges_when_refresh_meta_is_disabled() {
+fn maybe_reuse_committed_meta_merges_missing_fields() {
     let mut generated = snapshot(
         &[("actionlint", None, Some("github-releases"))],
         &[("mise.toml", &[("mise", &["actionlint"])])],
@@ -424,7 +458,7 @@ fn maybe_reuse_committed_meta_merges_when_refresh_meta_is_disabled() {
         &[("mise.toml", &[("mise", &["actionlint"])])],
     );
 
-    maybe_reuse_committed_meta(&mut generated, Some(&committed), false);
+    maybe_reuse_committed_meta(&mut generated, Some(&committed));
 
     assert_eq!(
         generated.meta["actionlint"].package_name.as_deref(),
@@ -433,12 +467,8 @@ fn maybe_reuse_committed_meta_merges_when_refresh_meta_is_disabled() {
 }
 
 #[test]
-fn maybe_reuse_committed_meta_skips_merge_when_refresh_meta_is_enabled() {
-    let mut generated = snapshot(
-        &[("actionlint", None, Some("github-releases"))],
-        &[("mise.toml", &[("mise", &["actionlint"])])],
-    );
-    let committed = snapshot(
+fn incomplete_meta_for_rules_passes_when_meta_is_complete() {
+    let snap = snapshot(
         &[(
             "actionlint",
             Some("rhysd/actionlint"),
@@ -446,10 +476,56 @@ fn maybe_reuse_committed_meta_skips_merge_when_refresh_meta_is_enabled() {
         )],
         &[("mise.toml", &[("mise", &["actionlint"])])],
     );
+    let rules = vec![ComparablePackageRule {
+        label: "group \"linters\"".to_string(),
+        matcher: RuleMatcher::DepNames(BTreeSet::from(["actionlint".to_string()])),
+    }];
+    assert!(incomplete_meta_for_rules(&snap, &rules).is_none());
+}
 
-    maybe_reuse_committed_meta(&mut generated, Some(&committed), true);
+#[test]
+fn incomplete_meta_for_rules_dep_name_rule_tolerates_missing_datasource() {
+    // matchDepNames doesn't need datasource — Renovate doesn't always surface
+    // one for bare-key mise tools (e.g. biome) and grouping isn't affected.
+    let snap = snapshot(
+        &[("biome", Some("biome"), None)],
+        &[("mise.toml", &[("mise", &["biome"])])],
+    );
+    let rules = vec![ComparablePackageRule {
+        label: "group \"linters\"".to_string(),
+        matcher: RuleMatcher::DepNames(BTreeSet::from(["biome".to_string()])),
+    }];
+    assert!(incomplete_meta_for_rules(&snap, &rules).is_none());
+}
 
-    assert_eq!(generated.meta["actionlint"].package_name, None);
+#[test]
+fn incomplete_meta_for_rules_dep_name_rule_flags_missing_packagename() {
+    let snap = snapshot(
+        &[("actionlint", None, Some("github-releases"))],
+        &[("mise.toml", &[("mise", &["actionlint"])])],
+    );
+    let rules = vec![ComparablePackageRule {
+        label: "group \"linters\"".to_string(),
+        matcher: RuleMatcher::DepNames(BTreeSet::from(["actionlint".to_string()])),
+    }];
+    let reason = incomplete_meta_for_rules(&snap, &rules).unwrap();
+    assert!(reason.contains("actionlint"));
+    assert!(reason.contains("packageName"));
+}
+
+#[test]
+fn incomplete_meta_for_rules_package_name_rule_requires_datasource() {
+    let snap = snapshot(
+        &[("mise", Some("jdx/mise"), None)],
+        &[("mise.toml", &[("mise", &["mise"])])],
+    );
+    let rules = vec![ComparablePackageRule {
+        label: "group \"mise\"".to_string(),
+        matcher: RuleMatcher::PackageNames(BTreeSet::from(["jdx/mise".to_string()])),
+    }];
+    let reason = incomplete_meta_for_rules(&snap, &rules).unwrap();
+    assert!(reason.contains("mise"));
+    assert!(reason.contains("datasource"));
 }
 
 #[test]

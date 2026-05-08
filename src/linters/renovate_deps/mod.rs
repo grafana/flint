@@ -3,8 +3,10 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
+use self::install_patch::configure_extract_workaround_env;
 use self::rules::{
-    comparable_package_rules_for_config, trim_snapshot_meta, validate_rule_coverage,
+    comparable_package_rules_for_config, incomplete_meta_for_rules, trim_snapshot_meta,
+    validate_rule_coverage,
 };
 use self::snapshot::{Snapshot, extract_deps, read_snapshot, unified_diff, write_snapshot};
 use crate::config::RenovateDepsConfig;
@@ -16,6 +18,7 @@ use crate::registry::{
     NativeRunContext, NativeRunFuture, PreparedNativeCheck,
 };
 
+mod install_patch;
 mod rules;
 mod snapshot;
 
@@ -67,18 +70,24 @@ impl PreparedNativeCheck for PreparedRenovateDeps {
 
     fn run(self: Box<Self>, ctx: NativeRunContext) -> NativeRunFuture {
         Box::pin(async move {
-            crate::linters::renovate_deps::run(&self.cfg, ctx.fix, &ctx.project_root).await
+            crate::linters::renovate_deps::run(&self.cfg, ctx.fix, ctx.verbose, &ctx.project_root)
+                .await
         })
     }
 }
 
-pub async fn run(cfg: &RenovateDepsConfig, fix: bool, project_root: &Path) -> LinterOutput {
+pub async fn run(
+    cfg: &RenovateDepsConfig,
+    fix: bool,
+    verbose: bool,
+    project_root: &Path,
+) -> LinterOutput {
     match validate_runtime_env() {
         Ok(Some(warning)) => eprintln!("{warning}"),
         Ok(None) => {}
         Err(stderr) => return LinterOutput::err(stderr),
     }
-    match run_inner(cfg, fix, project_root).await {
+    match run_inner(cfg, fix, verbose, project_root).await {
         Ok(out) => out,
         Err(e) => LinterOutput::err(format!("flint: renovate-deps: {e}\n")),
     }
@@ -393,6 +402,7 @@ fn add_to_extends(content: &str, entry: &str) -> anyhow::Result<String> {
 async fn run_inner(
     cfg: &RenovateDepsConfig,
     fix: bool,
+    verbose: bool,
     project_root: &Path,
 ) -> anyhow::Result<LinterOutput> {
     let config_path = resolve_renovate_config_path(project_root)?;
@@ -401,50 +411,43 @@ async fn run_inner(
     let skipped_rule_notes = parsed_rules.skipped_notes;
     let committed_path = committed_path_for_config(&config_path);
     let committed_display = display_path(project_root, &committed_path);
-
-    // Renovate occasionally produces empty packageFiles on the first run (transient
-    // network or registry issue). Retry up to 3 times with a short delay.
-    let mut generated = Snapshot::default();
-    for attempt in 1..=3u32 {
-        let log_bytes = run_renovate(project_root, &config_path).await?;
-        generated = extract_deps(&log_bytes, &cfg.exclude_managers)?;
-        if !generated.is_empty() || attempt == 3 {
-            break;
-        }
-        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-    }
-
     let committed = if committed_path.exists() {
         Some(read_snapshot(&std::fs::read_to_string(&committed_path)?)?)
     } else {
         None
     };
 
-    maybe_reuse_committed_meta(&mut generated, committed.as_ref(), cfg.refresh_meta);
+    // Verification path uses cheap extract + committed meta. Fix mode
+    // unconditionally regenerates via lookup so the written snapshot carries
+    // authoritative packageName/datasource metadata for every dep — extract
+    // alone leaves gaps (e.g. bare-key mise tools resolved through aqua).
+    let dry_run = if fix { "lookup" } else { "extract" };
+    if verbose && fix {
+        eprintln!("flint: renovate-deps: regenerating snapshot via lookup");
+    }
+    let mut generated =
+        generate_snapshot(project_root, &config_path, &cfg.exclude_managers, dry_run).await?;
+    if !fix {
+        maybe_reuse_committed_meta(&mut generated, committed.as_ref());
+    }
+
+    if let Some(reason) = incomplete_meta_for_rules(&generated, &rules) {
+        if fix {
+            anyhow::bail!(
+                "lookup did not populate required metadata: {reason}.\nThis is a renovate-deps bug — please report."
+            );
+        }
+        anyhow::bail!(
+            "dependency metadata is out of date: {reason}.\nRun `flint run --fix renovate-deps` to refresh metadata."
+        );
+    }
 
     validate_rule_coverage(&generated, &rules)?;
     trim_snapshot_meta(&mut generated, &rules);
 
-    if committed.is_none() {
-        if fix {
-            write_snapshot(&committed_path, &generated)?;
-            let mut stdout = notes_output(&skipped_rule_notes).into_bytes();
-            stdout.extend_from_slice(format!("{COMMITTED_FILE} has been created.\n").as_bytes());
-            return Ok(LinterOutput {
-                ok: true,
-                stdout,
-                stderr: vec![],
-                setup_outcome: None,
-            });
-        }
-        return Ok(LinterOutput::err(format!(
-            "ERROR: {committed_display} does not exist.\nRun `flint run --fix renovate-deps` to create it.\n"
-        )));
-    }
-
-    let committed = committed.expect("checked above");
-
-    if committed == generated {
+    if let Some(committed) = committed.as_ref()
+        && *committed == generated
+    {
         let mut stdout = notes_output(&skipped_rule_notes).into_bytes();
         stdout.extend_from_slice(format!("{COMMITTED_FILE} is up to date.\n").as_bytes());
         return Ok(LinterOutput {
@@ -455,28 +458,38 @@ async fn run_inner(
         });
     }
 
-    let diff = unified_diff(&committed, &generated, &committed_display);
-
-    if fix {
-        write_snapshot(&committed_path, &generated)?;
-        let mut stdout = notes_output(&skipped_rule_notes).into_bytes();
-        stdout.extend_from_slice(diff.as_bytes());
-        stdout.extend_from_slice(format!("{COMMITTED_FILE} has been updated.\n").as_bytes());
-        return Ok(LinterOutput {
-            ok: true,
-            stdout,
-            stderr: vec![],
-            setup_outcome: None,
-        });
+    if !fix {
+        let message = match committed.as_ref() {
+            Some(committed) => format!(
+                "{}ERROR: {COMMITTED_FILE} is out of date.\nRun `flint run --fix renovate-deps` to update.\n",
+                unified_diff(committed, &generated, &committed_display),
+            ),
+            None => format!(
+                "ERROR: {committed_display} does not exist.\nRun `flint run --fix renovate-deps` to create it.\n"
+            ),
+        };
+        return Ok(LinterOutput::err(message));
     }
 
+    write_snapshot(&committed_path, &generated)?;
+
+    let mut stdout = notes_output(&skipped_rule_notes).into_bytes();
+    let (diff, status) = match committed.as_ref() {
+        Some(committed) => (
+            unified_diff(committed, &generated, &committed_display),
+            format!("{COMMITTED_FILE} has been updated.\n"),
+        ),
+        None => (
+            String::new(),
+            format!("{COMMITTED_FILE} has been created.\n"),
+        ),
+    };
+    stdout.extend_from_slice(diff.as_bytes());
+    stdout.extend_from_slice(status.as_bytes());
     Ok(LinterOutput {
-        ok: false,
-        stdout: diff.into_bytes(),
-        stderr: format!(
-            "ERROR: {COMMITTED_FILE} is out of date.\nRun `flint run --fix renovate-deps` to update.\n"
-        )
-        .into_bytes(),
+        ok: true,
+        stdout,
+        stderr: vec![],
         setup_outcome: None,
     })
 }
@@ -489,10 +502,35 @@ fn notes_output(notes: &[String]) -> String {
     format!("{}\n", notes.join("\n"))
 }
 
+async fn generate_snapshot(
+    project_root: &Path,
+    config_path: &Path,
+    exclude_managers: &[String],
+    dry_run: &str,
+) -> anyhow::Result<Snapshot> {
+    // Renovate occasionally produces empty packageFiles on the first run (transient
+    // package cache, registry, or startup issue). Retry up to 3 times with a short delay.
+    let mut generated = Snapshot::default();
+    for attempt in 1..=3u32 {
+        let log_bytes = run_renovate(project_root, config_path, dry_run).await?;
+        generated = extract_deps(&log_bytes, exclude_managers)?;
+        if !generated.is_empty() || attempt == 3 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    }
+    Ok(generated)
+}
+
 /// Runs `renovate --platform=local` and returns the combined stdout+stderr log bytes.
-async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result<Vec<u8>> {
+async fn run_renovate(
+    project_root: &Path,
+    config_path: &Path,
+    dry_run: &str,
+) -> anyhow::Result<Vec<u8>> {
     // Forward env, setting Renovate-specific vars.
     let mut env: Vec<(String, String)> = std::env::vars().collect();
+    configure_extract_workaround_env(&mut env, dry_run)?;
     // Override logging to get parseable JSON output.
     env.retain(|(k, _)| k != "LOG_LEVEL" && k != "LOG_FORMAT" && k != "RENOVATE_CONFIG_FILE");
     env.push(("LOG_LEVEL".into(), "debug".into()));
@@ -517,7 +555,7 @@ async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result
             "renovate".to_string(),
             "--platform=local".to_string(),
             "--require-config=ignored".to_string(),
-            "--dry-run=extract".to_string(),
+            format!("--dry-run={dry_run}"),
         ],
         false,
     )
@@ -545,7 +583,6 @@ async fn run_renovate(project_root: &Path, config_path: &Path) -> anyhow::Result
 
     Ok(combined)
 }
-
 fn resolve_renovate_config_path(project_root: &Path) -> anyhow::Result<PathBuf> {
     RENOVATE_CONFIG_PATTERNS
         .iter()
@@ -584,14 +621,8 @@ fn merge_missing_meta_from_committed(generated: &mut Snapshot, committed: &Snaps
     }
 }
 
-fn maybe_reuse_committed_meta(
-    generated: &mut Snapshot,
-    committed: Option<&Snapshot>,
-    refresh_meta: bool,
-) {
-    if let Some(committed) = committed
-        && !refresh_meta
-    {
+fn maybe_reuse_committed_meta(generated: &mut Snapshot, committed: Option<&Snapshot>) {
+    if let Some(committed) = committed {
         merge_missing_meta_from_committed(generated, committed);
     }
 }

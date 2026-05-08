@@ -129,6 +129,98 @@ pub(crate) fn trim_snapshot_meta(snapshot: &mut Snapshot, rules: &[ComparablePac
         .retain(|dep_name, _| relevant.contains(dep_name));
 }
 
+/// Returns the first dep whose meta is incomplete relative to the configured
+/// package rules:
+///
+/// - any rule that references the dep requires `packageName`
+/// - rules using `matchPackageNames` additionally require `datasource` (so
+///   Renovate's `(packageName, datasource)` grouping is deterministic)
+///
+/// `matchDepNames` rules don't need `datasource` — Renovate matches deps by
+/// name there, and bare-key mise tools like `biome` don't always surface a
+/// datasource even in lookup-mode output.
+pub(crate) fn incomplete_meta_for_rules(
+    snapshot: &Snapshot,
+    rules: &[ComparablePackageRule],
+) -> Option<String> {
+    if rules.is_empty() {
+        return None;
+    }
+
+    for dep_name in extracted_dep_names(snapshot) {
+        let meta = snapshot.meta.get(&dep_name);
+        let package_name = meta.and_then(|m| m.package_name.as_deref());
+        let datasource = meta.and_then(|m| m.datasource.as_deref());
+
+        for rule in rules {
+            let (label, needs_datasource) = match &rule.matcher {
+                RuleMatcher::DepNames(names) if names.contains(&dep_name) => {
+                    (format!("matchDepNames in {}", rule.label), false)
+                }
+                RuleMatcher::PackageNames(names)
+                    if package_name_rule_dep_candidates(snapshot, names).contains(&dep_name) =>
+                {
+                    let packages = names.iter().cloned().collect::<Vec<_>>().join(", ");
+                    (
+                        format!("matchPackageNames [{packages}] in {}", rule.label),
+                        true,
+                    )
+                }
+                _ => continue,
+            };
+            if package_name.is_none() {
+                return Some(format!(
+                    "dep {dep_name:?} is matched by {label} but is missing packageName"
+                ));
+            }
+            if needs_datasource && datasource.is_none() {
+                return Some(format!(
+                    "dep {dep_name:?} is matched by {label} but is missing datasource"
+                ));
+            }
+        }
+    }
+
+    None
+}
+
+fn extracted_dep_names(snapshot: &Snapshot) -> BTreeSet<String> {
+    snapshot
+        .files
+        .values()
+        .flat_map(|managers| managers.values())
+        .flatten()
+        .cloned()
+        .collect()
+}
+
+fn package_name_rule_dep_candidates(
+    snapshot: &Snapshot,
+    package_names: &BTreeSet<String>,
+) -> BTreeSet<String> {
+    let mut candidates: BTreeSet<_> = snapshot
+        .meta
+        .iter()
+        .filter_map(|(dep_name, meta)| {
+            meta.package_name
+                .as_deref()
+                .filter(|package_name| package_names.contains(*package_name))
+                .map(|_| dep_name.clone())
+        })
+        .collect();
+
+    if candidates.is_empty() {
+        candidates.extend(
+            package_names
+                .iter()
+                .filter_map(|package_name| package_name.rsplit('/').next())
+                .map(ToOwned::to_owned),
+        );
+    }
+
+    candidates
+}
+
 enum ComparableRuleOutcome {
     Comparable(ComparablePackageRule),
     Skipped { note: String },

@@ -9,8 +9,8 @@ mod setup;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
-use registry::{CheckKind, FixBehavior, LinterConfig, RunPolicy, Scope};
-use runner::{CheckResult, RunOptions};
+use registry::{CheckKind, FixBehavior, LinterConfig, Scope};
+use runner::{CheckResult, RunContext as RunnerRunContext, RunOptions};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -44,7 +44,7 @@ struct HookArgs {
 
 #[derive(Subcommand, Debug)]
 enum HookCommand {
-    /// Install a pre-commit hook that runs `flint run --fix --fast-only`.
+    /// Install a pre-commit hook that runs `flint run --fix`.
     Install,
 }
 
@@ -87,10 +87,6 @@ struct RunArgs {
     #[arg(long, env = "FLINT_FULL")]
     full: bool,
 
-    /// Run only fast linters. Overridden by explicitly named linters.
-    #[arg(long, env = "FLINT_FAST_ONLY")]
-    fast_only: bool,
-
     /// Show all linter output, not just failures.
     #[arg(long, env = "FLINT_VERBOSE")]
     verbose: bool,
@@ -112,8 +108,28 @@ struct RunArgs {
     #[arg(long, env = "FLINT_TIME")]
     time: bool,
 
-    /// Linters to run (default: all discovered). Explicit linters override --fast-only.
+    /// Linters to run (default: all discovered).
+    /// Explicit names bypass the local relevance gate.
     linters: Vec<String>,
+}
+
+impl From<&RunArgs> for FixSummaryOptions {
+    fn from(args: &RunArgs) -> Self {
+        Self {
+            allow_fixed: args.allow_fixed,
+            short: args.short,
+            verbose: args.verbose,
+            time: args.time,
+        }
+    }
+}
+
+fn use_filtered_run_policy(args: &RunArgs, explicit: bool, is_ci: bool) -> bool {
+    if explicit || args.full {
+        return false;
+    }
+
+    !is_ci
 }
 
 #[tokio::main]
@@ -177,7 +193,7 @@ async fn run(
     let cfg = config::load(config_dir)?;
 
     // Filter registry to requested linters (or all if none specified).
-    // Explicit linter names override --fast-only (same behaviour as golangci-lint).
+    // Explicit linter names bypass filtered local defaults (same behaviour as golangci-lint).
     let explicit = !args.linters.is_empty();
     let checks: Vec<&registry::Check> = if explicit {
         let mut out = vec![];
@@ -203,10 +219,14 @@ async fn run(
         args.to_ref.as_deref(),
     )?;
 
-    // Discover which checks are declared in the consuming repo's mise.toml, and apply
-    // --fast-only policy (skipped when linters are named explicitly, relevance-gated for
-    // adaptive checks). mise guarantees declared tools are on PATH, so no PATH check needed.
+    // Discover which checks are declared in the consuming repo's mise.toml.
+    // Outside CI, plain `flint run` relevance-gates checks that declare an
+    // `adaptive_relevance` hook. Explicit linter names and `--full` bypass the
+    // gate; CI always runs the full set.
+    // mise guarantees declared tools are on PATH, so no PATH check needed.
     let mise_tools = registry::read_mise_tools(project_root);
+    let is_ci = linters::env::is_ci_from(|name| std::env::var(name).ok());
+    let use_filtered_policy = use_filtered_run_policy(&args, explicit, is_ci);
     let flint_setup_selected = checks.iter().any(|c| c.kind.is_setup());
     if !flint_setup_selected {
         if let Some((old, new)) = registry::find_obsolete_key(&mise_tools) {
@@ -229,17 +249,8 @@ async fn run(
         };
         for c in checks {
             if registry::check_active(c, &mise_tools) {
-                let include = if explicit || !args.fast_only {
-                    true
-                } else {
-                    match c.run_policy {
-                        RunPolicy::Fast => true,
-                        RunPolicy::Slow => false,
-                        RunPolicy::Adaptive => {
-                            c.adaptive_relevance.is_none_or(|hook| hook(&relevance_ctx))
-                        }
-                    }
-                };
+                let include = !use_filtered_policy
+                    || c.adaptive_relevance.is_none_or(|hook| hook(&relevance_ctx));
                 if include {
                     out.push(c);
                 }
@@ -269,7 +280,7 @@ async fn run(
                 short: args.short,
                 time: args.time,
             },
-            RunContext {
+            ExecutionContext {
                 active_checks: &active,
                 project_root,
                 cfg: &cfg,
@@ -290,7 +301,7 @@ async fn run(
                     FixOutcome::Partial(_) | FixOutcome::Review(_)
                 )
             {
-                finish_fix_outcomes(vec![setup_outcome], args.allow_fixed);
+                finish_fix_outcomes(vec![setup_outcome], (&args).into());
                 return Ok(());
             } else {
                 setup_fix_outcome = Some(setup_outcome);
@@ -319,7 +330,7 @@ async fn run(
 
     if active.is_empty() {
         if let Some(outcome) = setup_fix_outcome {
-            finish_fix_outcomes(vec![outcome], args.allow_fixed);
+            finish_fix_outcomes(vec![outcome], (&args).into());
         }
         if let Some(setup_result) = setup_check_result {
             finish_check_results(vec![setup_result], &active, args.short);
@@ -364,7 +375,7 @@ async fn run(
     } else {
         Some(files::all(project_root, &cfg)?)
     };
-    let run_ctx = RunContext {
+    let run_ctx = ExecutionContext {
         active_checks: &active,
         project_root,
         cfg: &cfg,
@@ -380,6 +391,7 @@ async fn run(
                 .copied()
                 .partition(|c| supports_single_pass_fix(c));
 
+        let fix_summary: FixSummaryOptions = (&args).into();
         let mut outcomes = setup_fix_outcome.into_iter().collect::<Vec<_>>();
 
         if !legacy_checks.is_empty() {
@@ -397,6 +409,14 @@ async fn run(
                 run_ctx,
             )
             .await?;
+
+            outcomes.extend(
+                check_results
+                    .iter()
+                    .filter(|r| r.ok)
+                    .cloned()
+                    .map(FixOutcome::Clean),
+            );
 
             let (fixable, reviewable): (Vec<CheckResult>, Vec<CheckResult>) = check_results
                 .into_iter()
@@ -431,8 +451,10 @@ async fn run(
                         if let Some(check) = legacy_checks.iter().find(|c| c.name == r.name) {
                             if check.fix_behavior() == registry::FixBehavior::PartialNeedsVerify {
                                 to_verify.push(r.name);
+                            } else if matches!(check.kind, CheckKind::Native(_)) {
+                                outcomes.push(classify_single_pass_fix(r));
                             } else {
-                                outcomes.push(FixOutcome::Fixed(r.name));
+                                outcomes.push(FixOutcome::Fixed(r));
                             }
                         }
                     } else {
@@ -463,7 +485,7 @@ async fn run(
                 .await?;
                 for r in verify_results {
                     if r.ok {
-                        outcomes.push(FixOutcome::Fixed(r.name));
+                        outcomes.push(FixOutcome::Fixed(r));
                     } else {
                         outcomes.push(FixOutcome::Partial(r));
                     }
@@ -491,7 +513,7 @@ async fn run(
             }
         }
 
-        finish_fix_outcomes(outcomes, args.allow_fixed);
+        finish_fix_outcomes(outcomes, fix_summary);
         return Ok(());
     }
 
@@ -519,11 +541,19 @@ async fn run(
 }
 
 #[derive(Clone, Copy)]
-struct RunContext<'a> {
+struct ExecutionContext<'a> {
     active_checks: &'a [&'a registry::Check],
     project_root: &'a Path,
     cfg: &'a config::Config,
     config_dir: &'a Path,
+}
+
+#[derive(Clone, Copy)]
+struct FixSummaryOptions {
+    allow_fixed: bool,
+    short: bool,
+    verbose: bool,
+    time: bool,
 }
 
 struct AdaptiveRunContext<'a> {
@@ -552,8 +582,8 @@ impl registry::StatusContext for LinterStatusContext<'_> {
 }
 
 enum FixOutcome {
-    Clean,
-    Fixed(String),
+    Clean(CheckResult),
+    Fixed(CheckResult),
     Partial(CheckResult),
     Review(CheckResult),
 }
@@ -561,22 +591,38 @@ enum FixOutcome {
 impl FixOutcome {
     fn result(&self) -> Option<&CheckResult> {
         match self {
-            Self::Partial(result) | Self::Review(result) => Some(result),
-            Self::Clean | Self::Fixed(_) => None,
+            Self::Clean(result)
+            | Self::Fixed(result)
+            | Self::Partial(result)
+            | Self::Review(result) => Some(result),
         }
     }
 }
 
-fn finish_fix_outcomes(outcomes: Vec<FixOutcome>, allow_fixed: bool) {
-    // Emit linter output for checks that need manual review so the caller has
-    // the failure details without a second flint invocation.
-    for r in outcomes.iter().filter_map(FixOutcome::result) {
-        eprintln!("[{}]", r.name);
-        if !r.stdout.is_empty() {
-            eprint!("{}", String::from_utf8_lossy(&r.stdout));
-        }
-        if !r.stderr.is_empty() {
-            eprint!("{}", String::from_utf8_lossy(&r.stderr));
+fn finish_fix_outcomes(outcomes: Vec<FixOutcome>, opts: FixSummaryOptions) {
+    let FixSummaryOptions {
+        allow_fixed,
+        short,
+        verbose,
+        time,
+    } = opts;
+    if !short {
+        for r in outcomes.iter().filter_map(FixOutcome::result) {
+            if verbose || !r.ok || time {
+                eprintln!(
+                    "[{}]{}",
+                    r.name,
+                    runner::format_duration_suffix(time, r.duration)
+                );
+            }
+            if verbose || !r.ok {
+                if !r.stdout.is_empty() {
+                    eprint!("{}", String::from_utf8_lossy(&r.stdout));
+                }
+                if !r.stderr.is_empty() {
+                    eprint!("{}", String::from_utf8_lossy(&r.stderr));
+                }
+            }
         }
     }
 
@@ -585,8 +631,8 @@ fn finish_fix_outcomes(outcomes: Vec<FixOutcome>, allow_fixed: bool) {
     let mut review = vec![];
     for outcome in outcomes {
         match outcome {
-            FixOutcome::Clean => {}
-            FixOutcome::Fixed(name) => fixed.push(name),
+            FixOutcome::Clean(_) => {}
+            FixOutcome::Fixed(result) => fixed.push(result.name),
             FixOutcome::Partial(result) => partial.push(result.name),
             FixOutcome::Review(result) => review.push(result.name),
         }
@@ -661,9 +707,9 @@ fn finish_check_results(results: Vec<CheckResult>, active: &[&registry::Check], 
 fn classify_single_pass_fix(result: CheckResult) -> FixOutcome {
     if result.ok {
         if result.changed {
-            FixOutcome::Fixed(result.name)
+            FixOutcome::Fixed(result)
         } else {
-            FixOutcome::Clean
+            FixOutcome::Clean(result)
         }
     } else if result.changed {
         FixOutcome::Partial(result)
@@ -702,7 +748,7 @@ async fn run_checks(
     baseline_file_list: Option<&files::FileList>,
     baseline_names: &HashSet<String>,
     opts: RunOptions,
-    ctx: RunContext<'_>,
+    ctx: ExecutionContext<'_>,
 ) -> Result<Vec<CheckResult>> {
     let (baseline, normal): (Vec<_>, Vec<_>) = checks
         .iter()
@@ -714,12 +760,14 @@ async fn run_checks(
         results.extend(
             runner::run(
                 &normal,
-                ctx.active_checks,
-                file_list,
+                RunnerRunContext {
+                    active_checks: ctx.active_checks,
+                    file_list,
+                    project_root: ctx.project_root,
+                    cfg: ctx.cfg,
+                    config_dir: ctx.config_dir,
+                },
                 opts,
-                ctx.project_root,
-                ctx.cfg,
-                ctx.config_dir,
             )
             .await?,
         );
@@ -729,12 +777,14 @@ async fn run_checks(
         results.extend(
             runner::run(
                 &baseline,
-                ctx.active_checks,
-                files,
+                RunnerRunContext {
+                    active_checks: ctx.active_checks,
+                    file_list: files,
+                    project_root: ctx.project_root,
+                    cfg: ctx.cfg,
+                    config_dir: ctx.config_dir,
+                },
                 opts,
-                ctx.project_root,
-                ctx.cfg,
-                ctx.config_dir,
             )
             .await?,
         );
@@ -956,8 +1006,8 @@ pub fn linter_json(check: &registry::Check) -> serde_json::Value {
         "binary": if check.uses_binary() { check.bin_name } else { "(built-in)" },
         "patterns": patterns,
         "fix": check.has_fix(),
-        "run_policy": run_policy_label(check.run_policy),
-        "slow": check.run_policy == RunPolicy::Slow,
+        "run_policy": run_policy_label(check),
+        "slow": check.category == registry::Category::Slow,
         "scope": scope,
         "config_file": config_file,
     })
@@ -967,11 +1017,13 @@ fn canonical_config_path(config: &LinterConfig) -> String {
     config.canonical_location()
 }
 
-fn run_policy_label(run_policy: RunPolicy) -> &'static str {
-    match run_policy {
-        RunPolicy::Fast => "fast",
-        RunPolicy::Slow => "slow",
-        RunPolicy::Adaptive => "adaptive",
+fn run_policy_label(check: &registry::Check) -> &'static str {
+    if check.adaptive_relevance.is_some() {
+        "adaptive"
+    } else if check.category == registry::Category::Slow {
+        "slow"
+    } else {
+        "fast"
     }
 }
 
@@ -1053,7 +1105,7 @@ where
 
     for check in registry {
         let status = linter_status(check, mise_tools, cfg, &binary_on_path);
-        let speed = run_policy_label(check.run_policy);
+        let speed = run_policy_label(check);
         let fix = if check.has_fix() { "yes" } else { "no" };
         let patterns_str = check.patterns.join(" ");
         let binary = display_binary(check);
@@ -1129,9 +1181,26 @@ fn display_binary(check: &registry::Check) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{display_binary, linter_status, render_linters_table, unsupported_config};
+    use super::{
+        RunArgs, display_binary, linter_status, render_linters_table, unsupported_config,
+        use_filtered_run_policy,
+    };
     use crate::{config, registry};
     use std::path::Path;
+
+    fn run_args() -> RunArgs {
+        RunArgs {
+            fix: false,
+            allow_fixed: false,
+            full: false,
+            verbose: false,
+            short: false,
+            new_from_rev: None,
+            to_ref: None,
+            time: false,
+            linters: Vec::new(),
+        }
+    }
 
     fn mise_tools_from(content: &str) -> std::collections::HashMap<String, String> {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -1249,6 +1318,31 @@ license-header        (built-in)          not configured  fast      no   Check s
             .find(|check| check.name == "license-header")
             .expect("license-header check");
         assert_eq!(display_binary(&license_header), "(built-in)");
+    }
+
+    #[test]
+    fn filtered_run_policy_is_default_outside_ci() {
+        assert!(use_filtered_run_policy(&run_args(), false, false));
+    }
+
+    #[test]
+    fn filtered_run_policy_is_disabled_by_default_in_ci() {
+        assert!(!use_filtered_run_policy(&run_args(), false, true));
+    }
+
+    #[test]
+    fn filtered_run_policy_is_disabled_for_full_runs() {
+        let mut args = run_args();
+        args.full = true;
+
+        assert!(!use_filtered_run_policy(&args, false, false));
+        assert!(!use_filtered_run_policy(&args, false, true));
+    }
+
+    #[test]
+    fn filtered_run_policy_is_disabled_for_explicit_linter_selection() {
+        assert!(!use_filtered_run_policy(&run_args(), true, false));
+        assert!(!use_filtered_run_policy(&run_args(), true, true));
     }
 
     #[test]

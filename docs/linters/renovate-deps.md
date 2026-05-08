@@ -10,6 +10,23 @@
 The second check is there to catch configuration mistakes before they show up as
 separate Renovate PRs or README drift.
 
+## When does this run?
+
+CI always runs `renovate-deps`. Locally `flint run` only runs it when the
+changed files plausibly affect the snapshot. `--full` or naming the
+linter explicitly bypass the skip.
+
+| Change                                        | Local | CI  |
+| --------------------------------------------- | ----- | --- |
+| Renovate config edited                        | ✅    | ✅  |
+| `renovate-tracked-deps.json` snapshot edited  | ✅    | ✅  |
+| File already tracked in the snapshot edited   | ✅    | ✅  |
+| New tool/action added that is not yet tracked | ❌    | ✅  |
+| Unrelated change (docs, source, etc.)         | ❌    | ✅  |
+
+The "new tool not yet tracked" case is the typical reason a CI failure
+won't reproduce locally without `--full`.
+
 ## What it catches
 
 Goal: `mise.toml` and `README.md` both refer to actionlint, so you want
@@ -100,13 +117,16 @@ If the snapshot is stale:
 flint run --fix renovate-deps
 ```
 
-If you want to force a fresh metadata rebuild instead of reusing any existing
-committed metadata for the same dependency names, for example after changing Renovate
-grouping config or while debugging suspicious `meta` entries:
+Verification (plain `flint run`) uses Renovate's cheap `--dry-run=extract`
+plus the committed snapshot's metadata. `--fix` regenerates via
+`--dry-run=lookup` so meta is authoritative.
 
-```bash
-FLINT_RENOVATE_DEPS_REFRESH_META=1 flint run --fix renovate-deps
-```
+The linter requires every dep referenced by a `packageRule` to have
+`packageName`; deps matched via `matchPackageNames` additionally require
+`datasource` so Renovate's `(packageName, datasource)` grouping is
+deterministic. `matchDepNames` rules don't require datasource — bare-key
+mise tools like `biome` don't always surface one even in lookup-mode
+output, and Renovate matches them by name regardless.
 
 If rule coverage is inconsistent:
 

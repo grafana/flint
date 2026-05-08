@@ -1,5 +1,5 @@
 [expected]
-args = "run --fast-only"
+args = "run"
 exit = 0
 
 [expected.files]

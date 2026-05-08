@@ -1,0 +1,15 @@
+{
+  "meta": {
+    "actionlint": {
+      "packageName": "rhysd/actionlint",
+      "datasource": "github-releases"
+    }
+  },
+  "files": {
+    "mise.toml": {
+      "mise": [
+        "actionlint"
+      ]
+    }
+  }
+}

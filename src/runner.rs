@@ -21,6 +21,16 @@ pub struct RunOptions {
     pub time: bool,
 }
 
+#[derive(Clone, Copy)]
+pub struct RunContext<'a> {
+    pub active_checks: &'a [&'a Check],
+    pub file_list: &'a FileList,
+    pub project_root: &'a Path,
+    pub cfg: &'a Config,
+    pub config_dir: &'a Path,
+}
+
+#[derive(Clone)]
 pub struct CheckResult {
     pub name: String,
     pub ok: bool,
@@ -117,6 +127,7 @@ impl PreparedCheck {
                 let out = native
                     .run(crate::registry::NativeRunContext {
                         fix,
+                        verbose,
                         project_root: project_root.to_path_buf(),
                     })
                     .await;
@@ -139,12 +150,8 @@ impl PreparedCheck {
 
 pub async fn run(
     checks: &[&Check],
-    active_checks: &[&Check],
-    file_list: &FileList,
+    ctx: RunContext<'_>,
     opts: RunOptions,
-    project_root: &Path,
-    cfg: &Config,
-    config_dir: &Path,
 ) -> Result<Vec<CheckResult>> {
     let RunOptions {
         fix,
@@ -157,12 +164,12 @@ pub async fn run(
         .filter_map(|&check| {
             prepare(
                 check,
-                file_list,
+                ctx.file_list,
                 fix,
-                project_root,
-                active_checks,
-                cfg,
-                config_dir,
+                ctx.project_root,
+                ctx.active_checks,
+                ctx.cfg,
+                ctx.config_dir,
             )
         })
         .collect();
@@ -170,7 +177,7 @@ pub async fn run(
     if fix {
         let mut results = vec![];
         for task in prepared {
-            let r = task.execute(fix, verbose, project_root).await;
+            let r = task.execute(fix, verbose, ctx.project_root).await;
             if !short && (verbose || !r.ok) {
                 eprintln!("[{}]{}", r.name, format_duration_suffix(time, r.duration));
                 flush_output(&r.stdout, &r.stderr);
@@ -182,7 +189,7 @@ pub async fn run(
 
     let mut set: JoinSet<CheckResult> = JoinSet::new();
     for task in prepared {
-        let root = project_root.to_path_buf();
+        let root = ctx.project_root.to_path_buf();
         set.spawn(async move { task.execute(false, verbose, &root).await });
     }
 
@@ -208,7 +215,6 @@ pub async fn run(
     Ok(collected)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn prepare(
     check: &Check,
     file_list: &FileList,
@@ -652,7 +658,7 @@ fn fingerprint_files(files: &[PathBuf]) -> u64 {
     hasher.finish()
 }
 
-fn format_duration_suffix(time: bool, duration: Duration) -> String {
+pub(crate) fn format_duration_suffix(time: bool, duration: Duration) -> String {
     if !time {
         return String::new();
     }
@@ -742,7 +748,7 @@ fn shell_words(cmd: String) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::files::FileList;
-    use crate::registry::{Category, Check, CheckKind, RunPolicy, Scope};
+    use crate::registry::{Category, Check, CheckKind, Scope};
     use std::path::PathBuf;
 
     #[test]
@@ -847,7 +853,6 @@ mod tests {
             editorconfig_line_length_policy: crate::registry::EditorconfigLineLengthPolicy::Default,
             activate_unconditionally: false,
             category: Category::Default,
-            run_policy: RunPolicy::Fast,
             toolchain: None,
             windows_java_jar: false,
             workflow_setup: None,

@@ -220,7 +220,7 @@ check_all_local = true
 | Binary      | `renovate`                                                                                                                 |
 | Scope       | [native](#scope-native)                                                                                                    |
 | Patterns    | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
-| Run policy  | adaptive — runs in `--fast-only` only when relevant                                                                        |
+| Run policy  | adaptive — see [when does this run?](linters/renovate-deps.md#when-does-this-run)                                          |
 
 Verifies `renovate-tracked-deps.json` next to the active Renovate
 config is up to date by running Renovate locally and comparing its
@@ -381,14 +381,6 @@ whole project when it does run. `golangci-lint` is the exception — it uses
 
 Implemented in-process rather than via a command template. These checks may run
 without file arguments or use custom orchestration logic.
-
-Checks use one of three run policies:
-
-- `fast` — always runs, including in `--fast-only`
-- `slow` — skipped by `--fast-only`
-- `adaptive` — runs in `--fast-only` only when the changed files are relevant
-
-Use `--fast-only` for local/pre-push feedback and the full set in CI.
 
 **`editorconfig-checker` defers to formatters**: `editorconfig-checker` runs on
 all files, but automatically skips file types owned by an active formatter. If

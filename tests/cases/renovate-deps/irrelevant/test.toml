@@ -1,5 +1,5 @@
 [expected]
-args = "run --fast-only"
+args = "run"
 exit = 0
 
 [env]
@@ -8,6 +8,6 @@ GITHUB_TOKEN = "token"
 [fake_bins]
 renovate = '''
 #!/bin/sh
-echo "renovate should not run for unrelated fast-only changes" >&2
+echo "renovate should not run for unrelated changes" >&2
 exit 1
 '''

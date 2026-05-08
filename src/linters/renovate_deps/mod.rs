@@ -577,12 +577,65 @@ async fn run_renovate(
         anyhow::bail!(
             "renovate exited with status {}: {}",
             out.status.code().unwrap_or(-1),
-            snippet.lines().take(20).collect::<Vec<_>>().join("\n")
+            extract_failure_snippet(&snippet)
         );
     }
 
     Ok(combined)
 }
+/// Extracts the most informative slice of a Renovate log for an error message.
+///
+/// Renovate emits one JSON log object per line with a numeric `level` field
+/// (bunyan: 30=info, 40=warn, 50=error, 60=fatal). Startup is dominated by
+/// debug/info lines, so taking the head of the log usually hides the actual
+/// failure. Prefer level >= 40 entries; fall back to the tail of the log.
+fn extract_failure_snippet(log: &str) -> String {
+    const MAX_LINES: usize = 20;
+
+    let high_level: Vec<String> = log
+        .lines()
+        .filter_map(|line| {
+            let value: serde_json::Value = serde_json::from_str(line).ok()?;
+            let level = value.get("level")?.as_u64()?;
+            if level < 40 {
+                return None;
+            }
+            let msg = value
+                .get("msg")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty());
+            let err = value
+                .get("err")
+                .and_then(|v| v.get("message"))
+                .and_then(|v| v.as_str());
+            let mut out = format!("level={level}");
+            if let Some(m) = msg {
+                out.push(' ');
+                out.push_str(m);
+            }
+            if let Some(e) = err {
+                out.push_str(if msg.is_some() { ": " } else { " " });
+                out.push_str(e);
+            }
+            Some(out)
+        })
+        .collect();
+
+    fn tail<I: IntoIterator>(items: I, n: usize) -> Vec<I::Item> {
+        let mut v: Vec<I::Item> = items.into_iter().collect();
+        if v.len() > n {
+            v.drain(..v.len() - n);
+        }
+        v
+    }
+
+    if high_level.is_empty() {
+        tail(log.lines(), MAX_LINES).join("\n")
+    } else {
+        tail(high_level.iter().map(String::as_str), MAX_LINES).join("\n")
+    }
+}
+
 fn resolve_renovate_config_path(project_root: &Path) -> anyhow::Result<PathBuf> {
     RENOVATE_CONFIG_PATTERNS
         .iter()

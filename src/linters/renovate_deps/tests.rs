@@ -931,3 +931,37 @@ fn relevant_when_snapshot_is_unparsable() {
         dir.path()
     ));
 }
+
+#[test]
+fn extract_failure_snippet_prefers_error_lines() {
+    let log = "\
+{\"level\":20,\"msg\":\"Parsing configs\"}\n\
+{\"level\":30,\"msg\":\"Renovate started\"}\n\
+{\"level\":50,\"msg\":\"Failed\",\"err\":{\"message\":\"boom\"}}\n\
+{\"level\":20,\"msg\":\"trailing debug\"}\n";
+    let snippet = extract_failure_snippet(log);
+    assert_eq!(snippet, "level=50 Failed: boom");
+}
+
+#[test]
+fn extract_failure_snippet_handles_missing_msg() {
+    let log = "\
+{\"level\":50,\"err\":{\"message\":\"boom\"}}\n\
+{\"level\":60,\"msg\":\"\",\"err\":{\"message\":\"fatal\"}}\n\
+{\"level\":40,\"msg\":\"warn only\"}\n";
+    let snippet = extract_failure_snippet(log);
+    assert_eq!(snippet, "level=50 boom\nlevel=60 fatal\nlevel=40 warn only");
+}
+
+#[test]
+fn extract_failure_snippet_falls_back_to_tail() {
+    let mut log = String::new();
+    for i in 0..30 {
+        log.push_str(&format!("{{\"level\":20,\"msg\":\"line {i}\"}}\n"));
+    }
+    let snippet = extract_failure_snippet(&log);
+    let lines: Vec<&str> = snippet.lines().collect();
+    assert_eq!(lines.len(), 20);
+    assert!(lines.last().unwrap().contains("line 29"));
+    assert!(lines.first().unwrap().contains("line 10"));
+}

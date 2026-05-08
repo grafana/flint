@@ -2,7 +2,7 @@
 args = "run --full renovate-deps"
 exit = 1
 stderr_contains = [
-  "flint: renovate-deps: dependency metadata is out of date for rule-coverage validation.",
+  "flint: renovate-deps: dependency metadata is out of date",
   "Run `flint run --fix renovate-deps` to refresh metadata.",
 ]
 

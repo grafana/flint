@@ -129,7 +129,14 @@ pub(crate) fn trim_snapshot_meta(snapshot: &mut Snapshot, rules: &[ComparablePac
         .retain(|dep_name, _| relevant.contains(dep_name));
 }
 
-pub(crate) fn metadata_lookup_reason(
+/// Returns the first dep whose meta is incomplete relative to the configured
+/// package rules. A meta entry is complete only when both `packageName` and
+/// `datasource` are populated; lookup-mode generation guarantees both fields,
+/// extract-mode does not.
+///
+/// In non-fix mode, callers use this to bail with a "run --fix" hint instead
+/// of silently writing partial meta.
+pub(crate) fn incomplete_meta_for_rules(
     snapshot: &Snapshot,
     rules: &[ComparablePackageRule],
 ) -> Option<String> {
@@ -138,16 +145,14 @@ pub(crate) fn metadata_lookup_reason(
     }
 
     for dep_name in extracted_dep_names(snapshot) {
-        if snapshot
-            .meta
-            .get(&dep_name)
-            .and_then(|meta| meta.package_name.as_deref())
-            .is_some()
-        {
+        let meta = snapshot.meta.get(&dep_name);
+        let has_package_name = meta.and_then(|m| m.package_name.as_deref()).is_some();
+        let has_datasource = meta.and_then(|m| m.datasource.as_deref()).is_some();
+        if has_package_name && has_datasource {
             continue;
         }
 
-        if let Some(reason) = dep_metadata_lookup_reason(&dep_name, snapshot, rules) {
+        if let Some(reason) = dep_meta_gap_reason(&dep_name, snapshot, rules, meta) {
             return Some(reason);
         }
     }
@@ -155,16 +160,44 @@ pub(crate) fn metadata_lookup_reason(
     None
 }
 
-fn dep_metadata_lookup_reason(
+/// Strict post-trim check: any meta entry left in the snapshot after trimming
+/// must have both packageName and datasource. Used as a sanity check after
+/// fix-mode lookup regeneration.
+pub(crate) fn missing_meta_field(snapshot: &Snapshot) -> Option<String> {
+    for (dep_name, meta) in &snapshot.meta {
+        match (meta.package_name.as_deref(), meta.datasource.as_deref()) {
+            (Some(_), Some(_)) => {}
+            (None, _) => {
+                return Some(format!("dep {dep_name:?} is missing packageName"));
+            }
+            (Some(_), None) => {
+                return Some(format!("dep {dep_name:?} is missing datasource"));
+            }
+        }
+    }
+    None
+}
+
+fn dep_meta_gap_reason(
     dep_name: &str,
     snapshot: &Snapshot,
     rules: &[ComparablePackageRule],
+    meta: Option<&super::snapshot::DepMeta>,
 ) -> Option<String> {
+    let missing_field = match (
+        meta.and_then(|m| m.package_name.as_deref()),
+        meta.and_then(|m| m.datasource.as_deref()),
+    ) {
+        (Some(_), Some(_)) => return None,
+        (None, _) => "packageName",
+        (Some(_), None) => "datasource",
+    };
+
     for rule in rules {
         match &rule.matcher {
             RuleMatcher::DepNames(names) if names.contains(dep_name) => {
                 return Some(format!(
-                    "dep {dep_name:?} is matched by {} via matchDepNames but is missing packageName metadata",
+                    "dep {dep_name:?} is matched by {} via matchDepNames but is missing {missing_field}",
                     rule.label
                 ));
             }
@@ -173,7 +206,7 @@ fn dep_metadata_lookup_reason(
             {
                 let packages = names.iter().cloned().collect::<Vec<_>>().join(", ");
                 return Some(format!(
-                    "dep {dep_name:?} is considered for {} via matchPackageNames [{packages}] but is missing packageName metadata",
+                    "dep {dep_name:?} is considered for {} via matchPackageNames [{packages}] but is missing {missing_field}",
                     rule.label
                 ));
             }

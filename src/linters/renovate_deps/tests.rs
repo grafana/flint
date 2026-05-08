@@ -1,7 +1,5 @@
 use super::install_patch::configure_extract_workaround_env;
-use super::rules::{
-    ComparablePackageRule, RuleMatcher, metadata_lookup_reason, relevant_dep_names,
-};
+use super::rules::{ComparablePackageRule, RuleMatcher, missing_meta_field, relevant_dep_names};
 use super::snapshot::{DepFiles, DepMeta};
 use super::*;
 use std::collections::BTreeSet;
@@ -467,34 +465,8 @@ fn maybe_reuse_committed_meta_merges_missing_fields() {
 }
 
 #[test]
-fn metadata_lookup_not_needed_without_comparable_rules() {
-    let generated = snapshot(
-        &[("actionlint", None, Some("github-releases"))],
-        &[("mise.toml", &[("mise", &["actionlint"])])],
-    );
-
-    assert!(metadata_lookup_reason(&generated, &[]).is_none());
-}
-
-#[test]
-fn metadata_lookup_needed_for_dep_name_rule_when_package_name_missing() {
-    let generated = snapshot(
-        &[("actionlint", None, Some("github-releases"))],
-        &[("mise.toml", &[("mise", &["actionlint"])])],
-    );
-    let rules = vec![ComparablePackageRule {
-        label: "group \"linters\"".to_string(),
-        matcher: RuleMatcher::DepNames(BTreeSet::from(["actionlint".to_string()])),
-    }];
-
-    let reason = metadata_lookup_reason(&generated, &rules).unwrap();
-    assert!(reason.contains("actionlint"));
-    assert!(reason.contains("matchDepNames"));
-}
-
-#[test]
-fn metadata_lookup_not_needed_for_dep_name_rule_when_cached_package_name_present() {
-    let generated = snapshot(
+fn missing_meta_field_passes_when_all_entries_have_packagename_and_datasource() {
+    let snap = snapshot(
         &[(
             "actionlint",
             Some("rhysd/actionlint"),
@@ -502,71 +474,29 @@ fn metadata_lookup_not_needed_for_dep_name_rule_when_cached_package_name_present
         )],
         &[("mise.toml", &[("mise", &["actionlint"])])],
     );
-    let rules = vec![ComparablePackageRule {
-        label: "group \"linters\"".to_string(),
-        matcher: RuleMatcher::DepNames(BTreeSet::from(["actionlint".to_string()])),
-    }];
-
-    assert!(metadata_lookup_reason(&generated, &rules).is_none());
+    assert!(missing_meta_field(&snap).is_none());
 }
 
 #[test]
-fn metadata_lookup_needed_for_package_name_rule_without_known_matching_dep() {
-    let generated = snapshot(
+fn missing_meta_field_flags_missing_datasource() {
+    let snap = snapshot(
+        &[("actionlint", Some("rhysd/actionlint"), None)],
+        &[("mise.toml", &[("mise", &["actionlint"])])],
+    );
+    let reason = missing_meta_field(&snap).unwrap();
+    assert!(reason.contains("actionlint"));
+    assert!(reason.contains("datasource"));
+}
+
+#[test]
+fn missing_meta_field_flags_missing_packagename() {
+    let snap = snapshot(
         &[("actionlint", None, Some("github-releases"))],
         &[("mise.toml", &[("mise", &["actionlint"])])],
     );
-    let rules = vec![ComparablePackageRule {
-        label: "group \"linters\"".to_string(),
-        matcher: RuleMatcher::PackageNames(BTreeSet::from(["rhysd/actionlint".to_string()])),
-    }];
-
-    let reason = metadata_lookup_reason(&generated, &rules).unwrap();
-    assert!(reason.contains("matchPackageNames"));
-    assert!(reason.contains("rhysd/actionlint"));
-}
-
-#[test]
-fn metadata_lookup_not_needed_for_package_name_rule_when_matching_dep_is_known() {
-    let generated = snapshot(
-        &[
-            ("mise", Some("jdx/mise"), Some("github-release-attachments")),
-            ("Swatinem/rust-cache", None, Some("github-tags")),
-        ],
-        &[
-            ("mise.toml", &[("mise", &["mise"])]),
-            (
-                "src/init/scaffold.rs",
-                &[("regex", &["Swatinem/rust-cache"])],
-            ),
-        ],
-    );
-    let rules = vec![ComparablePackageRule {
-        label: "group \"mise\"".to_string(),
-        matcher: RuleMatcher::PackageNames(BTreeSet::from(["jdx/mise".to_string()])),
-    }];
-
-    assert!(metadata_lookup_reason(&generated, &rules).is_none());
-}
-
-#[test]
-fn metadata_lookup_not_needed_for_unrelated_package_name_rule() {
-    let generated = snapshot(
-        &[("Swatinem/rust-cache", None, Some("github-tags"))],
-        &[(
-            "src/init/scaffold.rs",
-            &[("regex", &["Swatinem/rust-cache"])],
-        )],
-    );
-    let rules = vec![ComparablePackageRule {
-        label: "description \"Use regex versioning for slim Super-Linter tags (slim-v8.4.0)\""
-            .to_string(),
-        matcher: RuleMatcher::PackageNames(BTreeSet::from([
-            "ghcr.io/super-linter/super-linter".to_string()
-        ])),
-    }];
-
-    assert!(metadata_lookup_reason(&generated, &rules).is_none());
+    let reason = missing_meta_field(&snap).unwrap();
+    assert!(reason.contains("actionlint"));
+    assert!(reason.contains("packageName"));
 }
 
 #[test]
@@ -869,29 +799,6 @@ fn relevant_when_renovate_config_changed() {
             &[dir.path().join(".github/renovate.json5").to_str().unwrap()],
             false
         ),
-        dir.path()
-    ));
-}
-
-#[test]
-fn config_changed_detects_renovate_config_change() {
-    let dir = tempfile::tempdir().unwrap();
-
-    assert!(config_changed(
-        &file_list(
-            &[dir.path().join(".github/renovate.json5").to_str().unwrap()],
-            false
-        ),
-        dir.path()
-    ));
-}
-
-#[test]
-fn config_changed_ignores_non_config_changes() {
-    let dir = tempfile::tempdir().unwrap();
-
-    assert!(!config_changed(
-        &file_list(&[dir.path().join("README.md").to_str().unwrap()], false),
         dir.path()
     ));
 }

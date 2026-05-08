@@ -117,9 +117,11 @@ If the snapshot is stale:
 flint run --fix renovate-deps
 ```
 
-`--fix` keeps the normal fast extract path, but if rule-coverage validation
-actually needs package metadata it will do one lookup-backed refresh and write
-the updated snapshot.
+Verification (plain `flint run`) uses Renovate's cheap `--dry-run=extract`
+plus the committed snapshot's metadata. `--fix` always regenerates via
+`--dry-run=lookup` so every meta entry written carries both `packageName`
+and `datasource` — this avoids partial metadata in the committed snapshot,
+which would silently drift Renovate's grouping behavior.
 
 If rule coverage is inconsistent:
 

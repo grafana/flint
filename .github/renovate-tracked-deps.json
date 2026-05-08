@@ -13,7 +13,8 @@
       "datasource": "github-tags"
     },
     "biome": {
-      "packageName": "biome"
+      "packageName": "biomejs/biome",
+      "datasource": "github-tags"
     },
     "editorconfig-checker": {
       "packageName": "editorconfig-checker/editorconfig-checker",

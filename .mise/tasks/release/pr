@@ -9,6 +9,11 @@ if [ -z "${usage_git_token:-}" ]; then
 	exit 1
 fi
 
+if [ -z "${GITHUB_REPOSITORY:-}" ]; then
+	echo "GITHUB_REPOSITORY is required (this task is CI-only)" >&2
+	exit 1
+fi
+
 release-plz release-pr --git-token "${usage_git_token}" --forge github
 
 # Sync README pin to the new version on the release branch as a follow-up
@@ -27,7 +32,7 @@ fi
 
 git checkout -B "${release_branch}" "origin/${release_branch}"
 
-mise run release:docs-sync
+cargo run -q --bin sync-readme-snippets
 
 if git diff --quiet; then
 	echo "README already in sync."
@@ -38,6 +43,5 @@ git -c user.name='github-actions[bot]' \
 	-c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
 	commit -am "chore: sync README snippets"
 
-repo="${GITHUB_REPOSITORY:-grafana/flint}"
-remote_url="https://x-access-token:${usage_git_token}@github.com/${repo}.git"
+remote_url="https://x-access-token:${usage_git_token}@github.com/${GITHUB_REPOSITORY}.git"
 git push "${remote_url}" "HEAD:${release_branch}"

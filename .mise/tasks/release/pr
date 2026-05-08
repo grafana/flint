@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 #MISE description="Open or update the release PR"
 #MISE depends=["release:update"]
-#USAGE arg "[args]" var=#true help="Additional arguments passed to release-plz release-pr"
+#USAGE flag "--git-token <token>" help="GitHub token used by release-plz"
 
 set -euo pipefail
 
-pr_args=()
-if [ -n "${usage_args:-}" ]; then
-	# Mise provides variadic args as a shell-escaped string.
-	eval "pr_args=(${usage_args})"
+if [ -z "${usage_git_token:-}" ]; then
+	echo "--git-token is required" >&2
+	exit 1
 fi
 
-release-plz release-pr --allow-dirty "${pr_args[@]}"
+release-plz release-pr --allow-dirty --git-token "${usage_git_token}" --forge github

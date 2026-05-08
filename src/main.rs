@@ -609,7 +609,11 @@ fn finish_fix_outcomes(outcomes: Vec<FixOutcome>, opts: FixSummaryOptions) {
     if !short {
         for r in outcomes.iter().filter_map(FixOutcome::result) {
             if verbose || !r.ok || time {
-                eprintln!("[{}]{}", r.name, runner::format_duration_suffix(time, r.duration));
+                eprintln!(
+                    "[{}]{}",
+                    r.name,
+                    runner::format_duration_suffix(time, r.duration)
+                );
             }
             if verbose || !r.ok {
                 if !r.stdout.is_empty() {

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+#MISE description="Open or update the release PR"
+#MISE depends=["release:update"]
+#USAGE arg "[args]" var=#true help="Additional arguments passed to release-plz release-pr"
+
+set -euo pipefail
+
+pr_args=()
+if [ -n "${usage_args:-}" ]; then
+	# Mise provides variadic args as a shell-escaped string.
+	eval "pr_args=(${usage_args})"
+fi
+
+release-plz release-pr --allow-dirty "${pr_args[@]}"

@@ -9,4 +9,35 @@ if [ -z "${usage_git_token:-}" ]; then
 	exit 1
 fi
 
-release-plz release-pr --allow-dirty --git-token "${usage_git_token}" --forge github
+release-plz release-pr --git-token "${usage_git_token}" --forge github
+
+# release-plz pushed (or updated) a release branch with bumped Cargo.toml +
+# CHANGELOG. Sync README snippets on that branch to the new version and
+# push as an additional commit so the release PR stays consistent.
+git fetch origin '+refs/heads/release-plz-*:refs/remotes/origin/release-plz-*'
+
+release_branch="$(git for-each-ref \
+	--sort=-committerdate \
+	--format='%(refname:lstrip=3)' \
+	'refs/remotes/origin/release-plz-*' | head -n 1)"
+
+if [ -z "${release_branch}" ]; then
+	echo "No release-plz branch found; nothing to sync."
+	exit 0
+fi
+
+git checkout -B "${release_branch}" "origin/${release_branch}"
+
+mise run release:docs-sync
+
+if git diff --quiet; then
+	echo "README already in sync."
+	exit 0
+fi
+
+git -c user.name='github-actions[bot]' \
+	-c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+	commit -am "chore: sync README snippets"
+
+git push "https://x-access-token:${usage_git_token}@github.com/${GITHUB_REPOSITORY:-grafana/flint}.git" \
+	"HEAD:${release_branch}"

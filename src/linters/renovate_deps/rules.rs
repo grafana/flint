@@ -149,8 +149,8 @@ pub(crate) fn incomplete_meta_for_rules(
 
     for dep_name in extracted_dep_names(snapshot) {
         let meta = snapshot.meta.get(&dep_name);
-        let pn = meta.and_then(|m| m.package_name.as_deref());
-        let ds = meta.and_then(|m| m.datasource.as_deref());
+        let package_name = meta.and_then(|m| m.package_name.as_deref());
+        let datasource = meta.and_then(|m| m.datasource.as_deref());
 
         for rule in rules {
             let (label, needs_datasource) = match &rule.matcher {
@@ -168,12 +168,12 @@ pub(crate) fn incomplete_meta_for_rules(
                 }
                 _ => continue,
             };
-            if pn.is_none() {
+            if package_name.is_none() {
                 return Some(format!(
                     "dep {dep_name:?} is matched by {label} but is missing packageName"
                 ));
             }
-            if needs_datasource && ds.is_none() {
+            if needs_datasource && datasource.is_none() {
                 return Some(format!(
                     "dep {dep_name:?} is matched by {label} but is missing datasource"
                 ));

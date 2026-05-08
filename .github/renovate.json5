@@ -92,6 +92,24 @@
       depNameTemplate: "mise",
       matchStrings: ["jdx/mise-action.*\\n\\s*with:\\s*\\n\\s*version: [\"']?(?<currentValue>v[.\\d]+)[\"']?\\s*\\n\\s*sha256:\\s*(?:(?:[>|][-+]?)\\s*\\n\\s*)?[\"']?(?<currentDigest>[a-f0-9]{64})[\"']?"],
     },
+    {
+      customType: "regex",
+      description: "Pin biome datasource so flint's renovate-deps snapshot is complete",
+      managerFilePatterns: ["/^mise\\.toml$/"],
+      matchStrings: ["biome\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
+      datasourceTemplate: "github-releases",
+      depNameTemplate: "biome",
+      packageNameTemplate: "biomejs/biome",
+    },
+    {
+      customType: "regex",
+      description: "Pin google-java-format datasource so flint's renovate-deps snapshot is complete",
+      managerFilePatterns: ["/^mise\\.toml$/"],
+      matchStrings: ["google-java-format\\s*=\\s*\"(?<currentValue>[^\"]+)\""],
+      datasourceTemplate: "github-releases",
+      depNameTemplate: "google-java-format",
+      packageNameTemplate: "google/google-java-format",
+    },
   ],
   packageRules: [
     {

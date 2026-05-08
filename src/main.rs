@@ -9,7 +9,7 @@ mod setup;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
-use registry::{CheckKind, FixBehavior, LinterConfig, RunPolicy, Scope};
+use registry::{CheckKind, FixBehavior, LinterConfig, Scope};
 use runner::{CheckResult, RunContext as RunnerRunContext, RunOptions};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -87,11 +87,6 @@ struct RunArgs {
     #[arg(long, env = "FLINT_FULL")]
     full: bool,
 
-    /// Run only fast linters. Local `flint run` already does this by default.
-    /// Overridden by explicitly named linters and `--full`.
-    #[arg(long, env = "FLINT_FAST_ONLY")]
-    fast_only: bool,
-
     /// Show all linter output, not just failures.
     #[arg(long, env = "FLINT_VERBOSE")]
     verbose: bool,
@@ -113,7 +108,8 @@ struct RunArgs {
     #[arg(long, env = "FLINT_TIME")]
     time: bool,
 
-    /// Linters to run (default: all discovered). Explicit linters override --fast-only.
+    /// Linters to run (default: all discovered).
+    /// Explicit names bypass the local relevance gate.
     linters: Vec<String>,
 }
 
@@ -133,7 +129,7 @@ fn use_filtered_run_policy(args: &RunArgs, explicit: bool, is_ci: bool) -> bool 
         return false;
     }
 
-    args.fast_only || !is_ci
+    !is_ci
 }
 
 #[tokio::main]
@@ -223,9 +219,10 @@ async fn run(
         args.to_ref.as_deref(),
     )?;
 
-    // Discover which checks are declared in the consuming repo's mise.toml, and apply
-    // filtered-run policy when enabled. Outside CI, plain `flint run` defaults to the
-    // same filtering as `--fast-only`; explicit linter names and `--full` always bypass it.
+    // Discover which checks are declared in the consuming repo's mise.toml.
+    // Outside CI, plain `flint run` relevance-gates checks that declare an
+    // `adaptive_relevance` hook. Explicit linter names and `--full` bypass the
+    // gate; CI always runs the full set.
     // mise guarantees declared tools are on PATH, so no PATH check needed.
     let mise_tools = registry::read_mise_tools(project_root);
     let is_ci = linters::env::is_ci_from(|name| std::env::var(name).ok());
@@ -252,17 +249,8 @@ async fn run(
         };
         for c in checks {
             if registry::check_active(c, &mise_tools) {
-                let include = if !use_filtered_policy {
-                    true
-                } else {
-                    match c.run_policy {
-                        RunPolicy::Fast => true,
-                        RunPolicy::Slow => false,
-                        RunPolicy::Adaptive => {
-                            c.adaptive_relevance.is_none_or(|hook| hook(&relevance_ctx))
-                        }
-                    }
-                };
+                let include = !use_filtered_policy
+                    || c.adaptive_relevance.is_none_or(|hook| hook(&relevance_ctx));
                 if include {
                     out.push(c);
                 }
@@ -297,7 +285,6 @@ async fn run(
                 project_root,
                 cfg: &cfg,
                 config_dir,
-                filtered_run_policy: false,
             },
         )
         .await?;
@@ -393,7 +380,6 @@ async fn run(
         project_root,
         cfg: &cfg,
         config_dir,
-        filtered_run_policy: use_filtered_policy,
     };
 
     if args.fix {
@@ -560,7 +546,6 @@ struct ExecutionContext<'a> {
     project_root: &'a Path,
     cfg: &'a config::Config,
     config_dir: &'a Path,
-    filtered_run_policy: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -774,7 +759,6 @@ async fn run_checks(
                 RunnerRunContext {
                     active_checks: ctx.active_checks,
                     file_list,
-                    filtered_run_policy: ctx.filtered_run_policy,
                     project_root: ctx.project_root,
                     cfg: ctx.cfg,
                     config_dir: ctx.config_dir,
@@ -792,7 +776,6 @@ async fn run_checks(
                 RunnerRunContext {
                     active_checks: ctx.active_checks,
                     file_list: files,
-                    filtered_run_policy: false,
                     project_root: ctx.project_root,
                     cfg: ctx.cfg,
                     config_dir: ctx.config_dir,
@@ -1019,8 +1002,8 @@ pub fn linter_json(check: &registry::Check) -> serde_json::Value {
         "binary": if check.uses_binary() { check.bin_name } else { "(built-in)" },
         "patterns": patterns,
         "fix": check.has_fix(),
-        "run_policy": run_policy_label(check.run_policy),
-        "slow": check.run_policy == RunPolicy::Slow,
+        "run_policy": run_policy_label(check),
+        "slow": check.category == registry::Category::Slow,
         "scope": scope,
         "config_file": config_file,
     })
@@ -1030,11 +1013,13 @@ fn canonical_config_path(config: &LinterConfig) -> String {
     config.canonical_location()
 }
 
-fn run_policy_label(run_policy: RunPolicy) -> &'static str {
-    match run_policy {
-        RunPolicy::Fast => "fast",
-        RunPolicy::Slow => "slow",
-        RunPolicy::Adaptive => "adaptive",
+fn run_policy_label(check: &registry::Check) -> &'static str {
+    if check.adaptive_relevance.is_some() {
+        "adaptive"
+    } else if check.category == registry::Category::Slow {
+        "slow"
+    } else {
+        "fast"
     }
 }
 
@@ -1128,7 +1113,7 @@ where
 
     for check in registry {
         let status = linter_status(check, mise_tools, cfg, &binary_on_path);
-        let speed = run_policy_label(check.run_policy);
+        let speed = run_policy_label(check);
         let fix = if check.has_fix() { "yes" } else { "no" };
         let patterns_str = check.patterns.join(" ");
         let binary = display_binary(check);
@@ -1214,7 +1199,6 @@ mod tests {
             fix: false,
             allow_fixed: false,
             full: false,
-            fast_only: false,
             verbose: false,
             short: false,
             new_from_rev: None,
@@ -1365,13 +1349,5 @@ license-header        (built-in)          not configured  fast      no   Check s
     fn filtered_run_policy_is_disabled_for_explicit_linter_selection() {
         assert!(!use_filtered_run_policy(&run_args(), true, false));
         assert!(!use_filtered_run_policy(&run_args(), true, true));
-    }
-
-    #[test]
-    fn fast_only_enables_filtered_run_policy_in_ci() {
-        let mut args = run_args();
-        args.fast_only = true;
-
-        assert!(use_filtered_run_policy(&args, false, true));
     }
 }

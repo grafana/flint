@@ -18,13 +18,12 @@ it do not need to re-learn the interface.
 | -------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `--fix`              | Fix what's fixable, report `clean` / `fixed` / `partial` / `review` outcomes; exit non-zero if anything needs action |
 | `--full`             | Lint all files instead of only changed files                                                                         |
-| `--fast-only`        | Force the filtered local run policy explicitly. Overridden by explicit linter names and `--full`.                    |
 | `--short`            | Compact summary output, no per-check noise                                                                           |
 | `--verbose`          | Show all linter output, not just failures                                                                            |
 | `--new-from-rev REV` | Diff base (default: merge base with base branch)                                                                     |
 | `--to-ref REF`       | Diff head (default: HEAD)                                                                                            |
 
-Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`, `FLINT_FAST_ONLY`,
+Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`,
 `FLINT_VERBOSE`, `FLINT_SHORT`, `FLINT_NEW_FROM_REV`, `FLINT_TO_REF`.
 
 ## Intended use by context

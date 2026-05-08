@@ -369,22 +369,6 @@ fn editorconfig_checker_json_is_optional_not_generated_baseline() {
 }
 
 #[test]
-fn adaptive_checks_declare_relevance_hooks() {
-    let missing: Vec<_> = builtin()
-        .into_iter()
-        .filter(|check| check.run_policy == RunPolicy::Adaptive)
-        .filter(|check| check.adaptive_relevance.is_none())
-        .map(|check| check.name)
-        .collect();
-
-    assert!(
-        missing.is_empty(),
-        "adaptive checks missing relevance hooks: {}",
-        missing.join(", ")
-    );
-}
-
-#[test]
 fn default_renovate_preset_covers_all_linter_tools_weekly() {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let default_json_path = manifest_dir.join("default.json");
@@ -1013,21 +997,12 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
         }
     }
 
-    match check.run_policy {
-        crate::registry::RunPolicy::Fast => {}
-        crate::registry::RunPolicy::Slow => {
-            rows.push((
-                "Run policy",
-                "slow — skipped in local default runs and by `--fast-only`".to_string(),
-            ));
-        }
-        crate::registry::RunPolicy::Adaptive => {
-            rows.push((
-                "Run policy",
-                "adaptive — runs in local default runs and `--fast-only` only when relevant"
-                    .to_string(),
-            ));
-        }
+    if check.adaptive_relevance.is_some() {
+        rows.push((
+            "Run policy",
+            "adaptive — runs on local default runs only when changed files are relevant"
+                .to_string(),
+        ));
     }
 
     rows

@@ -40,18 +40,6 @@ pub enum Category {
     Slow,
 }
 
-/// How a check participates in `--fast-only`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum RunPolicy {
-    /// Always runs, including in `--fast-only`.
-    #[default]
-    Fast,
-    /// Skipped in `--fast-only` unless explicitly named.
-    Slow,
-    /// Runs in `--fast-only` only when the changed files are relevant to the check.
-    Adaptive,
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct NativeCheckRef {
     native: &'static dyn NativeCheck,
@@ -255,7 +243,6 @@ pub trait CheckType: Sync + std::fmt::Debug {
 pub struct NativePrepareContext<'a> {
     pub name: &'static str,
     pub file_list: &'a FileList,
-    pub filtered_run_policy: bool,
     pub project_root: &'a Path,
     pub cfg: &'a Config,
     pub config_dir: &'a Path,
@@ -473,7 +460,6 @@ pub struct Check {
     /// dedicated formatter already owns.
     pub excludes_if_active: &'static [&'static str],
     pub category: Category,
-    pub run_policy: RunPolicy,
     /// When set, look for linter config in `config_dir` and inject an argument
     /// right after the binary name.
     pub linter_config: Option<LinterConfig>,
@@ -497,7 +483,8 @@ pub struct Check {
     pub tool_key_migrations: Vec<ToolKeyMigration>,
     /// Optional check-type behavior shared by related checks.
     pub check_type: Option<&'static dyn CheckType>,
-    /// Optional relevance hook for adaptive checks in `--fast-only` mode.
+    /// Optional relevance hook. When set, the check is skipped on filtered
+    /// (local-default) runs unless the hook reports the changed files relevant.
     pub adaptive_relevance: Option<AdaptiveRelevanceHook>,
     /// Optional status override shown by `flint linters`.
     pub status_hook: Option<StatusHook>,
@@ -645,7 +632,6 @@ impl Check {
             editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
             activate_unconditionally: false,
             category: Category::Default,
-            run_policy: RunPolicy::Fast,
             toolchain: None,
             kind: CheckKind::Template {
                 check_cmd,
@@ -695,7 +681,6 @@ impl Check {
             editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
             activate_unconditionally: false,
             category: Category::Default,
-            run_policy: RunPolicy::Fast,
             toolchain: None,
             windows_java_jar: false,
             workflow_setup: None,
@@ -769,17 +754,10 @@ impl Check {
         self
     }
 
-    /// Mark as comprehensive-only in `flint init`, and skipped by `--fast-only`.
+    /// Mark as comprehensive-only in `flint init`. Pair with
+    /// `.adaptive_relevance(...)` to skip on local default runs when irrelevant.
     pub fn slow(mut self) -> Self {
         self.category = Category::Slow;
-        self.run_policy = RunPolicy::Slow;
-        self
-    }
-
-    /// Mark as comprehensive-only in `flint init`, and relevance-gated in `--fast-only`.
-    pub fn adaptive(mut self) -> Self {
-        self.category = Category::Slow;
-        self.run_policy = RunPolicy::Adaptive;
         self
     }
 

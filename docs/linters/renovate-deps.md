@@ -10,6 +10,23 @@
 The second check is there to catch configuration mistakes before they show up as
 separate Renovate PRs or README drift.
 
+## When does this run?
+
+CI always runs `renovate-deps`. Locally `flint run` only runs it when the
+changed files plausibly affect the snapshot. `--full` or naming the
+linter explicitly bypass the skip.
+
+| Change                                        | Local | CI  |
+| --------------------------------------------- | ----- | --- |
+| Renovate config edited                        | ✅    | ✅  |
+| `renovate-tracked-deps.json` snapshot edited  | ✅    | ✅  |
+| File already tracked in the snapshot edited   | ✅    | ✅  |
+| New tool/action added that is not yet tracked | ❌    | ✅  |
+| Unrelated change (docs, source, etc.)         | ❌    | ✅  |
+
+The "new tool not yet tracked" case is the typical reason a CI failure
+won't reproduce locally without `--full`.
+
 ## What it catches
 
 Goal: `mise.toml` and `README.md` both refer to actionlint, so you want

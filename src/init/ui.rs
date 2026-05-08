@@ -237,10 +237,12 @@ fn print_linter_table(
                 "[ ]"
             };
             let cursor_mark = if flat_idx == cursor { ">" } else { " " };
-            let speed = match check.run_policy {
-                crate::registry::RunPolicy::Fast => "fast",
-                crate::registry::RunPolicy::Slow => "slow",
-                crate::registry::RunPolicy::Adaptive => "adaptive",
+            let speed = if check.adaptive_relevance.is_some() {
+                "adaptive"
+            } else if check.category == crate::registry::Category::Slow {
+                "slow"
+            } else {
+                "fast"
             };
             let patterns = check.patterns.join(" ");
             write!(

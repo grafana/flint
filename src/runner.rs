@@ -25,7 +25,6 @@ pub struct RunOptions {
 pub struct RunContext<'a> {
     pub active_checks: &'a [&'a Check],
     pub file_list: &'a FileList,
-    pub filtered_run_policy: bool,
     pub project_root: &'a Path,
     pub cfg: &'a Config,
     pub config_dir: &'a Path,
@@ -166,7 +165,6 @@ pub async fn run(
             prepare(
                 check,
                 ctx.file_list,
-                ctx.filtered_run_policy,
                 fix,
                 ctx.project_root,
                 ctx.active_checks,
@@ -217,11 +215,9 @@ pub async fn run(
     Ok(collected)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn prepare(
     check: &Check,
     file_list: &FileList,
-    filtered_run_policy: bool,
     fix: bool,
     project_root: &Path,
     active_checks: &[&Check],
@@ -259,7 +255,6 @@ fn prepare(
             .prepare(NativePrepareContext {
                 name: check.name,
                 file_list,
-                filtered_run_policy,
                 project_root,
                 cfg,
                 config_dir,
@@ -753,7 +748,7 @@ fn shell_words(cmd: String) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::files::FileList;
-    use crate::registry::{Category, Check, CheckKind, RunPolicy, Scope};
+    use crate::registry::{Category, Check, CheckKind, Scope};
     use std::path::PathBuf;
 
     #[test]
@@ -858,7 +853,6 @@ mod tests {
             editorconfig_line_length_policy: crate::registry::EditorconfigLineLengthPolicy::Default,
             activate_unconditionally: false,
             category: Category::Default,
-            run_policy: RunPolicy::Fast,
             toolchain: None,
             windows_java_jar: false,
             workflow_setup: None,

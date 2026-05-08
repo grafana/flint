@@ -50,10 +50,6 @@ struct PreparedRenovateDeps {
 }
 
 fn prepare(ctx: NativePrepareContext<'_>) -> Option<Box<dyn PreparedNativeCheck>> {
-    if ctx.filtered_run_policy && !is_relevant(ctx.file_list, ctx.project_root) {
-        return None;
-    }
-
     Some(Box::new(PreparedRenovateDeps {
         name: ctx.name.to_string(),
         cfg: ctx.cfg.checks.renovate_deps.clone(),

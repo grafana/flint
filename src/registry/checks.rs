@@ -430,7 +430,7 @@ fn check_lychee() -> Check {
 
 fn check_renovate_deps() -> Check {
     Check::native(&renovate_deps::CHECK_TYPE)
-        .adaptive()
+        .slow()
         .adaptive_relevance(renovate_deps::adaptive_relevance)
         .mise_tool("npm:renovate")
         .patterns(RENOVATE_CONFIG_PATTERNS)

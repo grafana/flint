@@ -864,7 +864,6 @@ fn apply_env_and_tasks_adds_sections() {
     assert!(content.contains("FLINT_CONFIG_DIR = \".github/config\""));
     assert!(content.contains("flint run"));
     assert!(content.contains("flint run --fix"));
-    assert!(!content.contains("--fast-only"));
 }
 
 #[test]
@@ -873,7 +872,6 @@ fn apply_env_and_tasks_does_not_add_pre_commit_task_when_slow() {
     std::fs::write(tmp.path(), "").unwrap();
     apply_env_and_tasks(tmp.path(), ".", true, &[]).unwrap();
     let content = std::fs::read_to_string(tmp.path()).unwrap();
-    assert!(!content.contains("--fast-only"));
     assert!(!content.contains("lint:pre-commit"));
 }
 

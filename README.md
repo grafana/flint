@@ -89,18 +89,20 @@ description = "Auto-fix lint issues"
 run = "flint run --fix"
 ```
 
-Execution defaults:
+### Day-to-day use
 
-| Invocation           | Local (non-CI)               | CI                                                  |
-| -------------------- | ---------------------------- | --------------------------------------------------- |
-| `flint run`          | Linters triggered by changes | All active linters, still diff-aware where possible |
-| `flint run --full`   | All active linters           | All active linters                                  |
-| `flint run <linter>` | Run that linter explicitly   | Run that linter explicitly                          |
+Run lints on your changes:
 
-This means some failures may show up only in CI. When that happens, flint tells
-you which command to run locally, usually `--full` or the linter name. That is
-a reasonable default for day-to-day work: local runs stay focused on what you
-changed, while CI runs linters based on changed files where possible.
+```bash
+mise run lint        # check
+mise run lint:fix    # auto-fix what's fixable
+```
+
+> [!NOTE]
+> In rare cases (currently only `renovate-deps`) a failure may show up
+> only in CI. That is a deliberate performance optimization — see
+> [adaptive runs](#adaptive-runs). When it happens, flint prints the
+> command to reproduce locally (usually `--full` or the linter name).
 
 ### CI setup
 
@@ -220,6 +222,24 @@ Click a name in the table below for details. See the
 | [`xmllint`](docs/linters.md#xmllint)                           | Validate XML files are well-formed                                  | —   |
 
 <!-- registry-table-end -->
+
+### Adaptive runs
+
+Some linters are expensive enough that running them on every local
+`flint run` would slow the inner loop. For those, `flint run` skips the
+linter when none of the changed files could plausibly affect its result.
+CI is unaffected — it always runs the full set.
+
+Affected linters:
+
+| Linter                                                              | Skipped locally when…                                                |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| [`renovate-deps`](docs/linters/renovate-deps.md#when-does-this-run) | No change to Renovate config, the snapshot, or any tracked file     |
+
+To force a local run of a skipped linter:
+
+- `flint run --full` — runs every active linter
+- `flint run <linter>` — runs just that one
 
 ## Versioning
 

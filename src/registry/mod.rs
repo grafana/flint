@@ -16,7 +16,7 @@ pub use types::{
     ConfigMatch, EditorconfigDirectiveStyle, EditorconfigLineLengthPolicy, FixBehavior,
     InitHookContext, LinterConfig, LinterOutput, MissingComponentHint, NativeCheck, NativeCheckDef,
     NativePrepareContext, NativeRunContext, NativeRunFuture, NonverboseFailureOutputHook,
-    PreparedNativeCheck, RunPolicy, Scope, SetupOutcome, StatusContext, WorkflowSetup,
+    PreparedNativeCheck, Scope, SetupOutcome, StatusContext, WorkflowSetup,
 };
 
 /// Returns the explicit set of flint-managed tool keys that belong under the

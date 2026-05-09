@@ -1,4 +1,6 @@
-use super::types::{Check, ConfigFile, EditorconfigDirectiveStyle, WorkflowSetup};
+use super::types::{
+    Check, ConfigFile, EditorconfigDirectiveStyle, OverviewRole, OverviewSection, WorkflowSetup,
+};
 use crate::linters::{
     biome, flint_setup, license_header, lychee, renovate_deps,
     renovate_deps::RENOVATE_CONFIG_PATTERNS, rumdl, rustfmt, taplo, typos, yamllint,
@@ -8,6 +10,46 @@ const TOOL_TYPOS: &[&str] = &["tool", "typos"];
 const WORKSPACE_METADATA_TYPOS: &[&str] = &["workspace", "metadata", "typos"];
 const PACKAGE_METADATA_TYPOS: &[&str] = &["package", "metadata", "typos"];
 const TOOL_RUFF: &[&str] = &["tool", "ruff"];
+const ACTIONLINT_URL: &str = "https://github.com/rhysd/actionlint";
+const ACTIONLINT_CONFIG_URL: &str = "https://github.com/rhysd/actionlint/blob/main/docs/config.md";
+const BIOME_URL: &str = "https://biomejs.dev/";
+const BIOME_CONFIG_URL: &str = "https://biomejs.dev/guides/configure-biome/";
+const CLIPPY_URL: &str = "https://doc.rust-lang.org/clippy/configuration.html";
+const DOTNET_FORMAT_URL: &str = "https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-format";
+const EDITORCONFIG_CHECKER_URL: &str =
+    "https://github.com/editorconfig-checker/editorconfig-checker";
+const EDITORCONFIG_CHECKER_CONFIG_URL: &str =
+    "https://github.com/editorconfig-checker/editorconfig-checker?tab=readme-ov-file#configuration";
+const GOFMT_URL: &str = "https://pkg.go.dev/cmd/gofmt";
+const GOLANGCI_LINT_URL: &str = "https://golangci-lint.run/";
+const GOLANGCI_LINT_CONFIG_URL: &str = "https://golangci-lint.run/usage/configuration/";
+const GOOGLE_JAVA_FORMAT_URL: &str = "https://github.com/google/google-java-format";
+const HADOLINT_URL: &str = "https://github.com/hadolint/hadolint";
+const HADOLINT_CONFIG_URL: &str =
+    "https://github.com/hadolint/hadolint?tab=readme-ov-file#configure";
+const KTLINT_URL: &str = "https://pinterest.github.io/ktlint/latest/";
+const KTLINT_CONFIG_URL: &str =
+    "https://pinterest.github.io/ktlint/latest/rules/configuration-ktlint/";
+const LYCHEE_URL: &str = "https://lychee.cli.rs/";
+const RENOVATE_URL: &str = "https://docs.renovatebot.com/";
+const RUFF_URL: &str = "https://docs.astral.sh/ruff/";
+const RUFF_CONFIG_URL: &str = "https://docs.astral.sh/ruff/configuration/";
+const RUMDL_URL: &str = "https://rumdl.dev/";
+const RUMDL_CONFIG_URL: &str = "https://rumdl.dev/mdformat-comparison/#configuration";
+const RUSTFMT_URL: &str = "https://github.com/rust-lang/rustfmt";
+const RUSTFMT_CONFIG_URL: &str =
+    "https://github.com/rust-lang/rustfmt?tab=readme-ov-file#configuring-rustfmt";
+const SHELLCHECK_URL: &str = "https://github.com/koalaman/shellcheck";
+const SHELLCHECK_CONFIG_URL: &str =
+    "https://github.com/koalaman/shellcheck/blob/master/shellcheck.1.md";
+const SHFMT_URL: &str = "https://github.com/mvdan/sh";
+const TAPLO_URL: &str = "https://taplo.tamasfe.dev/";
+const TAPLO_CONFIG_URL: &str = "https://taplo.tamasfe.dev/configuration/file.html";
+const TYPOS_URL: &str = "https://github.com/crate-ci/typos";
+const TYPOS_CONFIG_URL: &str = "https://github.com/crate-ci/typos/blob/master/docs/reference.md";
+const XMLLINT_URL: &str = "https://github.com/jonwiggins/xmloxide";
+const YAMLLINT_CONFIG_URL: &str = "https://yamllint.readthedocs.io/en/stable/configuration.html";
+const RYL_URL: &str = "https://github.com/owenlamont/ryl";
 
 const SHELLCHECK_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir("shellcheckrc"),
@@ -98,6 +140,14 @@ fn check_shellcheck() -> Check {
     .linter_config(".shellcheckrc", "--rcfile")
     .baseline_config(ConfigFile::config_dir(".shellcheckrc"))
     .unsupported_configs(SHELLCHECK_UNSUPPORTED_CONFIGS)
+    .project_url(SHELLCHECK_URL)
+    .config_doc_url(SHELLCHECK_CONFIG_URL)
+    .overview(
+        OverviewSection::FilesFormats,
+        "Shell",
+        OverviewRole::Linter,
+        None,
+    )
     .migrate_tool_keys(&["github:koalaman/shellcheck"])
     .desc("Lint shell scripts for common mistakes")
     .style()
@@ -106,6 +156,13 @@ fn check_shellcheck() -> Check {
 fn check_shfmt() -> Check {
     Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"])
         .fix("shfmt -w {FILE}")
+        .project_url(SHFMT_URL)
+        .overview(
+            OverviewSection::FilesFormats,
+            "Shell",
+            OverviewRole::Formatter,
+            None,
+        )
         .formatter()
         .migrate_tool_keys(&["github:mvdan/sh"])
         .desc("Format shell scripts")
@@ -118,6 +175,14 @@ fn check_rumdl() -> Check {
         .linter_config(".rumdl.toml", "--config")
         .baseline_config(ConfigFile::config_dir(".rumdl.toml"))
         .unsupported_configs(RUMDL_UNSUPPORTED_CONFIGS)
+        .project_url(RUMDL_URL)
+        .config_doc_url(RUMDL_CONFIG_URL)
+        .overview(
+            OverviewSection::FilesFormats,
+            "Markdown",
+            OverviewRole::Both,
+            None,
+        )
         .check_type(&rumdl::CHECK_TYPE)
         .nonverbose_filter_prefixes(&["Success: No issues found in "])
         .formatter()
@@ -135,6 +200,14 @@ fn check_yaml_lint() -> Check {
         .linter_config(".yamllint.yml", "-c")
         .baseline_config(ConfigFile::config_dir(".yamllint.yml"))
         .unsupported_configs(YAMLLINT_UNSUPPORTED_CONFIGS)
+        .project_url(RYL_URL)
+        .config_doc_url(YAMLLINT_CONFIG_URL)
+        .overview(
+            OverviewSection::FilesFormats,
+            "YAML",
+            OverviewRole::Both,
+            None,
+        )
         .check_type(&yamllint::CHECK_TYPE)
         .formatter()
         .desc("Lint YAML files for style and consistency")
@@ -152,6 +225,14 @@ fn check_taplo() -> Check {
     .linter_config(".taplo.toml", "--config")
     .baseline_config(ConfigFile::config_dir(".taplo.toml"))
     .unsupported_configs(TAPLO_UNSUPPORTED_CONFIGS)
+    .project_url(TAPLO_URL)
+    .config_doc_url(TAPLO_CONFIG_URL)
+    .overview(
+        OverviewSection::FilesFormats,
+        "TOML",
+        OverviewRole::Formatter,
+        None,
+    )
     .check_type(&taplo::CHECK_TYPE)
     .stderr_filter_prefixes(&[" INFO taplo:"])
     .nonverbose_failure_output(taplo::normalize_nonverbose_failure_output)
@@ -180,6 +261,14 @@ fn check_actionlint() -> Check {
     .linter_config("actionlint.yml", "-config-file")
     .baseline_config(ConfigFile::config_dir("actionlint.yml"))
     .unsupported_configs(ACTIONLINT_UNSUPPORTED_CONFIGS)
+    .project_url(ACTIONLINT_URL)
+    .config_doc_url(ACTIONLINT_CONFIG_URL)
+    .overview(
+        OverviewSection::ToolingCi,
+        "GitHub Actions",
+        OverviewRole::Check,
+        None,
+    )
     .desc("Lint GitHub Actions workflow files")
     .style()
 }
@@ -193,6 +282,14 @@ fn check_hadolint() -> Check {
     .linter_config(".hadolint.yaml", "--config")
     .baseline_config(ConfigFile::config_dir(".hadolint.yaml"))
     .unsupported_configs(HADOLINT_UNSUPPORTED_CONFIGS)
+    .project_url(HADOLINT_URL)
+    .config_doc_url(HADOLINT_CONFIG_URL)
+    .overview(
+        OverviewSection::ToolingCi,
+        "Dockerfile",
+        OverviewRole::Check,
+        None,
+    )
     .desc("Lint Dockerfiles")
     .style()
 }
@@ -200,6 +297,13 @@ fn check_hadolint() -> Check {
 fn check_xmllint() -> Check {
     Check::files("xmllint", "xmllint --noout {FILES}", &["*.xml"])
         .mise_tool("aqua:jonwiggins/xmloxide")
+        .project_url(XMLLINT_URL)
+        .overview(
+            OverviewSection::FilesFormats,
+            "XML",
+            OverviewRole::Linter,
+            None,
+        )
         .migrate_tool_keys(&["cargo:xmloxide", "github:jonwiggins/xmloxide"])
         .desc("Validate XML files are well-formed")
 }
@@ -210,6 +314,14 @@ fn check_typos() -> Check {
         .linter_config("_typos.toml", "--config")
         .baseline_config(ConfigFile::config_dir("_typos.toml"))
         .unsupported_configs(TYPOS_UNSUPPORTED_CONFIGS)
+        .project_url(TYPOS_URL)
+        .config_doc_url(TYPOS_CONFIG_URL)
+        .overview(
+            OverviewSection::General,
+            "Spelling",
+            OverviewRole::Check,
+            Some("Spelling in source and text files"),
+        )
         .check_type(&typos::CHECK_TYPE)
         .migrate_tool_keys(&["codespell", "pipx:codespell", "aqua:crate-ci/typos"])
         .desc("Check for common spelling mistakes")
@@ -227,6 +339,14 @@ fn check_editorconfig_checker() -> Check {
         .linter_config(".editorconfig-checker.json", "-config")
         .baseline_triggers(EDITORCONFIG_CHECKER_BASELINE_TRIGGERS)
         .unsupported_configs(EDITORCONFIG_CHECKER_UNSUPPORTED_CONFIGS)
+        .project_url(EDITORCONFIG_CHECKER_URL)
+        .config_doc_url(EDITORCONFIG_CHECKER_CONFIG_URL)
+        .overview(
+            OverviewSection::General,
+            "EditorConfig",
+            OverviewRole::Check,
+            Some("EditorConfig compliance"),
+        )
         .desc("Check files comply with EditorConfig settings")
 }
 
@@ -239,6 +359,9 @@ fn check_golangci_lint() -> Check {
     .linter_config(".golangci.yml", "--config")
     .baseline_config(ConfigFile::config_dir(".golangci.yml"))
     .unsupported_configs(GOLANGCI_LINT_UNSUPPORTED_CONFIGS)
+    .project_url(GOLANGCI_LINT_URL)
+    .config_doc_url(GOLANGCI_LINT_CONFIG_URL)
+    .overview(OverviewSection::Languages, "Go", OverviewRole::Linter, None)
     .desc("Lint Go code; uses --new-from-rev to scope analysis to changed code")
     .lang()
 }
@@ -249,6 +372,14 @@ fn check_ruff() -> Check {
         .linter_config("ruff.toml", "--config")
         .baseline_config(RUFF_BASELINE_CONFIG)
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
+        .project_url(RUFF_URL)
+        .config_doc_url(RUFF_CONFIG_URL)
+        .overview(
+            OverviewSection::Languages,
+            "Python",
+            OverviewRole::Linter,
+            None,
+        )
         .migrate_tool_keys(&["pipx:ruff", "github:astral-sh/ruff"])
         .desc("Lint Python code")
         .lang()
@@ -261,6 +392,14 @@ fn check_ruff_format() -> Check {
         .linter_config("ruff.toml", "--config")
         .baseline_config(RUFF_BASELINE_CONFIG)
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
+        .project_url(RUFF_URL)
+        .config_doc_url(RUFF_CONFIG_URL)
+        .overview(
+            OverviewSection::Languages,
+            "Python",
+            OverviewRole::Formatter,
+            None,
+        )
         .formatter()
         .desc("Format Python code")
         .mise_tool("ruff")
@@ -276,6 +415,14 @@ fn check_biome() -> Check {
     .fix("biome check --fix {FILE}")
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
+    .project_url(BIOME_URL)
+    .config_doc_url(BIOME_CONFIG_URL)
+    .overview(
+        OverviewSection::Languages,
+        "JavaScript / TypeScript",
+        OverviewRole::Linter,
+        None,
+    )
     .check_type(&biome::CHECK_TYPE)
     .migrate_tool_keys(&["npm:@biomejs/biome"])
     .desc("Lint JS/TS/JSON files")
@@ -292,6 +439,14 @@ fn check_biome_format() -> Check {
     .fix("biome format --write {FILE}")
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
+    .project_url(BIOME_URL)
+    .config_doc_url(BIOME_CONFIG_URL)
+    .overview(
+        OverviewSection::Languages,
+        "JavaScript / TypeScript",
+        OverviewRole::Formatter,
+        None,
+    )
     .check_type(&biome::CHECK_TYPE)
     .formatter()
     .desc("Format JS/TS/JSON files")
@@ -314,6 +469,13 @@ fn check_cargo_clippy() -> Check {
         "'cargo-clippy' is not installed for the toolchain",
     )
     .workflow_setup(WorkflowSetup::RustComponents)
+    .project_url(CLIPPY_URL)
+    .overview(
+        OverviewSection::Languages,
+        "Rust",
+        OverviewRole::Linter,
+        None,
+    )
     .desc("Lint Rust code; runs on all .rs files, not just changed")
     .lang()
 }
@@ -324,6 +486,14 @@ fn check_cargo_fmt() -> Check {
         .linter_config("rustfmt.toml", "--config-path")
         .baseline_config(RUSTFMT_BASELINE_CONFIG)
         .unsupported_configs(RUSTFMT_UNSUPPORTED_CONFIGS)
+        .project_url(RUSTFMT_URL)
+        .config_doc_url(RUSTFMT_CONFIG_URL)
+        .overview(
+            OverviewSection::Languages,
+            "Rust",
+            OverviewRole::Formatter,
+            None,
+        )
         .check_type(&rustfmt::CHECK_TYPE)
         .bin("rustfmt")
         .mise_tool("rust")
@@ -341,6 +511,13 @@ fn check_gofmt() -> Check {
         .fix("gofmt -w {FILE}")
         .mise_tool("go")
         .toolchain()
+        .project_url(GOFMT_URL)
+        .overview(
+            OverviewSection::Languages,
+            "Go",
+            OverviewRole::Formatter,
+            None,
+        )
         .formatter()
         .desc("Format Go code")
         .lang()
@@ -364,6 +541,13 @@ fn check_google_java_format() -> Check {
         "ubi:google/google-java-format",
         "github:google/google-java-format",
     ])
+    .project_url(GOOGLE_JAVA_FORMAT_URL)
+    .overview(
+        OverviewSection::Languages,
+        "Java",
+        OverviewRole::Formatter,
+        None,
+    )
     .desc("Format Java code")
     .lang()
 }
@@ -381,6 +565,14 @@ fn check_ktlint() -> Check {
     )
     .windows_java_jar()
     .formatter()
+    .project_url(KTLINT_URL)
+    .config_doc_url(KTLINT_CONFIG_URL)
+    .overview(
+        OverviewSection::Languages,
+        "Kotlin",
+        OverviewRole::Both,
+        None,
+    )
     .migrate_tool_keys(&["ubi:pinterest/ktlint"])
     .migrate_tool_keys(&["github:pinterest/ktlint"])
     .desc("Lint and format Kotlin code")
@@ -398,6 +590,13 @@ fn check_dotnet_format() -> Check {
     .bin("dotnet")
     .mise_tool("dotnet")
     .toolchain()
+    .project_url(DOTNET_FORMAT_URL)
+    .overview(
+        OverviewSection::Languages,
+        "C#",
+        OverviewRole::Formatter,
+        None,
+    )
     .formatter()
     .desc("Format C# code")
     .lang()
@@ -405,6 +604,13 @@ fn check_dotnet_format() -> Check {
 
 fn check_lychee() -> Check {
     Check::native(&lychee::CHECK_TYPE)
+        .project_url(LYCHEE_URL)
+        .overview(
+            OverviewSection::General,
+            "Links",
+            OverviewRole::Check,
+            Some("Broken links"),
+        )
         .desc("Check for broken links")
         .docs(
             "Orchestrates [lychee](https://lychee.cli.rs/) for link checking. \
@@ -444,6 +650,13 @@ fn check_renovate_deps() -> Check {
         .adaptive_relevance(renovate_deps::adaptive_relevance)
         .mise_tool("npm:renovate")
         .patterns(RENOVATE_CONFIG_PATTERNS)
+        .project_url(RENOVATE_URL)
+        .overview(
+            OverviewSection::General,
+            "Renovate",
+            OverviewRole::Check,
+            Some("Dependency update configuration"),
+        )
         .desc("Verify Renovate dependency snapshot is up to date")
         .docs(
             "Verifies `renovate-tracked-deps.json` next to the active Renovate\n\
@@ -482,13 +695,42 @@ fn check_license_header() -> Check {
     Check::native(&license_header::CHECK_TYPE)
         .activate_unconditionally()
         .status_hook(license_header::status)
+        .overview(
+            OverviewSection::General,
+            "License headers",
+            OverviewRole::Check,
+            Some("Required file header text"),
+        )
         .desc("Check source files have the required license header")
+        .docs(
+            "Disabled by default. Configure in `flint.toml`:\n\
+            \n\
+            ```toml\n\
+            [checks.license-header]\n\
+            text = \"SPDX-License-Identifier: Apache-2.0\"\n\
+            patterns = [\"*.java\", \"*.kt\"]\n\
+            lines_to_check = 5\n\
+            ```\n\
+            \n\
+            - `text` — required header text to find near the top of each file\n\
+            - `patterns` — glob patterns selecting which files to check\n\
+            - `lines_to_check` — how many leading lines to search; defaults to `5`\n\
+            \n\
+            `text` may be multi-line. Flint joins the first `lines_to_check` lines with\n\
+            newlines and checks whether that text contains the configured header snippet.",
+        )
 }
 
 fn check_flint_setup() -> Check {
     Check::native(&flint_setup::CHECK_TYPE)
         .activate_unconditionally()
         .patterns(&["mise.toml"])
+        .overview(
+            OverviewSection::General,
+            "Flint setup",
+            OverviewRole::Check,
+            Some("Flint-managed setup and `mise.toml` layout"),
+        )
         .desc("Keep Flint setup current and mise.toml lint tooling canonical")
         .docs(
             "Checks the repo's Flint-managed setup state and `mise.toml` layout.\n\

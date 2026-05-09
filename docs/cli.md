@@ -67,12 +67,19 @@ have changed. Config-file triggers are detected from the raw git change list, so
 they still apply when the config path itself is excluded from ordinary lint file
 selection.
 
-Flint intentionally supports one canonical config filename per linter when it
-passes config paths explicitly. If an active linter has a known alternate
-upstream config file, Flint fails before running the linter instead of silently
-ignoring or partially auto-discovering that config. Move the config to the
-Flint-managed filename under `FLINT_CONFIG_DIR`, or remove the alternate file.
-Biome is the exception: its canonical config is root `biome.jsonc`.
+### Canonical config filenames
+
+When Flint passes config paths explicitly, it supports one canonical config
+filename per linter. If an active linter has a known alternate upstream config
+file, Flint fails before running the linter instead of silently ignoring or
+partially auto-discovering that config.
+
+Move the config to the Flint-managed filename under `FLINT_CONFIG_DIR`, or
+remove the alternate file.
+
+> [!NOTE]
+> Biome is the exception: its canonical config is root `biome.jsonc`, not a
+> file under `FLINT_CONFIG_DIR`.
 
 **`--short` output** — failed checks partitioned by fixability, fixable ones
 expressed as the exact command to run:

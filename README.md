@@ -187,39 +187,52 @@ Rust via `rustfmt`, and Java via `google-java-format`.
 
 ### Built-in linter registry
 
-Click a name in the table below for details. See the
-[linter reference](docs/linters.md) for scope semantics and per-linter notes.
+Click a linter name in the overview tables below for Flint-specific details. See the
+[linter reference](docs/linters.md) for Flint-specific details, config links,
+scope semantics, and per-linter notes.
 
 <!-- registry-table-start -->
 <!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
 
-| Name                                                           | Description                                                         | Fix |
-| -------------------------------------------------------------- | ------------------------------------------------------------------- | --- |
-| [`actionlint`](docs/linters.md#actionlint)                     | Lint GitHub Actions workflow files                                  | —   |
-| [`biome`](docs/linters.md#biome)                               | Lint JS/TS/JSON files                                               | yes |
-| [`biome-format`](docs/linters.md#biome-format)                 | Format JS/TS/JSON files                                             | yes |
-| [`cargo-clippy`](docs/linters.md#cargo-clippy)                 | Lint Rust code; runs on all .rs files, not just changed             | yes |
-| [`cargo-fmt`](docs/linters.md#cargo-fmt)                       | Format Rust code; runs on all .rs files, not just changed           | yes |
-| [`dotnet-format`](docs/linters.md#dotnet-format)               | Format C# code                                                      | yes |
-| [`editorconfig-checker`](docs/linters.md#editorconfig-checker) | Check files comply with EditorConfig settings                       | —   |
-| [`flint-setup`](docs/linters.md#flint-setup)                   | Keep Flint setup current and mise.toml lint tooling canonical       | yes |
-| [`gofmt`](docs/linters.md#gofmt)                               | Format Go code                                                      | yes |
-| [`golangci-lint`](docs/linters.md#golangci-lint)               | Lint Go code; uses --new-from-rev to scope analysis to changed code | —   |
-| [`google-java-format`](docs/linters.md#google-java-format)     | Format Java code                                                    | yes |
-| [`hadolint`](docs/linters.md#hadolint)                         | Lint Dockerfiles                                                    | —   |
-| [`ktlint`](docs/linters.md#ktlint)                             | Lint and format Kotlin code                                         | yes |
-| [`license-header`](docs/linters.md#license-header)             | Check source files have the required license header                 | —   |
-| [`lychee`](docs/linters.md#lychee)                             | Check for broken links                                              | —   |
-| [`renovate-deps`](docs/linters.md#renovate-deps)               | Verify Renovate dependency snapshot is up to date                   | yes |
-| [`ruff`](docs/linters.md#ruff)                                 | Lint Python code                                                    | yes |
-| [`ruff-format`](docs/linters.md#ruff-format)                   | Format Python code                                                  | yes |
-| [`rumdl`](docs/linters.md#rumdl)                               | Lint Markdown files for style and consistency                       | yes |
-| [`ryl`](docs/linters.md#ryl)                                   | Lint YAML files for style and consistency                           | yes |
-| [`shellcheck`](docs/linters.md#shellcheck)                     | Lint shell scripts for common mistakes                              | —   |
-| [`shfmt`](docs/linters.md#shfmt)                               | Format shell scripts                                                | yes |
-| [`taplo`](docs/linters.md#taplo)                               | Format TOML files                                                   | yes |
-| [`typos`](docs/linters.md#typos)                               | Check for common spelling mistakes                                  | yes |
-| [`xmllint`](docs/linters.md#xmllint)                           | Validate XML files are well-formed                                  | —   |
+### Languages
+
+| Name                    | Linter                                           | Formatter                                                  |
+| ----------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
+| C#                      | —                                                | [`dotnet-format`](docs/linters.md#dotnet-format)           |
+| Go                      | [`golangci-lint`](docs/linters.md#golangci-lint) | [`gofmt`](docs/linters.md#gofmt)                           |
+| Java                    | —                                                | [`google-java-format`](docs/linters.md#google-java-format) |
+| JavaScript / TypeScript | [`biome`](docs/linters.md#biome)                 | [`biome-format`](docs/linters.md#biome-format)             |
+| Kotlin                  | [`ktlint`](docs/linters.md#ktlint)               | [`ktlint`](docs/linters.md#ktlint)                         |
+| Python                  | [`ruff`](docs/linters.md#ruff)                   | [`ruff-format`](docs/linters.md#ruff-format)               |
+| Rust                    | [`cargo-clippy`](docs/linters.md#cargo-clippy)   | [`cargo-fmt`](docs/linters.md#cargo-fmt)                   |
+
+### Files / Formats
+
+| Name     | Linter                                     | Formatter                        |
+| -------- | ------------------------------------------ | -------------------------------- |
+| Markdown | [`rumdl`](docs/linters.md#rumdl)           | [`rumdl`](docs/linters.md#rumdl) |
+| Shell    | [`shellcheck`](docs/linters.md#shellcheck) | [`shfmt`](docs/linters.md#shfmt) |
+| TOML     | —                                          | [`taplo`](docs/linters.md#taplo) |
+| XML      | [`xmllint`](docs/linters.md#xmllint)       | —                                |
+| YAML     | [`ryl`](docs/linters.md#ryl)               | [`ryl`](docs/linters.md#ryl)     |
+
+### Tooling / CI
+
+| Name           | Check                                      |
+| -------------- | ------------------------------------------ |
+| Dockerfile     | [`hadolint`](docs/linters.md#hadolint)     |
+| GitHub Actions | [`actionlint`](docs/linters.md#actionlint) |
+
+### General
+
+| Name            | Check                                                          | Description                                |
+| --------------- | -------------------------------------------------------------- | ------------------------------------------ |
+| EditorConfig    | [`editorconfig-checker`](docs/linters.md#editorconfig-checker) | EditorConfig compliance                    |
+| Flint setup     | [`flint-setup`](docs/linters.md#flint-setup)                   | Flint-managed setup and `mise.toml` layout |
+| License headers | [`license-header`](docs/linters.md#license-header)             | Required file header text                  |
+| Links           | [`lychee`](docs/linters.md#lychee)                             | Broken links                               |
+| Renovate        | [`renovate-deps`](docs/linters.md#renovate-deps)               | Dependency update configuration            |
+| Spelling        | [`typos`](docs/linters.md#typos)                               | Spelling in source and text files          |
 
 <!-- registry-table-end -->
 

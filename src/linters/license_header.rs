@@ -9,8 +9,10 @@ use crate::registry::{
     PreparedNativeCheck, StatusContext,
 };
 
-pub(crate) static CHECK_TYPE: CheckTypeDef =
-    CheckTypeDef::native("license-header", NativeCheckDef::new(prepare));
+pub(crate) static CHECK_TYPE: CheckTypeDef = CheckTypeDef::native(
+    "license-header",
+    NativeCheckDef::new(prepare).with_config_display("via `[checks.license-header]` in flint.toml"),
+);
 
 #[derive(Debug)]
 struct PreparedLicenseHeader {

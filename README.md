@@ -11,6 +11,8 @@
 </p>
 <!-- markdownlint-enable MD033 MD041 -->
 
+[CLI reference](docs/cli.md) · [Linters](docs/linters.md) · [Why flint?](docs/why.md) · [Alternatives](docs/alternatives.md)
+
 Linter runner built for speed, consistency, and low setup friction:
 
 - **Fast** — native execution (no Docker), parallel, diff-aware
@@ -108,7 +110,7 @@ For more commands and flags, see the [CLI reference](docs/cli.md).
 > [!NOTE]
 > In rare cases (currently only `renovate-deps`) a failure may show up
 > only in CI. That is a deliberate performance optimization — see
-> [adaptive runs](#adaptive-runs). When it happens, flint prints the
+> [adaptive runs](docs/cli.md#adaptive-runs). When it happens, flint prints the
 > command to reproduce locally (usually `--full` or the linter name).
 
 ## Linters
@@ -158,39 +160,12 @@ For more commands and flags, see the [CLI reference](docs/cli.md).
 
 <!-- registry-table-end -->
 
-## Reference
-
-### CLI
-
-See the [CLI reference](docs/cli.md) for commands, flags, and examples.
-
-For command details, config behavior, and per-linter config filenames, see the
-[CLI reference](docs/cli.md) and [linter reference](docs/linters.md).
-
-### Adaptive runs
-
-Some linters are expensive enough that running them on every local
-`flint run` would slow the inner loop. For those, `flint run` skips the
-linter when none of the changed files could plausibly affect its result.
-CI is unaffected — it always runs the full set.
-
-Affected linters:
-
-| Linter                                                              | Skipped locally when…                                           |
-| ------------------------------------------------------------------- | --------------------------------------------------------------- |
-| [`renovate-deps`](docs/linters/renovate-deps.md#when-does-this-run) | No change to Renovate config, the snapshot, or any tracked file |
-
-To force a local run of a skipped linter:
-
-- `flint run --full` — runs every active linter
-- `flint run <linter>` — runs just that one
-
 ## FAQ
 
 ### How does Flint know which linters to run?
 
 Flint activates checks from your repo's `mise.toml`: if a Flint-managed tool is
-pinned there, that check is active; if it is not pinned, Flint skips it.
+declared there, that check is active; if it is not declared, Flint skips it.
 
 ## Versioning
 

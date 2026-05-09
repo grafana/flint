@@ -17,14 +17,17 @@ it do not need to re-learn the interface.
 | Flag                 | Description                                                                                                          |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `--fix`              | Fix what's fixable, report `clean` / `fixed` / `partial` / `review` outcomes; exit non-zero if anything needs action |
+| `--allow-fixed`      | In `--fix` mode, exit 0 when all reported issues were fixed successfully                                             |
 | `--full`             | Lint all files instead of only changed files                                                                         |
 | `--short`            | Compact summary output, no per-check noise                                                                           |
 | `--verbose`          | Show all linter output, not just failures                                                                            |
 | `--new-from-rev REV` | Diff base (default: merge base with base branch)                                                                     |
 | `--to-ref REF`       | Diff head (default: HEAD)                                                                                            |
+| `--time`             | Show how long each linter took to run                                                                                |
 
-Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`,
-`FLINT_VERBOSE`, `FLINT_SHORT`, `FLINT_NEW_FROM_REV`, `FLINT_TO_REF`.
+Most flags have an env var equivalent: `FLINT_FIX`, `FLINT_FULL`,
+`FLINT_VERBOSE`, `FLINT_SHORT`, `FLINT_NEW_FROM_REV`, `FLINT_TO_REF`, and
+`FLINT_TIME`. `--allow-fixed` has no env var binding.
 
 ## Intended use by context
 
@@ -66,6 +69,24 @@ only applies in changed-file mode, and only to checks whose lint coverage may
 have changed. Config-file triggers are detected from the raw git change list, so
 they still apply when the config path itself is excluded from ordinary lint file
 selection.
+
+## Adaptive runs
+
+Some linters are expensive enough that running them on every local
+`flint run` would slow the inner loop. For those, `flint run` skips the
+linter when none of the changed files could plausibly affect its result.
+CI is unaffected — it always runs the full set.
+
+Affected linters:
+
+| Linter                                                              | Skipped locally when…                                           |
+| ------------------------------------------------------------------- | --------------------------------------------------------------- |
+| [`renovate-deps`](linters/renovate-deps.md#when-does-this-run)      | No change to Renovate config, the snapshot, or any tracked file |
+
+To force a local run of a skipped linter:
+
+- `flint run --full` — runs every active linter
+- `flint run <linter>` — runs just that one
 
 ### Canonical config filenames
 

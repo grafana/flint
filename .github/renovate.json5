@@ -18,46 +18,6 @@
   customManagers: [
     {
       customType: "regex",
-      description: "Update SHA-pinned raw.githubusercontent.com URLs in README.md",
-      managerFilePatterns: ["/^README\\.md$/"],
-      matchStrings: ["https://raw\\.githubusercontent\\.com/(?<depName>[^/]+/[^/]+)/(?<currentDigest>[a-f0-9]{40})/.*#\\s*(?<currentValue>v\\S+)"],
-      datasourceTemplate: "github-tags",
-    },
-    {
-      customType: "regex",
-      description: "Update shellcheck version in README quickstart example",
-      managerFilePatterns: ["/^README\\.md$/"],
-      matchStrings: [
-        "# Add whichever linters apply to your repo:\\n[\\s\\S]*?shellcheck\\s*=\\s*\"(?<currentValue>[^\"]+)\"[\\s\\S]*?\\n```",
-      ],
-      datasourceTemplate: "github-releases",
-      depNameTemplate: "shellcheck",
-      packageNameTemplate: "koalaman/shellcheck",
-    },
-    {
-      customType: "regex",
-      description: "Update shfmt version in README quickstart example",
-      managerFilePatterns: ["/^README\\.md$/"],
-      matchStrings: [
-        "# Add whichever linters apply to your repo:\\n[\\s\\S]*?shfmt\\s*=\\s*\"(?<currentValue>[^\"]+)\"[\\s\\S]*?\\n```",
-      ],
-      datasourceTemplate: "github-releases",
-      depNameTemplate: "shfmt",
-      packageNameTemplate: "mvdan/sh",
-    },
-    {
-      customType: "regex",
-      description: "Update actionlint version in README quickstart example",
-      managerFilePatterns: ["/^README\\.md$/"],
-      matchStrings: [
-        "# Add whichever linters apply to your repo:\\n[\\s\\S]*?actionlint\\s*=\\s*\"(?<currentValue>[^\"]+)\"[\\s\\S]*?\\n```",
-      ],
-      datasourceTemplate: "github-releases",
-      depNameTemplate: "actionlint",
-      packageNameTemplate: "rhysd/actionlint",
-    },
-    {
-      customType: "regex",
       description: "Update mise version in GitHub Actions workflows",
       managerFilePatterns: ["/(^|/)(workflow-templates|\\.(?:github|gitea|forgejo)/(?:workflows|actions))/.+\\.ya?ml$/", "/(^|/)action\\.ya?ml$/"],
       datasourceTemplate: "github-release-attachments",

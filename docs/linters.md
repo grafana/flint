@@ -23,13 +23,14 @@ relevant upstream configuration docs when available.
 
 ### Files / Formats
 
-| Name     | Linter                      | Formatter         |
-| -------- | --------------------------- | ----------------- |
-| Markdown | [`rumdl`](#rumdl)           | [`rumdl`](#rumdl) |
-| Shell    | [`shellcheck`](#shellcheck) | [`shfmt`](#shfmt) |
-| TOML     | —                           | [`taplo`](#taplo) |
-| XML      | [`xmllint`](#xmllint)       | —                 |
-| YAML     | [`ryl`](#ryl)               | [`ryl`](#ryl)     |
+| Name     | Linter                      | Formatter                       |
+| -------- | --------------------------- | ------------------------------- |
+| JSON     | [`biome`](#biome)           | [`biome-format`](#biome-format) |
+| Markdown | [`rumdl`](#rumdl)           | [`rumdl`](#rumdl)               |
+| Shell    | [`shellcheck`](#shellcheck) | [`shfmt`](#shfmt)               |
+| TOML     | —                           | [`taplo`](#taplo)               |
+| XML      | [`xmllint`](#xmllint)       | —                               |
+| YAML     | [`ryl`](#ryl)               | [`ryl`](#ryl)                   |
 
 ### Tooling / CI
 

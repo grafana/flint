@@ -921,26 +921,25 @@ fn generate_overview_tables(registry: &[Check], link_target: OverviewLinkTarget)
         BTreeMap::new();
 
     for check in registry {
-        let Some(overview) = check.overview else {
-            continue;
-        };
-        let row = sections
-            .entry(overview.section)
-            .or_default()
-            .entry(overview.row_name)
-            .or_default();
-        let link = overview_name_cell(check, link_target);
-        match overview.role {
-            OverviewRole::Linter => row.linter = Some(link),
-            OverviewRole::Formatter => row.formatter = Some(link),
-            OverviewRole::Check => row.checks.push(link),
-            OverviewRole::Both => {
-                row.linter = Some(link.clone());
-                row.formatter = Some(link);
+        for overview in &check.overviews {
+            let row = sections
+                .entry(overview.section)
+                .or_default()
+                .entry(overview.row_name)
+                .or_default();
+            let link = overview_name_cell(check, link_target);
+            match overview.role {
+                OverviewRole::Linter => row.linter = Some(link),
+                OverviewRole::Formatter => row.formatter = Some(link),
+                OverviewRole::Check => row.checks.push(link),
+                OverviewRole::Both => {
+                    row.linter = Some(link.clone());
+                    row.formatter = Some(link);
+                }
             }
-        }
-        if let Some(description) = overview.description {
-            row.description = Some(description);
+            if let Some(description) = overview.description {
+                row.description = Some(description);
+            }
         }
     }
 

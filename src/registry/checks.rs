@@ -423,6 +423,12 @@ fn check_biome() -> Check {
         OverviewRole::Linter,
         None,
     )
+    .overview(
+        OverviewSection::FilesFormats,
+        "JSON",
+        OverviewRole::Linter,
+        None,
+    )
     .check_type(&biome::CHECK_TYPE)
     .migrate_tool_keys(&["npm:@biomejs/biome"])
     .desc("Lint JS/TS/JSON files")
@@ -444,6 +450,12 @@ fn check_biome_format() -> Check {
     .overview(
         OverviewSection::Languages,
         "JavaScript / TypeScript",
+        OverviewRole::Formatter,
+        None,
+    )
+    .overview(
+        OverviewSection::FilesFormats,
+        "JSON",
         OverviewRole::Formatter,
         None,
     )

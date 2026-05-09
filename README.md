@@ -9,9 +9,14 @@
   <a href="https://github.com/grafana/flint/actions/workflows/lint.yml"><img src="https://github.com/grafana/flint/actions/workflows/lint.yml/badge.svg" alt="Lint"></a>
   <a href="https://github.com/grafana/flint/releases"><img src="https://img.shields.io/github/v/release/grafana/flint" alt="GitHub Release"></a>
 </p>
-<!-- markdownlint-enable MD033 MD041 -->
 
-[CLI reference](docs/cli.md) · [Linters](docs/linters.md) · [Why flint?](docs/why.md) · [Alternatives](docs/alternatives.md)
+<p align="center">
+  <a href="docs/cli.md">CLI reference</a> ·
+  <a href="docs/linters.md">Linters</a> ·
+  <a href="docs/why.md">Why flint?</a> ·
+  <a href="docs/alternatives.md">Alternatives</a>
+</p>
+<!-- markdownlint-enable MD033 MD041 -->
 
 Linter runner built for speed, consistency, and low setup friction:
 
@@ -132,13 +137,14 @@ For more commands and flags, see the [CLI reference](docs/cli.md).
 
 ### Files / Formats
 
-| Name     | Linter                                     | Formatter                        |
-| -------- | ------------------------------------------ | -------------------------------- |
-| Markdown | [`rumdl`](docs/linters.md#rumdl)           | [`rumdl`](docs/linters.md#rumdl) |
-| Shell    | [`shellcheck`](docs/linters.md#shellcheck) | [`shfmt`](docs/linters.md#shfmt) |
-| TOML     | —                                          | [`taplo`](docs/linters.md#taplo) |
-| XML      | [`xmllint`](docs/linters.md#xmllint)       | —                                |
-| YAML     | [`ryl`](docs/linters.md#ryl)               | [`ryl`](docs/linters.md#ryl)     |
+| Name     | Linter                                     | Formatter                                      |
+| -------- | ------------------------------------------ | ---------------------------------------------- |
+| JSON     | [`biome`](docs/linters.md#biome)           | [`biome-format`](docs/linters.md#biome-format) |
+| Markdown | [`rumdl`](docs/linters.md#rumdl)           | [`rumdl`](docs/linters.md#rumdl)               |
+| Shell    | [`shellcheck`](docs/linters.md#shellcheck) | [`shfmt`](docs/linters.md#shfmt)               |
+| TOML     | —                                          | [`taplo`](docs/linters.md#taplo)               |
+| XML      | [`xmllint`](docs/linters.md#xmllint)       | —                                              |
+| YAML     | [`ryl`](docs/linters.md#ryl)               | [`ryl`](docs/linters.md#ryl)                   |
 
 ### Tooling / CI
 

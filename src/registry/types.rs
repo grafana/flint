@@ -561,8 +561,8 @@ pub struct Check {
     pub project_url: Option<&'static str>,
     /// Upstream config documentation used when rendering config filenames in generated docs.
     pub config_doc_url: Option<&'static str>,
-    /// Optional placement in generated overview tables.
-    pub overview: Option<OverviewEntry>,
+    /// Optional placements in generated overview tables.
+    pub overviews: Vec<OverviewEntry>,
     /// Extended markdown documentation shown in the README detail section (behaviour, config examples).
     pub docs: &'static str,
 }
@@ -687,7 +687,7 @@ impl Check {
             desc: "",
             project_url: None,
             config_doc_url: None,
-            overview: None,
+            overviews: vec![],
             docs: "",
         }
     }
@@ -733,7 +733,7 @@ impl Check {
             desc: "",
             project_url: None,
             config_doc_url: None,
-            overview: None,
+            overviews: vec![],
             docs: "",
         }
     }
@@ -868,7 +868,7 @@ impl Check {
         role: OverviewRole,
         description: Option<&'static str>,
     ) -> Self {
-        self.overview = Some(OverviewEntry {
+        self.overviews.push(OverviewEntry {
             section,
             row_name,
             role,

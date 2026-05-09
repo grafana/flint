@@ -867,7 +867,7 @@ mod tests {
             desc: "",
             project_url: None,
             config_doc_url: None,
-            overview: None,
+            overviews: vec![],
             docs: "",
         }
     }

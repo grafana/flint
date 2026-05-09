@@ -67,6 +67,11 @@ Read the [background and principles](docs/why.md) and
    If you want non-interactive setup, run `mise exec -- flint init --yes` and
    trim any generated linter pins afterward.
 
+   For a real setup example, see grafana/docker-otel-lgtm's
+   [`mise.toml`](https://github.com/grafana/docker-otel-lgtm/blob/main/mise.toml),
+   [`flint.toml`](https://github.com/grafana/docker-otel-lgtm/blob/main/.github/config/flint.toml), and
+   [lint workflow](https://github.com/grafana/docker-otel-lgtm/blob/main/.github/workflows/lint.yml).
+
 4. Optional: install a git hook that runs `flint run --fix` before each commit:
 
    ```bash
@@ -159,56 +164,8 @@ For more commands and flags, see the [CLI reference](docs/cli.md).
 
 See the [CLI reference](docs/cli.md) for commands, flags, and examples.
 
-### Manual setup
-
-See the [CLI reference](docs/cli.md) and [linter reference](docs/linters.md).
-
-### CI setup
-
-`flint init` creates a GitHub Actions workflow when needed. If you want to wire
-CI manually, the core step looks like this:
-
-```yaml
-- name: Checkout code
-  uses: actions/checkout@...
-  with:
-    fetch-depth: 0 # needed for merge-base detection
-
-- name: Setup mise
-  uses: jdx/mise-action@...
-
-- name: Lint
-  env:
-    GITHUB_REPOSITORY: ${{ github.repository }}
-    GITHUB_BASE_REF: ${{ github.base_ref }}
-    GITHUB_HEAD_REF: ${{ github.head_ref }}
-    PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-    GITHUB_TOKEN: ${{ github.token }}
-  run: mise run lint
-```
-
-`fetch-depth: 0` is required for merge-base detection. `GITHUB_TOKEN` is needed
-by some checks that query GitHub, but not every check. If `lychee` link checks
-are enabled, see [lychee](docs/linters.md#lychee) for PR remap environment
-requirements.
-
-### Config directory
-
-Flint can keep managed config files in a directory such as `.github/config`:
-
-```toml
-[env]
-FLINT_CONFIG_DIR = ".github/config"
-```
-
-When set, Flint loads `flint.toml` from that directory and passes supported
-linter config files from there when the canonical Flint-managed filename exists.
-See the [linter reference](docs/linters.md) for per-tool config filenames and
-notes.
-
-> [!NOTE]
-> Biome stays root-discovered on purpose: `biome.jsonc` is Flint's canonical
-> Biome config location.
+For command details, config behavior, and per-linter config filenames, see the
+[CLI reference](docs/cli.md) and [linter reference](docs/linters.md).
 
 ### Adaptive runs
 

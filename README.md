@@ -41,62 +41,61 @@ Read the [background and principles](docs/why.md) and
 
 ## Getting Started
 
-### Installation
+### Install
 
-Add `flint` to your repo's `mise.toml`:
+1. Install [mise](https://mise.jdx.dev/).
 
-```toml
-[tools]
-"aqua:grafana/flint" = "0.21.0"
-```
+2. Pin Flint in your repo:
 
-Bootstrap a repo with `flint init` (scaffolds config). Install a
-pre-commit hook with `flint hook install`.
-This is appropriate even if the repo already has an existing `mise.toml`;
-`flint init` is not just for greenfield repos. You can choose which linters to
-enable during the prompt, or trim the generated tool list afterward if you run
-`flint init --yes`.
+   ```bash
+   mise use --pin aqua:grafana/flint
+   ```
 
-### mise.toml setup
+3. Initialize Flint:
 
-Flint reads your `[tools]` section to discover which linters to run — declaring
-a tool is the opt-in. No separate configuration needed to activate a check: if
-ShellCheck's Flint-managed tool key is present in `[tools]`, flint runs
-shellcheck; otherwise that check is skipped. `mise install` puts all declared
-tools on PATH; flint picks up whatever is there.
+   ```bash
+   mise exec -- flint init
+   ```
 
-Add the linting tools your project needs alongside the `flint` binary itself:
+   `flint init` prompts you to choose linters based on your repo's tracked
+   files, adds the standard `mise` lint tasks, writes `flint.toml` when needed,
+   and creates `.github/workflows/lint.yml` when the repo does not already have
+   one.
 
-```toml
-[tools]
-"aqua:grafana/flint" = "0.21.0"
+   If you want non-interactive setup, run `mise exec -- flint init --yes` and trim
+   any generated linter pins afterward.
 
-# Add whichever linters apply to your repo:
-shellcheck              = "0.11.0"
-shfmt                   = "v3.13.1"
-actionlint              = "1.7.10"
-```
+4. Optional: install a git hook that runs `flint run --fix` before each commit:
 
-Then wire up lint tasks:
+   ```bash
+   mise exec -- flint hook install
+   ```
 
-```toml
-[tasks.lint]
-description = "Run all lints"
-run = "flint run"
+5. Optional: if you use coding agents, add a linting rule like this to your
+   repo's `AGENTS.md`:
 
-[tasks."lint:fix"]
-description = "Auto-fix lint issues"
-run = "flint run --fix"
-```
+   ```text
+   ## Linting
 
-### Day-to-day use
+   Run `mise run lint:fix` before committing changes.
+   Unlike most formatter and fixer commands, this also tells you when
+   everything is already good.
+   If fixes were applied, commit before pushing.
+   If anything still fails, review the remaining output.
 
-Run lints on your changes:
+   Example output:
+   flint: fixed: gofmt — commit before pushing | partial: cargo-clippy
+   ```
+
+### Using
+
+Flint will give you feedback ...
 
 ```bash
-mise run lint        # check
-mise run lint:fix    # auto-fix what's fixable
+mise run lint:fix
 ```
+
+For more commands and flags, see the [CLI reference](docs/cli.md).
 
 > [!NOTE]
 > In rare cases (currently only `renovate-deps`) a failure may show up
@@ -104,92 +103,7 @@ mise run lint:fix    # auto-fix what's fixable
 > [adaptive runs](#adaptive-runs). When it happens, flint prints the
 > command to reproduce locally (usually `--full` or the linter name).
 
-### CI setup
-
-```yaml
-- name: Checkout code
-  uses: actions/checkout@...
-  with:
-    fetch-depth: 0 # needed for merge-base detection
-
-- name: Setup mise
-  uses: jdx/mise-action@...
-
-- name: Lint
-  env:
-    GITHUB_REPOSITORY: ${{ github.repository }}
-    GITHUB_BASE_REF: ${{ github.base_ref }}
-    GITHUB_HEAD_REF: ${{ github.head_ref }}
-    PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-    GITHUB_TOKEN: ${{ github.token }}
-  run: mise run lint
-```
-
-`fetch-depth: 0` is required for merge-base detection. `GITHUB_TOKEN` is needed
-by some checks that query GitHub, but not every check. If `lychee` link checks
-are enabled, see [lychee](docs/linters.md#lychee) for PR remap environment
-requirements.
-
----
-
-## Reference
-
-### CLI
-
-See the [CLI reference](docs/cli.md) for commands and flags.
-
-### Config (`flint.toml`)
-
-Optional. Place in the repo root (or in `FLINT_CONFIG_DIR` — see below).
-All settings have defaults.
-
-```toml
-[settings]
-# base_branch = "dev"                   # branch to diff against; defaults to "main"
-exclude = ["CHANGELOG.md", "vendor/**"] # glob patterns — exclude matching files
-```
-
-See [linters](docs/linters.md) for per-linter configuration.
-
-### `FLINT_CONFIG_DIR`
-
-Set this env var to consolidate config files in one directory (e.g. `.github/config`):
-
-```toml
-# mise.toml
-[env]
-FLINT_CONFIG_DIR = ".github/config"
-```
-
-When set, `flint.toml` is loaded from that directory, and each linter that
-supports an explicit config path via a CLI flag will have it injected
-automatically when the corresponding canonical Flint-managed file exists there
-(see the "Config file" column in the table below).
-Files that are absent are silently skipped. Some tools still rely on project-root
-discovery semantics, and some alternate upstream config locations are rejected to
-avoid config drift. In practice, Flint is opinionated about which config filename
-each linter should use, but flexible about the directory those files live in.
-
-> [!NOTE]
-> `editorconfig-checker`'s config file (`.editorconfig-checker.json`) controls
-> its own settings, not `.editorconfig` itself. Editorconfig discovery always
-> walks up from the file being linted and cannot be redirected via a flag.
-
-When a formatter explicitly owns line length for a file type, Flint writes that
-carve-out into the shared root `.editorconfig` so editors and
-`editorconfig-checker` stay aligned. Today this applies to Markdown via `rumdl`,
-Rust via `rustfmt`, and Java via `google-java-format`.
-
-> [!NOTE]
-> Biome is also root-discovered on purpose. Flint treats root `biome.jsonc` as
-> the canonical Biome config rather than managing it through
-> `FLINT_CONFIG_DIR`.
-
-### Built-in linter registry
-
-Click a linter name in the overview tables below for Flint-specific details. See the
-[linter reference](docs/linters.md) for Flint-specific details, config links,
-scope semantics, and per-linter notes.
+## Linters
 
 <!-- registry-table-start -->
 <!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
@@ -236,6 +150,82 @@ scope semantics, and per-linter notes.
 
 <!-- registry-table-end -->
 
+## Reference
+
+### CLI
+
+See the [CLI reference](docs/cli.md) for commands, flags, and examples.
+
+### Manual setup
+
+If you prefer to wire Flint in yourself instead of using `flint init`, add Flint
+and whichever linters you want to your repo's `mise.toml`:
+
+```toml
+[tools]
+"aqua:grafana/flint" = "0.21.0"
+
+# Add whichever linters apply to your repo:
+shellcheck = "0.11.0"
+shfmt = "v3.13.1"
+actionlint = "1.7.10"
+
+[tasks.lint]
+description = "Run all lints"
+run = "flint run"
+
+[tasks."lint:fix"]
+description = "Auto-fix lint issues"
+run = "flint run --fix"
+```
+
+### CI setup
+
+`flint init` creates a GitHub Actions workflow when needed. If you want to wire
+CI manually, the core step looks like this:
+
+```yaml
+- name: Checkout code
+  uses: actions/checkout@...
+  with:
+    fetch-depth: 0 # needed for merge-base detection
+
+- name: Setup mise
+  uses: jdx/mise-action@...
+
+- name: Lint
+  env:
+    GITHUB_REPOSITORY: ${{ github.repository }}
+    GITHUB_BASE_REF: ${{ github.base_ref }}
+    GITHUB_HEAD_REF: ${{ github.head_ref }}
+    PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+    GITHUB_TOKEN: ${{ github.token }}
+  run: mise run lint
+```
+
+`fetch-depth: 0` is required for merge-base detection. `GITHUB_TOKEN` is needed
+by some checks that query GitHub, but not every check. If `lychee` link checks
+are enabled, see [lychee](docs/linters.md#lychee) for PR remap environment
+requirements.
+
+### Config directory
+
+Flint can keep managed config files in a directory such as `.github/config`:
+
+```toml
+[env]
+FLINT_CONFIG_DIR = ".github/config"
+```
+
+When set, Flint loads `flint.toml` from that directory and passes supported
+linter config files from there when the canonical Flint-managed filename exists.
+See the [linter reference](docs/linters.md) for per-tool config filenames and
+notes.
+
+> [!NOTE]
+> Biome stays root-discovered on purpose: `biome.jsonc` is Flint's canonical
+> Biome config location.
+
 ### Adaptive runs
 
 Some linters are expensive enough that running them on every local
@@ -253,6 +243,13 @@ To force a local run of a skipped linter:
 
 - `flint run --full` — runs every active linter
 - `flint run <linter>` — runs just that one
+
+## FAQ
+
+### How does Flint know which linters to run?
+
+Flint activates checks from your repo's `mise.toml`: if a Flint-managed tool is
+pinned there, that check is active; if it is not pinned, Flint skips it.
 
 ## Versioning
 

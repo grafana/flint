@@ -39,8 +39,16 @@ if git diff --quiet; then
 	exit 0
 fi
 
-git -c user.name='github-actions[bot]' \
-	-c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+# Derive commit identity from the token so it matches the GitHub actor
+# that owns the push (e.g. github-actions[bot] for GITHUB_TOKEN, a real
+# user for a PAT).
+gh_user="$(GH_TOKEN="${usage_git_token}" gh api user)"
+git_login="$(jq -r .login <<<"${gh_user}")"
+git_id="$(jq -r .id <<<"${gh_user}")"
+git_email="${git_id}+${git_login}@users.noreply.github.com"
+
+git -c user.name="${git_login}" \
+	-c user.email="${git_email}" \
 	commit -am "chore: sync README snippets"
 
 remote_url="https://x-access-token:${usage_git_token}@github.com/${GITHUB_REPOSITORY}.git"

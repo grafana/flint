@@ -45,25 +45,27 @@ Read the [background and principles](docs/why.md) and
 
 1. Install [mise](https://mise.jdx.dev/).
 
-2. Pin Flint in your repo:
+2. Add Flint to your repo:
 
    ```bash
    mise use --pin aqua:grafana/flint
    ```
 
-3. Initialize Flint:
+3. Let Flint scaffold the setup:
 
    ```bash
    mise exec -- flint init
    ```
 
-   `flint init` prompts you to choose linters based on your repo's tracked
-   files, adds the standard `mise` lint tasks, writes `flint.toml` when needed,
-   and creates `.github/workflows/lint.yml` when the repo does not already have
-   one.
+   During `flint init`, you can:
 
-   If you want non-interactive setup, run `mise exec -- flint init --yes` and trim
-   any generated linter pins afterward.
+   - choose which linters to enable
+   - add the standard `mise` lint tasks
+   - write `flint.toml` when needed
+   - create `.github/workflows/lint.yml` when the repo does not already have one
+
+   If you want non-interactive setup, run `mise exec -- flint init --yes` and
+   trim any generated linter pins afterward.
 
 4. Optional: install a git hook that runs `flint run --fix` before each commit:
 
@@ -71,17 +73,15 @@ Read the [background and principles](docs/why.md) and
    mise exec -- flint hook install
    ```
 
-5. Optional: if you use coding agents, add a linting rule like this to your
-   repo's `AGENTS.md`:
+5. Optional: if you use coding agents, add this to your repo's `AGENTS.md`:
 
    ```text
    ## Linting
 
    Run `mise run lint:fix` before committing changes.
-   Unlike most formatter and fixer commands, this also tells you when
-   everything is already good.
-   If fixes were applied, commit before pushing.
-   If anything still fails, review the remaining output.
+   If output includes `fixed`, keep those changes.
+   If output includes `partial` or `review`, address the remaining issues and
+   run `mise run lint:fix` again.
 
    Example output:
    flint: fixed: gofmt — commit before pushing | partial: cargo-clippy
@@ -89,11 +89,14 @@ Read the [background and principles](docs/why.md) and
 
 ### Using
 
-Flint will give you feedback ...
+For normal local use, run:
 
 ```bash
 mise run lint:fix
 ```
+
+Flint fixes what it can, tells you when everything is already good, and tells
+you what still needs review.
 
 For more commands and flags, see the [CLI reference](docs/cli.md).
 
@@ -158,26 +161,7 @@ See the [CLI reference](docs/cli.md) for commands, flags, and examples.
 
 ### Manual setup
 
-If you prefer to wire Flint in yourself instead of using `flint init`, add Flint
-and whichever linters you want to your repo's `mise.toml`:
-
-```toml
-[tools]
-"aqua:grafana/flint" = "0.21.0"
-
-# Add whichever linters apply to your repo:
-shellcheck = "0.11.0"
-shfmt = "v3.13.1"
-actionlint = "1.7.10"
-
-[tasks.lint]
-description = "Run all lints"
-run = "flint run"
-
-[tasks."lint:fix"]
-description = "Auto-fix lint issues"
-run = "flint run --fix"
-```
+See the [CLI reference](docs/cli.md) and [linter reference](docs/linters.md).
 
 ### CI setup
 

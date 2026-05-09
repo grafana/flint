@@ -93,13 +93,6 @@
         "mise"
       ]
     },
-    "README.md": {
-      "regex": [
-        "actionlint",
-        "shellcheck",
-        "shfmt"
-      ]
-    },
     "mise.toml": {
       "mise": [
         "actionlint",

@@ -14,20 +14,23 @@ it do not need to re-learn the interface.
 
 ## `flint run` flags
 
-| Flag                 | Description                                                                                                          |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `--fix`              | Fix what's fixable, report `clean` / `fixed` / `partial` / `review` outcomes; exit non-zero if anything needs action |
-| `--allow-fixed`      | In `--fix` mode, exit 0 when all reported issues were fixed successfully                                             |
-| `--full`             | Lint all files instead of only changed files                                                                         |
-| `--short`            | Compact summary output, no per-check noise                                                                           |
-| `--verbose`          | Show all linter output, not just failures                                                                            |
-| `--new-from-rev REV` | Diff base (default: merge base with base branch)                                                                     |
-| `--to-ref REF`       | Diff head (default: HEAD)                                                                                            |
-| `--time`             | Show how long each linter took to run                                                                                |
+<!-- run-flags-start -->
+<!-- Generated. Run `UPDATE_README=1 cargo test cli_docs_in_sync` to regenerate. -->
 
-Most flags have an env var equivalent: `FLINT_FIX`, `FLINT_FULL`,
-`FLINT_VERBOSE`, `FLINT_SHORT`, `FLINT_NEW_FROM_REV`, `FLINT_TO_REF`, and
-`FLINT_TIME`. `--allow-fixed` has no env var binding.
+| Flag                 | Env var              | Description                                                                                                                                                                |
+| -------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--fix`              | `FLINT_FIX`          | Fix what's fixable, report what still needs review. Exits 1 if anything was fixed (uncommitted) or needs review; 0 if already clean. Only 0 vs non-0 is stable for callers |
+| `--allow-fixed`      | `FLINT_ALLOW_FIXED`  | In --fix mode, exit 0 when all reported issues were fixed successfully. Still exits non-zero when any check is partial or needs review                                     |
+| `--full`             | `FLINT_FULL`         | Lint all files instead of only changed files                                                                                                                               |
+| `--verbose`          | `FLINT_VERBOSE`      | Show all linter output, not just failures                                                                                                                                  |
+| `--short`            | `FLINT_SHORT`        | Compact summary output — no per-check noise (human) or read-only AI review                                                                                                 |
+| `--new-from-rev` REV | `FLINT_NEW_FROM_REV` | Show only new issues created after git revision REV (default: merge base with base branch)                                                                                 |
+| `--to-ref` REF       | `FLINT_TO_REF`       | Compare changed files to this ref (default: HEAD)                                                                                                                          |
+| `--time`             | `FLINT_TIME`         | Show how long each linter took to run                                                                                                                                      |
+
+<!-- run-flags-end -->
+
+All `flint run` flags above have env var equivalents.
 
 ## Intended use by context
 

@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod cli_docs_tests;
 mod config;
 mod files;
 mod hook;
@@ -80,7 +82,7 @@ struct RunArgs {
 
     /// In --fix mode, exit 0 when all reported issues were fixed successfully.
     /// Still exits non-zero when any check is partial or needs review.
-    #[arg(long, requires = "fix")]
+    #[arg(long, env = "FLINT_ALLOW_FIXED", requires = "fix")]
     allow_fixed: bool,
 
     /// Lint all files instead of only changed files.

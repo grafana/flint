@@ -70,6 +70,7 @@ Read the [background and principles](docs/why.md) and
    - add the standard `mise` lint tasks
    - write `flint.toml` when needed
    - create `.github/workflows/lint.yml` when the repo does not already have one
+   - add linting guidance to `AGENTS.md` or `CLAUDE.md` (or create `AGENTS.md`)
 
    If you want non-interactive setup, run `mise exec -- flint init --yes` and
    trim any generated linter pins afterward.
@@ -83,20 +84,6 @@ Read the [background and principles](docs/why.md) and
 
    ```bash
    mise exec -- flint hook install
-   ```
-
-5. Optional: if you use coding agents, add this to your repo's `AGENTS.md`:
-
-   ```text
-   ## Linting
-
-   Run `mise run lint:fix` before committing changes.
-   If output includes `fixed`, keep those changes.
-   If output includes `partial` or `review`, address the remaining issues and
-   run `mise run lint:fix` again.
-
-   Example output:
-   flint: fixed: gofmt — commit before pushing | partial: cargo-clippy
    ```
 
 ### Using

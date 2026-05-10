@@ -31,7 +31,9 @@ use migrations::{
     selected_editorconfig_line_length_sections,
 };
 pub(crate) use migrations::{apply_setup_migrations, detect_setup_migrations};
-use scaffold::{apply_env_and_tasks, generate_lint_workflow, maybe_install_hook};
+use scaffold::{
+    apply_env_and_tasks, ensure_agent_linting_guidance, generate_lint_workflow, maybe_install_hook,
+};
 use ui::{interactive_select_linters, select_categories_arrow};
 
 const DEFAULT_LINE_LENGTH: u16 = 120;
@@ -403,6 +405,7 @@ Add and stage your source files before running init so the detection is accurate
         project_root,
         &editorconfig_line_length_sections,
     )?;
+    let agent_guidance_changed = ensure_agent_linting_guidance(project_root)?;
     if !editorconfig_line_length_disabled.is_empty() {
         println!(
             "  patched <REPO>/.editorconfig — disable max_line_length for {}",
@@ -421,6 +424,7 @@ Add and stage your source files before running init so the detection is accurate
         && !workflow_generated
         && !check_type_init_changed
         && !editorconfig_generated
+        && !agent_guidance_changed
         && editorconfig_line_length_disabled.is_empty()
     {
         println!("No changes to apply.");

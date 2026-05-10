@@ -14,6 +14,7 @@ Tip: flint init detects languages from tracked files (`git ls-files`). Add and s
   wrote <REPO>/.github/config/.rumdl.toml
   wrote <REPO>/.github/config/.yamllint.yml
   patched <REPO>/.editorconfig — set max_line_length = 120
+  wrote <REPO>/AGENTS.md
   patched <REPO>/.editorconfig — disable max_line_length for [*.rs], [*.md]
 installed pre-commit hook (.git/hooks/pre-commit)
 Done. Run `mise install` to install the new tools.
@@ -60,6 +61,17 @@ rules:
 '''
 ".github/config/rustfmt.toml" = '''
 max_width = 120
+'''
+"AGENTS.md" = '''
+## Linting
+
+Run `mise run lint:fix` before committing changes.
+If output includes `fixed`, keep those changes.
+If output includes `partial` or `review`, address the remaining issues and
+run `mise run lint:fix` again.
+
+Example output:
+flint: fixed: gofmt — commit before pushing | partial: cargo-clippy
 '''
 "biome.jsonc" = '''
 {

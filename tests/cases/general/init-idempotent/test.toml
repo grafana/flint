@@ -5,6 +5,7 @@ stdout = '''
 Tip: flint init detects languages from tracked files (`git ls-files`). Add and stage your source files before running init so the detection is accurate.
 
   normalized [tools] in <REPO>/mise.toml
+  wrote <REPO>/AGENTS.md
 installed pre-commit hook (.git/hooks/pre-commit)
 Done. Run `mise install` to install the new tools.
 '''

@@ -5,7 +5,7 @@ use detection::entry_components_differ;
 use generation::{
     apply_changes, get_existing_config_dir, has_slow_selected, normalize_tools_section,
 };
-use scaffold::{apply_env_and_tasks, generate_lint_workflow};
+use scaffold::{apply_env_and_tasks, ensure_agent_linting_guidance, generate_lint_workflow};
 use std::sync::{
     Mutex, OnceLock,
     atomic::{AtomicUsize, Ordering},
@@ -901,6 +901,44 @@ fn generate_lint_workflow_writes_file() {
     assert!(content.contains("pull_request.head.repo.full_name"));
     assert!(!content.contains("rust-cache"));
     assert!(!content.contains("rustup component"));
+}
+
+#[test]
+fn ensure_agent_linting_guidance_creates_agents_md_when_missing() {
+    let tmp = tempfile::TempDir::new().unwrap();
+
+    let changed = ensure_agent_linting_guidance(tmp.path()).unwrap();
+
+    assert!(changed);
+    let content = std::fs::read_to_string(tmp.path().join("AGENTS.md")).unwrap();
+    assert!(content.contains("## Linting"));
+    assert!(content.contains("Run `mise run lint:fix` before committing changes."));
+}
+
+#[test]
+fn ensure_agent_linting_guidance_prefers_existing_agents_md() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    std::fs::write(tmp.path().join("AGENTS.md"), "# Repo notes\n").unwrap();
+    std::fs::write(tmp.path().join("CLAUDE.md"), "# Claude notes\n").unwrap();
+
+    let changed = ensure_agent_linting_guidance(tmp.path()).unwrap();
+
+    assert!(changed);
+    let agents = std::fs::read_to_string(tmp.path().join("AGENTS.md")).unwrap();
+    let claude = std::fs::read_to_string(tmp.path().join("CLAUDE.md")).unwrap();
+    assert!(agents.contains("Run `mise run lint:fix` before committing changes."));
+    assert!(!claude.contains("Run `mise run lint:fix` before committing changes."));
+}
+
+#[test]
+fn ensure_agent_linting_guidance_is_idempotent() {
+    let tmp = tempfile::TempDir::new().unwrap();
+
+    assert!(ensure_agent_linting_guidance(tmp.path()).unwrap());
+    assert!(!ensure_agent_linting_guidance(tmp.path()).unwrap());
+
+    let content = std::fs::read_to_string(tmp.path().join("AGENTS.md")).unwrap();
+    assert_eq!(content.matches("## Linting").count(), 1);
 }
 
 #[test]

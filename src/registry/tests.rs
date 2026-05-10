@@ -814,7 +814,7 @@ struct OverviewDocRow {
 }
 
 fn generate_overview_tables(registry: &[Check], link_target: OverviewLinkTarget) -> String {
-    use crate::registry::{OverviewRole, OverviewSection};
+    use crate::registry::types::{OverviewRole, OverviewSection};
     use std::collections::BTreeMap;
 
     let mut sections: BTreeMap<OverviewSection, BTreeMap<&'static str, OverviewDocRow>> =
@@ -887,10 +887,10 @@ fn generate_overview_tables(registry: &[Check], link_target: OverviewLinkTarget)
 
 fn render_overview_rows(
     sections: &std::collections::BTreeMap<
-        crate::registry::OverviewSection,
+        crate::registry::types::OverviewSection,
         std::collections::BTreeMap<&'static str, OverviewDocRow>,
     >,
-    section: crate::registry::OverviewSection,
+    section: crate::registry::types::OverviewSection,
 ) -> Vec<[String; 3]> {
     sections
         .get(&section)
@@ -908,10 +908,10 @@ fn render_overview_rows(
 
 fn render_check_rows(
     sections: &std::collections::BTreeMap<
-        crate::registry::OverviewSection,
+        crate::registry::types::OverviewSection,
         std::collections::BTreeMap<&'static str, OverviewDocRow>,
     >,
-    section: crate::registry::OverviewSection,
+    section: crate::registry::types::OverviewSection,
 ) -> Vec<[String; 2]> {
     sections
         .get(&section)
@@ -932,12 +932,12 @@ fn render_check_rows(
 
 fn render_general_rows(
     sections: &std::collections::BTreeMap<
-        crate::registry::OverviewSection,
+        crate::registry::types::OverviewSection,
         std::collections::BTreeMap<&'static str, OverviewDocRow>,
     >,
 ) -> Vec<[String; 3]> {
     sections
-        .get(&crate::registry::OverviewSection::General)
+        .get(&crate::registry::types::OverviewSection::General)
         .into_iter()
         .flat_map(|rows| rows.iter())
         .map(|(name, row)| {

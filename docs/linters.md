@@ -1,8 +1,8 @@
 # Linter reference
 
-Per-linter Flint behavior, config locations, and notes. Each linter heading
-links to the upstream project page, and each config filename links to the
-relevant upstream configuration docs when available.
+Per-linter Flint behavior, config locations, and notes. Where available, each
+linter heading links to the upstream project page, and each config filename
+links to the relevant upstream configuration docs.
 
 ## Overview
 

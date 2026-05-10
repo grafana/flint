@@ -11,14 +11,12 @@ pub use mise::{
 };
 pub use obsolete::{find_obsolete_key, find_unsupported_key, obsolete_keys, unsupported_keys};
 pub use resolve::binary_on_path;
-#[allow(unused_imports)]
 pub use types::{
     AdaptiveRelevanceContext, Category, Check, CheckKind, CheckTypeDef, ConfigBase, ConfigFile,
     ConfigMatch, EditorconfigDirectiveStyle, EditorconfigLineLengthPolicy, FixBehavior,
     InitHookContext, LinterConfig, LinterOutput, MissingComponentHint, NativeCheck, NativeCheckDef,
     NativePrepareContext, NativeRunContext, NativeRunFuture, NonverboseFailureOutputHook,
-    OverviewEntry, OverviewRole, OverviewSection, PreparedNativeCheck, Scope, SetupOutcome,
-    StatusContext, WorkflowSetup,
+    PreparedNativeCheck, Scope, SetupOutcome, StatusContext, WorkflowSetup,
 };
 
 /// Returns the explicit set of flint-managed tool keys that belong under the

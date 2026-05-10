@@ -58,7 +58,11 @@ Read the [background and principles](docs/why.md) and
    mise use --pin aqua:grafana/flint
    ```
 
-3. Let Flint scaffold the setup:
+3. Optional: if you use Renovate, create your Renovate config before init.
+   Flint can then patch it to include the Flint preset, which helps keep
+   linter and Flint updates grouped with less PR noise.
+
+4. Let Flint scaffold the setup:
 
    ```bash
    mise exec -- flint init
@@ -80,7 +84,7 @@ Read the [background and principles](docs/why.md) and
    [`flint.toml`](https://github.com/grafana/docker-otel-lgtm/blob/main/.github/config/flint.toml), and
    [lint workflow](https://github.com/grafana/docker-otel-lgtm/blob/main/.github/workflows/lint.yml).
 
-4. Optional: install a git hook that runs `flint run --fix` before each commit:
+5. Optional: install a git hook that runs `flint run --fix` before each commit:
 
    ```bash
    mise exec -- flint hook install
@@ -96,6 +100,9 @@ mise run lint:fix
 
 Flint fixes what it can, tells you when everything is already good, and tells
 you what still needs review.
+
+**By default, Flint checks only changed files.** Use `--full` to check every
+matching file.
 
 For more commands and flags, see the [CLI reference](docs/cli.md).
 

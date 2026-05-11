@@ -14,17 +14,23 @@ it do not need to re-learn the interface.
 
 ## `flint run` flags
 
-| Flag                 | Description                                                                                                          |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `--fix`              | Fix what's fixable, report `clean` / `fixed` / `partial` / `review` outcomes; exit non-zero if anything needs action |
-| `--full`             | Lint all files instead of only changed files                                                                         |
-| `--short`            | Compact summary output, no per-check noise                                                                           |
-| `--verbose`          | Show all linter output, not just failures                                                                            |
-| `--new-from-rev REV` | Diff base (default: merge base with base branch)                                                                     |
-| `--to-ref REF`       | Diff head (default: HEAD)                                                                                            |
+<!-- run-flags-start -->
+<!-- Generated. Run `mise run generate` to regenerate. -->
 
-Every flag has an env var equivalent: `FLINT_FIX`, `FLINT_FULL`,
-`FLINT_VERBOSE`, `FLINT_SHORT`, `FLINT_NEW_FROM_REV`, `FLINT_TO_REF`.
+| Flag                 | Env var              | Description                                                                                                                                                                |
+| -------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--fix`              | `FLINT_FIX`          | Fix what's fixable, report what still needs review. Exits 1 if anything was fixed (uncommitted) or needs review; 0 if already clean. Only 0 vs non-0 is stable for callers |
+| `--allow-fixed`      | `FLINT_ALLOW_FIXED`  | In --fix mode, exit 0 when all reported issues were fixed successfully. Still exits non-zero when any check is partial or needs review                                     |
+| `--full`             | `FLINT_FULL`         | Lint all files instead of only changed files                                                                                                                               |
+| `--verbose`          | `FLINT_VERBOSE`      | Show all linter output, not just failures                                                                                                                                  |
+| `--short`            | `FLINT_SHORT`        | Compact summary output — no per-check noise (human) or read-only AI review                                                                                                 |
+| `--new-from-rev` REV | `FLINT_NEW_FROM_REV` | Show only new issues created after git revision REV (default: merge base with base branch)                                                                                 |
+| `--to-ref` REF       | `FLINT_TO_REF`       | Compare changed files to this ref (default: HEAD)                                                                                                                          |
+| `--time`             | `FLINT_TIME`         | Show how long each linter took to run                                                                                                                                      |
+
+<!-- run-flags-end -->
+
+All `flint run` flags above have env var equivalents.
 
 ## Intended use by context
 
@@ -67,12 +73,37 @@ have changed. Config-file triggers are detected from the raw git change list, so
 they still apply when the config path itself is excluded from ordinary lint file
 selection.
 
-Flint intentionally supports one canonical config filename per linter when it
-passes config paths explicitly. If an active linter has a known alternate
-upstream config file, Flint fails before running the linter instead of silently
-ignoring or partially auto-discovering that config. Move the config to the
-Flint-managed filename under `FLINT_CONFIG_DIR`, or remove the alternate file.
-Biome is the exception: its canonical config is root `biome.jsonc`.
+## Adaptive runs
+
+Some linters are expensive enough that running them on every local
+`flint run` would slow the inner loop. For those, `flint run` skips the
+linter when none of the changed files could plausibly affect its result.
+CI is unaffected — it always runs the full set.
+
+Affected linters:
+
+| Linter                                                              | Skipped locally when…                                           |
+| ------------------------------------------------------------------- | --------------------------------------------------------------- |
+| [`renovate-deps`](linters/renovate-deps.md#when-does-this-run)      | No change to Renovate config, the snapshot, or any tracked file |
+
+To force a local run of a skipped linter:
+
+- `flint run --full` — runs every active linter
+- `flint run <linter>` — runs just that one
+
+### Canonical config filenames
+
+When Flint passes config paths explicitly, it supports one canonical config
+filename per linter. If an active linter has a known alternate upstream config
+file, Flint fails before running the linter instead of silently ignoring or
+partially auto-discovering that config.
+
+Move the config to the Flint-managed filename under `FLINT_CONFIG_DIR`, or
+remove the alternate file.
+
+> [!NOTE]
+> Biome is the exception: its canonical config is root `biome.jsonc`, not a
+> file under `FLINT_CONFIG_DIR`.
 
 **`--short` output** — failed checks partitioned by fixability, fixable ones
 expressed as the exact command to run:

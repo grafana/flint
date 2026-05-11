@@ -2,6 +2,9 @@ use anyhow::{Context, Result};
 use std::io::{self, BufRead, Write};
 use std::path::Path;
 
+const AGENT_LINTING_SENTINEL: &str = "Run `mise run lint:fix` before committing changes.";
+const AGENT_LINTING_BLOCK: &str = "## Linting\n\nRun `mise run lint:fix` before committing changes.\nIf output includes `fixed`, keep those changes.\nIf output includes `partial` or `review`, address the remaining issues and\nrun `mise run lint:fix` again.\n\nExample output:\nflint: fixed: gofmt — commit before pushing | partial: cargo-clippy\n";
+
 /// Generates `.github/workflows/lint.yml` if it does not already exist.
 /// Returns `true` if the file was written.
 pub(super) fn generate_lint_workflow(
@@ -193,4 +196,47 @@ pub(super) fn maybe_install_hook(project_root: &Path, yes: bool) -> Result<()> {
         crate::hook::install(project_root)?;
     }
     Ok(())
+}
+
+/// Ensures agent guidance exists in AGENTS.md or CLAUDE.md.
+///
+/// Preference order:
+/// - patch existing `AGENTS.md`
+/// - else patch existing `CLAUDE.md`
+/// - else create `AGENTS.md`
+///
+/// Returns `true` if a file was written.
+pub(super) fn ensure_agent_linting_guidance(project_root: &Path) -> Result<bool> {
+    let agents_path = project_root.join("AGENTS.md");
+    let claude_path = project_root.join("CLAUDE.md");
+    let target = if agents_path.exists() {
+        agents_path
+    } else if claude_path.exists() {
+        claude_path
+    } else {
+        agents_path
+    };
+
+    let existing = std::fs::read_to_string(&target).unwrap_or_default();
+    if existing.contains(AGENT_LINTING_SENTINEL) {
+        return Ok(false);
+    }
+
+    let had_existing_content = !existing.is_empty();
+    let mut content = existing;
+    if !content.is_empty() && !content.ends_with('\n') {
+        content.push('\n');
+    }
+    if !content.is_empty() {
+        content.push('\n');
+    }
+    content.push_str(AGENT_LINTING_BLOCK);
+    std::fs::write(&target, content)?;
+    let action = if had_existing_content {
+        "patched"
+    } else {
+        "wrote"
+    };
+    println!("  {action} {}", target.display());
+    Ok(true)
 }

@@ -46,3 +46,11 @@ run = "cargo build"
 [tasks.test]
 description = "Run tests"
 run = "cargo test -q"
+
+[tasks.generate]
+description = "Regenerate README + docs/ tables from the registry and CLI"
+run = "UPDATE_README=1 cargo test -q -- readme_linter_table_in_sync cli_docs_in_sync"
+
+[tasks."generate:snapshots"]
+description = "Regenerate golden stdout/stderr/exit in tests/cases/*/test.toml"
+run = "UPDATE_SNAPSHOTS=1 cargo test -q cases"

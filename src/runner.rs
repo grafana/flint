@@ -865,6 +865,9 @@ mod tests {
                 scope: Scope::Project,
             },
             desc: "",
+            project_url: None,
+            config_doc_url: None,
+            overviews: vec![],
             docs: "",
         }
     }

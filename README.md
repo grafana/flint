@@ -9,6 +9,13 @@
   <a href="https://github.com/grafana/flint/actions/workflows/lint.yml"><img src="https://github.com/grafana/flint/actions/workflows/lint.yml/badge.svg" alt="Lint"></a>
   <a href="https://github.com/grafana/flint/releases"><img src="https://img.shields.io/github/v/release/grafana/flint" alt="GitHub Release"></a>
 </p>
+
+<p align="center">
+  <a href="docs/cli.md">CLI reference</a> ·
+  <a href="docs/linters.md">Linters</a> ·
+  <a href="docs/why.md">Why flint?</a> ·
+  <a href="docs/alternatives.md">Alternatives</a>
+</p>
 <!-- markdownlint-enable MD033 MD041 -->
 
 Linter runner built for speed, consistency, and low setup friction:
@@ -41,205 +48,124 @@ Read the [background and principles](docs/why.md) and
 
 ## Getting Started
 
-### Installation
+### Install
 
-Add `flint` to your repo's `mise.toml`:
+1. Install [mise](https://mise.jdx.dev/).
 
-```toml
-[tools]
-"aqua:grafana/flint" = "0.21.0"
-```
+2. Add Flint to your repo:
 
-Bootstrap a repo with `flint init` (scaffolds config). Install a
-pre-commit hook with `flint hook install`.
-This is appropriate even if the repo already has an existing `mise.toml`;
-`flint init` is not just for greenfield repos. You can choose which linters to
-enable during the prompt, or trim the generated tool list afterward if you run
-`flint init --yes`.
+   ```bash
+   mise use --pin aqua:grafana/flint
+   ```
 
-### mise.toml setup
+3. Optional: if you use Renovate, create your Renovate config before init.
+   Flint can then patch it to include the Flint preset, which helps keep
+   linter and Flint updates grouped with less PR noise.
 
-Flint reads your `[tools]` section to discover which linters to run — declaring
-a tool is the opt-in. No separate configuration needed to activate a check: if
-ShellCheck's Flint-managed tool key is present in `[tools]`, flint runs
-shellcheck; otherwise that check is skipped. `mise install` puts all declared
-tools on PATH; flint picks up whatever is there.
+4. Let Flint scaffold the setup:
 
-Add the linting tools your project needs alongside the `flint` binary itself:
+   ```bash
+   mise exec -- flint init
+   ```
 
-```toml
-[tools]
-"aqua:grafana/flint" = "0.21.0"
+   During `flint init`, you can:
 
-# Add whichever linters apply to your repo:
-shellcheck              = "0.11.0"
-shfmt                   = "v3.13.1"
-actionlint              = "1.7.10"
-```
+   - choose which linters to enable
+   - add the standard `mise` lint tasks
+   - write `flint.toml` when needed
+   - create `.github/workflows/lint.yml` when the repo does not already have one
+   - add linting guidance to `AGENTS.md` or `CLAUDE.md` (or create `AGENTS.md`)
 
-Then wire up lint tasks:
+   If you want non-interactive setup, run `mise exec -- flint init --yes` and
+   trim any generated linter pins afterward.
 
-```toml
-[tasks.lint]
-description = "Run all lints"
-run = "flint run"
+   For a real setup example, see grafana/docker-otel-lgtm's
+   [`mise.toml`](https://github.com/grafana/docker-otel-lgtm/blob/main/mise.toml),
+   [`flint.toml`](https://github.com/grafana/docker-otel-lgtm/blob/main/.github/config/flint.toml), and
+   [lint workflow](https://github.com/grafana/docker-otel-lgtm/blob/main/.github/workflows/lint.yml).
 
-[tasks."lint:fix"]
-description = "Auto-fix lint issues"
-run = "flint run --fix"
-```
+5. Optional: install a git hook that runs `flint run --fix` before each commit:
 
-### Day-to-day use
+   ```bash
+   mise exec -- flint hook install
+   ```
 
-Run lints on your changes:
+### Using
+
+For normal local use, run:
 
 ```bash
-mise run lint        # check
-mise run lint:fix    # auto-fix what's fixable
+mise run lint:fix
 ```
+
+Flint fixes what it can, tells you when everything is already good, and tells
+you what still needs review.
+
+**By default, Flint checks only changed files.** Use `--full` to check every
+matching file.
+
+For more commands and flags, see the [CLI reference](docs/cli.md).
 
 > [!NOTE]
 > In rare cases (currently only `renovate-deps`) a failure may show up
 > only in CI. That is a deliberate performance optimization — see
-> [adaptive runs](#adaptive-runs). When it happens, flint prints the
+> [adaptive runs](docs/cli.md#adaptive-runs). When it happens, flint prints the
 > command to reproduce locally (usually `--full` or the linter name).
 
-### CI setup
-
-```yaml
-- name: Checkout code
-  uses: actions/checkout@...
-  with:
-    fetch-depth: 0 # needed for merge-base detection
-
-- name: Setup mise
-  uses: jdx/mise-action@...
-
-- name: Lint
-  env:
-    GITHUB_REPOSITORY: ${{ github.repository }}
-    GITHUB_BASE_REF: ${{ github.base_ref }}
-    GITHUB_HEAD_REF: ${{ github.head_ref }}
-    PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-    GITHUB_TOKEN: ${{ github.token }}
-  run: mise run lint
-```
-
-`fetch-depth: 0` is required for merge-base detection. `GITHUB_TOKEN` is needed
-by some checks that query GitHub, but not every check. If `lychee` link checks
-are enabled, see [lychee](docs/linters.md#lychee) for PR remap environment
-requirements.
-
----
-
-## Reference
-
-### CLI
-
-See the [CLI reference](docs/cli.md) for commands and flags.
-
-### Config (`flint.toml`)
-
-Optional. Place in the repo root (or in `FLINT_CONFIG_DIR` — see below).
-All settings have defaults.
-
-```toml
-[settings]
-# base_branch = "dev"                   # branch to diff against; defaults to "main"
-exclude = ["CHANGELOG.md", "vendor/**"] # glob patterns — exclude matching files
-```
-
-See [linters](docs/linters.md) for per-linter configuration.
-
-### `FLINT_CONFIG_DIR`
-
-Set this env var to consolidate config files in one directory (e.g. `.github/config`):
-
-```toml
-# mise.toml
-[env]
-FLINT_CONFIG_DIR = ".github/config"
-```
-
-When set, `flint.toml` is loaded from that directory, and each linter that
-supports an explicit config path via a CLI flag will have it injected
-automatically when the corresponding canonical Flint-managed file exists there
-(see the "Config file" column in the table below).
-Files that are absent are silently skipped. Some tools still rely on project-root
-discovery semantics, and some alternate upstream config locations are rejected to
-avoid config drift. In practice, Flint is opinionated about which config filename
-each linter should use, but flexible about the directory those files live in.
-
-> [!NOTE]
-> `editorconfig-checker`'s config file (`.editorconfig-checker.json`) controls
-> its own settings, not `.editorconfig` itself. Editorconfig discovery always
-> walks up from the file being linted and cannot be redirected via a flag.
-
-When a formatter explicitly owns line length for a file type, Flint writes that
-carve-out into the shared root `.editorconfig` so editors and
-`editorconfig-checker` stay aligned. Today this applies to Markdown via `rumdl`,
-Rust via `rustfmt`, and Java via `google-java-format`.
-
-> [!NOTE]
-> Biome is also root-discovered on purpose. Flint treats root `biome.jsonc` as
-> the canonical Biome config rather than managing it through
-> `FLINT_CONFIG_DIR`.
-
-### Built-in linter registry
-
-Click a name in the table below for details. See the
-[linter reference](docs/linters.md) for scope semantics and per-linter notes.
+## Linters
 
 <!-- registry-table-start -->
-<!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
+<!-- Generated. Run `mise run generate` to regenerate. -->
 
-| Name                                                           | Description                                                         | Fix |
-| -------------------------------------------------------------- | ------------------------------------------------------------------- | --- |
-| [`actionlint`](docs/linters.md#actionlint)                     | Lint GitHub Actions workflow files                                  | —   |
-| [`biome`](docs/linters.md#biome)                               | Lint JS/TS/JSON files                                               | yes |
-| [`biome-format`](docs/linters.md#biome-format)                 | Format JS/TS/JSON files                                             | yes |
-| [`cargo-clippy`](docs/linters.md#cargo-clippy)                 | Lint Rust code; runs on all .rs files, not just changed             | yes |
-| [`cargo-fmt`](docs/linters.md#cargo-fmt)                       | Format Rust code; runs on all .rs files, not just changed           | yes |
-| [`dotnet-format`](docs/linters.md#dotnet-format)               | Format C# code                                                      | yes |
-| [`editorconfig-checker`](docs/linters.md#editorconfig-checker) | Check files comply with EditorConfig settings                       | —   |
-| [`flint-setup`](docs/linters.md#flint-setup)                   | Keep Flint setup current and mise.toml lint tooling canonical       | yes |
-| [`gofmt`](docs/linters.md#gofmt)                               | Format Go code                                                      | yes |
-| [`golangci-lint`](docs/linters.md#golangci-lint)               | Lint Go code; uses --new-from-rev to scope analysis to changed code | —   |
-| [`google-java-format`](docs/linters.md#google-java-format)     | Format Java code                                                    | yes |
-| [`hadolint`](docs/linters.md#hadolint)                         | Lint Dockerfiles                                                    | —   |
-| [`ktlint`](docs/linters.md#ktlint)                             | Lint and format Kotlin code                                         | yes |
-| [`license-header`](docs/linters.md#license-header)             | Check source files have the required license header                 | —   |
-| [`lychee`](docs/linters.md#lychee)                             | Check for broken links                                              | —   |
-| [`renovate-deps`](docs/linters.md#renovate-deps)               | Verify Renovate dependency snapshot is up to date                   | yes |
-| [`ruff`](docs/linters.md#ruff)                                 | Lint Python code                                                    | yes |
-| [`ruff-format`](docs/linters.md#ruff-format)                   | Format Python code                                                  | yes |
-| [`rumdl`](docs/linters.md#rumdl)                               | Lint Markdown files for style and consistency                       | yes |
-| [`ryl`](docs/linters.md#ryl)                                   | Lint YAML files for style and consistency                           | yes |
-| [`shellcheck`](docs/linters.md#shellcheck)                     | Lint shell scripts for common mistakes                              | —   |
-| [`shfmt`](docs/linters.md#shfmt)                               | Format shell scripts                                                | yes |
-| [`taplo`](docs/linters.md#taplo)                               | Format TOML files                                                   | yes |
-| [`typos`](docs/linters.md#typos)                               | Check for common spelling mistakes                                  | yes |
-| [`xmllint`](docs/linters.md#xmllint)                           | Validate XML files are well-formed                                  | —   |
+### Languages
+
+| Name                    | Linter                                           | Formatter                                                  |
+| ----------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
+| C#                      | —                                                | [`dotnet-format`](docs/linters.md#dotnet-format)           |
+| Go                      | [`golangci-lint`](docs/linters.md#golangci-lint) | [`gofmt`](docs/linters.md#gofmt)                           |
+| Java                    | —                                                | [`google-java-format`](docs/linters.md#google-java-format) |
+| JavaScript / TypeScript | [`biome`](docs/linters.md#biome)                 | [`biome-format`](docs/linters.md#biome-format)             |
+| Kotlin                  | [`ktlint`](docs/linters.md#ktlint)               | [`ktlint`](docs/linters.md#ktlint)                         |
+| Python                  | [`ruff`](docs/linters.md#ruff)                   | [`ruff-format`](docs/linters.md#ruff-format)               |
+| Rust                    | [`cargo-clippy`](docs/linters.md#cargo-clippy)   | [`cargo-fmt`](docs/linters.md#cargo-fmt)                   |
+
+### Files / Formats
+
+| Name     | Linter                                     | Formatter                                      |
+| -------- | ------------------------------------------ | ---------------------------------------------- |
+| JSON     | [`biome`](docs/linters.md#biome)           | [`biome-format`](docs/linters.md#biome-format) |
+| Markdown | [`rumdl`](docs/linters.md#rumdl)           | [`rumdl`](docs/linters.md#rumdl)               |
+| Shell    | [`shellcheck`](docs/linters.md#shellcheck) | [`shfmt`](docs/linters.md#shfmt)               |
+| TOML     | —                                          | [`taplo`](docs/linters.md#taplo)               |
+| XML      | [`xmllint`](docs/linters.md#xmllint)       | —                                              |
+| YAML     | [`ryl`](docs/linters.md#ryl)               | [`ryl`](docs/linters.md#ryl)                   |
+
+### Tooling / CI
+
+| Name           | Check                                      |
+| -------------- | ------------------------------------------ |
+| Dockerfile     | [`hadolint`](docs/linters.md#hadolint)     |
+| GitHub Actions | [`actionlint`](docs/linters.md#actionlint) |
+
+### General
+
+| Name            | Check                                                          | Description                                |
+| --------------- | -------------------------------------------------------------- | ------------------------------------------ |
+| EditorConfig    | [`editorconfig-checker`](docs/linters.md#editorconfig-checker) | EditorConfig compliance                    |
+| Flint setup     | [`flint-setup`](docs/linters.md#flint-setup)                   | Flint-managed setup and `mise.toml` layout |
+| License headers | [`license-header`](docs/linters.md#license-header)             | Required file header text                  |
+| Links           | [`lychee`](docs/linters.md#lychee)                             | Broken links                               |
+| Renovate        | [`renovate-deps`](docs/linters.md#renovate-deps)               | Dependency update configuration            |
+| Spelling        | [`typos`](docs/linters.md#typos)                               | Spelling in source and text files          |
 
 <!-- registry-table-end -->
 
-### Adaptive runs
+## FAQ
 
-Some linters are expensive enough that running them on every local
-`flint run` would slow the inner loop. For those, `flint run` skips the
-linter when none of the changed files could plausibly affect its result.
-CI is unaffected — it always runs the full set.
+### How does Flint know which linters to run?
 
-Affected linters:
-
-| Linter                                                              | Skipped locally when…                                           |
-| ------------------------------------------------------------------- | --------------------------------------------------------------- |
-| [`renovate-deps`](docs/linters/renovate-deps.md#when-does-this-run) | No change to Renovate config, the snapshot, or any tracked file |
-
-To force a local run of a skipped linter:
-
-- `flint run --full` — runs every active linter
-- `flint run <linter>` — runs just that one
+Flint activates checks from your repo's `mise.toml`: if a Flint-managed tool is
+declared there, that check is active; if it is not declared, Flint skips it.
 
 ## Versioning
 

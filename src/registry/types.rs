@@ -40,6 +40,41 @@ pub enum Category {
     Slow,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum OverviewSection {
+    Languages,
+    FilesFormats,
+    ToolingCi,
+    General,
+}
+
+impl OverviewSection {
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::Languages => "Languages",
+            Self::FilesFormats => "Files / Formats",
+            Self::ToolingCi => "Tooling / CI",
+            Self::General => "General",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum OverviewRole {
+    Linter,
+    Formatter,
+    Check,
+    Both,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OverviewEntry {
+    pub section: OverviewSection,
+    pub row_name: &'static str,
+    pub role: OverviewRole,
+    pub description: Option<&'static str>,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct NativeCheckRef {
     native: &'static dyn NativeCheck,
@@ -522,6 +557,12 @@ pub struct Check {
     pub kind: CheckKind,
     /// Plain-text description of what the check does — shown in `flint linters` and the README table.
     pub desc: &'static str,
+    /// Upstream project page used when rendering linter names in generated docs.
+    pub project_url: Option<&'static str>,
+    /// Upstream config documentation used when rendering config filenames in generated docs.
+    pub config_doc_url: Option<&'static str>,
+    /// Optional placements in generated overview tables.
+    pub overviews: Vec<OverviewEntry>,
     /// Extended markdown documentation shown in the README detail section (behaviour, config examples).
     pub docs: &'static str,
 }
@@ -644,6 +685,9 @@ impl Check {
             workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
             desc: "",
+            project_url: None,
+            config_doc_url: None,
+            overviews: vec![],
             docs: "",
         }
     }
@@ -687,6 +731,9 @@ impl Check {
             fix_behavior: FixBehavior::Definitive,
             kind: CheckKind::Native(NativeCheckRef::new(native)),
             desc: "",
+            project_url: None,
+            config_doc_url: None,
+            overviews: vec![],
             docs: "",
         }
     }
@@ -798,6 +845,35 @@ impl Check {
     /// Set the plain-text description shown in `flint linters` and the README table.
     pub fn desc(mut self, desc: &'static str) -> Self {
         self.desc = desc;
+        self
+    }
+
+    /// Set the upstream project page used for generated documentation links.
+    pub fn project_url(mut self, project_url: &'static str) -> Self {
+        self.project_url = Some(project_url);
+        self
+    }
+
+    /// Set the upstream config documentation page used for generated config links.
+    pub fn config_doc_url(mut self, config_doc_url: &'static str) -> Self {
+        self.config_doc_url = Some(config_doc_url);
+        self
+    }
+
+    /// Place this check in the generated overview tables.
+    pub fn overview(
+        mut self,
+        section: OverviewSection,
+        row_name: &'static str,
+        role: OverviewRole,
+        description: Option<&'static str>,
+    ) -> Self {
+        self.overviews.push(OverviewEntry {
+            section,
+            row_name,
+            role,
+            description,
+        });
         self
     }
 

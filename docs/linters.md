@@ -1,102 +1,153 @@
-# Built-in linter registry
+# Linter reference
 
-Every supported check, its config file (when applicable), and its scope. The
-[summary table lives in the README](../README.md#built-in-linter-registry).
+Per-linter Flint behavior, config locations, and notes. Where available, each
+linter heading links to the upstream project page, and each config filename
+links to the relevant upstream configuration docs.
 
-Flint is intentionally opinionated about config shape: when a linter supports an
-explicit config flag, Flint manages one canonical filename for it. Repos can
-still choose the config directory via `FLINT_CONFIG_DIR` where supported.
+## Overview
 
-> [!NOTE]
-> Biome is the exception to `FLINT_CONFIG_DIR`: its real CLI does not work
-> reliably with a nested managed config, so Flint treats root `biome.jsonc` as
-> the canonical Biome config. Flint is opinionated here: use JSONC, not
-> `biome.json`.
+<!-- linter-overview-start -->
+<!-- Generated. Run `mise run generate` to regenerate. -->
+
+### Languages
+
+| Name                    | Linter                            | Formatter                                   |
+| ----------------------- | --------------------------------- | ------------------------------------------- |
+| C#                      | —                                 | [`dotnet-format`](#dotnet-format)           |
+| Go                      | [`golangci-lint`](#golangci-lint) | [`gofmt`](#gofmt)                           |
+| Java                    | —                                 | [`google-java-format`](#google-java-format) |
+| JavaScript / TypeScript | [`biome`](#biome)                 | [`biome-format`](#biome-format)             |
+| Kotlin                  | [`ktlint`](#ktlint)               | [`ktlint`](#ktlint)                         |
+| Python                  | [`ruff`](#ruff)                   | [`ruff-format`](#ruff-format)               |
+| Rust                    | [`cargo-clippy`](#cargo-clippy)   | [`cargo-fmt`](#cargo-fmt)                   |
+
+### Files / Formats
+
+| Name     | Linter                      | Formatter                       |
+| -------- | --------------------------- | ------------------------------- |
+| JSON     | [`biome`](#biome)           | [`biome-format`](#biome-format) |
+| Markdown | [`rumdl`](#rumdl)           | [`rumdl`](#rumdl)               |
+| Shell    | [`shellcheck`](#shellcheck) | [`shfmt`](#shfmt)               |
+| TOML     | —                           | [`taplo`](#taplo)               |
+| XML      | [`xmllint`](#xmllint)       | —                               |
+| YAML     | [`ryl`](#ryl)               | [`ryl`](#ryl)                   |
+
+### Tooling / CI
+
+| Name           | Check                       |
+| -------------- | --------------------------- |
+| Dockerfile     | [`hadolint`](#hadolint)     |
+| GitHub Actions | [`actionlint`](#actionlint) |
+
+### General
+
+| Name            | Check                                           | Description                                |
+| --------------- | ----------------------------------------------- | ------------------------------------------ |
+| EditorConfig    | [`editorconfig-checker`](#editorconfig-checker) | EditorConfig compliance                    |
+| Flint setup     | [`flint-setup`](#flint-setup)                   | Flint-managed setup and `mise.toml` layout |
+| License headers | [`license-header`](#license-header)             | Required file header text                  |
+| Links           | [`lychee`](#lychee)                             | Broken links                               |
+| Renovate        | [`renovate-deps`](#renovate-deps)               | Dependency update configuration            |
+| Spelling        | [`typos`](#typos)                               | Spelling in source and text files          |
+
+<!-- linter-overview-end -->
+
+## Linters
 
 <!-- linter-details-start -->
-<!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
-## `actionlint`
+<!-- Generated. Run `mise run generate` to regenerate. -->
+### [`actionlint`](https://github.com/rhysd/actionlint)
 
-|             |                                                    |
-| ----------- | -------------------------------------------------- |
-| Description | Lint GitHub Actions workflow files                 |
-| Fix         | no                                                 |
-| Binary      | `actionlint`                                       |
-| Scope       | [file](#scope-file)                                |
-| Patterns    | `.github/workflows/*.yml .github/workflows/*.yaml` |
-| Config      | `actionlint.yml`                                   |
+|          |                                                                                  |
+| -------- | -------------------------------------------------------------------------------- |
+| Fix      | no                                                                               |
+| Binary   | `actionlint`                                                                     |
+| Scope    | [file](#scope-file)                                                              |
+| Patterns | `.github/workflows/*.yml .github/workflows/*.yaml`                               |
+| Config   | [`actionlint.yml`](https://github.com/rhysd/actionlint/blob/main/docs/config.md) |
 
-## `biome`
+Lint GitHub Actions workflow files
 
-|             |                                        |
-| ----------- | -------------------------------------- |
-| Description | Lint JS/TS/JSON files                  |
-| Fix         | yes                                    |
-| Binary      | `biome`                                |
-| Scope       | [file](#scope-file)                    |
-| Patterns    | `*.json *.jsonc *.js *.ts *.jsx *.tsx` |
+### [`biome`](https://biomejs.dev/)
 
-## `biome-format`
+|          |                                                              |
+| -------- | ------------------------------------------------------------ |
+| Fix      | yes                                                          |
+| Binary   | `biome`                                                      |
+| Scope    | [file](#scope-file)                                          |
+| Patterns | `*.json *.jsonc *.js *.ts *.jsx *.tsx`                       |
+| Config   | [`biome.jsonc`](https://biomejs.dev/guides/configure-biome/) |
 
-|             |                                        |
-| ----------- | -------------------------------------- |
-| Description | Format JS/TS/JSON files                |
-| Fix         | yes                                    |
-| Binary      | `biome`                                |
-| Scope       | [file](#scope-file)                    |
-| Patterns    | `*.json *.jsonc *.js *.ts *.jsx *.tsx` |
+Lint JS/TS/JSON files
 
-## `cargo-clippy`
+### [`biome-format`](https://biomejs.dev/)
 
-|             |                                                         |
-| ----------- | ------------------------------------------------------- |
-| Description | Lint Rust code; runs on all .rs files, not just changed |
-| Fix         | yes                                                     |
-| Binary      | `cargo-clippy`                                          |
-| Scope       | [project](#scope-project)                               |
-| Patterns    | `*.rs`                                                  |
+|          |                                                              |
+| -------- | ------------------------------------------------------------ |
+| Fix      | yes                                                          |
+| Binary   | `biome`                                                      |
+| Scope    | [file](#scope-file)                                          |
+| Patterns | `*.json *.jsonc *.js *.ts *.jsx *.tsx`                       |
+| Config   | [`biome.jsonc`](https://biomejs.dev/guides/configure-biome/) |
 
-## `cargo-fmt`
+Format JS/TS/JSON files
 
-|             |                                                           |
-| ----------- | --------------------------------------------------------- |
-| Description | Format Rust code; runs on all .rs files, not just changed |
-| Fix         | yes                                                       |
-| Binary      | `rustfmt`                                                 |
-| Scope       | [project](#scope-project)                                 |
-| Patterns    | `*.rs`                                                    |
-| Config      | `rustfmt.toml`                                            |
+### [`cargo-clippy`](https://doc.rust-lang.org/clippy/configuration.html)
 
-## `dotnet-format`
+|          |                           |
+| -------- | ------------------------- |
+| Fix      | yes                       |
+| Binary   | `cargo-clippy`            |
+| Scope    | [project](#scope-project) |
+| Patterns | `*.rs`                    |
 
-|             |                       |
-| ----------- | --------------------- |
-| Description | Format C# code        |
-| Fix         | yes                   |
-| Binary      | `dotnet`              |
-| Scope       | [files](#scope-files) |
-| Patterns    | `*.cs`                |
+Lint Rust code; runs on all .rs files, not just changed
 
-## `editorconfig-checker`
+### [`cargo-fmt`](https://github.com/rust-lang/rustfmt)
 
-|             |                                               |
-| ----------- | --------------------------------------------- |
-| Description | Check files comply with EditorConfig settings |
-| Fix         | no                                            |
-| Binary      | `ec`                                          |
-| Scope       | [files](#scope-files)                         |
-| Patterns    | `*`                                           |
-| Config      | `.editorconfig-checker.json`                  |
+|          |                                                                                               |
+| -------- | --------------------------------------------------------------------------------------------- |
+| Fix      | yes                                                                                           |
+| Binary   | `rustfmt`                                                                                     |
+| Scope    | [project](#scope-project)                                                                     |
+| Patterns | `*.rs`                                                                                        |
+| Config   | [`rustfmt.toml`](https://github.com/rust-lang/rustfmt?tab=readme-ov-file#configuring-rustfmt) |
 
-## `flint-setup`
+Format Rust code; runs on all .rs files, not just changed
 
-|             |                                                               |
-| ----------- | ------------------------------------------------------------- |
-| Description | Keep Flint setup current and mise.toml lint tooling canonical |
-| Fix         | yes                                                           |
-| Binary      | (built-in)                                                    |
-| Scope       | [native](#scope-native)                                       |
-| Patterns    | `mise.toml`                                                   |
+### [`dotnet-format`](https://learn.microsoft.com/dotnet/core/tools/dotnet-format)
+
+|          |                       |
+| -------- | --------------------- |
+| Fix      | yes                   |
+| Binary   | `dotnet`              |
+| Scope    | [files](#scope-files) |
+| Patterns | `*.cs`                |
+
+Format C# code
+
+### [`editorconfig-checker`](https://github.com/editorconfig-checker/editorconfig-checker)
+
+|          |                                                                                                                               |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Fix      | no                                                                                                                            |
+| Binary   | `ec`                                                                                                                          |
+| Scope    | [files](#scope-files)                                                                                                         |
+| Patterns | `*`                                                                                                                           |
+| Config   | [`.editorconfig-checker.json`](https://github.com/editorconfig-checker/editorconfig-checker?tab=readme-ov-file#configuration) |
+
+Check files comply with EditorConfig settings
+
+### `flint-setup`
+
+|          |                         |
+| -------- | ----------------------- |
+| Fix      | yes                     |
+| Binary   | (built-in)              |
+| Scope    | [native](#scope-native) |
+| Patterns | `mise.toml`             |
+
+Keep Flint setup current and mise.toml lint tooling canonical
 
 Checks the repo's Flint-managed setup state and `mise.toml` layout.
 
@@ -112,76 +163,100 @@ This verifies and fixes Flint-managed setup:
 With `--fix`, rewrites Flint-managed config in place and applies any
 currently actionable setup migration.
 
-## `gofmt`
+### [`gofmt`](https://pkg.go.dev/cmd/gofmt)
 
-|             |                     |
-| ----------- | ------------------- |
-| Description | Format Go code      |
-| Fix         | yes                 |
-| Binary      | `gofmt`             |
-| Scope       | [file](#scope-file) |
-| Patterns    | `*.go`              |
+|          |                     |
+| -------- | ------------------- |
+| Fix      | yes                 |
+| Binary   | `gofmt`             |
+| Scope    | [file](#scope-file) |
+| Patterns | `*.go`              |
 
-## `golangci-lint`
+Format Go code
 
-|             |                                                                     |
-| ----------- | ------------------------------------------------------------------- |
-| Description | Lint Go code; uses --new-from-rev to scope analysis to changed code |
-| Fix         | no                                                                  |
-| Binary      | `golangci-lint`                                                     |
-| Scope       | [project](#scope-project)                                           |
-| Patterns    | `*.go`                                                              |
-| Config      | `.golangci.yml`                                                     |
+### [`golangci-lint`](https://golangci-lint.run/)
 
-## `google-java-format`
+|          |                                                                   |
+| -------- | ----------------------------------------------------------------- |
+| Fix      | no                                                                |
+| Binary   | `golangci-lint`                                                   |
+| Scope    | [project](#scope-project)                                         |
+| Patterns | `*.go`                                                            |
+| Config   | [`.golangci.yml`](https://golangci-lint.run/usage/configuration/) |
 
-|             |                       |
-| ----------- | --------------------- |
-| Description | Format Java code      |
-| Fix         | yes                   |
-| Binary      | `google-java-format`  |
-| Scope       | [files](#scope-files) |
-| Patterns    | `*.java`              |
+Lint Go code; uses --new-from-rev to scope analysis to changed code
 
-## `hadolint`
+### [`google-java-format`](https://github.com/google/google-java-format)
 
-|             |                                        |
-| ----------- | -------------------------------------- |
-| Description | Lint Dockerfiles                       |
-| Fix         | no                                     |
-| Binary      | `hadolint`                             |
-| Scope       | [file](#scope-file)                    |
-| Patterns    | `Dockerfile Dockerfile.* *.dockerfile` |
-| Config      | `.hadolint.yaml`                       |
+|          |                       |
+| -------- | --------------------- |
+| Fix      | yes                   |
+| Binary   | `google-java-format`  |
+| Scope    | [files](#scope-files) |
+| Patterns | `*.java`              |
 
-## `ktlint`
+Format Java code
 
-|             |                             |
-| ----------- | --------------------------- |
-| Description | Lint and format Kotlin code |
-| Fix         | yes                         |
-| Binary      | `ktlint`                    |
-| Scope       | [files](#scope-files)       |
-| Patterns    | `*.kt *.kts`                |
+### [`hadolint`](https://github.com/hadolint/hadolint)
 
-## `license-header`
+|          |                                                                                       |
+| -------- | ------------------------------------------------------------------------------------- |
+| Fix      | no                                                                                    |
+| Binary   | `hadolint`                                                                            |
+| Scope    | [file](#scope-file)                                                                   |
+| Patterns | `Dockerfile Dockerfile.* *.dockerfile`                                                |
+| Config   | [`.hadolint.yaml`](https://github.com/hadolint/hadolint?tab=readme-ov-file#configure) |
 
-|             |                                                     |
-| ----------- | --------------------------------------------------- |
-| Description | Check source files have the required license header |
-| Fix         | no                                                  |
-| Binary      | (built-in)                                          |
-| Scope       | [native](#scope-native)                             |
+Lint Dockerfiles
 
-## `lychee`
+### [`ktlint`](https://pinterest.github.io/ktlint/latest/)
 
-|             |                                    |
-| ----------- | ---------------------------------- |
-| Description | Check for broken links             |
-| Fix         | no                                 |
-| Binary      | `lychee`                           |
-| Scope       | [native](#scope-native)            |
-| Config      | via `[checks.links]` in flint.toml |
+|          |                       |
+| -------- | --------------------- |
+| Fix      | yes                   |
+| Binary   | `ktlint`              |
+| Scope    | [files](#scope-files) |
+| Patterns | `*.kt *.kts`          |
+
+Lint and format Kotlin code
+
+### `license-header`
+
+|        |                                             |
+| ------ | ------------------------------------------- |
+| Fix    | no                                          |
+| Binary | (built-in)                                  |
+| Scope  | [native](#scope-native)                     |
+| Config | via `[checks.license-header]` in flint.toml |
+
+Check source files have the required license header
+
+Disabled by default. Configure in `flint.toml`:
+
+```toml
+[checks.license-header]
+text = "SPDX-License-Identifier: Apache-2.0"
+patterns = ["*.java", "*.kt"]
+lines_to_check = 5
+```
+
+- `text` — required header text to find near the top of each file
+- `patterns` — glob patterns selecting which files to check
+- `lines_to_check` — how many leading lines to search; defaults to `5`
+
+`text` may be multi-line. Flint joins the first `lines_to_check` lines with
+newlines and checks whether that text contains the configured header snippet.
+
+### [`lychee`](https://lychee.cli.rs/)
+
+|        |                                    |
+| ------ | ---------------------------------- |
+| Fix    | no                                 |
+| Binary | `lychee`                           |
+| Scope  | [native](#scope-native)            |
+| Config | via `[checks.links]` in flint.toml |
+
+Check for broken links
 
 Orchestrates [lychee](https://lychee.cli.rs/) for link checking. Requires `lychee` in `[tools]`.
 
@@ -211,16 +286,17 @@ config = ".github/config/lychee.toml"
 check_all_local = true
 ```
 
-## `renovate-deps`
+### [`renovate-deps`](https://docs.renovatebot.com/)
 
-|             |                                                                                                                            |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Description | Verify Renovate dependency snapshot is up to date                                                                          |
-| Fix         | yes                                                                                                                        |
-| Binary      | `renovate`                                                                                                                 |
-| Scope       | [native](#scope-native)                                                                                                    |
-| Patterns    | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
-| Run policy  | adaptive — see [when does this run?](linters/renovate-deps.md#when-does-this-run)                                          |
+|            |                                                                                                                            |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Fix        | yes                                                                                                                        |
+| Binary     | `renovate`                                                                                                                 |
+| Scope      | [native](#scope-native)                                                                                                    |
+| Patterns   | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
+| Run policy | adaptive — see [when does this run?](linters/renovate-deps.md#when-does-this-run)                                          |
+
+Verify Renovate dependency snapshot is up to date
 
 Verifies `renovate-tracked-deps.json` next to the active Renovate
 config is up to date by running Renovate locally and comparing its
@@ -252,81 +328,88 @@ Configure via `flint.toml`:
 exclude_managers = ["github-actions", "github-runners"]
 ```
 
-## `ruff`
+### [`ruff`](https://docs.astral.sh/ruff/)
 
-|             |                     |
-| ----------- | ------------------- |
-| Description | Lint Python code    |
-| Fix         | yes                 |
-| Binary      | `ruff`              |
-| Scope       | [file](#scope-file) |
-| Patterns    | `*.py`              |
-| Config      | `ruff.toml`         |
+|          |                                                           |
+| -------- | --------------------------------------------------------- |
+| Fix      | yes                                                       |
+| Binary   | `ruff`                                                    |
+| Scope    | [file](#scope-file)                                       |
+| Patterns | `*.py`                                                    |
+| Config   | [`ruff.toml`](https://docs.astral.sh/ruff/configuration/) |
 
-## `ruff-format`
+Lint Python code
 
-|             |                     |
-| ----------- | ------------------- |
-| Description | Format Python code  |
-| Fix         | yes                 |
-| Binary      | `ruff`              |
-| Scope       | [file](#scope-file) |
-| Patterns    | `*.py`              |
-| Config      | `ruff.toml`         |
+### [`ruff-format`](https://docs.astral.sh/ruff/)
 
-## `rumdl`
+|          |                                                           |
+| -------- | --------------------------------------------------------- |
+| Fix      | yes                                                       |
+| Binary   | `ruff`                                                    |
+| Scope    | [file](#scope-file)                                       |
+| Patterns | `*.py`                                                    |
+| Config   | [`ruff.toml`](https://docs.astral.sh/ruff/configuration/) |
 
-|             |                                               |
-| ----------- | --------------------------------------------- |
-| Description | Lint Markdown files for style and consistency |
-| Fix         | yes                                           |
-| Binary      | `rumdl`                                       |
-| Scope       | [file](#scope-file)                           |
-| Patterns    | `*.md`                                        |
-| Config      | `.rumdl.toml`                                 |
+Format Python code
 
-## `ryl`
+### [`rumdl`](https://rumdl.dev/)
 
-|             |                                           |
-| ----------- | ----------------------------------------- |
-| Description | Lint YAML files for style and consistency |
-| Fix         | yes                                       |
-| Binary      | `ryl`                                     |
-| Scope       | [files](#scope-files)                     |
-| Patterns    | `*.yml *.yaml`                            |
-| Config      | `.yamllint.yml`                           |
+|          |                                                                       |
+| -------- | --------------------------------------------------------------------- |
+| Fix      | yes                                                                   |
+| Binary   | `rumdl`                                                               |
+| Scope    | [file](#scope-file)                                                   |
+| Patterns | `*.md`                                                                |
+| Config   | [`.rumdl.toml`](https://rumdl.dev/mdformat-comparison/#configuration) |
 
-## `shellcheck`
+Lint Markdown files for style and consistency
 
-|             |                                        |
-| ----------- | -------------------------------------- |
-| Description | Lint shell scripts for common mistakes |
-| Fix         | no                                     |
-| Binary      | `shellcheck`                           |
-| Scope       | [file](#scope-file)                    |
-| Patterns    | `*.sh *.bash *.bats`                   |
-| Config      | `.shellcheckrc`                        |
+### [`ryl`](https://github.com/owenlamont/ryl)
 
-## `shfmt`
+|          |                                                                                 |
+| -------- | ------------------------------------------------------------------------------- |
+| Fix      | yes                                                                             |
+| Binary   | `ryl`                                                                           |
+| Scope    | [files](#scope-files)                                                           |
+| Patterns | `*.yml *.yaml`                                                                  |
+| Config   | [`.yamllint.yml`](https://yamllint.readthedocs.io/en/stable/configuration.html) |
 
-|             |                      |
-| ----------- | -------------------- |
-| Description | Format shell scripts |
-| Fix         | yes                  |
-| Binary      | `shfmt`              |
-| Scope       | [file](#scope-file)  |
-| Patterns    | `*.sh *.bash`        |
+Lint YAML files for style and consistency
 
-## `taplo`
+### [`shellcheck`](https://github.com/koalaman/shellcheck)
 
-|             |                     |
-| ----------- | ------------------- |
-| Description | Format TOML files   |
-| Fix         | yes                 |
-| Binary      | `taplo`             |
-| Scope       | [file](#scope-file) |
-| Patterns    | `*.toml`            |
-| Config      | `.taplo.toml`       |
+|          |                                                                                       |
+| -------- | ------------------------------------------------------------------------------------- |
+| Fix      | no                                                                                    |
+| Binary   | `shellcheck`                                                                          |
+| Scope    | [file](#scope-file)                                                                   |
+| Patterns | `*.sh *.bash *.bats`                                                                  |
+| Config   | [`.shellcheckrc`](https://github.com/koalaman/shellcheck/blob/master/shellcheck.1.md) |
+
+Lint shell scripts for common mistakes
+
+### [`shfmt`](https://github.com/mvdan/sh)
+
+|          |                     |
+| -------- | ------------------- |
+| Fix      | yes                 |
+| Binary   | `shfmt`             |
+| Scope    | [file](#scope-file) |
+| Patterns | `*.sh *.bash`       |
+
+Format shell scripts
+
+### [`taplo`](https://taplo.tamasfe.dev/)
+
+|          |                                                                    |
+| -------- | ------------------------------------------------------------------ |
+| Fix      | yes                                                                |
+| Binary   | `taplo`                                                            |
+| Scope    | [file](#scope-file)                                                |
+| Patterns | `*.toml`                                                           |
+| Config   | [`.taplo.toml`](https://taplo.tamasfe.dev/configuration/file.html) |
+
+Format TOML files
 
 Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).
 
@@ -337,27 +420,28 @@ flint's existing formatter-style checks.
 Current caveat: Taplo's published docs currently advertise TOML 1.0.0
 support, so treat this check as TOML 1.0-oriented for now.
 
-## `typos`
+### [`typos`](https://github.com/crate-ci/typos)
 
-|             |                                    |
-| ----------- | ---------------------------------- |
-| Description | Check for common spelling mistakes |
-| Fix         | yes                                |
-| Binary      | `typos`                            |
-| Scope       | [files](#scope-files)              |
-| Patterns    | `*`                                |
-| Config      | `_typos.toml`                      |
+|          |                                                                                  |
+| -------- | -------------------------------------------------------------------------------- |
+| Fix      | yes                                                                              |
+| Binary   | `typos`                                                                          |
+| Scope    | [files](#scope-files)                                                            |
+| Patterns | `*`                                                                              |
+| Config   | [`_typos.toml`](https://github.com/crate-ci/typos/blob/master/docs/reference.md) |
 
-## `xmllint`
+Check for common spelling mistakes
 
-|             |                                    |
-| ----------- | ---------------------------------- |
-| Description | Validate XML files are well-formed |
-| Fix         | no                                 |
-| Binary      | `xmllint`                          |
-| Scope       | [files](#scope-files)              |
-| Patterns    | `*.xml`                            |
+### [`xmllint`](https://github.com/jonwiggins/xmloxide)
 
+|          |                       |
+| -------- | --------------------- |
+| Fix      | no                    |
+| Binary   | `xmllint`             |
+| Scope    | [files](#scope-files) |
+| Patterns | `*.xml`               |
+
+Validate XML files are well-formed
 <!-- linter-details-end -->
 
 ## Scopes

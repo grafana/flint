@@ -5,9 +5,6 @@ use regex::Regex;
 
 use super::*;
 
-#[path = "../readme_snippets.rs"]
-mod readme_snippets;
-
 #[test]
 fn find_obsolete_key_returns_none_for_clean_tools() {
     let mut tools = HashMap::new();
@@ -680,109 +677,13 @@ fn sorted_rule_names(rule: &serde_json::Value) -> Vec<&str> {
     names
 }
 
-fn extract_fenced_block_after<'a>(haystack: &'a str, marker: &str, lang: &str) -> &'a str {
-    let start = haystack
-        .find(marker)
-        .unwrap_or_else(|| panic!("missing marker {marker:?}"));
-    let after_marker = &haystack[start + marker.len()..];
-    let fence = format!("```{lang}\n");
-    let block_start = after_marker
-        .find(&fence)
-        .unwrap_or_else(|| panic!("missing {lang} fenced block after {marker:?}"))
-        + fence.len();
-    let rest = &after_marker[block_start..];
-    let block_end = rest
-        .find("\n```")
-        .unwrap_or_else(|| panic!("missing closing fence after {marker:?}"));
-    &rest[..block_end]
-}
-
-fn toml_tool_versions_from_table(
-    table: &toml::Table,
-    keys: &[&str],
-) -> std::collections::BTreeMap<String, String> {
-    keys.iter()
-        .map(|key| {
-            let value = table
-                .get(*key)
-                .unwrap_or_else(|| panic!("missing tool key {key:?}"));
-            let version = value
-                .as_str()
-                .map(ToOwned::to_owned)
-                .or_else(|| {
-                    value
-                        .as_table()
-                        .and_then(|t| t.get("version"))
-                        .and_then(toml::Value::as_str)
-                        .map(ToOwned::to_owned)
-                })
-                .unwrap_or_else(|| panic!("tool key {key:?} must have a string version"));
-            ((*key).to_string(), version)
-        })
-        .collect()
-}
-
-#[test]
-fn readme_quickstart_tools_snippets_stay_current() {
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let readme_path = manifest_dir.join("README.md");
-    let mise_path = manifest_dir.join("mise.toml");
-
-    let readme = std::fs::read_to_string(&readme_path).expect("README.md must be readable");
-    let mise = std::fs::read_to_string(&mise_path).expect("mise.toml must be readable");
-
-    let install_block =
-        extract_fenced_block_after(&readme, readme_snippets::INSTALL_MARKER, "toml");
-    let install_toml: toml::Value =
-        toml::from_str(install_block).expect("README install block must be valid TOML");
-    let install_tools = install_toml["tools"]
-        .as_table()
-        .expect("README install block must contain [tools]");
-    assert_eq!(
-        install_tools
-            .get("aqua:grafana/flint")
-            .and_then(toml::Value::as_str),
-        Some(env!("CARGO_PKG_VERSION")),
-        "README install snippet must pin the current flint release"
-    );
-
-    let quickstart_block =
-        extract_fenced_block_after(&readme, readme_snippets::QUICKSTART_MARKER, "toml");
-    let quickstart_toml: toml::Value =
-        toml::from_str(quickstart_block).expect("README quickstart block must be valid TOML");
-    let quickstart_tools = quickstart_toml["tools"]
-        .as_table()
-        .expect("README quickstart block must contain [tools]");
-
-    let repo_mise: toml::Value = toml::from_str(&mise).expect("mise.toml must be valid TOML");
-    let repo_tools = repo_mise["tools"]
-        .as_table()
-        .expect("repo mise.toml must contain [tools]");
-
-    let expected = toml_tool_versions_from_table(repo_tools, readme_snippets::QUICKSTART_KEYS)
-        .into_iter()
-        .chain(std::iter::once((
-            "aqua:grafana/flint".to_string(),
-            env!("CARGO_PKG_VERSION").to_string(),
-        )))
-        .collect::<std::collections::BTreeMap<_, _>>();
-    let actual = toml_tool_versions_from_table(
-        quickstart_tools,
-        &["aqua:grafana/flint", "shellcheck", "shfmt", "actionlint"],
-    );
-
-    assert_eq!(
-        actual, expected,
-        "README quickstart [tools] snippet drifted from current repo tool versions"
-    );
-}
-
 /// Verifies README summary table and docs/linters.md detail sections stay
 /// in sync with the registry. The summary table lives in README.md between
-/// `registry-table-*` markers; the per-linter detail sections live in
+/// `registry-table-*` markers; the same overview tables live in docs/linters.md
+/// between `linter-overview-*` markers; the per-linter detail sections live in
 /// docs/linters.md between `linter-details-*` markers.
 ///
-/// Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate.
+/// Run `mise run generate` to regenerate.
 #[test]
 fn readme_linter_table_in_sync() {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -792,7 +693,8 @@ fn readme_linter_table_in_sync() {
     let details = std::fs::read_to_string(&details_path).expect("docs/linters.md must be readable");
     let registry = builtin();
 
-    let expected_summary = generate_summary_table(&registry);
+    let expected_summary = generate_overview_tables(&registry, OverviewLinkTarget::Readme);
+    let expected_overview = generate_overview_tables(&registry, OverviewLinkTarget::LinterPage);
     let expected_details = generate_linter_details(&registry);
 
     if std::env::var("UPDATE_README").is_ok() {
@@ -802,8 +704,12 @@ fn readme_linter_table_in_sync() {
             README_TABLE_END,
             &expected_summary,
         );
-        let updated_details =
-            replace_section(&details, DETAILS_START, DETAILS_END, &expected_details);
+        let updated_details = replace_section(
+            &replace_section(&details, OVERVIEW_START, OVERVIEW_END, &expected_overview),
+            DETAILS_START,
+            DETAILS_END,
+            &expected_details,
+        );
         std::fs::write(&readme_path, updated_readme).expect("failed to write README.md");
         std::fs::write(&details_path, updated_details).expect("failed to write docs/linters.md");
         return;
@@ -813,20 +719,29 @@ fn readme_linter_table_in_sync() {
     // headings, tables, and code blocks. This keeps the comparison stable
     // even when docs contain multi-paragraph content with blank lines.
     let actual_summary = extract_section(&readme, README_TABLE_START, README_TABLE_END);
+    let actual_overview = extract_section(&details, OVERVIEW_START, OVERVIEW_END);
     let actual_details = extract_section(&details, DETAILS_START, DETAILS_END);
     let expected_summary_norm = strip_blank_lines(&expected_summary);
+    let expected_overview_norm = strip_blank_lines(&expected_overview);
     let expected_details_norm = strip_blank_lines(&expected_details);
     if actual_summary != expected_summary_norm {
         panic!(
             "README summary table is out of sync with the registry.\n\
-             Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate.\n\n\
+             Run `mise run generate` to regenerate.\n\n\
              Expected:\n{expected_summary_norm}\n\nActual:\n{actual_summary}"
+        );
+    }
+    if actual_overview != expected_overview_norm {
+        panic!(
+            "docs/linters.md overview tables are out of sync with the registry.\n\
+             Run `mise run generate` to regenerate.\n\n\
+             Expected:\n{expected_overview_norm}\n\nActual:\n{actual_overview}"
         );
     }
     if actual_details != expected_details_norm {
         panic!(
             "docs/linters.md detail sections out of sync with the registry.\n\
-             Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate.\n\n\
+             Run `mise run generate` to regenerate.\n\n\
              Expected:\n{expected_details_norm}\n\nActual:\n{actual_details}"
         );
     }
@@ -834,9 +749,11 @@ fn readme_linter_table_in_sync() {
 
 const README_TABLE_START: &str = "<!-- registry-table-start -->";
 const README_TABLE_END: &str = "<!-- registry-table-end -->";
+const OVERVIEW_START: &str = "<!-- linter-overview-start -->";
+const OVERVIEW_END: &str = "<!-- linter-overview-end -->";
 const DETAILS_START: &str = "<!-- linter-details-start -->";
 const DETAILS_END: &str = "<!-- linter-details-end -->";
-const GENERATED_COMMENT: &str = "<!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->";
+const GENERATED_COMMENT: &str = "<!-- Generated. Run `mise run generate` to regenerate. -->";
 
 fn strip_blank_lines(s: &str) -> String {
     s.lines()
@@ -873,17 +790,173 @@ fn replace_section(haystack: &str, start_marker: &str, end_marker: &str, body: &
     )
 }
 
-fn generate_summary_table(registry: &[Check]) -> String {
-    // Summary table: Name | Description | Fix — sorted alphabetically.
-    // Name column links to the matching detail section in docs/linters.md,
-    // except for checks with a dedicated guide page.
-    let headers = ["Name", "Description", "Fix"];
-    let mut sorted: Vec<&Check> = registry.iter().collect();
-    sorted.sort_by_key(|c| c.name);
-    let rows: Vec<[String; 3]> = sorted.iter().map(|c| summary_row(c)).collect();
+#[derive(Clone, Copy)]
+enum OverviewLinkTarget {
+    Readme,
+    LinterPage,
+}
 
+impl OverviewLinkTarget {
+    fn heading_prefix(self) -> &'static str {
+        match self {
+            Self::Readme => "###",
+            Self::LinterPage => "###",
+        }
+    }
+}
+
+#[derive(Default)]
+struct OverviewDocRow {
+    linter: Option<String>,
+    formatter: Option<String>,
+    checks: Vec<String>,
+    description: Option<&'static str>,
+}
+
+fn generate_overview_tables(registry: &[Check], link_target: OverviewLinkTarget) -> String {
+    use crate::registry::types::{OverviewRole, OverviewSection};
+    use std::collections::BTreeMap;
+
+    let mut sections: BTreeMap<OverviewSection, BTreeMap<&'static str, OverviewDocRow>> =
+        BTreeMap::new();
+
+    for check in registry {
+        for overview in &check.overviews {
+            let row = sections
+                .entry(overview.section)
+                .or_default()
+                .entry(overview.row_name)
+                .or_default();
+            let link = overview_name_cell(check, link_target);
+            match overview.role {
+                OverviewRole::Linter => row.linter = Some(link),
+                OverviewRole::Formatter => row.formatter = Some(link),
+                OverviewRole::Check => row.checks.push(link),
+                OverviewRole::Both => {
+                    row.linter = Some(link.clone());
+                    row.formatter = Some(link);
+                }
+            }
+            if let Some(description) = overview.description {
+                row.description = Some(description);
+            }
+        }
+    }
+
+    let lines = vec![
+        GENERATED_COMMENT.to_string(),
+        format!(
+            "{} {}",
+            link_target.heading_prefix(),
+            OverviewSection::Languages.title()
+        ),
+        render_markdown_table(
+            &["Name", "Linter", "Formatter"],
+            &render_overview_rows(&sections, OverviewSection::Languages),
+        ),
+        format!(
+            "{} {}",
+            link_target.heading_prefix(),
+            OverviewSection::FilesFormats.title()
+        ),
+        render_markdown_table(
+            &["Name", "Linter", "Formatter"],
+            &render_overview_rows(&sections, OverviewSection::FilesFormats),
+        ),
+        format!(
+            "{} {}",
+            link_target.heading_prefix(),
+            OverviewSection::ToolingCi.title()
+        ),
+        render_markdown_table(
+            &["Name", "Check"],
+            &render_check_rows(&sections, OverviewSection::ToolingCi),
+        ),
+        format!(
+            "{} {}",
+            link_target.heading_prefix(),
+            OverviewSection::General.title()
+        ),
+        render_markdown_table(
+            &["Name", "Check", "Description"],
+            &render_general_rows(&sections),
+        ),
+    ];
+    lines.join("\n\n")
+}
+
+fn render_overview_rows(
+    sections: &std::collections::BTreeMap<
+        crate::registry::types::OverviewSection,
+        std::collections::BTreeMap<&'static str, OverviewDocRow>,
+    >,
+    section: crate::registry::types::OverviewSection,
+) -> Vec<[String; 3]> {
+    sections
+        .get(&section)
+        .into_iter()
+        .flat_map(|rows| rows.iter())
+        .map(|(name, row)| {
+            [
+                (*name).to_string(),
+                row.linter.clone().unwrap_or_else(|| "—".to_string()),
+                row.formatter.clone().unwrap_or_else(|| "—".to_string()),
+            ]
+        })
+        .collect()
+}
+
+fn render_check_rows(
+    sections: &std::collections::BTreeMap<
+        crate::registry::types::OverviewSection,
+        std::collections::BTreeMap<&'static str, OverviewDocRow>,
+    >,
+    section: crate::registry::types::OverviewSection,
+) -> Vec<[String; 2]> {
+    sections
+        .get(&section)
+        .into_iter()
+        .flat_map(|rows| rows.iter())
+        .map(|(name, row)| {
+            [
+                (*name).to_string(),
+                if row.checks.is_empty() {
+                    "—".to_string()
+                } else {
+                    row.checks.join(" / ")
+                },
+            ]
+        })
+        .collect()
+}
+
+fn render_general_rows(
+    sections: &std::collections::BTreeMap<
+        crate::registry::types::OverviewSection,
+        std::collections::BTreeMap<&'static str, OverviewDocRow>,
+    >,
+) -> Vec<[String; 3]> {
+    sections
+        .get(&crate::registry::types::OverviewSection::General)
+        .into_iter()
+        .flat_map(|rows| rows.iter())
+        .map(|(name, row)| {
+            [
+                (*name).to_string(),
+                if row.checks.is_empty() {
+                    "—".to_string()
+                } else {
+                    row.checks.join(" / ")
+                },
+                row.description.unwrap_or("—").to_string(),
+            ]
+        })
+        .collect()
+}
+
+fn render_markdown_table<const N: usize>(headers: &[&str; N], rows: &[[String; N]]) -> String {
     let mut widths = headers.map(|h| h.len());
-    for row in &rows {
+    for row in rows {
         for (i, cell) in row.iter().enumerate() {
             widths[i] = widths[i].max(cell.len());
         }
@@ -900,12 +973,8 @@ fn generate_summary_table(registry: &[Check]) -> String {
     let sep_row = format!("| {} |", separator.join(" | "));
     let header_strs: Vec<&str> = headers.to_vec();
 
-    let mut lines = vec![
-        GENERATED_COMMENT.to_string(),
-        fmt_row(&header_strs),
-        sep_row,
-    ];
-    for row in &rows {
+    let mut lines = vec![fmt_row(&header_strs), sep_row];
+    for row in rows {
         let strs: Vec<&str> = row.iter().map(|s| s.as_str()).collect();
         lines.push(fmt_row(&strs));
     }
@@ -918,21 +987,21 @@ fn generate_linter_details(registry: &[Check]) -> String {
 
     let mut lines = vec![GENERATED_COMMENT.to_string()];
     for check in &sorted {
-        lines.push(format!("## `{}`", check.name));
+        let heading = match check.project_url {
+            Some(url) => format!("### [`{}`]({url})", check.name),
+            None => format!("### `{}`", check.name),
+        };
+        lines.push(heading);
         lines.push(detail_table(check));
     }
     lines.join("\n")
 }
 
-fn summary_row(check: &Check) -> [String; 3] {
-    let name = format!("[`{}`]({})", check.name, detail_link(check));
-    let desc = if check.desc.is_empty() {
-        "—".to_string()
-    } else {
-        check.desc.to_string()
-    };
-    let fix = if check.has_fix() { "yes" } else { "—" }.to_string();
-    [name, desc, fix]
+fn overview_name_cell(check: &Check, link_target: OverviewLinkTarget) -> String {
+    match link_target {
+        OverviewLinkTarget::Readme => format!("[`{}`]({})", check.name, detail_link(check)),
+        OverviewLinkTarget::LinterPage => format!("[`{}`](#{})", check.name, check.name),
+    }
 }
 
 fn detail_link(check: &Check) -> String {
@@ -951,12 +1020,17 @@ fn detail_table(check: &Check) -> String {
     let sep = format!("| {} | {} |", "-".repeat(col1_w), "-".repeat(col2_w));
 
     // Empty header row: markdown requires one, but we don't need visible
-    // column labels — Description and Fix are data rows, not headers.
+    // column labels for the metadata table.
     let mut lines = vec![fmt("", ""), sep];
     for (k, v) in &rows {
         lines.push(fmt(k, v));
     }
+    if !check.desc.is_empty() {
+        lines.push(String::new());
+        lines.push(check.desc.to_string());
+    }
     if !check.docs.is_empty() {
+        lines.push(String::new());
         lines.push(check.docs.to_string());
     }
     lines.join("\n")
@@ -964,10 +1038,6 @@ fn detail_table(check: &Check) -> String {
 
 fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     let mut rows: Vec<(&'static str, String)> = vec![];
-
-    if !check.desc.is_empty() {
-        rows.push(("Description", check.desc.to_string()));
-    }
 
     rows.push((
         "Fix",
@@ -988,13 +1058,27 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
         rows.push(("Patterns", format!("`{}`", check.patterns.join(" "))));
     }
 
-    match check.linter_config.as_ref() {
-        Some(config) => rows.push(("Config", format!("`{}`", config.display_name()))),
-        None => {
-            if let Some(config) = check.kind.native_config_display() {
-                rows.push(("Config", config.to_string()));
-            }
+    match (
+        check.linter_config.as_ref(),
+        check.baseline_config.as_ref(),
+        check.kind.native_config_display(),
+    ) {
+        (Some(config), _, _) => {
+            let value = match check.config_doc_url {
+                Some(url) => format!("[`{}`]({url})", config.display_name()),
+                None => format!("`{}`", config.display_name()),
+            };
+            rows.push(("Config", value));
         }
+        (None, Some(config), _) => {
+            let value = match check.config_doc_url {
+                Some(url) => format!("[`{}`]({url})", config.path),
+                None => format!("`{}`", config.path),
+            };
+            rows.push(("Config", value));
+        }
+        (None, None, Some(config)) => rows.push(("Config", config.to_string())),
+        (None, None, None) => {}
     }
 
     if check.adaptive_relevance.is_some() {

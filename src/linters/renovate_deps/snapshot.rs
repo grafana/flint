@@ -1,4 +1,3 @@
-use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
@@ -77,7 +76,7 @@ pub(crate) fn extract_deps(
         .ok_or_else(|| anyhow::anyhow!("none of {:?} found in Renovate log", PACKAGE_FILES_MSGS))?;
 
     let mut deps_by_file: BTreeMap<String, BTreeMap<String, BTreeSet<String>>> = BTreeMap::new();
-    let mut meta_by_dep: BTreeMap<String, DepMeta> = BTreeMap::new();
+    let mut meta_by_dep: BTreeMap<String, DepMetaAccumulator> = BTreeMap::new();
 
     if let Some(obj) = config.as_object() {
         for (manager, manager_files) in obj {
@@ -114,13 +113,10 @@ pub(crate) fn extract_deps(
                             .and_then(|v| v.as_str())
                             .map(ToOwned::to_owned),
                     };
-                    merge_dep_meta(
-                        meta_by_dep.entry(dep_name.to_string()).or_default(),
-                        &next_meta,
-                    )
-                    .with_context(|| {
-                        format!("conflicting metadata extracted for dependency {dep_name:?}")
-                    })?;
+                    meta_by_dep
+                        .entry(dep_name.to_string())
+                        .or_default()
+                        .merge(&next_meta);
                     deps_by_file
                         .entry(file_path.clone())
                         .or_default()
@@ -144,35 +140,44 @@ pub(crate) fn extract_deps(
         })
         .collect();
 
-    Ok(Snapshot {
-        meta: meta_by_dep,
-        files,
-    })
+    let meta = meta_by_dep
+        .into_iter()
+        .map(|(dep_name, meta)| (dep_name, meta.finish()))
+        .collect();
+
+    Ok(Snapshot { meta, files })
 }
 
-fn merge_dep_meta(existing: &mut DepMeta, next: &DepMeta) -> anyhow::Result<()> {
-    merge_optional_field(
-        &mut existing.package_name,
-        &next.package_name,
-        "packageName",
-    )?;
-    merge_optional_field(&mut existing.datasource, &next.datasource, "datasource")?;
-    Ok(())
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct DepMetaAccumulator {
+    package_names: BTreeSet<String>,
+    datasources: BTreeSet<String>,
 }
 
-fn merge_optional_field(
-    existing: &mut Option<String>,
-    next: &Option<String>,
-    field: &str,
-) -> anyhow::Result<()> {
-    match (existing.as_deref(), next.as_deref()) {
-        (Some(left), Some(right)) if left != right => {
-            anyhow::bail!("conflicting {field}: {left:?} != {right:?}");
+impl DepMetaAccumulator {
+    fn merge(&mut self, next: &DepMeta) {
+        if let Some(package_name) = next.package_name.as_ref() {
+            self.package_names.insert(package_name.clone());
         }
-        (None, Some(value)) => *existing = Some(value.to_string()),
-        _ => {}
+        if let Some(datasource) = next.datasource.as_ref() {
+            self.datasources.insert(datasource.clone());
+        }
     }
-    Ok(())
+
+    fn finish(self) -> DepMeta {
+        DepMeta {
+            package_name: collapse_unique(self.package_names),
+            datasource: collapse_unique(self.datasources),
+        }
+    }
+}
+
+fn collapse_unique(values: BTreeSet<String>) -> Option<String> {
+    if values.len() == 1 {
+        values.into_iter().next()
+    } else {
+        None
+    }
 }
 
 pub(crate) fn write_snapshot(path: &Path, deps: &Snapshot) -> anyhow::Result<()> {

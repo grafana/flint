@@ -179,27 +179,61 @@ fn is_flint_tool_key(key: &str) -> bool {
         || key.starts_with("cargo:https://github.com/grafana/flint.git")
 }
 
-/// Replaces obsolete tool keys in mise.toml with their modern equivalents,
-/// preserving the existing version value. Returns the list of replacements made
-/// as `(old_key, new_key)` pairs. No-ops if the file doesn't exist or has no
-/// obsolete keys.
+/// Replaces obsolete tool keys in mise.toml with their modern equivalents.
+/// Most migrations preserve the existing version value, but migrations from
+/// `codespell`/`pipx:codespell` to `typos` resolve a fresh `typos` pin via mise
+/// when possible and otherwise fall back to `typos = "latest"`. Returns the
+/// list of replacements made as `(old_key, new_key)` pairs. No-ops if the file
+/// doesn't exist or has no obsolete keys.
 pub(crate) fn replace_obsolete_keys(
     project_root: &Path,
     obsolete: &[(&str, &str)],
 ) -> Result<Vec<(String, String)>> {
+    replace_obsolete_keys_with(project_root, obsolete, run_mise_use)
+}
+
+fn replace_obsolete_keys_with(
+    project_root: &Path,
+    obsolete: &[(&str, &str)],
+    mut runner: impl FnMut(&Path, &str, &str),
+) -> Result<Vec<(String, String)>> {
     let path = project_root.join("mise.toml");
-    let content = match std::fs::read_to_string(&path) {
+    let mut content = match std::fs::read_to_string(&path) {
         Ok(c) => c,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(vec![]),
         Err(e) => return Err(e).with_context(|| format!("failed to read {}", path.display())),
     };
+
+    if obsolete
+        .iter()
+        .any(|(old_key, new_key)| needs_fresh_pin_version(old_key, new_key))
+    {
+        for &(old_key, new_key) in obsolete {
+            if !needs_fresh_pin_version(old_key, new_key) {
+                continue;
+            }
+            let parsed = content.parse::<toml_edit::DocumentMut>().ok();
+            let (has_old, has_new) = parsed
+                .as_ref()
+                .and_then(|doc| doc.get("tools"))
+                .and_then(|t| t.as_table())
+                .map(|tools| (tools.contains_key(old_key), tools.contains_key(new_key)))
+                .unwrap_or((false, false));
+            if has_old && !has_new {
+                let _ = pin_tool_via_mise_with(project_root, new_key, "latest", &mut runner);
+                content = std::fs::read_to_string(&path).unwrap_or(content);
+            }
+        }
+    }
+
     let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse mise.toml")?;
 
     let mut replaced = vec![];
     if let Some(tools) = doc.get_mut("tools").and_then(|t| t.as_table_mut()) {
         for &(old_key, new_key) in obsolete {
             if let Some(value) = tools.remove(old_key) {
-                tools.insert(new_key, value);
+                let replacement = replacement_value_for_migration(tools, old_key, new_key, value);
+                tools.insert(new_key, replacement);
                 replaced.push((old_key.to_string(), new_key.to_string()));
             }
         }
@@ -235,6 +269,25 @@ pub(crate) fn remove_tool_keys(project_root: &Path, keys: &[&str]) -> Result<Vec
         std::fs::write(&path, doc.to_string()).context("failed to write mise.toml")?;
     }
     Ok(removed)
+}
+
+fn needs_fresh_pin_version(old_key: &str, new_key: &str) -> bool {
+    new_key == "typos" && matches!(old_key, "codespell" | "pipx:codespell")
+}
+
+fn replacement_value_for_migration(
+    tools: &toml_edit::Table,
+    old_key: &str,
+    new_key: &str,
+    old_value: toml_edit::Item,
+) -> toml_edit::Item {
+    if needs_fresh_pin_version(old_key, new_key) {
+        if let Some(version) = tool_version(tools, new_key) {
+            return toml_edit::Item::Value(toml_edit::Value::from(version));
+        }
+        return toml_edit::Item::Value(toml_edit::Value::from("latest"));
+    }
+    old_value
 }
 
 pub(super) fn apply_changes(
@@ -468,7 +521,7 @@ mod tests {
     use super::{
         apply_changes_with, ensure_flint_self_pin, ensure_flint_self_pin_with, ensure_node_for_npm,
         ensure_node_for_npm_with, needs_node_for_npm, pin_tool_via_mise_with, remove_tool_keys,
-        replace_obsolete_keys,
+        replace_obsolete_keys, replace_obsolete_keys_with,
     };
 
     #[test]
@@ -620,6 +673,105 @@ mod tests {
             "old key removed: {result}"
         );
         assert!(result.contains("v3.13.1"), "version preserved: {result}");
+    }
+
+    #[test]
+    fn replaces_codespell_with_typos_using_fresh_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        std::fs::write(&path, "[tools]\n\"pipx:codespell\" = \"2.4.2\"\n").unwrap();
+
+        let replaced = replace_obsolete_keys_with(
+            dir.path(),
+            &[("pipx:codespell", "typos")],
+            |project_root, key, version| {
+                assert_eq!(key, "typos");
+                assert_eq!(version, "latest");
+                std::fs::write(
+                    project_root.join("mise.toml"),
+                    "[tools]\n\"pipx:codespell\" = \"2.4.2\"\ntypos = \"1.46.0\"\n",
+                )
+                .unwrap();
+            },
+        )
+        .unwrap();
+        let result = std::fs::read_to_string(&path).unwrap();
+
+        assert_eq!(
+            replaced,
+            vec![("pipx:codespell".to_string(), "typos".to_string())]
+        );
+        assert!(
+            result.contains("typos = \"1.46.0\""),
+            "fresh typos version kept: {result}"
+        );
+        assert!(
+            !result.contains("typos = \"2.4.2\""),
+            "legacy codespell version not copied to typos: {result}"
+        );
+        assert!(
+            !result.contains("pipx:codespell"),
+            "old key removed: {result}"
+        );
+    }
+
+    #[test]
+    fn replaces_codespell_with_typos_preserves_existing_typos_pin() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        std::fs::write(
+            &path,
+            "[tools]\n\"pipx:codespell\" = \"2.4.2\"\ntypos = \"1.46.0\"\n",
+        )
+        .unwrap();
+
+        let replaced = replace_obsolete_keys_with(
+            dir.path(),
+            &[("pipx:codespell", "typos")],
+            |_project_root, _key, _version| {
+                panic!("runner should not be called when typos is already pinned")
+            },
+        )
+        .unwrap();
+        let result = std::fs::read_to_string(&path).unwrap();
+
+        assert_eq!(
+            replaced,
+            vec![("pipx:codespell".to_string(), "typos".to_string())]
+        );
+        assert!(
+            result.contains("typos = \"1.46.0\""),
+            "existing typos version preserved: {result}"
+        );
+        assert!(
+            !result.contains("pipx:codespell"),
+            "old key removed: {result}"
+        );
+    }
+
+    #[test]
+    fn replaces_codespell_with_typos_falls_back_to_latest_when_pin_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        std::fs::write(&path, "[tools]\ncodespell = \"2.4.2\"\n").unwrap();
+
+        let replaced = replace_obsolete_keys_with(
+            dir.path(),
+            &[("codespell", "typos")],
+            |_project_root, _key, _version| {},
+        )
+        .unwrap();
+        let result = std::fs::read_to_string(&path).unwrap();
+
+        assert_eq!(
+            replaced,
+            vec![("codespell".to_string(), "typos".to_string())]
+        );
+        assert!(
+            result.contains("typos = \"latest\""),
+            "fallback version used: {result}"
+        );
+        assert!(!result.contains("codespell"), "old key removed: {result}");
     }
 
     #[test]

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.22.1](https://github.com/grafana/flint/compare/v0.22.0...v0.22.1) - 2026-05-11
+
+### Fixed
+
+- *(init)* avoid carrying codespell version into typos ([#289](https://github.com/grafana/flint/pull/289))
+- *(ci)* align release workflow path with aqua attestation metadata ([#287](https://github.com/grafana/flint/pull/287))
+- *(renovate-deps)* tolerate metadata collisions across managers ([#288](https://github.com/grafana/flint/pull/288))
+
 ## [0.22.0](https://github.com/grafana/flint/compare/v0.21.0...v0.22.0) - 2026-05-11
 
 ### Added

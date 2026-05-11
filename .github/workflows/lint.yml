@@ -25,8 +25,8 @@ jobs:
       - name: Setup mise
         uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
         with:
-          version: v2026.5.0
-          sha256: 7db5db7a36d28203eb8329140d98fb26b41f5efea32d762f69a1e4b369e1e1a8
+          version: v2026.5.2
+          sha256: 23e21feb6a561a2c2923c49473f9f21820f1cf3b9b2e5e8f8d7fafab80854dff
 
       # mise may activate an existing Rust toolchain without adding missing components.
       - name: Install Rust lint components

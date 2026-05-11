@@ -78,12 +78,12 @@
         "mise"
       ]
     },
-    ".github/workflows/release-assets.yml": {
+    ".github/workflows/release-plz.yml": {
       "regex": [
         "mise"
       ]
     },
-    ".github/workflows/release-plz.yml": {
+    ".github/workflows/release.yml": {
       "regex": [
         "mise"
       ]

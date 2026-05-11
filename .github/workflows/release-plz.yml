@@ -12,7 +12,7 @@ jobs:
   release:
     # Runs on every push to main. If the release PR was just merged (i.e. Cargo.toml
     # version was bumped), creates a git tag and a draft GitHub release, then triggers
-    # release-assets.yml to build platform binaries and publish the release.
+    # release.yml to build platform binaries and publish the release.
     name: Create Release
     runs-on: ubuntu-24.04
     if: ${{ github.repository == 'grafana/flint' }}

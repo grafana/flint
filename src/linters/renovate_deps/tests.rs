@@ -318,6 +318,18 @@ fn other_skip_reasons_are_kept() {
 }
 
 #[test]
+fn extracts_deps_tolerate_conflicting_metadata_for_same_dep_name() {
+    let log = log(
+        r#"{"gomod":[{"packageFile":"go.mod","deps":[{"depName":"go","packageName":"go","datasource":"golang-version"}]}],"mise":[{"packageFile":"mise.toml","deps":[{"depName":"go","packageName":"go","datasource":"core"}]}]}"#,
+    );
+    let result = extract_deps(&log, &[]).unwrap();
+    assert_eq!(result.files["go.mod"]["gomod"], vec!["go"]);
+    assert_eq!(result.files["mise.toml"]["mise"], vec!["go"]);
+    assert_eq!(result.meta["go"].package_name.as_deref(), Some("go"));
+    assert_eq!(result.meta["go"].datasource, None);
+}
+
+#[test]
 fn excludes_managers() {
     let log = log(
         r#"{"npm":[{"packageFile":"package.json","deps":[{"depName":"express"}]}],"cargo":[{"packageFile":"Cargo.toml","deps":[{"depName":"tokio"}]}]}"#,

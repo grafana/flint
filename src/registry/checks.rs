@@ -15,7 +15,7 @@ const ACTIONLINT_CONFIG_URL: &str = "https://github.com/rhysd/actionlint/blob/ma
 const BIOME_URL: &str = "https://biomejs.dev/";
 const BIOME_CONFIG_URL: &str = "https://biomejs.dev/guides/configure-biome/";
 const CLIPPY_URL: &str = "https://doc.rust-lang.org/clippy/configuration.html";
-const DOTNET_FORMAT_URL: &str = "https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-format";
+const DOTNET_FORMAT_URL: &str = "https://learn.microsoft.com/dotnet/core/tools/dotnet-format";
 const EDITORCONFIG_CHECKER_URL: &str =
     "https://github.com/editorconfig-checker/editorconfig-checker";
 const EDITORCONFIG_CHECKER_CONFIG_URL: &str =

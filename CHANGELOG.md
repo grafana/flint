@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.22.2](https://github.com/grafana/flint/compare/v0.22.1...v0.22.2) - 2026-05-11
+
+### Fixed
+
+- *(release)* dispatch renamed release workflow ([#291](https://github.com/grafana/flint/pull/291))
+
 ## [0.22.1](https://github.com/grafana/flint/compare/v0.22.0...v0.22.1) - 2026-05-11
 
 ### Fixed

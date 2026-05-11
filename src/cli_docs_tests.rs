@@ -3,7 +3,7 @@ use clap::CommandFactory;
 use std::path::Path;
 
 const CLI_FLAGS_GENERATED_COMMENT: &str =
-    "<!-- Generated. Run `UPDATE_README=1 cargo test cli_docs_in_sync` to regenerate. -->";
+    "<!-- Generated. Run `mise run generate` to regenerate. -->";
 const CLI_FLAGS_START: &str = "<!-- run-flags-start -->";
 const CLI_FLAGS_END: &str = "<!-- run-flags-end -->";
 
@@ -134,7 +134,7 @@ fn cli_docs_in_sync() {
     let expected_norm = strip_blank_lines(&expected);
     assert_eq!(
         actual, expected_norm,
-        "docs/cli.md run flags table is out of sync.\nRun `UPDATE_README=1 cargo test cli_docs_in_sync` to regenerate."
+        "docs/cli.md run flags table is out of sync.\nRun `mise run generate` to regenerate."
     );
 }
 

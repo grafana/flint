@@ -115,7 +115,7 @@ For more commands and flags, see the [CLI reference](docs/cli.md).
 ## Linters
 
 <!-- registry-table-start -->
-<!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
+<!-- Generated. Run `mise run generate` to regenerate. -->
 
 ### Languages
 

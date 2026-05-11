@@ -15,7 +15,7 @@ it do not need to re-learn the interface.
 ## `flint run` flags
 
 <!-- run-flags-start -->
-<!-- Generated. Run `UPDATE_README=1 cargo test cli_docs_in_sync` to regenerate. -->
+<!-- Generated. Run `mise run generate` to regenerate. -->
 
 | Flag                 | Env var              | Description                                                                                                                                                                |
 | -------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -95,8 +95,12 @@ vars control its behaviour:
   e.g. `FLINT_CASES=shellcheck` or
   `FLINT_CASES=shellcheck/clean`.
 - `UPDATE_SNAPSHOTS=1` — regenerate golden stdout/stderr/exit
-  in `test.toml` instead of asserting. Always review the diff
+  in `test.toml` instead of asserting (run via
+  `mise run generate:snapshots`). Always review the diff
   before committing.
+
+To regenerate README + docs tables from the registry/CLI, run
+`mise run generate`.
 
 On failure the test prints a rerun hint, e.g.:
 `FLINT_CASES=shellcheck/clean cargo test cases`

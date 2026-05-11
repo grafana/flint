@@ -683,7 +683,7 @@ fn sorted_rule_names(rule: &serde_json::Value) -> Vec<&str> {
 /// between `linter-overview-*` markers; the per-linter detail sections live in
 /// docs/linters.md between `linter-details-*` markers.
 ///
-/// Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate.
+/// Run `mise run generate` to regenerate.
 #[test]
 fn readme_linter_table_in_sync() {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -727,21 +727,21 @@ fn readme_linter_table_in_sync() {
     if actual_summary != expected_summary_norm {
         panic!(
             "README summary table is out of sync with the registry.\n\
-             Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate.\n\n\
+             Run `mise run generate` to regenerate.\n\n\
              Expected:\n{expected_summary_norm}\n\nActual:\n{actual_summary}"
         );
     }
     if actual_overview != expected_overview_norm {
         panic!(
             "docs/linters.md overview tables are out of sync with the registry.\n\
-             Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate.\n\n\
+             Run `mise run generate` to regenerate.\n\n\
              Expected:\n{expected_overview_norm}\n\nActual:\n{actual_overview}"
         );
     }
     if actual_details != expected_details_norm {
         panic!(
             "docs/linters.md detail sections out of sync with the registry.\n\
-             Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate.\n\n\
+             Run `mise run generate` to regenerate.\n\n\
              Expected:\n{expected_details_norm}\n\nActual:\n{actual_details}"
         );
     }
@@ -753,7 +753,7 @@ const OVERVIEW_START: &str = "<!-- linter-overview-start -->";
 const OVERVIEW_END: &str = "<!-- linter-overview-end -->";
 const DETAILS_START: &str = "<!-- linter-details-start -->";
 const DETAILS_END: &str = "<!-- linter-details-end -->";
-const GENERATED_COMMENT: &str = "<!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->";
+const GENERATED_COMMENT: &str = "<!-- Generated. Run `mise run generate` to regenerate. -->";
 
 fn strip_blank_lines(s: &str) -> String {
     s.lines()

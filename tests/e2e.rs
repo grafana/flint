@@ -78,7 +78,8 @@ fn git_repo() -> TempDir {
 ///   echo '...'
 ///   '''
 ///
-/// Set UPDATE_SNAPSHOTS=1 to regenerate golden output in test.toml.
+/// Run `mise run generate:snapshots` (sets UPDATE_SNAPSHOTS=1) to regenerate
+/// golden output in test.toml.
 /// Set FLINT_CASES=<dir> to run only cases under that directory (e.g. FLINT_CASES=shellcheck
 /// or FLINT_CASES=shellcheck/clean). Top-level groups run in parallel.
 ///
@@ -142,7 +143,7 @@ fn cases() {
                             .or_else(|| e.downcast_ref::<&str>().map(|s| s.to_string()))
                             .unwrap_or_else(|| format!("panic in {name}"));
                         failures.lock().unwrap().push(format!(
-                            "FAILED: {name}\n{msg}\n  → rerun: FLINT_CASES={name} cargo test cases"
+                            "FAILED: {name}\n{msg}\n  → rerun: FLINT_CASES={name} cargo test cases\n  → regenerate snapshots: mise run generate:snapshots (optionally FLINT_CASES={name})"
                         ));
                     }
                 }

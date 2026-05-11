@@ -7,7 +7,7 @@ links to the relevant upstream configuration docs.
 ## Overview
 
 <!-- linter-overview-start -->
-<!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
+<!-- Generated. Run `mise run generate` to regenerate. -->
 
 ### Languages
 
@@ -55,7 +55,7 @@ links to the relevant upstream configuration docs.
 ## Linters
 
 <!-- linter-details-start -->
-<!-- Generated. Run `UPDATE_README=1 cargo test readme_linter_table_in_sync` to regenerate. -->
+<!-- Generated. Run `mise run generate` to regenerate. -->
 ### [`actionlint`](https://github.com/rhysd/actionlint)
 
 |          |                                                                                  |
@@ -115,7 +115,7 @@ Lint Rust code; runs on all .rs files, not just changed
 
 Format Rust code; runs on all .rs files, not just changed
 
-### [`dotnet-format`](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-format)
+### [`dotnet-format`](https://learn.microsoft.com/dotnet/core/tools/dotnet-format)
 
 |          |                       |
 | -------- | --------------------- |

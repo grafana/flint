@@ -154,7 +154,7 @@ fn parse_legacy_markdownlint_config(path: &Path) -> Result<Option<LegacyMarkdown
 
     let parsed = match ext {
         "json" | "jsonc" => json5::from_str::<LegacyMarkdownlintConfig>(&content).ok(),
-        "yaml" | "yml" => serde_yaml::from_str::<LegacyMarkdownlintConfig>(&content).ok(),
+        "yaml" | "yml" => serde_yaml_bw::from_str::<LegacyMarkdownlintConfig>(&content).ok(),
         _ => None,
     };
     Ok(parsed)

@@ -48,6 +48,20 @@ pub(super) fn get_existing_config_dir(content: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+pub(super) fn select_config_dir(input: &str) -> Option<&'static str> {
+    const CHOICES: &[&str] = &[".github/config", ".github", ".", "other…"];
+    let input = input.trim();
+    let idx: usize = if input.is_empty() {
+        0
+    } else {
+        input.parse::<usize>().unwrap_or(1).saturating_sub(1)
+    };
+    CHOICES
+        .get(idx)
+        .copied()
+        .or_else(|| CHOICES.first().copied())
+}
+
 /// Asks where `flint.toml` should live. Skips the prompt when `--yes` or when
 /// `FLINT_CONFIG_DIR` is already set in the current mise.toml.
 ///
@@ -70,21 +84,18 @@ pub(super) fn prompt_config_dir(existing: Option<&str>, yes: bool) -> Result<Str
 
     let mut input = String::new();
     io::stdin().lock().read_line(&mut input)?;
-    let input = input.trim();
+    let selected = select_config_dir(&input).unwrap_or(".github/config");
 
-    let idx: usize = if input.is_empty() {
-        0
-    } else {
-        input.parse::<usize>().unwrap_or(1).saturating_sub(1)
-    };
-
-    if idx == CHOICES.len() - 1 {
+    if selected == "other…" {
         print!("Config dir path: ");
         io::stdout().flush()?;
         let mut path = String::new();
         io::stdin().lock().read_line(&mut path)?;
-        Ok(path.trim().to_string())
+        let path = path.trim().to_string();
+        println!("Using config dir: {path}");
+        Ok(path)
     } else {
-        Ok(CHOICES[idx.min(CHOICES.len() - 2)].to_string())
+        println!("Using config dir: {selected}");
+        Ok(selected.to_string())
     }
 }

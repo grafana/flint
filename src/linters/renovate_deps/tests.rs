@@ -69,7 +69,7 @@ fn write_tmp(content: &str) -> tempfile::NamedTempFile {
 #[test]
 fn configure_renovate_deps_appends_placeholder() {
     let tmp = write_tmp("[settings]\n");
-    let changed = configure_renovate_deps_config(tmp.path(), None).unwrap();
+    let changed = configure_renovate_deps_config(tmp.path()).unwrap();
     assert!(changed);
     let result = std::fs::read_to_string(tmp.path()).unwrap();
     assert!(result.contains("[checks.renovate-deps]"));
@@ -77,28 +77,12 @@ fn configure_renovate_deps_appends_placeholder() {
 }
 
 #[test]
-fn configure_renovate_deps_appends_migrated_managers() {
-    let tmp = write_tmp("[settings]\n");
-    let managers = vec!["github-actions".to_string(), "cargo".to_string()];
-    let changed = configure_renovate_deps_config(tmp.path(), Some(&managers)).unwrap();
-    assert!(changed);
-    let result = std::fs::read_to_string(tmp.path()).unwrap();
-    assert!(
-        result.contains("exclude_managers = [\"github-actions\", \"cargo\"]"),
-        "managers written uncommented: {result}"
-    );
-    assert!(!result.contains("# exclude_managers"));
-}
-
-#[test]
-fn configure_renovate_deps_keeps_existing_managers() {
+fn configure_renovate_deps_keeps_existing_config() {
     let tmp = write_tmp("[checks.renovate-deps]\nexclude_managers = [\"npm\"]\n");
-    let managers = vec!["github-actions".to_string(), "cargo".to_string()];
-    let changed = configure_renovate_deps_config(tmp.path(), Some(&managers)).unwrap();
+    let changed = configure_renovate_deps_config(tmp.path()).unwrap();
     assert!(!changed);
     let result = std::fs::read_to_string(tmp.path()).unwrap();
     assert!(result.contains("exclude_managers = [\"npm\"]"));
-    assert!(!result.contains("github-actions"));
 }
 
 #[test]
@@ -675,7 +659,7 @@ fn comparable_rules_allow_non_contextual_match_constraints() {
   packageRules: [
     {
       description: "slim tags",
-      matchPackageNames: ["ghcr.io/super-linter/super-linter"],
+      matchPackageNames: ["jdx/mise"],
       matchCurrentValue: "/^slim-/"
     }
   ]

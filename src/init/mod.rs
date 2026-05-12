@@ -13,7 +13,6 @@ mod migrations;
 mod mise_tools;
 mod scaffold;
 mod ui;
-mod v1;
 
 use config_files::{
     disable_editorconfig_line_length_for_patterns, generate_editorconfig, generate_flint_toml,
@@ -24,7 +23,7 @@ use detection::{
 use generation::{
     apply_changes, detect_base_branch, ensure_flint_self_pin, ensure_node_for_npm,
     get_existing_config_dir, has_slow_selected, normalize_tools_section, prompt_config_dir,
-    remove_tool_keys, remove_v1_tasks,
+    remove_tool_keys,
 };
 use migrations::{
     apply_repo_migrations, selected_editorconfig_cleanup_sections,
@@ -87,7 +86,6 @@ struct CheckTypeInitHookContext<'a> {
     config_dir: &'a Path,
     line_length: u16,
     flint_toml_generated: bool,
-    renovate_exclude_managers: Option<&'a [String]>,
 }
 
 impl InitHookContext for CheckTypeInitHookContext<'_> {
@@ -106,10 +104,6 @@ impl InitHookContext for CheckTypeInitHookContext<'_> {
     fn flint_toml_generated(&self) -> bool {
         self.flint_toml_generated
     }
-
-    fn renovate_exclude_managers(&self) -> Option<&[String]> {
-        self.renovate_exclude_managers
-    }
 }
 
 fn apply_check_type_init_hooks(
@@ -118,14 +112,12 @@ fn apply_check_type_init_hooks(
     config_dir: &Path,
     line_length: u16,
     flint_toml_generated: bool,
-    renovate_exclude_managers: Option<&[String]>,
 ) -> Result<bool> {
     let context = CheckTypeInitHookContext {
         project_root,
         config_dir,
         line_length,
         flint_toml_generated,
-        renovate_exclude_managers,
     };
     let mut changed = false;
     let mut initialized_check_types = HashSet::new();
@@ -372,16 +364,7 @@ Add and stage your source files before running init so the detection is accurate
     if flint_pinned {
         println!("  pinned flint itself — reproducible lint runs across contributors");
     }
-    let v1 = remove_v1_tasks(&mise_path)?;
-    for key in &v1.removed_tasks {
-        println!("  removing v1 task {key}");
-    }
-    if v1.removed_renovate_env {
-        println!("  removing RENOVATE_TRACKED_DEPS_EXCLUDE from [env] (use flint.toml instead)");
-    }
-
-    let meta_changed =
-        apply_env_and_tasks(&mise_path, &config_dir_rel, has_slow, &v1.removed_tasks)?;
+    let meta_changed = apply_env_and_tasks(&mise_path, &config_dir_rel, has_slow)?;
     let node_added = ensure_node_for_npm(project_root)?;
     if node_added {
         println!("  added node (LTS) — required by npm: backend tools");
@@ -403,7 +386,6 @@ Add and stage your source files before running init so the detection is accurate
         &config_dir_path,
         line_length,
         toml_generated,
-        v1.renovate_exclude_managers.as_deref(),
     )?;
     let editorconfig_line_length_sections =
         selected_editorconfig_line_length_sections(&selected_checks);
@@ -429,8 +411,6 @@ Add and stage your source files before running init so the detection is accurate
     if !tools_changed
         && migration_summary.is_noop()
         && !flint_pinned
-        && v1.removed_tasks.is_empty()
-        && !v1.removed_renovate_env
         && !meta_changed
         && !node_added
         && !tools_normalized

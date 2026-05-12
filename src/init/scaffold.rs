@@ -94,37 +94,14 @@ fn write_task(tasks: &mut toml_edit::Table, name: &str, description: &str, run: 
     tasks.insert(name, toml_edit::Item::Table(t));
 }
 
-/// Returns `true` when the named task has a `depends` array where at least one
-/// entry is in `removed_tasks`. Used to detect tasks made stale by v1 removal.
-fn task_has_removed_dep(tasks: &toml_edit::Table, name: &str, removed: &[String]) -> bool {
-    let Some(item) = tasks.get(name) else {
-        return false;
-    };
-    let Some(task) = item.as_table() else {
-        return false;
-    };
-    let Some(depends) = task.get("depends").and_then(|v| v.as_array()) else {
-        return false;
-    };
-    depends.iter().any(|v| {
-        v.as_str()
-            .map(|s| removed.iter().any(|r| r == s))
-            .unwrap_or(false)
-    })
-}
-
 /// Adds `[env] FLINT_CONFIG_DIR` and the standard `lint*` tasks to `mise.toml`,
 /// skipping any that are already present.
-///
-/// When `removed_v1_tasks` is non-empty, standard tasks whose `depends` reference
-/// any of those removed tasks are replaced (they became stale after v1 removal).
 ///
 /// Returns `true` if the file was changed.
 pub(super) fn apply_env_and_tasks(
     mise_path: &Path,
     config_dir_rel: &str,
     _has_slow: bool,
-    removed_v1_tasks: &[String],
 ) -> Result<bool> {
     let content = std::fs::read_to_string(mise_path).unwrap_or_default();
     let mut doc: toml_edit::DocumentMut = content
@@ -155,16 +132,7 @@ pub(super) fn apply_env_and_tasks(
             .as_table_mut()
             .context("[tasks] is not a table")?;
 
-        // Replace the lint task when it was made stale by v1 removal (its depends
-        // referenced removed tasks and would now fail). Otherwise add if absent.
-        let lint_stale = task_has_removed_dep(tasks, "lint", removed_v1_tasks);
-        if lint_stale {
-            write_task(tasks, "lint", "Run all lints", "flint run");
-            changed = true;
-        } else {
-            changed |= add_task_if_absent(tasks, "lint", "Run all lints", "flint run");
-        }
-
+        changed |= add_task_if_absent(tasks, "lint", "Run all lints", "flint run");
         changed |= add_task_if_absent(tasks, "lint:fix", "Auto-fix lint issues", "flint run --fix");
     }
 

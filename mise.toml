@@ -27,10 +27,6 @@ shfmt = "v3.13.1"
 taplo = "0.10.0"
 typos = "1.46.0"
 
-[tasks."setup:update-super-linter-versions"]
-description = "Generate super-linter version mapping from the super-linter repo"
-file = "tasks/setup/update-super-linter-versions.sh"
-
 [tasks.lint]
 description = "Run all lints"
 run = "cargo run -q --bin flint -- run"

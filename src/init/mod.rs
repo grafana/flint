@@ -358,8 +358,8 @@ Add and stage your source files before running init so the detection is accurate
 
     let tools_changed =
         !final_add.is_empty() || !final_remove.is_empty() || !final_upgrade.is_empty();
-    interactive_note(yes, "\nApplying mise/tooling changes...");
     if tools_changed {
+        interactive_note(yes, "\nApplying mise/tooling changes...");
         apply_changes(
             &mise_path,
             &current_content,

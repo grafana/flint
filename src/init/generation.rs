@@ -48,18 +48,20 @@ pub(super) fn get_existing_config_dir(content: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-pub(super) fn select_config_dir(input: &str) -> Option<&'static str> {
-    const CHOICES: &[&str] = &[".github/config", ".github", ".", "other…"];
+const CONFIG_DIR_CHOICES: &[&str] = &[".github/config", ".github", ".", "other…"];
+
+pub(super) fn select_config_dir(input: &str) -> &'static str {
     let input = input.trim();
     let idx: usize = if input.is_empty() {
         0
     } else {
         input.parse::<usize>().unwrap_or(1).saturating_sub(1)
     };
-    CHOICES
+    CONFIG_DIR_CHOICES
         .get(idx)
         .copied()
-        .or_else(|| CHOICES.first().copied())
+        .or_else(|| CONFIG_DIR_CHOICES.first().copied())
+        .unwrap_or(".github/config")
 }
 
 /// Asks where `flint.toml` should live. Skips the prompt when `--yes` or when
@@ -74,9 +76,8 @@ pub(super) fn prompt_config_dir(existing: Option<&str>, yes: bool) -> Result<Str
         return Ok(".github/config".to_string());
     }
 
-    const CHOICES: &[&str] = &[".github/config", ".github", ".", "other…"];
     println!("Where should flint.toml live?\n");
-    for (i, choice) in CHOICES.iter().enumerate() {
+    for (i, choice) in CONFIG_DIR_CHOICES.iter().enumerate() {
         println!("  {}) {}", i + 1, choice);
     }
     print!("\nChoice [1]: ");
@@ -84,7 +85,7 @@ pub(super) fn prompt_config_dir(existing: Option<&str>, yes: bool) -> Result<Str
 
     let mut input = String::new();
     io::stdin().lock().read_line(&mut input)?;
-    let selected = select_config_dir(&input).unwrap_or(".github/config");
+    let selected = select_config_dir(&input);
 
     if selected == "other…" {
         print!("Config dir path: ");

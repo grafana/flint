@@ -451,22 +451,22 @@ fn get_existing_config_dir_absent() {
 
 #[test]
 fn select_config_dir_defaults_to_github_config_on_enter() {
-    assert_eq!(select_config_dir(""), Some(".github/config"));
-    assert_eq!(select_config_dir("\n"), Some(".github/config"));
+    assert_eq!(select_config_dir(""), ".github/config");
+    assert_eq!(select_config_dir("\n"), ".github/config");
 }
 
 #[test]
 fn select_config_dir_maps_numbered_choices() {
-    assert_eq!(select_config_dir("1"), Some(".github/config"));
-    assert_eq!(select_config_dir("2"), Some(".github"));
-    assert_eq!(select_config_dir("3"), Some("."));
-    assert_eq!(select_config_dir("4"), Some("other…"));
+    assert_eq!(select_config_dir("1"), ".github/config");
+    assert_eq!(select_config_dir("2"), ".github");
+    assert_eq!(select_config_dir("3"), ".");
+    assert_eq!(select_config_dir("4"), "other…");
 }
 
 #[test]
 fn select_config_dir_falls_back_to_default_for_invalid_input() {
-    assert_eq!(select_config_dir("abc"), Some(".github/config"));
-    assert_eq!(select_config_dir("99"), Some(".github/config"));
+    assert_eq!(select_config_dir("abc"), ".github/config");
+    assert_eq!(select_config_dir("99"), ".github/config");
 }
 
 #[test]

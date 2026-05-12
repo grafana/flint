@@ -460,7 +460,7 @@ fn select_config_dir_maps_numbered_choices() {
     assert_eq!(select_config_dir("1"), ".github/config");
     assert_eq!(select_config_dir("2"), ".github");
     assert_eq!(select_config_dir("3"), ".");
-    assert_eq!(select_config_dir("4"), "other…");
+    assert_eq!(select_config_dir("4"), "other...");
 }
 
 #[test]

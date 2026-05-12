@@ -48,6 +48,24 @@ pub(super) fn get_existing_config_dir(content: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+const DEFAULT_CONFIG_DIR: &str = ".github/config";
+const OTHER_CONFIG_DIR_CHOICE: &str = "other...";
+const CONFIG_DIR_CHOICES: &[&str] = &[DEFAULT_CONFIG_DIR, ".github", ".", OTHER_CONFIG_DIR_CHOICE];
+
+pub(super) fn select_config_dir(input: &str) -> &'static str {
+    let input = input.trim();
+    let idx: usize = if input.is_empty() {
+        0
+    } else {
+        input.parse::<usize>().unwrap_or(1).saturating_sub(1)
+    };
+    CONFIG_DIR_CHOICES
+        .get(idx)
+        .copied()
+        .or_else(|| CONFIG_DIR_CHOICES.first().copied())
+        .unwrap_or(DEFAULT_CONFIG_DIR)
+}
+
 /// Asks where `flint.toml` should live. Skips the prompt when `--yes` or when
 /// `FLINT_CONFIG_DIR` is already set in the current mise.toml.
 ///
@@ -57,12 +75,11 @@ pub(super) fn prompt_config_dir(existing: Option<&str>, yes: bool) -> Result<Str
         return Ok(dir.to_string());
     }
     if yes {
-        return Ok(".github/config".to_string());
+        return Ok(DEFAULT_CONFIG_DIR.to_string());
     }
 
-    const CHOICES: &[&str] = &[".github/config", ".github", ".", "other…"];
     println!("Where should flint.toml live?\n");
-    for (i, choice) in CHOICES.iter().enumerate() {
+    for (i, choice) in CONFIG_DIR_CHOICES.iter().enumerate() {
         println!("  {}) {}", i + 1, choice);
     }
     print!("\nChoice [1]: ");
@@ -70,21 +87,18 @@ pub(super) fn prompt_config_dir(existing: Option<&str>, yes: bool) -> Result<Str
 
     let mut input = String::new();
     io::stdin().lock().read_line(&mut input)?;
-    let input = input.trim();
+    let selected = select_config_dir(&input);
 
-    let idx: usize = if input.is_empty() {
-        0
-    } else {
-        input.parse::<usize>().unwrap_or(1).saturating_sub(1)
-    };
-
-    if idx == CHOICES.len() - 1 {
+    if selected == OTHER_CONFIG_DIR_CHOICE {
         print!("Config dir path: ");
         io::stdout().flush()?;
         let mut path = String::new();
         io::stdin().lock().read_line(&mut path)?;
-        Ok(path.trim().to_string())
+        let path = path.trim().to_string();
+        println!("Using config dir: {path}");
+        Ok(path)
     } else {
-        Ok(CHOICES[idx.min(CHOICES.len() - 2)].to_string())
+        println!("Using config dir: {selected}");
+        Ok(selected.to_string())
     }
 }

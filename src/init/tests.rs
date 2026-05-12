@@ -4,6 +4,7 @@ use config_files::generate_flint_toml;
 use detection::entry_components_differ;
 use generation::{
     apply_changes, get_existing_config_dir, has_slow_selected, normalize_tools_section,
+    select_config_dir,
 };
 use scaffold::{apply_env_and_tasks, ensure_agent_linting_guidance, generate_lint_workflow};
 use std::sync::{
@@ -446,6 +447,26 @@ fn get_existing_config_dir_reads_env_section() {
 fn get_existing_config_dir_absent() {
     let content = "[tools]\nrust = \"latest\"\n";
     assert_eq!(get_existing_config_dir(content), None);
+}
+
+#[test]
+fn select_config_dir_defaults_to_github_config_on_enter() {
+    assert_eq!(select_config_dir(""), ".github/config");
+    assert_eq!(select_config_dir("\n"), ".github/config");
+}
+
+#[test]
+fn select_config_dir_maps_numbered_choices() {
+    assert_eq!(select_config_dir("1"), ".github/config");
+    assert_eq!(select_config_dir("2"), ".github");
+    assert_eq!(select_config_dir("3"), ".");
+    assert_eq!(select_config_dir("4"), "other...");
+}
+
+#[test]
+fn select_config_dir_falls_back_to_default_for_invalid_input() {
+    assert_eq!(select_config_dir("abc"), ".github/config");
+    assert_eq!(select_config_dir("99"), ".github/config");
 }
 
 #[test]

@@ -38,6 +38,12 @@ use ui::{interactive_select_linters, select_categories_arrow};
 
 const DEFAULT_LINE_LENGTH: u16 = 120;
 
+fn interactive_note(yes: bool, message: &str) {
+    if !yes {
+        println!("{message}");
+    }
+}
+
 /// Linter profile — shorthand for `--profile` CLI flag; maps to a category set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum Profile {
@@ -342,11 +348,18 @@ Add and stage your source files before running init so the detection is accurate
 
     // Prompt for the flint config dir (skipped if already set in mise.toml or --yes).
     let existing_config_dir = get_existing_config_dir(&current_content);
+    if existing_config_dir.is_some() {
+        interactive_note(
+            yes,
+            "Using existing FLINT_CONFIG_DIR from mise.toml; skipping config-dir prompt.",
+        );
+    }
     let config_dir_rel = prompt_config_dir(existing_config_dir.as_deref(), yes)?;
 
     let tools_changed =
         !final_add.is_empty() || !final_remove.is_empty() || !final_upgrade.is_empty();
     if tools_changed {
+        interactive_note(yes, "\nApplying mise/tooling changes...");
         apply_changes(
             &mise_path,
             &current_content,
@@ -375,6 +388,7 @@ Add and stage your source files before running init so the detection is accurate
     }
     let tools_normalized = normalize_tools_section(&mise_path)?;
 
+    interactive_note(yes, "\nScaffolding flint config and workflow...");
     let base_branch = detect_base_branch(project_root);
     let config_dir_path = project_root.join(&config_dir_rel);
     let toml_generated = generate_flint_toml(&config_dir_path, &base_branch)?;
@@ -431,6 +445,7 @@ Add and stage your source files before running init so the detection is accurate
         return Ok(());
     }
 
+    interactive_note(yes, "\nFinishing setup...");
     maybe_install_hook(project_root, yes)?;
 
     println!("Done. Run `mise install` to install the new tools.");

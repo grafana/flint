@@ -2,7 +2,7 @@
 name = "flint"
 version = "0.22.2"
 edition = "2024"
-description = "mise-native lint orchestrator"
+description = "Fast, simple linting that doesn't slow down your AI coding"
 license = "Apache-2.0"
 repository = "https://github.com/grafana/flint"
 

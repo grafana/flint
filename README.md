@@ -18,7 +18,7 @@
 </p>
 <!-- markdownlint-enable MD033 MD041 -->
 
-Linter runner built for speed, consistency, and low setup friction:
+Flint is a fast, simple lint runner that doesn't slow down your AI coding.
 
 - **Fast** — native execution (no Docker), parallel, diff-aware
   (changed files only), opt-in (undeclared tools don't run), small binary

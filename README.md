@@ -169,6 +169,23 @@ For more commands and flags, see the [CLI reference](docs/cli.md).
 Flint activates checks from your repo's `mise.toml`: if a Flint-managed tool is
 declared there, that check is active; if it is not declared, Flint skips it.
 
+### What's the best way to exclude files from linting?
+
+Flint never lints untracked files. This question is about files that are
+tracked in git.
+
+There are three main options:
+
+1. Mark generated files in `.gitattributes` with `linguist-generated`
+2. Add repo-wide Flint excludes in `flint.toml` via `settings.exclude`
+3. Use a tool-specific exclude in the linter's own config, when that tool
+   needs behavior Flint should not manage globally
+
+**Recommended:** use `.gitattributes` for generated files whenever possible.
+That lets Flint, GitHub, and other tools share the same generated-file
+metadata. See the [CLI reference](docs/cli.md#changed-file-and-baseline-runs)
+for details.
+
 ## Versioning
 
 This project uses [Semantic Versioning](https://semver.org/).

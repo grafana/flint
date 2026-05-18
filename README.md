@@ -101,8 +101,10 @@ mise run lint:fix
 Flint fixes what it can, tells you when everything is already good, and tells
 you what still needs review.
 
-**By default, Flint checks only changed files.** Use `--full` to check every
-matching file.
+**By default, Flint checks only changed tracked files.** Use `--full` to check
+every matching tracked file. Flint also skips files marked
+`linguist-generated` in `.gitattributes`; prefer that over Flint-only excludes
+so GitHub and other tools can reuse the same metadata.
 
 For more commands and flags, see the [CLI reference](docs/cli.md).
 

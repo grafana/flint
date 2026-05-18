@@ -1,9 +1,8 @@
 use anyhow::{Context, Result};
 use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 use std::collections::{BTreeSet, HashSet};
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 use crate::config::Config;
 use crate::linters::renovate_deps::COMMITTED_PATHS;
@@ -197,41 +196,34 @@ fn generated_paths(project_root: &Path, names: &BTreeSet<String>) -> Result<Hash
         return Ok(HashSet::new());
     }
 
-    let mut child = Command::new("git")
-        .args(["check-attr", "--stdin", "-z", "linguist-generated"])
-        .current_dir(project_root)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .context("git check-attr")?;
-
-    {
-        let mut stdin = child
-            .stdin
-            .take()
-            .context("git check-attr stdin was not piped")?;
-        for name in names {
-            stdin
-                .write_all(name.as_bytes())
-                .and_then(|_| stdin.write_all(b"\0"))
-                .context("writing git check-attr stdin")?;
-        }
-    }
-
-    let out = child.wait_with_output().context("git check-attr")?;
-    if !out.status.success() {
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        anyhow::bail!("git check-attr failed ({}): {}", out.status, stderr.trim());
-    }
-
+    const CHECK_ATTR_BATCH_SIZE: usize = 256;
     let mut generated = HashSet::new();
-    let fields: Vec<&[u8]> = out.stdout.split(|byte| *byte == 0).collect();
-    for chunk in fields.chunks_exact(3) {
-        let path = String::from_utf8_lossy(chunk[0]);
-        let info = String::from_utf8_lossy(chunk[2]);
-        if info == "set" {
-            generated.insert(path.into_owned());
+
+    for batch in names
+        .iter()
+        .collect::<Vec<_>>()
+        .chunks(CHECK_ATTR_BATCH_SIZE)
+    {
+        let mut args = vec!["check-attr", "-z", "linguist-generated", "--"];
+        args.extend(batch.iter().copied().map(String::as_str));
+
+        let out = Command::new("git")
+            .args(&args)
+            .current_dir(project_root)
+            .output()
+            .context("git check-attr")?;
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            anyhow::bail!("git check-attr failed ({}): {}", out.status, stderr.trim());
+        }
+
+        let fields: Vec<&[u8]> = out.stdout.split(|byte| *byte == 0).collect();
+        for chunk in fields.chunks_exact(3) {
+            let path = String::from_utf8_lossy(chunk[0]);
+            let info = String::from_utf8_lossy(chunk[2]);
+            if info == "set" {
+                generated.insert(path.into_owned());
+            }
         }
     }
 

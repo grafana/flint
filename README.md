@@ -43,6 +43,12 @@ Read the [background and principles](docs/why.md) and
 
 > [!TIP]
 > **Legacy v1** (bash task scripts): see [README-V1.md](README-V1.md).
+>
+> **Compatibility note:** the Flint Renovate preset still includes deprecated
+> custom managers for downstream repos that rely on legacy v1 patterns such as
+> SHA-pinned `raw.githubusercontent.com/.../<sha>/... # vX.Y.Z` task URLs and
+> `_VERSION` variables in `mise.toml`. This PR removes Flint's own v1 assets,
+> but the preset compatibility path remains for consumers during migration.
 
 ---
 

@@ -83,6 +83,7 @@ const ZIZMOR_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir("zizmor.yaml"),
     ConfigFile::project("zizmor.yml"),
     ConfigFile::project("zizmor.yaml"),
+    ConfigFile::project(".github/zizmor.yml"),
     ConfigFile::project(".github/zizmor.yaml"),
 ];
 const HADOLINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[

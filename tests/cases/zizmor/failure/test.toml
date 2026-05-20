@@ -3,21 +3,19 @@ args = "run --full zizmor"
 exit = 1
 stderr = '''
 [zizmor]
-error[template-injection]: code injection via template expansion
- --> <REPO>/.github/workflows/template-injection.yml:8:24
+warning[artipacked]: credential persistence through GitHub Actions artifacts
+ --> <REPO>/.github/workflows/artipacked.yml:8:9
   |
-8 |       - run: echo "${{ github.event.issue.title }}"
-  |         ---            ^^^^^^^^^^^^^^^^^^^^^^^^ may expand into attacker-controllable code
-  |         |
-  |         this run block
+8 |       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ does not set persist-credentials: false
   |
-  = note: audit confidence → High
+  = note: audit confidence → Low
   = note: this finding has an auto-fix
-  = help: audit documentation → https://docs.zizmor.sh/audits/#template-injection
+  = help: audit documentation → https://docs.zizmor.sh/audits/#artipacked
 
-3 findings (2 suppressed, 1 unsafe fixes): 0 informational, 0 low, 0 medium, 1 high
+3 findings (2 suppressed, 1 unsafe fixes): 0 informational, 0 low, 1 medium, 0 high
  INFO zizmor: 🌈 zizmor v1.25.2
- INFO audit: zizmor: 🌈 completed <REPO>/.github/workflows/template-injection.yml
+ INFO audit: zizmor: 🌈 completed <REPO>/.github/workflows/artipacked.yml
 
 flint: 1 check failed (zizmor)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.

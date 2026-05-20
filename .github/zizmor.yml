@@ -1,5 +1,0 @@
-rules:
-  template-injection:
-    ignore:
-      # Test fixture: intentionally vulnerable to validate zizmor detection.
-      - template-injection.yml

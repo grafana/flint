@@ -1,8 +1,0 @@
-name: CI
-on: issues
-permissions: {}
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "${{ github.event.issue.title }}"

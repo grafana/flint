@@ -845,10 +845,21 @@ fn unsupported_config(
     project_root: &Path,
     config_dir: &Path,
 ) -> Option<String> {
+    let baseline_path = check
+        .baseline_config
+        .as_ref()
+        .map(|config| config_file_abs_path(project_root, config_dir, config));
+
     check
         .unsupported_configs
         .iter()
-        .find(|config| config_present(project_root, config_dir, config))
+        .find(|config| {
+            let path = config_file_abs_path(project_root, config_dir, config);
+            baseline_path
+                .as_ref()
+                .is_none_or(|baseline| *baseline != path)
+                && config_present(project_root, config_dir, config)
+        })
         .map(|config| config_file_rel_path(project_root, config_dir, config))
 }
 
@@ -1362,5 +1373,34 @@ license-header        (built-in)          not configured  fast      no   Check s
         let found = unsupported_config(&typos, dir.path(), Path::new("."));
 
         assert_eq!(found, None);
+    }
+
+    #[test]
+    fn zizmor_supported_root_config_is_not_flagged_when_config_dir_is_project_root() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("zizmor.yml"), "rules: {}\n").unwrap();
+        let zizmor = registry::builtin()
+            .into_iter()
+            .find(|check| check.name == "zizmor")
+            .expect("zizmor check");
+
+        let found = unsupported_config(&zizmor, dir.path(), Path::new("."));
+
+        assert_eq!(found, None);
+    }
+
+    #[test]
+    fn zizmor_root_config_is_still_flagged_when_config_dir_is_elsewhere() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(dir.path().join(".github/config")).unwrap();
+        std::fs::write(dir.path().join("zizmor.yml"), "rules: {}\n").unwrap();
+        let zizmor = registry::builtin()
+            .into_iter()
+            .find(|check| check.name == "zizmor")
+            .expect("zizmor check");
+
+        let found = unsupported_config(&zizmor, dir.path(), Path::new(".github/config"));
+
+        assert_eq!(found, Some("zizmor.yml".to_string()));
     }
 }

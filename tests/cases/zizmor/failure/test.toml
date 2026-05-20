@@ -1,0 +1,24 @@
+[expected]
+args = "run --full zizmor"
+exit = 1
+stderr = '''
+[zizmor]
+error[template-injection]: code injection via template expansion
+ --> <REPO>/.github/workflows/ci.yml:8:24
+  |
+8 |       - run: echo "${{ github.event.issue.title }}"
+  |         ---            ^^^^^^^^^^^^^^^^^^^^^^^^ may expand into attacker-controllable code
+  |         |
+  |         this run block
+  |
+  = note: audit confidence → High
+  = note: this finding has an auto-fix
+  = help: audit documentation → https://docs.zizmor.sh/audits/#template-injection
+
+3 findings (2 suppressed, 1 unsafe fixes): 0 informational, 0 low, 0 medium, 1 high
+ INFO zizmor: 🌈 zizmor v1.25.2
+ INFO audit: zizmor: 🌈 completed <REPO>/.github/workflows/ci.yml
+
+flint: 1 check failed (zizmor)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''

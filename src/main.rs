@@ -1222,6 +1222,7 @@ lychee = "0.22.0"
 shellcheck = "v0.11.0"
 shfmt = "v3.13.1"
 actionlint = "1.7.10"
+zizmor = "1.25.2"
 editorconfig-checker = "v3.6.1"
 ruff = "0.15.0"
 typos = "1.46.0"
@@ -1245,6 +1246,7 @@ rust = { version = "1.94.1", components = "clippy,rustfmt" }
             "shellcheck",
             "shfmt",
             "taplo",
+            "zizmor",
         ];
 
         let table = render_linters_table(&registry::builtin(), &mise_tools, &cfg, |bin| {
@@ -1262,6 +1264,7 @@ rumdl                 rumdl               active         fast      yes  Lint Mar
 ryl                   ryl                 active         fast      yes  Lint YAML files for style and consistency                            *.yml *.yaml
 taplo                 taplo               active         fast      yes  Format TOML files                                                    *.toml
 actionlint            actionlint          active         fast      no   Lint GitHub Actions workflow files                                   .github/workflows/*.yml .github/workflows/*.yaml
+zizmor                zizmor              active         fast      yes  Audit GitHub Actions workflows for security issues                   .github/workflows/*.yml .github/workflows/*.yaml
 hadolint              hadolint            missing        fast      no   Lint Dockerfiles                                                     Dockerfile Dockerfile.* *.dockerfile
 xmllint               xmllint             missing        fast      no   Validate XML files are well-formed                                   *.xml
 typos                 typos               active         fast      yes  Check for common spelling mistakes                                   *

@@ -34,10 +34,10 @@ links to the relevant upstream configuration docs.
 
 ### Tooling / CI
 
-| Name           | Check                       |
-| -------------- | --------------------------- |
-| Dockerfile     | [`hadolint`](#hadolint)     |
-| GitHub Actions | [`actionlint`](#actionlint) |
+| Name           | Check                                             |
+| -------------- | ------------------------------------------------- |
+| Dockerfile     | [`hadolint`](#hadolint)                           |
+| GitHub Actions | [`actionlint`](#actionlint) / [`zizmor`](#zizmor) |
 
 ### General
 
@@ -442,6 +442,18 @@ Check for common spelling mistakes
 | Patterns | `*.xml`               |
 
 Validate XML files are well-formed
+
+### [`zizmor`](https://github.com/zizmorcore/zizmor)
+
+|          |                                                       |
+| -------- | ----------------------------------------------------- |
+| Fix      | yes                                                   |
+| Binary   | `zizmor`                                              |
+| Scope    | [file](#scope-file)                                   |
+| Patterns | `.github/workflows/*.yml .github/workflows/*.yaml`    |
+| Config   | [`zizmor.yml`](https://docs.zizmor.sh/configuration/) |
+
+Audit GitHub Actions workflows for security issues
 <!-- linter-details-end -->
 
 ## Scopes

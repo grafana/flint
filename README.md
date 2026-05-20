@@ -142,10 +142,10 @@ For more commands and flags, see the [CLI reference](docs/cli.md).
 
 ### Tooling / CI
 
-| Name           | Check                                      |
-| -------------- | ------------------------------------------ |
-| Dockerfile     | [`hadolint`](docs/linters.md#hadolint)     |
-| GitHub Actions | [`actionlint`](docs/linters.md#actionlint) |
+| Name           | Check                                                                           |
+| -------------- | ------------------------------------------------------------------------------- |
+| Dockerfile     | [`hadolint`](docs/linters.md#hadolint)                                          |
+| GitHub Actions | [`actionlint`](docs/linters.md#actionlint) / [`zizmor`](docs/linters.md#zizmor) |
 
 ### General
 

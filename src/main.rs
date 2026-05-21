@@ -855,9 +855,10 @@ fn unsupported_config(
         .iter()
         .find(|config| {
             let path = config_file_abs_path(project_root, config_dir, config);
-            baseline_path
+            let overlaps_baseline = baseline_path
                 .as_ref()
-                .is_none_or(|baseline| *baseline != path)
+                .is_some_and(|baseline| *baseline == path);
+            (!overlaps_baseline || !check.allow_baseline_overlap_in_unsupported_configs)
                 && config_present(project_root, config_dir, config)
         })
         .map(|config| config_file_rel_path(project_root, config_dir, config))
@@ -1373,6 +1374,20 @@ license-header        (built-in)          not configured  fast      no   Check s
         let found = unsupported_config(&typos, dir.path(), Path::new("."));
 
         assert_eq!(found, None);
+    }
+
+    #[test]
+    fn rustfmt_root_config_is_still_flagged_when_config_dir_is_project_root() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("rustfmt.toml"), "max_width = 120\n").unwrap();
+        let rustfmt = registry::builtin()
+            .into_iter()
+            .find(|check| check.name == "cargo-fmt")
+            .expect("cargo-fmt check");
+
+        let found = unsupported_config(&rustfmt, dir.path(), Path::new("."));
+
+        assert_eq!(found, Some("rustfmt.toml".to_string()));
     }
 
     #[test]

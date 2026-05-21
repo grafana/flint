@@ -841,6 +841,7 @@ mod tests {
             stderr_filter_prefixes: &[],
             baseline_config: None,
             unsupported_configs: &[],
+            allow_baseline_overlap_in_unsupported_configs: false,
             tool_key_migrations: vec![],
             check_type: None,
             adaptive_relevance: None,

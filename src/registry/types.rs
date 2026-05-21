@@ -514,6 +514,9 @@ pub struct Check {
     /// Known upstream config locations that flint does not support for this
     /// check. Their presence is a hard failure to avoid silent config drift.
     pub unsupported_configs: &'static [ConfigFile],
+    /// When true, do not treat an unsupported config entry as unsupported if it
+    /// resolves to the same path as this check's supported baseline config.
+    pub allow_baseline_overlap_in_unsupported_configs: bool,
     /// Old mise tool keys that should migrate to this check's current install key.
     pub tool_key_migrations: Vec<ToolKeyMigration>,
     /// Optional check-type behavior shared by related checks.
@@ -661,6 +664,7 @@ impl Check {
             stderr_filter_prefixes: &[],
             baseline_config: None,
             unsupported_configs: &[],
+            allow_baseline_overlap_in_unsupported_configs: false,
             tool_key_migrations: vec![],
             check_type: None,
             adaptive_relevance: None,
@@ -713,6 +717,7 @@ impl Check {
             stderr_filter_prefixes: &[],
             baseline_config: None,
             unsupported_configs: &[],
+            allow_baseline_overlap_in_unsupported_configs: false,
             tool_key_migrations: vec![],
             check_type: Some(check_type),
             adaptive_relevance: None,
@@ -963,6 +968,11 @@ impl Check {
 
     pub fn unsupported_configs(mut self, files: &'static [ConfigFile]) -> Self {
         self.unsupported_configs = files;
+        self
+    }
+
+    pub fn allow_baseline_overlap_in_unsupported_configs(mut self) -> Self {
+        self.allow_baseline_overlap_in_unsupported_configs = true;
         self
     }
 

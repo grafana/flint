@@ -292,6 +292,7 @@ fn check_zizmor() -> Check {
     .linter_config("zizmor.yml", "--config")
     .baseline_config(ConfigFile::config_dir("zizmor.yml"))
     .unsupported_configs(ZIZMOR_UNSUPPORTED_CONFIGS)
+    .allow_baseline_overlap_in_unsupported_configs()
     .project_url(ZIZMOR_URL)
     .config_doc_url(ZIZMOR_CONFIG_URL)
     .overview(
@@ -345,6 +346,7 @@ fn check_typos() -> Check {
         .linter_config("_typos.toml", "--config")
         .baseline_config(ConfigFile::config_dir("_typos.toml"))
         .unsupported_configs(TYPOS_UNSUPPORTED_CONFIGS)
+        .allow_baseline_overlap_in_unsupported_configs()
         .project_url(TYPOS_URL)
         .config_doc_url(TYPOS_CONFIG_URL)
         .overview(

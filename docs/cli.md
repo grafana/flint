@@ -17,11 +17,10 @@ it do not need to re-learn the interface.
 Flint is built to be quiet so AI agents (and humans) don't have to read pages
 of linter output to find the actionable bit:
 
-- **Clean run** — no output. Flint is fast enough that the absence of a crash
-  is the feedback.
-- **`--fix`** — silently fixes what it can, prints only what still needs human
-  review, and ends with a one-line summary naming each check and its state
-  (`fixed`, `review`, `partial`).
+- **Clean run** — no output. Same under `--fix` when nothing needed fixing.
+- **`--fix`** — silently fixes what it can, prints review-required output, and
+  ends with a one-line summary of the non-clean checks and their state
+  (`fixed`, `review`, `partial`). Fully-clean `--fix` runs print nothing.
 
 Example `--fix` output:
 

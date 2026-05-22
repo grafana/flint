@@ -30,7 +30,7 @@ Flint is a fast, simple lint runner that doesn't slow down your AI coding.
 - **Opinionated config** — Flint chooses canonical config filenames per linter,
   while still letting you keep them in a directory such as `.github/config`
 - **AI-friendly** — quiet by default: clean runs print nothing, `--fix`
-  surfaces only what needs review
+  surfaces only what still needs action
 - **Separated ownership** — dedicated linters and formatters own their file
   types to avoid overlapping rules and editor-config conflicts
 - **Predictable and updatable linter versions** — lint behavior stays stable
@@ -100,7 +100,8 @@ mise run lint:fix
 ```
 
 Flint is built to be quiet. A clean run prints nothing. `--fix` silently fixes
-what it can and prints only what still needs review:
+what it can and prints what still needs action — review items plus a reminder
+to commit any fixes:
 
 ```text
 [shellcheck]

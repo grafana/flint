@@ -36,6 +36,7 @@ fn git_repo() -> TempDir {
         vec!["init", "-b", "main"],
         vec!["config", "user.email", "test@test.com"],
         vec!["config", "user.name", "Test"],
+        vec!["config", "commit.gpgsign", "false"],
     ] {
         let out = Command::new("git")
             .args(&args)

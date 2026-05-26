@@ -1,4 +1,5 @@
 use anyhow::Context;
+use regex::Regex;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -34,6 +35,16 @@ pub(crate) struct ComparablePackageRule {
 pub(crate) struct ComparablePackageRules {
     pub(crate) rules: Vec<ComparablePackageRule>,
     pub(crate) skipped_notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ExtractVersionMismatch {
+    pub(crate) dep_name: String,
+    pub(crate) package_name: Option<String>,
+    pub(crate) current_value: String,
+    pub(crate) current_version: String,
+    pub(crate) extract_version: String,
+    pub(crate) suggested_extract_version: Option<String>,
 }
 
 pub(crate) fn comparable_package_rules_for_config(
@@ -127,6 +138,195 @@ pub(crate) fn trim_snapshot_meta(snapshot: &mut Snapshot, rules: &[ComparablePac
     snapshot
         .meta
         .retain(|dep_name, _| relevant.contains(dep_name));
+}
+
+pub(crate) fn extract_version_mismatches(
+    snapshot: &Snapshot,
+) -> anyhow::Result<Vec<ExtractVersionMismatch>> {
+    let mut mismatches = Vec::new();
+
+    for dep_name in extracted_dep_names(snapshot) {
+        let Some(meta) = snapshot.meta.get(&dep_name) else {
+            continue;
+        };
+        let Some((current_value, current_version, extract_version)) = meta.version_context() else {
+            continue;
+        };
+
+        let Some(extracted) = extract_version_value(extract_version, current_version)
+            .with_context(|| format!("failed to evaluate extractVersion for dep {dep_name:?}"))?
+        else {
+            continue;
+        };
+
+        if extracted == current_value {
+            continue;
+        }
+
+        mismatches.push(ExtractVersionMismatch {
+            dep_name,
+            package_name: meta.package_name.clone(),
+            current_value: current_value.to_string(),
+            current_version: current_version.to_string(),
+            extract_version: extract_version.to_string(),
+            suggested_extract_version: infer_extract_version_from_current(
+                current_version,
+                current_value,
+            ),
+        });
+    }
+
+    Ok(mismatches)
+}
+
+pub(crate) fn validate_extract_version_consistency(snapshot: &Snapshot) -> anyhow::Result<()> {
+    let mismatches = extract_version_mismatches(snapshot)?;
+    let errors: Vec<_> = mismatches
+        .iter()
+        .map(|mismatch| {
+            format!(
+                "dep {:?} has extractVersion {:?} but currentVersion {:?} does not extract currentValue {:?}{}{}",
+                mismatch.dep_name,
+                mismatch.extract_version,
+                mismatch.current_version,
+                mismatch.current_value,
+                mismatch
+                    .package_name
+                    .as_deref()
+                    .map(|package_name| format!(" (packageName {package_name})"))
+                    .unwrap_or_default(),
+                mismatch
+                    .suggested_extract_version
+                    .as_deref()
+                    .map(|suggested| format!("\nSuggested extractVersion: {suggested:?}"))
+                    .unwrap_or_default(),
+            )
+        })
+        .collect();
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        anyhow::bail!(
+            "{}\nThese deps likely need an extractVersion override or a canonical dep/package mapping update.",
+            errors.join("\n")
+        )
+    }
+}
+
+fn infer_extract_version_from_current(
+    current_version: &str,
+    current_value: &str,
+) -> Option<String> {
+    if current_value.is_empty() {
+        return None;
+    }
+    let first = current_version.find(current_value)?;
+    let second = current_version[first + current_value.len()..].find(current_value);
+    if second.is_some() {
+        return None;
+    }
+    let prefix = &current_version[..first];
+    let suffix = &current_version[first + current_value.len()..];
+    if prefix.is_empty() && suffix.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "^{}(?<version>.+){}$",
+        regex::escape(prefix),
+        regex::escape(suffix)
+    ))
+}
+
+fn extract_version_value(
+    extract_version: &str,
+    current_version: &str,
+) -> anyhow::Result<Option<String>> {
+    let normalized = extract_version.replace("(?<", "(?P<");
+    let regex = Regex::new(&normalized)?;
+    Ok(regex
+        .captures(current_version)
+        .and_then(|captures| captures.name("version"))
+        .map(|version| version.as_str().to_string()))
+}
+
+impl ComparablePackageRule {
+    fn matches(&self, dep_name: &str, snapshot: &Snapshot) -> bool {
+        match &self.matcher {
+            RuleMatcher::DepNames(names) => names.contains(dep_name),
+            RuleMatcher::PackageNames(names) => snapshot
+                .meta
+                .get(dep_name)
+                .and_then(|meta| meta.package_name.as_deref())
+                .is_some_and(|package_name| names.contains(package_name)),
+        }
+    }
+}
+
+fn package_groups(snapshot: &Snapshot) -> BTreeMap<(String, Option<String>), BTreeSet<String>> {
+    let mut groups = BTreeMap::new();
+    for dep_name in snapshot
+        .files
+        .values()
+        .flat_map(|managers| managers.values())
+        .flatten()
+    {
+        let Some(meta) = snapshot.meta.get(dep_name) else {
+            continue;
+        };
+        let Some(package_name) = meta.package_name.as_ref() else {
+            continue;
+        };
+        groups
+            .entry((package_name.clone(), meta.datasource.clone()))
+            .or_insert_with(BTreeSet::new)
+            .insert(dep_name.clone());
+    }
+    groups
+}
+
+pub(crate) fn relevant_dep_names(
+    snapshot: &Snapshot,
+    rules: &[ComparablePackageRule],
+) -> BTreeSet<String> {
+    let mut relevant = BTreeSet::new();
+    let extracted_dep_names: BTreeSet<_> = snapshot
+        .files
+        .values()
+        .flat_map(|managers| managers.values())
+        .flatten()
+        .cloned()
+        .collect();
+
+    for rule in rules {
+        match &rule.matcher {
+            RuleMatcher::DepNames(names) => {
+                relevant.extend(
+                    names
+                        .iter()
+                        .filter(|dep_name| extracted_dep_names.contains(*dep_name))
+                        .cloned(),
+                );
+            }
+            RuleMatcher::PackageNames(names) => {
+                relevant.extend(snapshot.meta.iter().filter_map(|(dep_name, meta)| {
+                    meta.package_name
+                        .as_deref()
+                        .is_some_and(|package_name| names.contains(package_name))
+                        .then_some(dep_name.clone())
+                }));
+            }
+        }
+    }
+
+    let package_groups = package_groups(snapshot);
+    for deps in package_groups.values() {
+        if deps.iter().any(|dep_name| relevant.contains(dep_name)) {
+            relevant.extend(deps.iter().cloned());
+        }
+    }
+
+    relevant
 }
 
 /// Returns the first dep whose meta is incomplete relative to the configured
@@ -318,83 +518,4 @@ fn optional_matcher_values(
 
 fn requires_contextual_matching(key: &str) -> bool {
     CONTEXTUAL_MATCHERS.contains(&key)
-}
-
-impl ComparablePackageRule {
-    fn matches(&self, dep_name: &str, snapshot: &Snapshot) -> bool {
-        match &self.matcher {
-            RuleMatcher::DepNames(names) => names.contains(dep_name),
-            RuleMatcher::PackageNames(names) => snapshot
-                .meta
-                .get(dep_name)
-                .and_then(|meta| meta.package_name.as_deref())
-                .is_some_and(|package_name| names.contains(package_name)),
-        }
-    }
-}
-
-fn package_groups(snapshot: &Snapshot) -> BTreeMap<(String, Option<String>), BTreeSet<String>> {
-    let mut groups = BTreeMap::new();
-    for dep_name in snapshot
-        .files
-        .values()
-        .flat_map(|managers| managers.values())
-        .flatten()
-    {
-        let Some(meta) = snapshot.meta.get(dep_name) else {
-            continue;
-        };
-        let Some(package_name) = meta.package_name.as_ref() else {
-            continue;
-        };
-        groups
-            .entry((package_name.clone(), meta.datasource.clone()))
-            .or_insert_with(BTreeSet::new)
-            .insert(dep_name.clone());
-    }
-    groups
-}
-
-pub(crate) fn relevant_dep_names(
-    snapshot: &Snapshot,
-    rules: &[ComparablePackageRule],
-) -> BTreeSet<String> {
-    let mut relevant = BTreeSet::new();
-    let extracted_dep_names: BTreeSet<_> = snapshot
-        .files
-        .values()
-        .flat_map(|managers| managers.values())
-        .flatten()
-        .cloned()
-        .collect();
-
-    for rule in rules {
-        match &rule.matcher {
-            RuleMatcher::DepNames(names) => {
-                relevant.extend(
-                    names
-                        .iter()
-                        .filter(|dep_name| extracted_dep_names.contains(*dep_name))
-                        .cloned(),
-                );
-            }
-            RuleMatcher::PackageNames(names) => {
-                relevant.extend(snapshot.meta.iter().filter_map(|(dep_name, meta)| {
-                    meta.package_name
-                        .as_deref()
-                        .is_some_and(|package_name| names.contains(package_name))
-                        .then_some(dep_name.clone())
-                }));
-            }
-        }
-    }
-
-    let package_groups = package_groups(snapshot);
-    for deps in package_groups.values() {
-        if deps.iter().any(|dep_name| relevant.contains(dep_name)) {
-            relevant.extend(deps.iter().cloned());
-        }
-    }
-
-    relevant
 }

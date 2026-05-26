@@ -5,7 +5,8 @@ use std::process::Stdio;
 
 use self::install_patch::configure_extract_workaround_env;
 use self::rules::{
-    comparable_package_rules_for_config, incomplete_meta_for_rules, trim_snapshot_meta,
+    ExtractVersionMismatch, comparable_package_rules_for_config, extract_version_mismatches,
+    incomplete_meta_for_rules, trim_snapshot_meta, validate_extract_version_consistency,
     validate_rule_coverage,
 };
 use self::snapshot::{Snapshot, extract_deps, read_snapshot, unified_diff, write_snapshot};
@@ -406,9 +407,7 @@ async fn run_inner(
     project_root: &Path,
 ) -> anyhow::Result<LinterOutput> {
     let config_path = resolve_renovate_config_path(project_root)?;
-    let parsed_rules = comparable_package_rules_for_config(&config_path)?;
-    let rules = parsed_rules.rules;
-    let skipped_rule_notes = parsed_rules.skipped_notes;
+    let mut parsed_rules = comparable_package_rules_for_config(&config_path)?;
     let committed_path = committed_path_for_config(&config_path);
     let committed_display = display_path(project_root, &committed_path);
     let committed = if committed_path.exists() {
@@ -431,6 +430,17 @@ async fn run_inner(
         maybe_reuse_committed_meta(&mut generated, committed.as_ref());
     }
 
+    let mismatches = extract_version_mismatches(&generated)?;
+    if !mismatches.is_empty() && fix && patch_extract_version_overrides(&config_path, &mismatches)?
+    {
+        generated =
+            generate_snapshot(project_root, &config_path, &cfg.exclude_managers, "lookup").await?;
+        parsed_rules = comparable_package_rules_for_config(&config_path)?;
+    }
+
+    let rules = parsed_rules.rules;
+    let skipped_rule_notes = parsed_rules.skipped_notes;
+
     if let Some(reason) = incomplete_meta_for_rules(&generated, &rules) {
         if fix {
             anyhow::bail!(
@@ -442,8 +452,10 @@ async fn run_inner(
         );
     }
 
+    validate_extract_version_consistency(&generated)?;
     validate_rule_coverage(&generated, &rules)?;
     trim_snapshot_meta(&mut generated, &rules);
+    generated.strip_lookup_meta();
 
     if let Some(committed) = committed.as_ref()
         && *committed == generated
@@ -665,12 +677,23 @@ fn merge_missing_meta_from_committed(generated: &mut Snapshot, committed: &Snaps
         let Some(committed_meta) = committed.meta.get(dep_name) else {
             continue;
         };
-        if generated_meta.package_name.is_none() {
-            generated_meta.package_name = committed_meta.package_name.clone();
-        }
-        if generated_meta.datasource.is_none() {
-            generated_meta.datasource = committed_meta.datasource.clone();
-        }
+        fill_if_none(
+            &mut generated_meta.package_name,
+            &committed_meta.package_name,
+        );
+        fill_if_none(&mut generated_meta.datasource, &committed_meta.datasource);
+        fill_if_none(
+            &mut generated_meta.current_value,
+            &committed_meta.current_value,
+        );
+        fill_if_none(
+            &mut generated_meta.current_version,
+            &committed_meta.current_version,
+        );
+        fill_if_none(
+            &mut generated_meta.extract_version,
+            &committed_meta.extract_version,
+        );
     }
 }
 
@@ -678,6 +701,78 @@ fn maybe_reuse_committed_meta(generated: &mut Snapshot, committed: Option<&Snaps
     if let Some(committed) = committed {
         merge_missing_meta_from_committed(generated, committed);
     }
+}
+
+fn fill_if_none<T: Clone>(slot: &mut Option<T>, fallback: &Option<T>) {
+    if slot.is_none() {
+        *slot = fallback.clone();
+    }
+}
+
+fn patch_extract_version_overrides(
+    config_path: &Path,
+    mismatches: &[ExtractVersionMismatch],
+) -> anyhow::Result<bool> {
+    let fixes: Vec<_> = mismatches
+        .iter()
+        .filter_map(|mismatch| {
+            mismatch
+                .suggested_extract_version
+                .as_ref()
+                .map(|extract_version| (mismatch.dep_name.clone(), extract_version.clone()))
+        })
+        .collect();
+
+    if fixes.is_empty() {
+        return Ok(false);
+    }
+
+    let content = std::fs::read_to_string(config_path)
+        .with_context(|| format!("failed to read {}", config_path.display()))?;
+    let mut parsed: serde_json::Value = json5::from_str(&content)
+        .with_context(|| format!("failed to parse {}", config_path.display()))?;
+    let root = parsed.as_object_mut().ok_or_else(|| {
+        anyhow::anyhow!("{} must contain a top-level object", config_path.display())
+    })?;
+
+    let package_rules = root
+        .entry("packageRules".to_string())
+        .or_insert_with(|| serde_json::Value::Array(Vec::new()))
+        .as_array_mut()
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "{} must declare packageRules as an array",
+                config_path.display()
+            )
+        })?;
+
+    let mut changed = false;
+    for (dep_name, extract_version) in fixes {
+        let already_present = package_rules.iter().any(|rule| {
+            rule.get("extractVersion").and_then(|value| value.as_str()) == Some(&extract_version)
+                && rule
+                    .get("matchDepNames")
+                    .and_then(|value| value.as_array())
+                    .is_some_and(|names| names.iter().any(|name| name.as_str() == Some(&dep_name)))
+        });
+        if already_present {
+            continue;
+        }
+
+        package_rules.push(serde_json::json!({
+            "description": format!("Flint autofix: align extractVersion for {dep_name}"),
+            "matchDepNames": [dep_name],
+            "extractVersion": extract_version,
+        }));
+        changed = true;
+    }
+
+    if changed {
+        std::fs::write(config_path, serde_json::to_string_pretty(&parsed)? + "\n")
+            .with_context(|| format!("failed to write {}", config_path.display()))?;
+    }
+
+    Ok(changed)
 }
 
 #[cfg(test)]

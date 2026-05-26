@@ -70,6 +70,10 @@
     "typos": {
       "packageName": "crate-ci/typos",
       "datasource": "github-releases"
+    },
+    "zizmor": {
+      "packageName": "zizmorcore/zizmor",
+      "datasource": "github-tags"
     }
   },
   "files": {
@@ -116,7 +120,8 @@
         "shellcheck",
         "shfmt",
         "taplo",
-        "typos"
+        "typos",
+        "zizmor"
       ]
     },
     "src/init/scaffold.rs": {

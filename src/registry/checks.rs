@@ -12,6 +12,8 @@ const PACKAGE_METADATA_TYPOS: &[&str] = &["package", "metadata", "typos"];
 const TOOL_RUFF: &[&str] = &["tool", "ruff"];
 const ACTIONLINT_URL: &str = "https://github.com/rhysd/actionlint";
 const ACTIONLINT_CONFIG_URL: &str = "https://github.com/rhysd/actionlint/blob/main/docs/config.md";
+const ZIZMOR_URL: &str = "https://github.com/zizmorcore/zizmor";
+const ZIZMOR_CONFIG_URL: &str = "https://docs.zizmor.sh/configuration/";
 const BIOME_URL: &str = "https://biomejs.dev/";
 const BIOME_CONFIG_URL: &str = "https://biomejs.dev/guides/configure-biome/";
 const CLIPPY_URL: &str = "https://doc.rust-lang.org/clippy/configuration.html";
@@ -76,6 +78,13 @@ const ACTIONLINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir("actionlint.yaml"),
     ConfigFile::project(".github/actionlint.yaml"),
     ConfigFile::project(".github/actionlint.yml"),
+];
+const ZIZMOR_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
+    ConfigFile::config_dir("zizmor.yaml"),
+    ConfigFile::project("zizmor.yml"),
+    ConfigFile::project("zizmor.yaml"),
+    ConfigFile::project(".github/zizmor.yml"),
+    ConfigFile::project(".github/zizmor.yaml"),
 ];
 const HADOLINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir(".hadolint.yml"),
@@ -273,6 +282,29 @@ fn check_actionlint() -> Check {
     .style()
 }
 
+fn check_zizmor() -> Check {
+    Check::file(
+        "zizmor",
+        "zizmor {FILE}",
+        &[".github/workflows/*.yml", ".github/workflows/*.yaml"],
+    )
+    .fix("zizmor --fix {FILE}")
+    .linter_config("zizmor.yml", "--config")
+    .baseline_config(ConfigFile::config_dir("zizmor.yml"))
+    .unsupported_configs(ZIZMOR_UNSUPPORTED_CONFIGS)
+    .allow_baseline_overlap_in_unsupported_configs()
+    .project_url(ZIZMOR_URL)
+    .config_doc_url(ZIZMOR_CONFIG_URL)
+    .overview(
+        OverviewSection::ToolingCi,
+        "GitHub Actions",
+        OverviewRole::Check,
+        None,
+    )
+    .desc("Audit GitHub Actions workflows for security issues")
+    .style()
+}
+
 fn check_hadolint() -> Check {
     Check::file(
         "hadolint",
@@ -314,6 +346,7 @@ fn check_typos() -> Check {
         .linter_config("_typos.toml", "--config")
         .baseline_config(ConfigFile::config_dir("_typos.toml"))
         .unsupported_configs(TYPOS_UNSUPPORTED_CONFIGS)
+        .allow_baseline_overlap_in_unsupported_configs()
         .project_url(TYPOS_URL)
         .config_doc_url(TYPOS_CONFIG_URL)
         .overview(
@@ -769,6 +802,7 @@ pub fn builtin() -> Vec<Check> {
         check_yaml_lint(),
         check_taplo(),
         check_actionlint(),
+        check_zizmor(),
         check_hadolint(),
         check_xmllint(),
         check_typos(),

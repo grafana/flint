@@ -73,6 +73,7 @@
         "shfmt",
         "taplo",
         "typos",
+        "zizmor",
       ],
       groupName: "linters",
       commitMessageTopic: "flint-managed linter updates",

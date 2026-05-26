@@ -1,0 +1,7 @@
+[expected]
+args = "run zizmor"
+exit = 1
+stderr = '''
+flint: unsupported zizmor config file found: .github/zizmor.yml
+  Flint only supports FLINT_CONFIG_DIR/zizmor.yml for zizmor. Move the config to the supported location or remove the alternate file.
+'''

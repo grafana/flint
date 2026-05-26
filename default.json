@@ -53,7 +53,8 @@
         "shellcheck",
         "shfmt",
         "taplo",
-        "typos"
+        "typos",
+        "zizmor"
       ],
       "groupName": "linters",
       "commitMessageTopic": "flint-managed linter updates",

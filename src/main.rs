@@ -845,10 +845,22 @@ fn unsupported_config(
     project_root: &Path,
     config_dir: &Path,
 ) -> Option<String> {
+    let baseline_path = check
+        .baseline_config
+        .as_ref()
+        .map(|config| config_file_abs_path(project_root, config_dir, config));
+
     check
         .unsupported_configs
         .iter()
-        .find(|config| config_present(project_root, config_dir, config))
+        .find(|config| {
+            let path = config_file_abs_path(project_root, config_dir, config);
+            let overlaps_baseline = baseline_path
+                .as_ref()
+                .is_some_and(|baseline| *baseline == path);
+            (!overlaps_baseline || !check.allow_baseline_overlap_in_unsupported_configs)
+                && config_present(project_root, config_dir, config)
+        })
         .map(|config| config_file_rel_path(project_root, config_dir, config))
 }
 
@@ -1222,6 +1234,7 @@ lychee = "0.22.0"
 shellcheck = "v0.11.0"
 shfmt = "v3.13.1"
 actionlint = "1.7.10"
+zizmor = "1.25.2"
 editorconfig-checker = "v3.6.1"
 ruff = "0.15.0"
 typos = "1.46.0"
@@ -1245,6 +1258,7 @@ rust = { version = "1.94.1", components = "clippy,rustfmt" }
             "shellcheck",
             "shfmt",
             "taplo",
+            "zizmor",
         ];
 
         let table = render_linters_table(&registry::builtin(), &mise_tools, &cfg, |bin| {
@@ -1262,6 +1276,7 @@ rumdl                 rumdl               active         fast      yes  Lint Mar
 ryl                   ryl                 active         fast      yes  Lint YAML files for style and consistency                            *.yml *.yaml
 taplo                 taplo               active         fast      yes  Format TOML files                                                    *.toml
 actionlint            actionlint          active         fast      no   Lint GitHub Actions workflow files                                   .github/workflows/*.yml .github/workflows/*.yaml
+zizmor                zizmor              active         fast      yes  Audit GitHub Actions workflows for security issues                   .github/workflows/*.yml .github/workflows/*.yaml
 hadolint              hadolint            missing        fast      no   Lint Dockerfiles                                                     Dockerfile Dockerfile.* *.dockerfile
 xmllint               xmllint             missing        fast      no   Validate XML files are well-formed                                   *.xml
 typos                 typos               active         fast      yes  Check for common spelling mistakes                                   *
@@ -1359,5 +1374,48 @@ license-header        (built-in)          not configured  fast      no   Check s
         let found = unsupported_config(&typos, dir.path(), Path::new("."));
 
         assert_eq!(found, None);
+    }
+
+    #[test]
+    fn rustfmt_root_config_is_still_flagged_when_config_dir_is_project_root() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("rustfmt.toml"), "max_width = 120\n").unwrap();
+        let rustfmt = registry::builtin()
+            .into_iter()
+            .find(|check| check.name == "cargo-fmt")
+            .expect("cargo-fmt check");
+
+        let found = unsupported_config(&rustfmt, dir.path(), Path::new("."));
+
+        assert_eq!(found, Some("rustfmt.toml".to_string()));
+    }
+
+    #[test]
+    fn zizmor_supported_root_config_is_not_flagged_when_config_dir_is_project_root() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("zizmor.yml"), "rules: {}\n").unwrap();
+        let zizmor = registry::builtin()
+            .into_iter()
+            .find(|check| check.name == "zizmor")
+            .expect("zizmor check");
+
+        let found = unsupported_config(&zizmor, dir.path(), Path::new("."));
+
+        assert_eq!(found, None);
+    }
+
+    #[test]
+    fn zizmor_root_config_is_still_flagged_when_config_dir_is_elsewhere() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(dir.path().join(".github/config")).unwrap();
+        std::fs::write(dir.path().join("zizmor.yml"), "rules: {}\n").unwrap();
+        let zizmor = registry::builtin()
+            .into_iter()
+            .find(|check| check.name == "zizmor")
+            .expect("zizmor check");
+
+        let found = unsupported_config(&zizmor, dir.path(), Path::new(".github/config"));
+
+        assert_eq!(found, Some("zizmor.yml".to_string()));
     }
 }

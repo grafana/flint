@@ -12,6 +12,28 @@ Commands and flags follow
 [golangci-lint](https://golangci-lint.run/) conventions. Teams already using
 it do not need to re-learn the interface.
 
+## Output
+
+Flint is built to be quiet so AI agents (and humans) don't have to read pages
+of linter output to find the actionable bit:
+
+- **Clean run** — no output. Same under `--fix` when nothing needed fixing.
+- **`--fix`** — silently fixes what it can, prints review-required output, and
+  ends with a one-line summary of the non-clean checks and their state
+  (`fixed`, `review`, `partial`). Fully-clean `--fix` runs print nothing.
+
+Example `--fix` output:
+
+```text
+[shellcheck]
+
+In bad.sh line 2:
+echo $1
+     ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+...
+flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
+```
+
 ## `flint run` flags
 
 <!-- run-flags-start -->

@@ -29,7 +29,8 @@ Flint is a fast, simple lint runner that doesn't slow down your AI coding.
   repos can stick with the generated defaults
 - **Opinionated config** — Flint chooses canonical config filenames per linter,
   while still letting you keep them in a directory such as `.github/config`
-- **AI-friendly** — fix silently, surface only what needs review
+- **AI-friendly** — quiet by default: clean runs print nothing, `--fix`
+  surfaces only what still needs action
 - **Separated ownership** — dedicated linters and formatters own their file
   types to avoid overlapping rules and editor-config conflicts
 - **Predictable and updatable linter versions** — lint behavior stays stable
@@ -98,8 +99,21 @@ For normal local use, run:
 mise run lint:fix
 ```
 
-Flint fixes what it can, tells you when everything is already good, and tells
-you what still needs review.
+Flint is built to be quiet. A clean run prints nothing. `--fix` silently fixes
+what it can and prints what still needs action — review items plus a reminder
+to commit any fixes:
+
+```text
+[shellcheck]
+
+In bad.sh line 2:
+echo $1
+     ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+...
+flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
+```
+
+Terse enough for AI agents, nice for humans too.
 
 **By default, Flint checks only changed files.** Use `--full` to check every
 matching file.

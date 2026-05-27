@@ -312,8 +312,7 @@ so Renovate can authenticate GitHub requests. If `GITHUB_COM_TOKEN` is
 unset, flint forwards `GITHUB_TOKEN` to Renovate as `GITHUB_COM_TOKEN`.
 
 When `flint init` writes a new `flint.toml`, it includes this section if
-`renovate-deps` is selected. During v1 setup migration it also carries
-legacy `RENOVATE_TRACKED_DEPS_EXCLUDE` values into `exclude_managers`.
+`renovate-deps` is selected.
 
 With `--fix`, automatically regenerates and commits the snapshot.
 For custom/regex managers, prefer canonical `depNameTemplate` values

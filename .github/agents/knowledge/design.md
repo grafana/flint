@@ -38,10 +38,12 @@
    template model. Their implementations live in
    `src/linters/`.
 
-7. **Built-in file exclusions**: `src/files.rs` has a
-   `BUILTIN_EXCLUDES` slice of paths that are always removed
-   from the file list before any linter sees it. Currently
-   contains `.github/renovate-tracked-deps.json` (a
-   generated file that should never be linted by `rumdl`,
-   ec, etc.). Add entries here — not in user-facing `exclude`
-   docs — when a file is managed by flint itself.
+7. **Built-in + shared generated exclusions**: `src/files.rs`
+   removes two classes of files before generic linting:
+   flint-managed committed paths in `BUILTIN_EXCLUDES`, and
+   any tracked file marked `linguist-generated` in
+   `.gitattributes`. Prefer that route for user repos so
+   GitHub and other tools can reuse the same generated-file
+   metadata. Reserve
+   `BUILTIN_EXCLUDES` for files managed by flint itself such
+   as `.github/renovate-tracked-deps.json`.

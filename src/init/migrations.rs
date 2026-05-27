@@ -51,7 +51,7 @@ impl RepoMigrationSummary {
             println!("  added node (LTS) — required by npm: backend tools");
         }
         for rel in &self.legacy_files_removed {
-            println!("  removed <REPO>/{rel} (legacy flint v1 / super-linter file)");
+            println!("  removed <REPO>/{rel} (legacy flint file)");
         }
         for rel in &self.stale_md013_comments_removed {
             println!("  removed stale markdownlint MD013 directives from <REPO>/{rel}");
@@ -249,7 +249,7 @@ fn apply_repo_migrations_with_keys(
     )?;
     let node_added = ensure_node_for_npm(project_root)?;
     let legacy_files_removed = if include_repo_cleanup {
-        remove_legacy_lint_files(project_root, config_dir)?
+        remove_legacy_lint_files(project_root)?
     } else {
         vec![]
     };

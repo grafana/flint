@@ -3,14 +3,6 @@
 This file provides guidance to AI coding agents when working
 with code in this repository.
 
-## Scope
-
-This repository is flint v2: a single Rust binary.
-
-Unless the task explicitly calls for v1 maintenance, do not
-change v1-only assets such as `super-linter-versions/` and
-`tasks/setup/update-super-linter-versions.sh`.
-
 ## Repository Layout
 
 - Usage documentation: `README.md`

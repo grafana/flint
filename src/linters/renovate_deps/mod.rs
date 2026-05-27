@@ -96,12 +96,8 @@ pub async fn run(
 
 pub(crate) fn init(ctx: &dyn InitHookContext) -> anyhow::Result<bool> {
     let toml_path = ctx.config_dir().join("flint.toml");
-    let config_changed = if let Some(managers) = ctx.renovate_exclude_managers()
-        && !managers.is_empty()
-    {
-        configure_renovate_deps_config(&toml_path, Some(managers))?
-    } else if ctx.flint_toml_generated() {
-        configure_renovate_deps_config(&toml_path, None)?
+    let config_changed = if ctx.flint_toml_generated() {
+        configure_renovate_deps_config(&toml_path)?
     } else {
         false
     };
@@ -211,66 +207,29 @@ pub(crate) fn adaptive_relevance(ctx: &dyn AdaptiveRelevanceContext) -> bool {
 
 /// Ensures `flint.toml` has the Renovate check config requested by init.
 /// Returns `true` when the file was changed.
-fn configure_renovate_deps_config(
-    toml_path: &Path,
-    exclude_managers: Option<&[String]>,
-) -> anyhow::Result<bool> {
+fn configure_renovate_deps_config(toml_path: &Path) -> anyhow::Result<bool> {
     let content = std::fs::read_to_string(toml_path)
         .with_context(|| format!("failed to read {}", toml_path.display()))?;
-    let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse flint.toml")?;
+    let doc: toml_edit::DocumentMut = content.parse().context("failed to parse flint.toml")?;
     let Some(checks) = doc.get("checks").and_then(|item| item.as_table()) else {
-        return append_renovate_deps_config(toml_path, &content, exclude_managers);
+        return append_renovate_deps_config(toml_path, &content);
     };
-    let Some(table_key) = ["renovate-deps", "renovate_deps"]
+    if ["renovate-deps", "renovate_deps"]
         .into_iter()
-        .find(|key| checks.contains_key(key))
-    else {
-        return append_renovate_deps_config(toml_path, &content, exclude_managers);
-    };
-
-    let Some(managers) = exclude_managers.filter(|managers| !managers.is_empty()) else {
-        return Ok(false);
-    };
-    let renovate = doc
-        .get_mut("checks")
-        .and_then(|item| item.as_table_mut())
-        .and_then(|checks| checks.get_mut(table_key))
-        .and_then(|item| item.as_table_mut())
-        .with_context(|| {
-            format!(
-                "[checks.{table_key}] is not a table in {}",
-                toml_path.display()
-            )
-        })?;
-    if renovate.contains_key("exclude_managers") {
-        return Ok(false);
+        .all(|key| !checks.contains_key(key))
+    {
+        return append_renovate_deps_config(toml_path, &content);
     }
-    renovate.insert("exclude_managers", toml_edit::value(string_array(managers)));
-    std::fs::write(toml_path, doc.to_string())
-        .with_context(|| format!("failed to write {}", toml_path.display()))?;
-    println!(
-        "  patched {} — added checks.renovate-deps.exclude_managers",
-        toml_path.display()
-    );
-    Ok(true)
+    Ok(false)
 }
 
-fn append_renovate_deps_config(
-    toml_path: &Path,
-    content: &str,
-    exclude_managers: Option<&[String]>,
-) -> anyhow::Result<bool> {
+fn append_renovate_deps_config(toml_path: &Path, content: &str) -> anyhow::Result<bool> {
     let mut next = String::from(content);
     if !next.ends_with('\n') {
         next.push('\n');
     }
     next.push_str("\n[checks.renovate-deps]\n");
-    match exclude_managers {
-        Some(managers) if !managers.is_empty() => {
-            next.push_str(&format!("exclude_managers = {}\n", string_array(managers)));
-        }
-        _ => next.push_str("# exclude_managers = []\n"),
-    }
+    next.push_str("# exclude_managers = []\n");
     std::fs::write(toml_path, next)
         .with_context(|| format!("failed to write {}", toml_path.display()))?;
     println!(
@@ -278,14 +237,6 @@ fn append_renovate_deps_config(
         toml_path.display()
     );
     Ok(true)
-}
-
-fn string_array(values: &[String]) -> toml_edit::Array {
-    let mut array = toml_edit::Array::default();
-    for value in values {
-        array.push(value.as_str());
-    }
-    array
 }
 
 fn patch_renovate_preset(project_root: &Path) -> anyhow::Result<bool> {

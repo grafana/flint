@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.22.3](https://github.com/grafana/flint/compare/v0.22.2...v0.22.3) - 2026-05-27
+
+### Added
+
+- skip generated git-tracked files during linting ([#305](https://github.com/grafana/flint/pull/305))
+- add zizmor as GitHub Actions security linter ([#302](https://github.com/grafana/flint/pull/302))
+
+### Fixed
+
+- *(init)* improve interactive init feedback ([#295](https://github.com/grafana/flint/pull/295))
+
+### Other
+
+- remove v1 assets and compatibility ([#297](https://github.com/grafana/flint/pull/297))
+- document quiet-by-default output ([#303](https://github.com/grafana/flint/pull/303))
+- *(deps)* update taiki-e/install-action digest to 184183c ([#299](https://github.com/grafana/flint/pull/299))
+- simplify positioning copy ([#298](https://github.com/grafana/flint/pull/298))
+- *(deps)* update taiki-e/install-action digest to 3235f89 ([#294](https://github.com/grafana/flint/pull/294))
+- replace archived serde-yaml with serde-yaml-bw ([#296](https://github.com/grafana/flint/pull/296))
+
 ## [0.22.2](https://github.com/grafana/flint/compare/v0.22.1...v0.22.2) - 2026-05-11
 
 ### Fixed

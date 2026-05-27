@@ -65,6 +65,15 @@ separately.
 
 `renovate-deps` reports that mismatch earlier, at config-check time.
 
+## Preset compatibility note
+
+`default.json` now describes Flint's current Renovate behavior only. It does
+not include the legacy regex managers some v1-era repos used to update
+SHA-pinned `raw.githubusercontent.com/.../<sha>/... # vX.Y.Z` references or
+`*_VERSION` variables in `mise.toml`. Repos that still need those updates
+should keep repo-local custom managers for them when extending the shared
+preset.
+
 ## Preferred pattern
 
 When a custom manager needs a different lookup identity than the grouping name,

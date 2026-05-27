@@ -23,13 +23,10 @@ pub(super) fn generate_flint_toml(config_dir: &Path, base_branch: &str) -> Resul
     Ok(true)
 }
 
-/// Removes stale v1/super-linter-era files that flint v2 no longer uses.
+/// Removes stale legacy files that flint no longer uses.
 /// Returns the list of removed paths relative to `project_root`.
-pub(super) fn remove_legacy_lint_files(
-    project_root: &Path,
-    config_dir: &Path,
-) -> Result<Vec<String>> {
-    let candidates = legacy_lint_files(project_root, config_dir);
+pub(super) fn remove_legacy_lint_files(project_root: &Path) -> Result<Vec<String>> {
+    let candidates = legacy_lint_files(project_root);
 
     let mut removed = vec![];
     for path in candidates {
@@ -47,13 +44,10 @@ pub(super) fn remove_legacy_lint_files(
     Ok(removed)
 }
 
-fn legacy_lint_files(project_root: &Path, config_dir: &Path) -> Vec<std::path::PathBuf> {
+fn legacy_lint_files(project_root: &Path) -> Vec<std::path::PathBuf> {
     vec![
         project_root.join(".prettierignore"),
         project_root.join(".gitleaksignore"),
-        config_dir.join("super-linter.env"),
-        project_root.join(".github/config/super-linter.env"),
-        project_root.join(".github/super-linter.env"),
     ]
 }
 

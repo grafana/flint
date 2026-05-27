@@ -1,24 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate custom managers for repositories that use flint mise tasks",
+  "description": "Renovate preset for repositories that use flint",
   "customManagers": [
-    {
-      "customType": "regex",
-      "description": "DEPRECATED: update _VERSION variables in mise.toml (consumer preset compatibility only)",
-      "managerFilePatterns": ["/^mise\\.toml$/"],
-      "matchStrings": [
-        "# renovate: datasource=(?<datasource>[a-z-]+?)(?: depName=(?<depName>.+?))?(?: packageName=(?<packageName>.+?))?(?: versioning=(?<versioning>[a-z-]+?))?\\s.+?_VERSION=\"?(?<currentValue>[^@\"]+?)(?:@(?<currentDigest>sha256:[a-f0-9]+))?\"?\\s"
-      ]
-    },
-    {
-      "customType": "regex",
-      "description": "Update raw.githubusercontent.com URLs pinned to SHA with version comment",
-      "managerFilePatterns": ["/^mise\\.toml$/"],
-      "matchStrings": [
-        "https://raw\\.githubusercontent\\.com/(?<depName>[^/]+/[^/]+)/(?<currentDigest>[a-f0-9]{40})/.*#\\s*(?<currentValue>v\\S+)"
-      ],
-      "datasourceTemplate": "github-tags"
-    },
     {
       "customType": "regex",
       "description": "Update mise version in GitHub Actions workflows",

@@ -718,8 +718,7 @@ fn check_renovate_deps() -> Check {
             unset, flint forwards `GITHUB_TOKEN` to Renovate as `GITHUB_COM_TOKEN`.\n\
             \n\
             When `flint init` writes a new `flint.toml`, it includes this section if\n\
-            `renovate-deps` is selected. During v1 setup migration it also carries\n\
-            legacy `RENOVATE_TRACKED_DEPS_EXCLUDE` values into `exclude_managers`.\n\
+            `renovate-deps` is selected.\n\
             \n\
             With `--fix`, automatically regenerates and commits the snapshot.\n\
             For custom/regex managers, prefer canonical `depNameTemplate` values\n\

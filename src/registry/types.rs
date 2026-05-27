@@ -213,7 +213,6 @@ pub trait InitHookContext {
     fn config_dir(&self) -> &Path;
     fn line_length(&self) -> u16;
     fn flint_toml_generated(&self) -> bool;
-    fn renovate_exclude_managers(&self) -> Option<&[String]>;
 }
 
 pub type InitHookFn = fn(&dyn InitHookContext) -> anyhow::Result<bool>;

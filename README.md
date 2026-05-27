@@ -42,9 +42,6 @@ Flint is a fast, simple lint runner that doesn't slow down your AI coding.
 Read the [background and principles](docs/why.md) and
 [alternatives/comparisons](docs/alternatives.md).
 
-> [!TIP]
-> **Legacy v1** (bash task scripts): see [README-V1.md](README-V1.md).
-
 ---
 
 ## Getting Started
@@ -62,6 +59,14 @@ Read the [background and principles](docs/why.md) and
 3. Optional: if you use Renovate, create your Renovate config before init.
    Flint can then patch it to include the Flint preset, which helps keep
    linter and Flint updates grouped with less PR noise.
+
+   > [!IMPORTANT]
+   > Flint's shared `default.json` preset now targets the current setup only.
+   > It no longer ships the legacy custom managers that updated SHA-pinned
+   > `raw.githubusercontent.com/.../<sha>/... # vX.Y.Z` references or
+   > `*_VERSION` variables in `mise.toml`. If your repo still relies on those
+   > v1 patterns, keep your own custom managers for them before extending the
+   > preset.
 
 4. Let Flint scaffold the setup:
 

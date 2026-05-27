@@ -1,0 +1,55 @@
+[expected]
+args = "run --full renovate-deps"
+exit = 0
+
+[env]
+GITHUB_TOKEN = "token"
+
+[expected.files]
+".reno-mode" = "extract\n"
+".reno-preset" = "yes\n"
+".reno-local-override" = "no\n"
+"renovate-tracked-deps.json" = '''
+{
+  "meta": {},
+  "files": {
+    "mise.toml": {
+      "mise": [
+        "biome"
+      ]
+    }
+  }
+}
+'''
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+set -eu
+
+mode=""
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run=*) mode="${arg#--dry-run=}" ;;
+  esac
+done
+printf '%s\n' "$mode" > .reno-mode
+
+if grep -F 'github>grafana/flint#v' "$RENOVATE_CONFIG_FILE" >/dev/null 2>&1; then
+  printf 'yes\n' > .reno-preset
+else
+  printf 'no\n' > .reno-preset
+  echo "missing flint preset in $RENOVATE_CONFIG_FILE" >&2
+  exit 1
+fi
+
+if grep -F '"extractVersion": "^@biomejs/biome@(?<version>.+)$"' "$RENOVATE_CONFIG_FILE" >/dev/null 2>&1; then
+  printf 'yes\n' > .reno-local-override
+  echo "unexpected local biome extractVersion override in $RENOVATE_CONFIG_FILE" >&2
+  exit 1
+else
+  printf 'no\n' > .reno-local-override
+fi
+
+printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"mise":[{"packageFile":"mise.toml","deps":[{"depName":"biome","packageName":"biomejs/biome","datasource":"github-tags","currentValue":"2.4.12","currentVersion":"@biomejs/biome@2.4.12","extractVersion":"^@biomejs/biome@(?<version>.+)$"}]}]}}'
+'''

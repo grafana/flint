@@ -82,6 +82,11 @@
       separateMajorMinor: false,
     },
     {
+      description: "Align biome's aqua tag format with Renovate extractVersion matching",
+      matchDepNames: ["biome"],
+      extractVersion: "^@biomejs/biome@(?<version>.+)$",
+    },
+    {
       matchPackageNames: ["jdx/mise"],
       groupName: "mise",
       description: "Only update mise once a week",

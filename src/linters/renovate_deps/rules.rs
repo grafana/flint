@@ -44,6 +44,7 @@ pub(crate) struct ExtractVersionMismatch {
     pub(crate) current_value: String,
     pub(crate) current_version: String,
     pub(crate) extract_version: String,
+    pub(crate) extracted_value: Option<String>,
     pub(crate) suggested_extract_version: Option<String>,
 }
 
@@ -153,13 +154,9 @@ pub(crate) fn extract_version_mismatches(
             continue;
         };
 
-        let Some(extracted) = extract_version_value(extract_version, current_version)
-            .with_context(|| format!("failed to evaluate extractVersion for dep {dep_name:?}"))?
-        else {
-            continue;
-        };
-
-        if extracted == current_value {
+        let extracted = extract_version_value(extract_version, current_version)
+            .with_context(|| format!("failed to evaluate extractVersion for dep {dep_name:?}"))?;
+        if extracted.as_deref() == Some(current_value) {
             continue;
         }
 
@@ -169,6 +166,7 @@ pub(crate) fn extract_version_mismatches(
             current_value: current_value.to_string(),
             current_version: current_version.to_string(),
             extract_version: extract_version.to_string(),
+            extracted_value: extracted,
             suggested_extract_version: infer_extract_version_from_current(
                 current_version,
                 current_value,
@@ -184,11 +182,20 @@ pub(crate) fn validate_extract_version_consistency(snapshot: &Snapshot) -> anyho
     let errors: Vec<_> = mismatches
         .iter()
         .map(|mismatch| {
+            let extraction_detail = mismatch
+                .extracted_value
+                .as_deref()
+                .map(|extracted| format!("extracted value {:?} instead of currentValue", extracted))
+                .unwrap_or_else(|| {
+                    "did not match currentVersion (no match or missing `version` capture) for currentValue"
+                        .to_string()
+                });
             format!(
-                "dep {:?} has extractVersion {:?} but currentVersion {:?} does not extract currentValue {:?}{}{}",
+                "dep {:?} has extractVersion {:?} but currentVersion {:?} {} {:?}{}{}",
                 mismatch.dep_name,
                 mismatch.extract_version,
                 mismatch.current_version,
+                extraction_detail,
                 mismatch.current_value,
                 mismatch
                     .package_name

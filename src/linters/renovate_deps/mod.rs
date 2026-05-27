@@ -400,6 +400,161 @@ fn add_to_extends(content: &str, entry: &str) -> anyhow::Result<String> {
     }
 }
 
+fn add_to_package_rules(content: &str, rules: &[serde_json::Value]) -> anyhow::Result<String> {
+    if rules.is_empty() {
+        return Ok(content.to_string());
+    }
+
+    let re = regex::Regex::new(r#"(?:"packageRules"|packageRules)\s*:\s*\["#).unwrap();
+
+    if let Some(m) = re.find(content) {
+        let bracket_pos = m.end() - 1;
+        let close_pos = find_matching_delimiter(content, bracket_pos, '[', ']')?;
+        let inside_start = bracket_pos + 1;
+        let inside = &content[inside_start..close_pos];
+
+        if inside.contains('\n') {
+            let insert_pos = inside
+                .char_indices()
+                .rfind(|(_, ch)| !ch.is_whitespace())
+                .map(|(idx, _)| inside_start + idx + 1)
+                .unwrap_or(inside_start);
+            let indent = inside
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .map(|line| " ".repeat(line.len() - line.trim_start().len()))
+                .unwrap_or_else(|| "    ".to_string());
+            let rendered = render_package_rules(rules, &indent)?;
+            let separator = if inside.trim().is_empty() { "" } else { "," };
+
+            return Ok(format!(
+                "{}{}\n{}{}{}",
+                &content[..insert_pos],
+                separator,
+                rendered,
+                &content[insert_pos..close_pos],
+                &content[close_pos..]
+            ));
+        }
+
+        let rendered = rules
+            .iter()
+            .map(serde_json::to_string)
+            .collect::<Result<Vec<_>, _>>()?
+            .join(", ");
+        let separator = if inside.trim().is_empty() { "" } else { ", " };
+        Ok(format!(
+            "{}{}{}{}",
+            &content[..close_pos],
+            separator,
+            rendered,
+            &content[close_pos..]
+        ))
+    } else {
+        let open = content
+            .find('{')
+            .context("no opening { in renovate config")?;
+        let (before, after) = content.split_at(open + 1);
+        let separator = if after.trim() == "}" { "" } else { "," };
+        let rendered = render_package_rules(rules, "    ")?;
+        Ok(format!(
+            "{}\n  \"packageRules\": [\n{}\n  ]{}{}",
+            before, rendered, separator, after
+        ))
+    }
+}
+
+fn render_package_rules(rules: &[serde_json::Value], indent: &str) -> anyhow::Result<String> {
+    rules
+        .iter()
+        .map(|rule| serde_json::to_string_pretty(rule).map(|text| indent_block(&text, indent)))
+        .collect::<Result<Vec<_>, _>>()
+        .map(|rendered| rendered.join(",\n"))
+        .map_err(Into::into)
+}
+
+fn indent_block(text: &str, indent: &str) -> String {
+    text.lines()
+        .map(|line| format!("{indent}{line}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn find_matching_delimiter(
+    content: &str,
+    open_pos: usize,
+    open: char,
+    close: char,
+) -> anyhow::Result<usize> {
+    let mut depth = 0usize;
+    let mut in_string: Option<char> = None;
+    let mut escaped = false;
+    let mut line_comment = false;
+    let mut block_comment = false;
+    let mut prev = '\0';
+
+    for (idx, ch) in content
+        .char_indices()
+        .skip_while(|(idx, _)| *idx < open_pos)
+    {
+        if line_comment {
+            if ch == '\n' {
+                line_comment = false;
+            }
+            prev = ch;
+            continue;
+        }
+        if block_comment {
+            if prev == '*' && ch == '/' {
+                block_comment = false;
+            }
+            prev = ch;
+            continue;
+        }
+        if let Some(quote) = in_string {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == quote {
+                in_string = None;
+            }
+            prev = ch;
+            continue;
+        }
+
+        if prev == '/' && ch == '/' {
+            line_comment = true;
+            prev = ch;
+            continue;
+        }
+        if prev == '/' && ch == '*' {
+            block_comment = true;
+            prev = ch;
+            continue;
+        }
+        if matches!(ch, '"' | '\'') {
+            in_string = Some(ch);
+            prev = ch;
+            continue;
+        }
+        if ch == open {
+            depth += 1;
+        } else if ch == close {
+            depth = depth
+                .checked_sub(1)
+                .ok_or_else(|| anyhow::anyhow!("unbalanced delimiter {close}"))?;
+            if depth == 0 {
+                return Ok(idx);
+            }
+        }
+
+        prev = ch;
+    }
+
+    anyhow::bail!("no closing {close} found")
+}
+
 async fn run_inner(
     cfg: &RenovateDepsConfig,
     fix: bool,
@@ -719,7 +874,19 @@ fn patch_extract_version_overrides(
             mismatch
                 .suggested_extract_version
                 .as_ref()
-                .map(|extract_version| (mismatch.dep_name.clone(), extract_version.clone()))
+                .map(|extract_version| {
+                    (
+                        mismatch.dep_name.clone(),
+                        serde_json::json!({
+                            "description": format!(
+                                "Flint autofix: align extractVersion for {}",
+                                mismatch.dep_name
+                            ),
+                            "matchDepNames": [mismatch.dep_name],
+                            "extractVersion": extract_version,
+                        }),
+                    )
+                })
         })
         .collect();
 
@@ -729,28 +896,45 @@ fn patch_extract_version_overrides(
 
     let content = std::fs::read_to_string(config_path)
         .with_context(|| format!("failed to read {}", config_path.display()))?;
-    let mut parsed: serde_json::Value = json5::from_str(&content)
+    let parsed: serde_json::Value = json5::from_str(&content)
         .with_context(|| format!("failed to parse {}", config_path.display()))?;
-    let root = parsed.as_object_mut().ok_or_else(|| {
+    let root = parsed.as_object().ok_or_else(|| {
         anyhow::anyhow!("{} must contain a top-level object", config_path.display())
     })?;
 
-    let package_rules = root
-        .entry("packageRules".to_string())
-        .or_insert_with(|| serde_json::Value::Array(Vec::new()))
-        .as_array_mut()
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "{} must declare packageRules as an array",
-                config_path.display()
-            )
-        })?;
+    if let Some(package_rules) = root.get("packageRules")
+        && !package_rules.is_array()
+    {
+        anyhow::bail!(
+            "{} must declare packageRules as an array",
+            config_path.display()
+        );
+    }
 
-    let mut changed = false;
-    for (dep_name, extract_version) in fixes {
-        let already_present = package_rules.iter().any(|rule| {
-            rule.get("extractVersion").and_then(|value| value.as_str()) == Some(&extract_version)
-                && rule
+    let existing_rules = root
+        .get("packageRules")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let mut new_rules = Vec::new();
+
+    for (dep_name, rule) in fixes {
+        let extract_version = rule["extractVersion"].as_str();
+        let already_present = existing_rules.iter().any(|existing| {
+            existing
+                .get("extractVersion")
+                .and_then(|value| value.as_str())
+                == extract_version
+                && existing
+                    .get("matchDepNames")
+                    .and_then(|value| value.as_array())
+                    .is_some_and(|names| names.iter().any(|name| name.as_str() == Some(&dep_name)))
+        }) || new_rules.iter().any(|existing: &serde_json::Value| {
+            existing
+                .get("extractVersion")
+                .and_then(|value| value.as_str())
+                == extract_version
+                && existing
                     .get("matchDepNames")
                     .and_then(|value| value.as_array())
                     .is_some_and(|names| names.iter().any(|name| name.as_str() == Some(&dep_name)))
@@ -759,20 +943,19 @@ fn patch_extract_version_overrides(
             continue;
         }
 
-        package_rules.push(serde_json::json!({
-            "description": format!("Flint autofix: align extractVersion for {dep_name}"),
-            "matchDepNames": [dep_name],
-            "extractVersion": extract_version,
-        }));
-        changed = true;
+        new_rules.push(rule);
     }
 
-    if changed {
-        std::fs::write(config_path, serde_json::to_string_pretty(&parsed)? + "\n")
-            .with_context(|| format!("failed to write {}", config_path.display()))?;
+    if new_rules.is_empty() {
+        return Ok(false);
     }
 
-    Ok(changed)
+    let updated = add_to_package_rules(&content, &new_rules)
+        .with_context(|| format!("failed to patch packageRules in {}", config_path.display()))?;
+    std::fs::write(config_path, updated)
+        .with_context(|| format!("failed to write {}", config_path.display()))?;
+
+    Ok(true)
 }
 
 #[cfg(test)]

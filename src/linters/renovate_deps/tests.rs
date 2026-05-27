@@ -611,6 +611,31 @@ fn validate_extract_version_consistency_flags_mismatch() {
 }
 
 #[test]
+fn validate_extract_version_consistency_flags_no_match() {
+    let snap = Snapshot {
+        meta: [(
+            "biome".to_string(),
+            DepMeta {
+                package_name: Some("biomejs/biome".to_string()),
+                datasource: Some("github-tags".to_string()),
+                current_value: Some("2.4.12".to_string()),
+                current_version: Some("@biomejs/biome@2.4.12".to_string()),
+                extract_version: Some("^v(?<version>.+)$".to_string()),
+            },
+        )]
+        .into_iter()
+        .collect(),
+        files: dep_files(&[("mise.toml", &[("mise", &["biome"])])]),
+    };
+
+    let err = validate_extract_version_consistency(&snap).unwrap_err();
+    let msg = err.to_string();
+
+    assert!(msg.contains("no match"), "unexpected error:\n{msg}");
+    assert!(msg.contains("^v(?<version>.+)$"));
+}
+
+#[test]
 fn patch_extract_version_overrides_appends_rule() {
     let tmp = write_tmp("{\n  extends: [\"config:recommended\"]\n}\n");
     let changed = patch_extract_version_overrides(
@@ -621,6 +646,7 @@ fn patch_extract_version_overrides_appends_rule() {
             current_value: "2.4.12".to_string(),
             current_version: "@biomejs/biome@2.4.12".to_string(),
             extract_version: "^v?(?<version>.+)".to_string(),
+            extracted_value: Some("@biomejs/biome@2.4.12".to_string()),
             suggested_extract_version: Some("^@biomejs/biome@(?<version>.+)$".to_string()),
         }],
     )
@@ -637,6 +663,41 @@ fn patch_extract_version_overrides_appends_rule() {
         rules[0]["extractVersion"],
         "^@biomejs/biome@(?<version>.+)$"
     );
+}
+
+#[test]
+fn patch_extract_version_overrides_preserves_json5_formatting() {
+    let tmp = write_tmp(
+        r#"{
+  // keep this comment
+  extends: ["config:recommended"],
+}
+"#,
+    );
+    let changed = patch_extract_version_overrides(
+        tmp.path(),
+        &[ExtractVersionMismatch {
+            dep_name: "biome".to_string(),
+            package_name: Some("biomejs/biome".to_string()),
+            current_value: "2.4.12".to_string(),
+            current_version: "@biomejs/biome@2.4.12".to_string(),
+            extract_version: "^v?(?<version>.+)".to_string(),
+            extracted_value: Some("@biomejs/biome@2.4.12".to_string()),
+            suggested_extract_version: Some("^@biomejs/biome@(?<version>.+)$".to_string()),
+        }],
+    )
+    .unwrap();
+
+    assert!(changed);
+
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    assert!(result.contains("// keep this comment"));
+    assert!(result.contains("extends: [\"config:recommended\"]"));
+
+    let parsed: serde_json::Value = json5::from_str(&result).unwrap();
+    let rules = parsed["packageRules"].as_array().unwrap();
+    assert_eq!(rules.len(), 1);
+    assert_eq!(rules[0]["matchDepNames"][0], "biome");
 }
 
 #[test]

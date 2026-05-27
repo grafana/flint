@@ -1,14 +1,16 @@
 # `renovate-deps`
 
-`renovate-deps` does two related checks:
+`renovate-deps` does three related checks:
 
 1. It verifies that `renovate-tracked-deps.json` next to the active Renovate
    config matches what Renovate currently extracts from the repo.
 2. It checks that extracted dependencies which resolve to the same upstream
    package are covered consistently by Renovate package rules.
+3. It checks that any extracted `extractVersion` still turns Renovate's
+   resolved `currentVersion` into the tracked `currentValue`.
 
-The second check is there to catch configuration mistakes before they show up as
-separate Renovate PRs or README drift.
+The second and third checks are there to catch configuration mistakes before
+they show up as separate Renovate PRs, stalled updates, or README drift.
 
 ## When does this run?
 
@@ -28,6 +30,11 @@ The "new tool not yet tracked" case is the typical reason a CI failure
 won't reproduce locally without `--full`.
 
 ## What it catches
+
+It also catches stale or overly generic `extractVersion` rules. For example,
+if Renovate resolves a current upstream tag like `@biomejs/biome@2.4.12` but
+the configured `extractVersion` is still `^v?(?<version>.+)`, Flint will flag
+that the regex no longer extracts the tracked `currentValue` (`2.4.12`).
 
 Goal: `mise.toml` and `README.md` both refer to actionlint, so you want
 Renovate to treat them as the same dependency and keep them in the same group.
@@ -110,13 +117,15 @@ Renovate config:
 - `.github/renovate-tracked-deps.json` for `.github/renovate.json5`
 - `renovate-tracked-deps.json` for root-level configs such as `.renovaterc.json`
 
-It stores only the metadata Flint needs for these checks:
+It stores only the stable metadata Flint needs for these checks:
 
 - `files`: extracted dependency names by file and manager
-- `meta`: package metadata for deps relevant to rule-coverage validation
+- `meta`: stable package metadata used for rule-coverage validation
 
-This is intentionally narrower than full Renovate output so steady-state
-`renovate-deps --fix` stays cheap.
+Lookup-only fields such as `currentVersion`, `currentValue`, and
+`extractVersion` are used transiently during validation and autofix, but are
+stripped before Flint compares or writes the committed snapshot. This keeps
+`renovate-tracked-deps.json` stable across routine version changes.
 
 ## Fixing failures
 
@@ -129,6 +138,10 @@ flint run --fix renovate-deps
 Verification (plain `flint run`) uses Renovate's cheap `--dry-run=extract`
 plus the committed snapshot's metadata. `--fix` regenerates via
 `--dry-run=lookup` so meta is authoritative.
+
+When Flint can infer a better `extractVersion` directly from Renovate's
+resolved `currentVersion` and `currentValue`, `--fix` also appends a targeted
+`packageRules` override for the affected `depName` and retries the lookup.
 
 The linter requires every dep referenced by a `packageRule` to have
 `packageName`; deps matched via `matchPackageNames` additionally require

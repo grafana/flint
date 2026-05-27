@@ -29,6 +29,12 @@ fn flint_with_env(args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Output {
     cmd.output().expect("failed to spawn flint")
 }
 
+fn combined_output(out: &Output) -> String {
+    let mut combined = out.stdout.clone();
+    combined.extend_from_slice(&out.stderr);
+    String::from_utf8_lossy(&combined).into_owned()
+}
+
 /// Creates a temp directory initialised as a git repo with branch `main`.
 fn git_repo() -> TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -36,6 +42,7 @@ fn git_repo() -> TempDir {
         vec!["init", "-b", "main"],
         vec!["config", "user.email", "test@test.com"],
         vec!["config", "user.name", "Test"],
+        vec!["config", "commit.gpgsign", "false"],
     ] {
         let out = Command::new("git")
             .args(&args)
@@ -265,6 +272,94 @@ printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"mise":[{"package
         "expected stale renovate snapshot failure; stdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+// Unix-only: this live smoke test hits the real `renovate` binary through
+// `flint run --full --fix renovate-deps` against a GitHub-hosted Flint preset.
+// It is ignored by default because it requires network access plus a GitHub
+// token. Set FLINT_RENOVATE_PRESET_REF to test an unreleased branch or commit;
+// otherwise it defaults to the current crate tag.
+#[cfg(unix)]
+#[test]
+#[ignore = "requires network, real renovate, and GITHUB_TOKEN"]
+fn renovate_deps_live_accepts_preset_only_biome_repo() {
+    let repo = git_repo();
+
+    std::fs::write(
+        repo.path().join("mise.toml"),
+        r#"[tools]
+biome = "2.4.12"
+"npm:renovate" = "43.150.0"
+"#,
+    )
+    .unwrap();
+
+    let default_ref = env!("CARGO_PKG_VERSION")
+        .split('-')
+        .next()
+        .unwrap()
+        .to_string();
+    let preset_ref = std::env::var("FLINT_RENOVATE_PRESET_REF").unwrap_or(default_ref);
+    std::fs::write(
+        repo.path().join("renovate.json5"),
+        format!(r#"{{ extends: ["github>grafana/flint#{preset_ref}"] }}"#),
+    )
+    .unwrap();
+
+    let out = Command::new("git")
+        .args(["add", "-A"])
+        .current_dir(repo.path())
+        .output()
+        .expect("failed to spawn git add");
+    assert!(
+        out.status.success(),
+        "git add failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let out = Command::new("git")
+        .args(["commit", "-q", "-m", "init"])
+        .current_dir(repo.path())
+        .output()
+        .expect("failed to spawn git commit");
+    assert!(
+        out.status.success(),
+        "git commit failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let token = std::env::var("GITHUB_TOKEN")
+        .expect("set GITHUB_TOKEN before running this live renovate smoke test");
+
+    let out = flint_with_env(
+        &["run", "--full", "--fix", "renovate-deps"],
+        repo.path(),
+        &[("GITHUB_TOKEN", &token)],
+    );
+    let output = combined_output(&out);
+    assert!(
+        out.status.code() == Some(1),
+        "expected flint --fix to report changes needed:\n{output}"
+    );
+    assert!(
+        output.contains("fixed: renovate-deps"),
+        "expected renovate-deps fix output:\n{output}"
+    );
+
+    let config = std::fs::read_to_string(repo.path().join("renovate.json5")).unwrap();
+    assert!(
+        config.contains(&format!("github>grafana/flint#{preset_ref}")),
+        "flint unexpectedly rewrote the preset-only config:\n{config}"
+    );
+    assert!(
+        !config.contains("extractVersion"),
+        "flint should not add a local extractVersion override when the preset-only repo passes:\n{config}"
+    );
+
+    let snapshot = std::fs::read_to_string(repo.path().join("renovate-tracked-deps.json")).unwrap();
+    assert!(
+        snapshot.contains(r#""biome""#),
+        "expected biome to be tracked in the generated snapshot:\n{snapshot}"
     );
 }
 

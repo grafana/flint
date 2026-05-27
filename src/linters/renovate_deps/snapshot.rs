@@ -22,11 +22,39 @@ pub(crate) struct DepMeta {
     pub(crate) package_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) datasource: Option<String>,
+    #[serde(rename = "currentValue", skip_serializing_if = "Option::is_none")]
+    pub(crate) current_value: Option<String>,
+    #[serde(rename = "currentVersion", skip_serializing_if = "Option::is_none")]
+    pub(crate) current_version: Option<String>,
+    #[serde(rename = "extractVersion", skip_serializing_if = "Option::is_none")]
+    pub(crate) extract_version: Option<String>,
+}
+
+impl DepMeta {
+    pub(crate) fn version_context(&self) -> Option<(&str, &str, &str)> {
+        Some((
+            self.current_value.as_deref()?,
+            self.current_version.as_deref()?,
+            self.extract_version.as_deref()?,
+        ))
+    }
+
+    pub(crate) fn clear_version_context(&mut self) {
+        self.current_value = None;
+        self.current_version = None;
+        self.extract_version = None;
+    }
 }
 
 impl Snapshot {
     pub(crate) fn is_empty(&self) -> bool {
         self.files.is_empty()
+    }
+
+    pub(crate) fn strip_lookup_meta(&mut self) {
+        for meta in self.meta.values_mut() {
+            meta.clear_version_context();
+        }
     }
 }
 
@@ -112,6 +140,18 @@ pub(crate) fn extract_deps(
                             .get("datasource")
                             .and_then(|v| v.as_str())
                             .map(ToOwned::to_owned),
+                        current_value: dep
+                            .get("currentValue")
+                            .and_then(|v| v.as_str())
+                            .map(ToOwned::to_owned),
+                        current_version: dep
+                            .get("currentVersion")
+                            .and_then(|v| v.as_str())
+                            .map(ToOwned::to_owned),
+                        extract_version: dep
+                            .get("extractVersion")
+                            .and_then(|v| v.as_str())
+                            .map(ToOwned::to_owned),
                     };
                     meta_by_dep
                         .entry(dep_name.to_string())
@@ -152,23 +192,34 @@ pub(crate) fn extract_deps(
 struct DepMetaAccumulator {
     package_names: BTreeSet<String>,
     datasources: BTreeSet<String>,
+    current_values: BTreeSet<String>,
+    current_versions: BTreeSet<String>,
+    extract_versions: BTreeSet<String>,
 }
 
 impl DepMetaAccumulator {
     fn merge(&mut self, next: &DepMeta) {
-        if let Some(package_name) = next.package_name.as_ref() {
-            self.package_names.insert(package_name.clone());
-        }
-        if let Some(datasource) = next.datasource.as_ref() {
-            self.datasources.insert(datasource.clone());
-        }
+        insert_if_some(&mut self.package_names, next.package_name.as_ref());
+        insert_if_some(&mut self.datasources, next.datasource.as_ref());
+        insert_if_some(&mut self.current_values, next.current_value.as_ref());
+        insert_if_some(&mut self.current_versions, next.current_version.as_ref());
+        insert_if_some(&mut self.extract_versions, next.extract_version.as_ref());
     }
 
     fn finish(self) -> DepMeta {
         DepMeta {
             package_name: collapse_unique(self.package_names),
             datasource: collapse_unique(self.datasources),
+            current_value: collapse_unique(self.current_values),
+            current_version: collapse_unique(self.current_versions),
+            extract_version: collapse_unique(self.extract_versions),
         }
+    }
+}
+
+fn insert_if_some(set: &mut BTreeSet<String>, value: Option<&String>) {
+    if let Some(value) = value {
+        set.insert(value.clone());
     }
 }
 

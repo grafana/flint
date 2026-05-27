@@ -179,13 +179,16 @@ fn filter_names(
     exclude: &GlobSet,
     names: BTreeSet<String>,
 ) -> Result<Vec<PathBuf>> {
-    let generated = generated_paths(project_root, &names)?;
-
-    Ok(names
+    let candidates: BTreeSet<String> = names
         .into_iter()
         .filter(|name| !BUILTIN_EXCLUDES.contains(&name.as_str()))
-        .filter(|name| !generated.contains(name))
         .filter(|name| !exclude.is_match(name))
+        .collect();
+    let generated = generated_paths(project_root, &candidates)?;
+
+    Ok(candidates
+        .into_iter()
+        .filter(|name| !generated.contains(name))
         .map(|name| project_root.join(name))
         .filter(|path| path.exists())
         .collect())
@@ -221,7 +224,7 @@ fn generated_paths(project_root: &Path, names: &BTreeSet<String>) -> Result<Hash
         for chunk in fields.chunks_exact(3) {
             let path = String::from_utf8_lossy(chunk[0]);
             let info = String::from_utf8_lossy(chunk[2]);
-            if info == "set" {
+            if matches!(info.as_ref(), "set" | "true") {
                 generated.insert(path.into_owned());
             }
         }
@@ -343,5 +346,41 @@ mod tests {
             files,
             vec![tmp.path().join("custom.txt"), tmp.path().join("tracked.sh")]
         );
+    }
+
+    #[test]
+    fn filter_names_skips_true_generated_paths_from_gitattributes() {
+        let tmp = tempfile::TempDir::new().unwrap();
+
+        for args in [
+            ["init", "-b", "main"].as_slice(),
+            ["config", "user.email", "test@test.com"].as_slice(),
+            ["config", "user.name", "Test"].as_slice(),
+        ] {
+            let out = Command::new("git")
+                .args(args)
+                .current_dir(tmp.path())
+                .output()
+                .unwrap();
+            assert!(out.status.success(), "git {:?} failed", args);
+        }
+
+        std::fs::write(
+            tmp.path().join(".gitattributes"),
+            "generated.sh linguist-generated=true\n",
+        )
+        .unwrap();
+        std::fs::write(tmp.path().join("generated.sh"), "#!/bin/sh\n").unwrap();
+        std::fs::write(tmp.path().join("tracked.sh"), "#!/bin/sh\n").unwrap();
+
+        let names = ["generated.sh", "tracked.sh"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+
+        let files =
+            filter_names(tmp.path(), &GlobSetBuilder::new().build().unwrap(), names).unwrap();
+
+        assert_eq!(files, vec![tmp.path().join("tracked.sh")]);
     }
 }

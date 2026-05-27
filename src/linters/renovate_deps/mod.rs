@@ -455,12 +455,18 @@ fn add_to_package_rules(content: &str, rules: &[serde_json::Value]) -> anyhow::R
             .find('{')
             .context("no opening { in renovate config")?;
         let (before, after) = content.split_at(open + 1);
-        let separator = if after.trim() == "}" { "" } else { "," };
         let rendered = render_package_rules(rules, "    ")?;
-        Ok(format!(
-            "{}\n  \"packageRules\": [\n{}\n  ]{}{}",
-            before, rendered, separator, after
-        ))
+        if after.trim() == "}" {
+            Ok(format!(
+                "{}\n  \"packageRules\": [\n{}\n  ]\n{}",
+                before, rendered, after
+            ))
+        } else {
+            Ok(format!(
+                "{}\n  \"packageRules\": [\n{}\n  ],{}",
+                before, rendered, after
+            ))
+        }
     }
 }
 

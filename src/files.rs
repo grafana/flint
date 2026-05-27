@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
+use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -40,7 +41,7 @@ pub fn changed(
         let to = to_ref.unwrap_or("HEAD");
         let names = collect_changed_names(project_root, base, to)?;
         (
-            filter_names(project_root, &exclude, names.clone()),
+            filter_names(project_root, &exclude, names.clone())?,
             names.into_iter().collect(),
         )
     } else {
@@ -136,13 +137,13 @@ fn all_files(project_root: &Path, exclude: &GlobSet) -> Result<FileList> {
         anyhow::bail!("git ls-files failed ({}): {}", out.status, stderr.trim());
     }
 
-    let names: std::collections::BTreeSet<String> = String::from_utf8_lossy(&out.stdout)
+    let names: BTreeSet<String> = String::from_utf8_lossy(&out.stdout)
         .lines()
         .map(str::to_string)
         .collect();
 
     Ok(FileList {
-        files: filter_names(project_root, exclude, names),
+        files: filter_names(project_root, exclude, names)?,
         changed_paths: vec![],
         merge_base: None,
         full: true,
@@ -176,15 +177,60 @@ fn git_diff_names(project_root: &Path, extra_args: &[&str]) -> Result<Vec<String
 fn filter_names(
     project_root: &Path,
     exclude: &GlobSet,
-    names: std::collections::BTreeSet<String>,
-) -> Vec<PathBuf> {
-    names
+    names: BTreeSet<String>,
+) -> Result<Vec<PathBuf>> {
+    let candidates: BTreeSet<String> = names
         .into_iter()
         .filter(|name| !BUILTIN_EXCLUDES.contains(&name.as_str()))
         .filter(|name| !exclude.is_match(name))
+        .collect();
+    let generated = generated_paths(project_root, &candidates)?;
+
+    Ok(candidates
+        .into_iter()
+        .filter(|name| !generated.contains(name))
         .map(|name| project_root.join(name))
         .filter(|path| path.exists())
-        .collect()
+        .collect())
+}
+
+fn generated_paths(project_root: &Path, names: &BTreeSet<String>) -> Result<HashSet<String>> {
+    if names.is_empty() {
+        return Ok(HashSet::new());
+    }
+
+    const CHECK_ATTR_BATCH_SIZE: usize = 256;
+    let mut generated = HashSet::new();
+
+    for batch in names
+        .iter()
+        .collect::<Vec<_>>()
+        .chunks(CHECK_ATTR_BATCH_SIZE)
+    {
+        let mut args = vec!["check-attr", "-z", "linguist-generated", "--"];
+        args.extend(batch.iter().copied().map(String::as_str));
+
+        let out = Command::new("git")
+            .args(&args)
+            .current_dir(project_root)
+            .output()
+            .context("git check-attr")?;
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            anyhow::bail!("git check-attr failed ({}): {}", out.status, stderr.trim());
+        }
+
+        let fields: Vec<&[u8]> = out.stdout.split(|byte| *byte == 0).collect();
+        for chunk in fields.chunks_exact(3) {
+            let path = String::from_utf8_lossy(chunk[0]);
+            let info = String::from_utf8_lossy(chunk[2]);
+            if matches!(info.as_ref(), "set" | "true") {
+                generated.insert(path.into_owned());
+            }
+        }
+    }
+
+    Ok(generated)
 }
 
 pub fn match_files<'a>(
@@ -245,13 +291,96 @@ mod tests {
     #[test]
     fn filter_names_skips_deleted_worktree_paths() {
         let tmp = tempfile::TempDir::new().unwrap();
+        let out = Command::new("git")
+            .args(["init", "-b", "main"])
+            .current_dir(tmp.path())
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git init failed");
         std::fs::write(tmp.path().join("present.md"), "ok\n").unwrap();
         let names = ["missing.md".to_string(), "present.md".to_string()]
             .into_iter()
             .collect();
 
-        let files = filter_names(tmp.path(), &GlobSetBuilder::new().build().unwrap(), names);
+        let files =
+            filter_names(tmp.path(), &GlobSetBuilder::new().build().unwrap(), names).unwrap();
 
         assert_eq!(files, vec![tmp.path().join("present.md")]);
+    }
+
+    #[test]
+    fn filter_names_skips_generated_paths_from_gitattributes() {
+        let tmp = tempfile::TempDir::new().unwrap();
+
+        for args in [
+            ["init", "-b", "main"].as_slice(),
+            ["config", "user.email", "test@test.com"].as_slice(),
+            ["config", "user.name", "Test"].as_slice(),
+        ] {
+            let out = Command::new("git")
+                .args(args)
+                .current_dir(tmp.path())
+                .output()
+                .unwrap();
+            assert!(out.status.success(), "git {:?} failed", args);
+        }
+
+        std::fs::write(
+            tmp.path().join(".gitattributes"),
+            "generated.sh linguist-generated\n",
+        )
+        .unwrap();
+        std::fs::write(tmp.path().join("generated.sh"), "#!/bin/sh\n").unwrap();
+        std::fs::write(tmp.path().join("custom.txt"), "not excluded\n").unwrap();
+        std::fs::write(tmp.path().join("tracked.sh"), "#!/bin/sh\n").unwrap();
+
+        let names = ["custom.txt", "generated.sh", "tracked.sh"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+
+        let files =
+            filter_names(tmp.path(), &GlobSetBuilder::new().build().unwrap(), names).unwrap();
+
+        assert_eq!(
+            files,
+            vec![tmp.path().join("custom.txt"), tmp.path().join("tracked.sh")]
+        );
+    }
+
+    #[test]
+    fn filter_names_skips_true_generated_paths_from_gitattributes() {
+        let tmp = tempfile::TempDir::new().unwrap();
+
+        for args in [
+            ["init", "-b", "main"].as_slice(),
+            ["config", "user.email", "test@test.com"].as_slice(),
+            ["config", "user.name", "Test"].as_slice(),
+        ] {
+            let out = Command::new("git")
+                .args(args)
+                .current_dir(tmp.path())
+                .output()
+                .unwrap();
+            assert!(out.status.success(), "git {:?} failed", args);
+        }
+
+        std::fs::write(
+            tmp.path().join(".gitattributes"),
+            "generated.sh linguist-generated=true\n",
+        )
+        .unwrap();
+        std::fs::write(tmp.path().join("generated.sh"), "#!/bin/sh\n").unwrap();
+        std::fs::write(tmp.path().join("tracked.sh"), "#!/bin/sh\n").unwrap();
+
+        let names = ["generated.sh", "tracked.sh"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+
+        let files =
+            filter_names(tmp.path(), &GlobSetBuilder::new().build().unwrap(), names).unwrap();
+
+        assert_eq!(files, vec![tmp.path().join("tracked.sh")]);
     }
 }

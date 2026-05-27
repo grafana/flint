@@ -65,10 +65,14 @@ All `flint run` flags above have env var equivalents.
 
 ## Changed-file and baseline runs
 
-By default, local `flint run` checks linters triggered by changes relative to
-the merge base. In CI, `flint run` activates the full linter set while still
-keeping diff-aware scoping where each linter supports it. Use `--full` to
-check every matching file explicitly.
+By default, local `flint run` checks tracked files triggered by changes
+relative to the merge base. In CI, `flint run` activates the full linter set
+while still keeping diff-aware scoping where each linter supports it. Use
+`--full` to check every matching tracked file explicitly.
+
+Flint skips files marked `linguist-generated` in `.gitattributes`. Prefer that
+over Flint-only `settings.exclude` entries when the file is generated, because
+GitHub and other tools can reuse the same metadata.
 
 Some changed-file runs intentionally expand one or more affected checks to all
 matching files. This establishes a baseline when lint coverage changes, while

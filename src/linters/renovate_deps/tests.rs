@@ -568,6 +568,48 @@ fn validate_extract_version_consistency_accepts_matching_extraction() {
 }
 
 #[test]
+fn validate_extract_version_consistency_accepts_normalized_current_version() {
+    let snap = Snapshot {
+        meta: [(
+            "actionlint".to_string(),
+            DepMeta {
+                package_name: Some("rhysd/actionlint".to_string()),
+                datasource: Some("github-releases".to_string()),
+                current_value: Some("1.7.12".to_string()),
+                current_version: Some("1.7.12".to_string()),
+                extract_version: Some("^v(?<version>\\S+)".to_string()),
+            },
+        )]
+        .into_iter()
+        .collect(),
+        files: dep_files(&[("mise.toml", &[("mise", &["actionlint"])])]),
+    };
+
+    assert!(validate_extract_version_consistency(&snap).is_ok());
+}
+
+#[test]
+fn validate_extract_version_consistency_accepts_normalized_prefixed_current_value() {
+    let snap = Snapshot {
+        meta: [(
+            "shellcheck".to_string(),
+            DepMeta {
+                package_name: Some("koalaman/shellcheck".to_string()),
+                datasource: Some("github-releases".to_string()),
+                current_value: Some("v0.11.0".to_string()),
+                current_version: Some("0.11.0".to_string()),
+                extract_version: Some("^v(?<version>\\S+)".to_string()),
+            },
+        )]
+        .into_iter()
+        .collect(),
+        files: dep_files(&[("mise.toml", &[("mise", &["shellcheck"])])]),
+    };
+
+    assert!(validate_extract_version_consistency(&snap).is_ok());
+}
+
+#[test]
 fn validate_extract_version_consistency_flags_mismatch() {
     let snap = Snapshot {
         meta: [(

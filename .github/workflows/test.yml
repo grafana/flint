@@ -67,3 +67,10 @@ jobs:
 
       - name: Test
         run: mise run test
+
+      - name: Live Renovate regression
+        if: runner.os == 'Linux'
+        env:
+          FLINT_LIVE_RENOVATE_TESTS: "1"
+          GITHUB_TOKEN: ${{ github.token }}
+        run: mise exec -- cargo test -q renovate_deps_live_accepts_normalized_current_version -- --nocapture

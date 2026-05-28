@@ -14,8 +14,6 @@ warning[artipacked]: credential persistence through GitHub Actions artifacts
   = help: audit documentation → https://docs.zizmor.sh/audits/#artipacked
 
 3 findings (2 suppressed, 1 unsafe fixes): 0 informational, 0 low, 1 medium, 0 high
- INFO zizmor: 🌈 zizmor v1.25.2
- INFO audit: zizmor: 🌈 completed <REPO>/.github/workflows/artipacked.yml
 
 flint: 1 check failed (zizmor)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.

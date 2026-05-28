@@ -1,0 +1,32 @@
+[expected]
+args = "run --full --fix zizmor"
+exit = 1
+stderr = '''
+[zizmor]
+bad workflow: .github/workflows/two.yml
+flint: review: zizmor
+'''
+
+[expected.files]
+".zizmor-argc" = '''
+3
+'''
+
+[fake_bins]
+zizmor = '''
+#!/bin/sh
+set -eu
+printf '%s\n' "$#" > .zizmor-argc
+for file in "$@"; do
+  case "$file" in
+    *.github/workflows/two.yml)
+      printf '%s\n' 'bad workflow: .github/workflows/two.yml' >&2
+      exit 1
+      ;;
+  esac
+done
+printf '%s\n' ' INFO zizmor: 🌈 zizmor v1.25.2' >&2
+printf '%s\n' ' INFO audit: zizmor: 🌈 completed /repo/.github/workflows/one.yml' >&2
+printf '%s\n' 'No fixes available to apply.'
+exit 0
+'''

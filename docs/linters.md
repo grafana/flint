@@ -209,7 +209,7 @@ Format Java code
 
 Lint Dockerfiles
 
-### [`ktlint`](https://pinterest.github.io/ktlint/latest/)
+### [`ktlint`](https://github.com/ktlint/ktlint)
 
 |          |                       |
 | -------- | --------------------- |
@@ -448,7 +448,7 @@ Validate XML files are well-formed
 | -------- | ----------------------------------------------------- |
 | Fix      | yes                                                   |
 | Binary   | `zizmor`                                              |
-| Scope    | [file](#scope-file)                                   |
+| Scope    | [files](#scope-files)                                 |
 | Patterns | `.github/workflows/*.yml .github/workflows/*.yaml`    |
 | Config   | [`zizmor.yml`](https://docs.zizmor.sh/configuration/) |
 

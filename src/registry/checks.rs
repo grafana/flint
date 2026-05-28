@@ -29,7 +29,7 @@ const GOOGLE_JAVA_FORMAT_URL: &str = "https://github.com/google/google-java-form
 const HADOLINT_URL: &str = "https://github.com/hadolint/hadolint";
 const HADOLINT_CONFIG_URL: &str =
     "https://github.com/hadolint/hadolint?tab=readme-ov-file#configure";
-const KTLINT_URL: &str = "https://pinterest.github.io/ktlint/latest/";
+const KTLINT_URL: &str = "https://github.com/ktlint/ktlint";
 const KTLINT_CONFIG_URL: &str =
     "https://pinterest.github.io/ktlint/latest/rules/configuration-ktlint/";
 const LYCHEE_URL: &str = "https://lychee.cli.rs/";
@@ -283,16 +283,22 @@ fn check_actionlint() -> Check {
 }
 
 fn check_zizmor() -> Check {
-    Check::file(
+    Check::files(
         "zizmor",
-        "zizmor {FILE}",
+        "zizmor {FILES}",
         &[".github/workflows/*.yml", ".github/workflows/*.yaml"],
     )
-    .fix("zizmor --fix {FILE}")
+    .fix("zizmor --fix {FILES}")
     .linter_config("zizmor.yml", "--config")
     .baseline_config(ConfigFile::config_dir("zizmor.yml"))
     .unsupported_configs(ZIZMOR_UNSUPPORTED_CONFIGS)
     .allow_baseline_overlap_in_unsupported_configs()
+    .nonverbose_filter_prefixes(&[
+        "No findings to report. Good job!",
+        "No fixes available to apply.",
+        " INFO zizmor:",
+        " INFO audit: zizmor:",
+    ])
     .project_url(ZIZMOR_URL)
     .config_doc_url(ZIZMOR_CONFIG_URL)
     .overview(

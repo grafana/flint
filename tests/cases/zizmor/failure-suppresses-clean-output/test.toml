@@ -1,0 +1,37 @@
+[expected]
+args = "run --full zizmor"
+exit = 1
+stderr = '''
+[zizmor]
+bad workflow: .github/workflows/two.yml
+
+flint: 1 check failed (zizmor)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''
+
+[expected.files]
+".zizmor-argc" = '''
+2
+'''
+
+[fake_bins]
+zizmor = '''
+#!/bin/sh
+set -eu
+printf '%s\n' "$#" > .zizmor-argc
+for file in "$@"; do
+  case "$file" in
+    *.github/workflows/two.yml)
+      printf '%s\n' 'bad workflow: .github/workflows/two.yml' >&2
+      exit 1
+      ;;
+  esac
+done
+printf '%s\n' 'No findings to report. Good job! (2 suppressed)'
+printf '%s\n' 'No findings to report. Good job! (2 suppressed)' >&2
+printf '%s\n' 'No findings to report. Good job! (6 suppressed)'
+printf '%s\n' 'No findings to report. Good job! (3 suppressed)' >&2
+printf '%s\n' ' INFO zizmor: 🌈 zizmor v1.25.2' >&2
+printf '%s\n' ' INFO audit: zizmor: 🌈 completed /repo/.github/workflows/one.yml' >&2
+exit 0
+'''

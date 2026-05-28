@@ -1,0 +1,8 @@
+name: Two
+on: push
+permissions: {}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo two

@@ -154,9 +154,15 @@ pub(crate) fn extract_version_mismatches(
             continue;
         };
 
-        let extracted = extract_version_value(extract_version, current_version)
-            .with_context(|| format!("failed to evaluate extractVersion for dep {dep_name:?}"))?;
-        if extracted.as_deref() == Some(current_value) {
+        let extract_version_regex = compile_extract_version(extract_version)
+            .with_context(|| format!("failed to compile extractVersion for dep {dep_name:?}"))?;
+        let extracted = extract_version_value(&extract_version_regex, current_version);
+        if extract_version_is_consistent(
+            &extract_version_regex,
+            current_value,
+            current_version,
+            extracted.as_deref(),
+        ) {
             continue;
         }
 
@@ -175,6 +181,31 @@ pub(crate) fn extract_version_mismatches(
     }
 
     Ok(mismatches)
+}
+
+fn extract_version_is_consistent(
+    extract_version_regex: &Regex,
+    current_value: &str,
+    current_version: &str,
+    extracted_from_current_version: Option<&str>,
+) -> bool {
+    if extracted_from_current_version == Some(current_value) {
+        return true;
+    }
+
+    // Renovate's version fields are manager/datasource dependent. Some lookup
+    // results expose `currentVersion` as the normalized version after
+    // `extractVersion` has already been applied rather than as the raw upstream
+    // tag. In that shape, a valid `extractVersion` may no longer match
+    // `currentVersion` directly.
+    if current_version == current_value {
+        return true;
+    }
+
+    // Other results keep the exact file token in currentValue (e.g. `v0.11.0`)
+    // and put the normalized extracted value in currentVersion (`0.11.0`).
+    // Validate that direction too before reporting a stale extractVersion.
+    extract_version_value(extract_version_regex, current_value).as_deref() == Some(current_version)
 }
 
 pub(crate) fn validate_extract_version_consistency(snapshot: &Snapshot) -> anyhow::Result<()> {
@@ -245,16 +276,16 @@ fn infer_extract_version_from_current(
     ))
 }
 
-fn extract_version_value(
-    extract_version: &str,
-    current_version: &str,
-) -> anyhow::Result<Option<String>> {
+fn compile_extract_version(extract_version: &str) -> anyhow::Result<Regex> {
     let normalized = extract_version.replace("(?<", "(?P<");
-    let regex = Regex::new(&normalized)?;
-    Ok(regex
-        .captures(current_version)
+    Ok(Regex::new(&normalized)?)
+}
+
+fn extract_version_value(regex: &Regex, value: &str) -> Option<String> {
+    regex
+        .captures(value)
         .and_then(|captures| captures.name("version"))
-        .map(|version| version.as_str().to_string()))
+        .map(|version| version.as_str().to_string())
 }
 
 impl ComparablePackageRule {

@@ -363,6 +363,80 @@ biome = "2.4.12"
     );
 }
 
+// Live regression test using the real Renovate binary. It is skipped by default
+// for local `cargo test` because it requires network access, Renovate on PATH,
+// and a GitHub token. CI opts in with FLINT_LIVE_RENOVATE_TESTS=1.
+#[cfg(unix)]
+#[test]
+fn renovate_deps_live_accepts_normalized_current_version() {
+    if std::env::var("FLINT_LIVE_RENOVATE_TESTS").as_deref() != Ok("1") {
+        eprintln!("skipping live Renovate test; set FLINT_LIVE_RENOVATE_TESTS=1 to run");
+        return;
+    }
+
+    let token =
+        std::env::var("GITHUB_TOKEN").expect("set GITHUB_TOKEN before running live Renovate tests");
+
+    let repo = git_repo();
+
+    std::fs::write(
+        repo.path().join("mise.toml"),
+        r#"[tools]
+actionlint = "1.7.12"
+shellcheck = "v0.11.0"
+"npm:renovate" = "43.150.0"
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        repo.path().join("renovate.json5"),
+        r#"{ extends: ["config:recommended"] }
+"#,
+    )
+    .unwrap();
+
+    let out = Command::new("git")
+        .args(["add", "-A"])
+        .current_dir(repo.path())
+        .output()
+        .expect("failed to spawn git add");
+    assert!(
+        out.status.success(),
+        "git add failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let out = Command::new("git")
+        .args(["commit", "-q", "-m", "init"])
+        .current_dir(repo.path())
+        .output()
+        .expect("failed to spawn git commit");
+    assert!(
+        out.status.success(),
+        "git commit failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = flint_with_env(
+        &["run", "--full", "--fix", "renovate-deps"],
+        repo.path(),
+        &[("GITHUB_TOKEN", &token)],
+    );
+    let output = combined_output(&out);
+    assert!(
+        out.status.code() == Some(1),
+        "expected flint --fix to report changes needed:\n{output}"
+    );
+    assert!(
+        output.contains("fixed: renovate-deps"),
+        "expected renovate-deps to accept Renovate's normalized currentVersion output:\n{output}"
+    );
+
+    let snapshot = std::fs::read_to_string(repo.path().join("renovate-tracked-deps.json"))
+        .expect("renovate-tracked-deps.json should be written");
+    assert!(snapshot.contains(r#""actionlint""#), "{snapshot}");
+    assert!(snapshot.contains(r#""shellcheck""#), "{snapshot}");
+}
+
 // Unix-only: this e2e test creates fake linters as POSIX shell scripts and
 // marks them executable with Unix permissions.
 #[cfg(unix)]

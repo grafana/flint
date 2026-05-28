@@ -1,6 +1,6 @@
 [package]
 name = "flint"
-version = "0.22.3"
+version = "0.22.4"
 edition = "2024"
 description = "Fast, simple linting that doesn't slow down your AI coding"
 license = "Apache-2.0"

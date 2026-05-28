@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.22.4](https://github.com/grafana/flint/compare/v0.22.3...v0.22.4) - 2026-05-28
+
+### Fixed
+
+- accept normalized Renovate currentVersion ([#313](https://github.com/grafana/flint/pull/313))
+- quiet and batch zizmor runs ([#314](https://github.com/grafana/flint/pull/314))
+
+### Other
+
+- remove deprecated setting ([#312](https://github.com/grafana/flint/pull/312))
+- *(deps)* update rust crate similar to v3.1.1 ([#309](https://github.com/grafana/flint/pull/309))
+- *(deps)* update node.js to v24.16.0 ([#310](https://github.com/grafana/flint/pull/310))
+- *(deps)* update rust crate serde_json to v1.0.150 ([#308](https://github.com/grafana/flint/pull/308))
+- *(deps)* update taiki-e/install-action action to v2.79.6 ([#311](https://github.com/grafana/flint/pull/311))
+
 ## [0.22.3](https://github.com/grafana/flint/compare/v0.22.2...v0.22.3) - 2026-05-27
 
 ### Added

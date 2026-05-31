@@ -1,4 +1,13 @@
-# Adding a New Linter
+# Linter implementation notes
+
+This article is for **agent implementation guidance** when editing Flint's
+check registry or adding custom linter behavior.
+
+For the higher-level, human-facing execution model — how checks become active,
+template vs native checks, fix outcomes, and Flint's boundaries — see
+`docs/check-model.md`.
+
+## Adding or changing a check
 
 Add an entry to `builtin()` in `src/registry.rs` using the
 builder pattern:
@@ -70,8 +79,8 @@ auto-discover a config that flint does not baseline or inject. Use
 run when changed, even if they are not passed via `.linter_config(...)`; for
 example, `editorconfig-checker` treats `.editorconfig` as a baseline config.
 
-For checks that need custom logic (not a simple command template), add a module
-under `src/linters/` and use `CheckKind::Special`.
+For checks that need custom logic beyond a simple command template, add a
+module under `src/linters/` and use `CheckKind::Special`.
 
 ## Changed-files scoping
 

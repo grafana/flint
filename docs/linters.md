@@ -475,7 +475,9 @@ whole project when it does run. `golangci-lint` is the exception — it uses
 ### Scope: native
 
 Implemented in-process rather than via a command template. These checks may run
-without file arguments or use custom orchestration logic.
+without file arguments or use custom orchestration logic. See
+[How Flint runs checks](check-model.md) for the higher-level model and when to
+choose native vs template checks.
 
 **`editorconfig-checker` defers to formatters**: `editorconfig-checker` runs on
 all files, but automatically skips file types owned by an active formatter. If

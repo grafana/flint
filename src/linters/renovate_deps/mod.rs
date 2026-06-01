@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 use self::install_patch::configure_extract_workaround_env;
+use self::mise_normalize::patch_semver_equivalent_mise_values;
 use self::rules::{
     ExtractVersionMismatch, comparable_package_rules_for_config, extract_version_mismatches,
     incomplete_meta_for_rules, trim_snapshot_meta, validate_extract_version_consistency,
@@ -20,6 +21,7 @@ use crate::registry::{
 };
 
 mod install_patch;
+mod mise_normalize;
 mod rules;
 mod snapshot;
 
@@ -542,12 +544,24 @@ async fn run_inner(
         maybe_reuse_committed_meta(&mut generated, committed.as_ref());
     }
 
-    let mismatches = extract_version_mismatches(&generated)?;
-    if !mismatches.is_empty() && fix && patch_extract_version_overrides(&config_path, &mismatches)?
-    {
-        generated =
-            generate_snapshot(project_root, &config_path, &cfg.exclude_managers, "lookup").await?;
-        parsed_rules = comparable_package_rules_for_config(&config_path)?;
+    if fix {
+        let mismatches = extract_version_mismatches(&generated)?;
+        if !mismatches.is_empty()
+            && patch_semver_equivalent_mise_values(project_root, &generated, &mismatches)?
+        {
+            generated =
+                generate_snapshot(project_root, &config_path, &cfg.exclude_managers, "lookup")
+                    .await?;
+            parsed_rules = comparable_package_rules_for_config(&config_path)?;
+        }
+
+        let mismatches = extract_version_mismatches(&generated)?;
+        if !mismatches.is_empty() && patch_extract_version_overrides(&config_path, &mismatches)? {
+            generated =
+                generate_snapshot(project_root, &config_path, &cfg.exclude_managers, "lookup")
+                    .await?;
+            parsed_rules = comparable_package_rules_for_config(&config_path)?;
+        }
     }
 
     let rules = parsed_rules.rules;

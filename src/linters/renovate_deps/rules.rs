@@ -208,6 +208,38 @@ fn extract_version_is_consistent(
     extract_version_value(extract_version_regex, current_value).as_deref() == Some(current_version)
 }
 
+pub(crate) fn equivalent_version_shapes(left: &str, right: &str) -> bool {
+    left == right
+        || semverish_shape(left)
+            .zip(semverish_shape(right))
+            .is_some_and(|(left, right)| left == right)
+}
+
+fn semverish_shape(value: &str) -> Option<(u64, u64, u64, Option<&str>)> {
+    let captures =
+        reg_ex(r"^v?(?<major>\d+)(?:\.(?<minor>\d+))?(?:\.(?<patch>\d+))?(?<suffix>[-+].+)?$")
+            .captures(value)?;
+    let major = captures.name("major")?.as_str().parse().ok()?;
+    let minor = captures
+        .name("minor")
+        .map(|minor| minor.as_str().trim_start_matches('.'))
+        .unwrap_or("0")
+        .parse()
+        .ok()?;
+    let patch = captures
+        .name("patch")
+        .map(|patch| patch.as_str().trim_start_matches('.'))
+        .unwrap_or("0")
+        .parse()
+        .ok()?;
+    let suffix = captures.name("suffix").map(|suffix| suffix.as_str());
+    Some((major, minor, patch, suffix))
+}
+
+fn reg_ex(pattern: &str) -> Regex {
+    Regex::new(pattern).expect("valid semver-shape regex")
+}
+
 pub(crate) fn validate_extract_version_consistency(snapshot: &Snapshot) -> anyhow::Result<()> {
     let mismatches = extract_version_mismatches(snapshot)?;
     let errors: Vec<_> = mismatches

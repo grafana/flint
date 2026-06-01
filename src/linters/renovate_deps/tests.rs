@@ -1,4 +1,5 @@
 use super::install_patch::configure_extract_workaround_env;
+use super::mise_normalize::patch_semver_equivalent_mise_values;
 use super::rules::{
     ComparablePackageRule, ExtractVersionMismatch, RuleMatcher, incomplete_meta_for_rules,
     relevant_dep_names, validate_extract_version_consistency,
@@ -336,6 +337,19 @@ fn extracts_extended_dep_metadata_from_lookup_logs() {
 }
 
 #[test]
+fn extracts_legacy_manager_names_using_canonical_snapshot_keys() {
+    let log = log(
+        r#"{"renovate-config-presets":[{"packageFile":".github/renovate.json5","deps":[{"depName":"grafana/flint"}]}]}"#,
+    );
+    let result = extract_deps(&log, &[]).unwrap();
+
+    assert_eq!(
+        result.files[".github/renovate.json5"]["renovate-config"],
+        vec!["grafana/flint"]
+    );
+}
+
+#[test]
 fn excludes_managers() {
     let log = log(
         r#"{"npm":[{"packageFile":"package.json","deps":[{"depName":"express"}]}],"cargo":[{"packageFile":"Cargo.toml","deps":[{"depName":"tokio"}]}]}"#,
@@ -659,6 +673,39 @@ fn validate_extract_version_consistency_flags_no_match() {
 
     assert!(msg.contains("no match"), "unexpected error:\n{msg}");
     assert!(msg.contains("^v(?<version>.+)$"));
+}
+
+#[test]
+fn patch_semver_equivalent_mise_values_rewrites_to_preferred_shape() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("mise.toml");
+    std::fs::write(&path, "[tools]\nprotoc = \"35.0\"\n").unwrap();
+
+    let snap = Snapshot {
+        meta: [(
+            "protoc".to_string(),
+            DepMeta {
+                package_name: Some("protocolbuffers/protobuf".to_string()),
+                datasource: Some("github-releases".to_string()),
+                current_value: Some("35.0".to_string()),
+                current_version: Some("v35".to_string()),
+                extract_version: Some("^v(?<version>\\S+)".to_string()),
+            },
+        )]
+        .into_iter()
+        .collect(),
+        files: dep_files(&[("mise.toml", &[("mise", &["protoc"])])]),
+    };
+    let mismatches = extract_version_mismatches(&snap).unwrap();
+
+    let changed = patch_semver_equivalent_mise_values(dir.path(), &snap, &mismatches).unwrap();
+
+    assert!(changed);
+    let result = std::fs::read_to_string(path).unwrap();
+    assert!(
+        result.contains("protoc = \"35\""),
+        "rewritten content: {result}"
+    );
 }
 
 #[test]

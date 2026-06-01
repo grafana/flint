@@ -9,7 +9,7 @@ template vs native checks, fix outcomes, and Flint's boundaries — see
 
 ## Adding or changing a check
 
-Add an entry to `builtin()` in `src/registry.rs` using the
+Add an entry to `builtin()` in `src/registry/checks.rs` using the
 builder pattern:
 
 ```rust
@@ -80,7 +80,8 @@ run when changed, even if they are not passed via `.linter_config(...)`; for
 example, `editorconfig-checker` treats `.editorconfig` as a baseline config.
 
 For checks that need custom logic beyond a simple command template, add a
-module under `src/linters/` and use `CheckKind::Special`.
+module under `src/linters/` and register it with `Check::native(&CHECK_TYPE)`
+so the registry uses `CheckKind::Native`.
 
 ## Changed-files scoping
 

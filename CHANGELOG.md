@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.22.5](https://github.com/grafana/flint/compare/v0.22.4...v0.22.5) - 2026-06-01
+
+### Other
+
+- *(deps)* update dependency mise to v2026.5.16 ([#324](https://github.com/grafana/flint/pull/324))
+- *(deps)* lock file maintenance ([#325](https://github.com/grafana/flint/pull/325))
+- *(deps)* update taiki-e/install-action action to v2.79.11 ([#322](https://github.com/grafana/flint/pull/322))
+- *(deps)* update dependency rust to v1.96.0 ([#323](https://github.com/grafana/flint/pull/323))
+- *(deps)* update taiki-e/install-action action to v2.79.10 ([#321](https://github.com/grafana/flint/pull/321))
+- *(deps)* update taiki-e/install-action action to v2.79.9 ([#319](https://github.com/grafana/flint/pull/319))
+- *(deps)* update taiki-e/install-action action to v2.79.8 ([#316](https://github.com/grafana/flint/pull/316))
+
 ## [0.22.4](https://github.com/grafana/flint/compare/v0.22.3...v0.22.4) - 2026-05-28
 
 ### Fixed

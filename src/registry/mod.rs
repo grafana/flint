@@ -6,8 +6,8 @@ mod types;
 
 pub use checks::builtin;
 pub use mise::{
-    check_active, flint_version_changed, read_mise_tools, read_mise_tools_at_ref,
-    tool_version_changed,
+    check_active, flint_version_changed, full_baseline_runtime_changed, read_mise_tools,
+    read_mise_tools_at_ref, runtime_version_changed, tool_version_changed,
 };
 pub use obsolete::{find_obsolete_key, find_unsupported_key, obsolete_keys, unsupported_keys};
 pub use resolve::binary_on_path;

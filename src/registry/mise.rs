@@ -100,6 +100,54 @@ pub fn tool_version_changed(
     previous.is_some() && current.is_some() && previous != current
 }
 
+/// Returns true when a runtime prerequisite changed for this check even though
+/// the check's own package version did not.
+///
+/// Today this is intentionally narrow: Node upgrades are treated as baseline
+/// triggers for npm-backed tools because the runtime can change their behavior
+/// across the whole repo.
+pub fn runtime_version_changed(
+    check: &Check,
+    previous_tools: &HashMap<String, String>,
+    current_tools: &HashMap<String, String>,
+) -> bool {
+    let Some(tool_key) = check.mise_tool_name else {
+        return false;
+    };
+    if !tool_key.starts_with("npm:") {
+        return false;
+    }
+
+    let previous_node = previous_tools.get("node");
+    let current_node = current_tools.get("node");
+    if previous_node.is_none() || current_node.is_none() || previous_node == current_node {
+        return false;
+    }
+
+    declared_tool_version(check, previous_tools).is_some()
+        && declared_tool_version(check, current_tools).is_some()
+}
+
+pub fn full_baseline_runtime_changed(
+    active: &[&Check],
+    previous_tools: &HashMap<String, String>,
+    current_tools: &HashMap<String, String>,
+) -> bool {
+    let previous_node = previous_tools.get("node");
+    let current_node = current_tools.get("node");
+    if previous_node.is_none() || current_node.is_none() || previous_node == current_node {
+        return false;
+    }
+
+    active.iter().any(|check| {
+        check
+            .mise_tool_name
+            .is_some_and(|tool| tool.starts_with("npm:"))
+            && declared_tool_version(check, previous_tools).is_some()
+            && declared_tool_version(check, current_tools).is_some()
+    })
+}
+
 pub fn flint_version_changed(
     previous_tools: &HashMap<String, String>,
     current_tools: &HashMap<String, String>,

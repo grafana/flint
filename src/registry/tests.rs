@@ -613,6 +613,63 @@ fn flint_version_changed_detects_release_to_cargo_backend_switch() {
     assert!(flint_version_changed(&previous, &current));
 }
 
+#[test]
+fn runtime_version_changed_detects_node_updates_for_npm_checks() {
+    let check = builtin()
+        .into_iter()
+        .find(|check| check.name == "renovate-deps")
+        .expect("renovate-deps check");
+    let previous = HashMap::from([
+        ("node".to_string(), "22.0.0".to_string()),
+        ("npm:renovate".to_string(), "43.136.3".to_string()),
+    ]);
+    let current = HashMap::from([
+        ("node".to_string(), "24.0.0".to_string()),
+        ("npm:renovate".to_string(), "43.136.3".to_string()),
+    ]);
+
+    assert!(runtime_version_changed(&check, &previous, &current));
+}
+
+#[test]
+fn runtime_version_changed_ignores_node_updates_for_non_npm_checks() {
+    let check = builtin()
+        .into_iter()
+        .find(|check| check.name == "shellcheck")
+        .expect("shellcheck check");
+    let previous = HashMap::from([
+        ("node".to_string(), "22.0.0".to_string()),
+        ("shellcheck".to_string(), "0.10.0".to_string()),
+    ]);
+    let current = HashMap::from([
+        ("node".to_string(), "24.0.0".to_string()),
+        ("shellcheck".to_string(), "0.10.0".to_string()),
+    ]);
+
+    assert!(!runtime_version_changed(&check, &previous, &current));
+}
+
+#[test]
+fn full_baseline_runtime_changed_detects_node_updates_for_active_npm_tools() {
+    let checks = builtin();
+    let active: Vec<_> = checks
+        .iter()
+        .filter(|check| ["renovate-deps", "shellcheck"].contains(&check.name))
+        .collect();
+    let previous = HashMap::from([
+        ("node".to_string(), "22.0.0".to_string()),
+        ("npm:renovate".to_string(), "43.136.3".to_string()),
+        ("shellcheck".to_string(), "0.10.0".to_string()),
+    ]);
+    let current = HashMap::from([
+        ("node".to_string(), "24.0.0".to_string()),
+        ("npm:renovate".to_string(), "43.136.3".to_string()),
+        ("shellcheck".to_string(), "0.10.0".to_string()),
+    ]);
+
+    assert!(full_baseline_runtime_changed(&active, &previous, &current));
+}
+
 fn package_rule_by_group_name<'a>(
     parsed: &'a serde_json::Value,
     group_name: &str,

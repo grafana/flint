@@ -1,0 +1,44 @@
+[expected]
+args = "run"
+exit = 1
+stderr = '''
+[shellcheck]
+
+In <REPO>/bad.sh line 2:
+echo $1
+     ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+
+Did you mean:
+echo "$1"
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2086 -- Double quote to prevent globbing ...
+
+flint: 1 check failed (shellcheck)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''
+
+[env]
+CI = "true"
+GITHUB_TOKEN = "token"
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"npm":[{"packageFile":"package.json","deps":[{"depName":"express"},{"depName":"lodash"}]}]}}'
+'''
+shellcheck = '''
+#!/bin/sh
+printf '\nIn %s line 2:\n' "$4" >&2
+cat >&2 <<'OUT'
+echo $1
+     ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+
+Did you mean:
+echo "$1"
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2086 -- Double quote to prevent globbing ...
+OUT
+exit 1
+'''

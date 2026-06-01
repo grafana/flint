@@ -76,7 +76,10 @@ pub(crate) fn extract_deps(
 ) -> anyhow::Result<Snapshot> {
     let log = std::str::from_utf8(log_bytes)?;
 
-    let exclude: HashSet<&str> = exclude_managers.iter().map(String::as_str).collect();
+    let exclude: HashSet<_> = exclude_managers
+        .iter()
+        .map(|manager| canonical_manager_name(manager).to_string())
+        .collect();
 
     // Find the last "packageFiles with updates" log entry — Renovate emits it
     // once per run with the full resolved config.
@@ -108,7 +111,8 @@ pub(crate) fn extract_deps(
 
     if let Some(obj) = config.as_object() {
         for (manager, manager_files) in obj {
-            if exclude.contains(manager.as_str()) {
+            let manager = canonical_manager_name(manager);
+            if exclude.contains(manager) {
                 continue;
             }
             let Some(files) = manager_files.as_array() else {
@@ -160,7 +164,7 @@ pub(crate) fn extract_deps(
                     deps_by_file
                         .entry(file_path.clone())
                         .or_default()
-                        .entry(manager.clone())
+                        .entry(manager.to_string())
                         .or_default()
                         .insert(dep_name.to_string());
                 }
@@ -186,6 +190,13 @@ pub(crate) fn extract_deps(
         .collect();
 
     Ok(Snapshot { meta, files })
+}
+
+fn canonical_manager_name(manager: &str) -> &str {
+    match manager {
+        "renovate-config-presets" => "renovate-config",
+        _ => manager,
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

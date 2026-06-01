@@ -1,0 +1,69 @@
+[expected]
+args = "run --full --fix renovate-deps"
+exit = 1
+
+stderr = '''
+flint: fixed: renovate-deps — commit before pushing
+'''
+
+[env]
+GITHUB_TOKEN = "token"
+
+[expected.files]
+".reno-mode" = "lookup\n"
+".reno-modes" = "extract\nlookup\nlookup\n"
+".reno-count" = "3\n"
+".reno-local-override" = "no\n"
+"mise.toml" = '''
+[tools]
+"npm:renovate" = "43.136.3"
+protoc = "35"
+'''
+"renovate-tracked-deps.json" = '''
+{
+  "meta": {},
+  "files": {
+    "mise.toml": {
+      "mise": [
+        "protoc"
+      ]
+    }
+  }
+}
+'''
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+set -eu
+
+mode=""
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run=*) mode="${arg#--dry-run=}" ;;
+  esac
+done
+printf '%s\n' "$mode" > .reno-mode
+printf '%s\n' "$mode" >> .reno-modes
+
+count=0
+if [ -f .reno-count ]; then
+  count=$(cat .reno-count)
+fi
+count=$((count + 1))
+printf '%s\n' "$count" > .reno-count
+
+if grep -F '"extractVersion": "^(?<version>.+)\\.0$"' "$RENOVATE_CONFIG_FILE" >/dev/null 2>&1; then
+  printf 'yes\n' > .reno-local-override
+  echo "unexpected local protoc extractVersion override in $RENOVATE_CONFIG_FILE" >&2
+  exit 1
+else
+  printf 'no\n' > .reno-local-override
+fi
+
+if grep -F 'protoc = "35"' mise.toml >/dev/null 2>&1; then
+  printf '%s\n' '{"msg":"packageFiles with updates","config":{"mise":[{"packageFile":"mise.toml","deps":[{"depName":"protoc","packageName":"protocolbuffers/protobuf","datasource":"github-releases","currentValue":"35","currentVersion":"v35","extractVersion":"^v(?<version>\\S+)"}]}]}}'
+else
+  printf '%s\n' '{"msg":"packageFiles with updates","config":{"mise":[{"packageFile":"mise.toml","deps":[{"depName":"protoc","packageName":"protocolbuffers/protobuf","datasource":"github-releases","currentValue":"35.0","currentVersion":"v35","extractVersion":"^v(?<version>\\S+)"}]}]}}'
+fi
+'''

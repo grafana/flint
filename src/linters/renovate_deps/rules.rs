@@ -2,6 +2,7 @@ use anyhow::Context;
 use regex::Regex;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
+use std::sync::OnceLock;
 
 use super::snapshot::Snapshot;
 
@@ -215,29 +216,33 @@ pub(crate) fn equivalent_version_shapes(left: &str, right: &str) -> bool {
             .is_some_and(|(left, right)| left == right)
 }
 
-fn semverish_shape(value: &str) -> Option<(u64, u64, u64, Option<&str>)> {
-    let captures =
-        reg_ex(r"^v?(?<major>\d+)(?:\.(?<minor>\d+))?(?:\.(?<patch>\d+))?(?<suffix>[-+].+)?$")
-            .captures(value)?;
+fn semverish_shape(value: &str) -> Option<(u64, u64, u64, u64, Option<&str>)> {
+    let captures = semverish_regex().captures(value)?;
     let major = captures.name("major")?.as_str().parse().ok()?;
     let minor = captures
         .name("minor")
-        .map(|minor| minor.as_str().trim_start_matches('.'))
-        .unwrap_or("0")
-        .parse()
+        .map_or(Ok(0), |minor| minor.as_str().parse())
         .ok()?;
     let patch = captures
         .name("patch")
-        .map(|patch| patch.as_str().trim_start_matches('.'))
-        .unwrap_or("0")
-        .parse()
+        .map_or(Ok(0), |patch| patch.as_str().parse())
+        .ok()?;
+    let revision = captures
+        .name("revision")
+        .map_or(Ok(0), |revision| revision.as_str().parse())
         .ok()?;
     let suffix = captures.name("suffix").map(|suffix| suffix.as_str());
-    Some((major, minor, patch, suffix))
+    Some((major, minor, patch, revision, suffix))
 }
 
-fn reg_ex(pattern: &str) -> Regex {
-    Regex::new(pattern).expect("valid semver-shape regex")
+fn semverish_regex() -> &'static Regex {
+    static SEMVERISH_REGEX: OnceLock<Regex> = OnceLock::new();
+    SEMVERISH_REGEX.get_or_init(|| {
+        Regex::new(
+            r"^v?(?<major>\d+)(?:\.(?<minor>\d+))?(?:\.(?<patch>\d+))?(?:\.(?<revision>\d+))?(?<suffix>[-+].+)?$",
+        )
+        .expect("valid semver-shape regex")
+    })
 }
 
 pub(crate) fn validate_extract_version_consistency(snapshot: &Snapshot) -> anyhow::Result<()> {

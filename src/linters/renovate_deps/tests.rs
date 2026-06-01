@@ -1,8 +1,8 @@
 use super::install_patch::configure_extract_workaround_env;
 use super::mise_normalize::patch_semver_equivalent_mise_values;
 use super::rules::{
-    ComparablePackageRule, ExtractVersionMismatch, RuleMatcher, incomplete_meta_for_rules,
-    relevant_dep_names, validate_extract_version_consistency,
+    ComparablePackageRule, ExtractVersionMismatch, RuleMatcher, equivalent_version_shapes,
+    incomplete_meta_for_rules, relevant_dep_names, validate_extract_version_consistency,
 };
 use super::snapshot::{DepFiles, DepMeta};
 use super::*;
@@ -673,6 +673,13 @@ fn validate_extract_version_consistency_flags_no_match() {
 
     assert!(msg.contains("no match"), "unexpected error:\n{msg}");
     assert!(msg.contains("^v(?<version>.+)$"));
+}
+
+#[test]
+fn equivalent_version_shapes_accepts_four_part_versions() {
+    assert!(equivalent_version_shapes("1.2.3.4", "v1.2.3.4"));
+    assert!(equivalent_version_shapes("1.2.3", "1.2.3.0"));
+    assert!(!equivalent_version_shapes("1.2.3.4", "1.2.3.5"));
 }
 
 #[test]

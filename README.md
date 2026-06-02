@@ -12,6 +12,7 @@
 
 <p align="center">
   <a href="docs/cli.md">CLI reference</a> ·
+  <a href="docs/check-model.md">How checks work</a> ·
   <a href="docs/linters.md">Linters</a> ·
   <a href="docs/why.md">Why flint?</a> ·
   <a href="docs/alternatives.md">Alternatives</a>

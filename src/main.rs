@@ -811,7 +811,9 @@ fn baseline_check_names(
 
     let changed = changed_rel_paths(file_list, project_root);
     let previous_tools = registry::read_mise_tools_at_ref(project_root, merge_base);
-    if registry::flint_version_changed(&previous_tools, current_tools) {
+    if registry::flint_version_changed(&previous_tools, current_tools)
+        || registry::full_baseline_runtime_changed(active, &previous_tools, current_tools)
+    {
         return active.iter().map(|check| check.name.to_string()).collect();
     }
 
@@ -825,6 +827,7 @@ fn baseline_check_names(
         .filter(|check| {
             !registry::check_active(check, &previous_tools)
                 || registry::tool_version_changed(check, &previous_tools, current_tools)
+                || registry::runtime_version_changed(check, &previous_tools, current_tools)
                 || flint_toml.as_ref().is_some_and(|change| {
                     change.settings_changed
                         || (check.kind.is_native() && change.check_changed(check.name))

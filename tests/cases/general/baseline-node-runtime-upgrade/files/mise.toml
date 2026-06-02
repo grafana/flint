@@ -1,0 +1,6 @@
+[tools]
+node = "22.0.0"
+
+# Linters
+"npm:renovate" = "43.136.3"
+shellcheck = "0.10.0"

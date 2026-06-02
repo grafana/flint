@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.22.5](https://github.com/grafana/flint/compare/v0.22.4...v0.22.5) - 2026-06-02
+
+### Fixed
+
+- trigger full lint when node runtime updates ([#328](https://github.com/grafana/flint/pull/328))
+- normalize renovate-deps version and manager shapes ([#326](https://github.com/grafana/flint/pull/326))
+
+### Other
+
+- clarify Flint check model ([#317](https://github.com/grafana/flint/pull/317))
+- *(deps)* update taiki-e/install-action action to v2.79.15 ([#329](https://github.com/grafana/flint/pull/329))
+- *(deps)* update taiki-e/install-action action to v2.79.14 ([#327](https://github.com/grafana/flint/pull/327))
+- *(deps)* update dependency mise to v2026.5.16 ([#324](https://github.com/grafana/flint/pull/324))
+- *(deps)* lock file maintenance ([#325](https://github.com/grafana/flint/pull/325))
+- *(deps)* update taiki-e/install-action action to v2.79.11 ([#322](https://github.com/grafana/flint/pull/322))
+- *(deps)* update dependency rust to v1.96.0 ([#323](https://github.com/grafana/flint/pull/323))
+- *(deps)* update taiki-e/install-action action to v2.79.10 ([#321](https://github.com/grafana/flint/pull/321))
+- *(deps)* update taiki-e/install-action action to v2.79.9 ([#319](https://github.com/grafana/flint/pull/319))
+- *(deps)* update taiki-e/install-action action to v2.79.8 ([#316](https://github.com/grafana/flint/pull/316))
+
 ## [0.22.4](https://github.com/grafana/flint/compare/v0.22.3...v0.22.4) - 2026-05-28
 
 ### Fixed

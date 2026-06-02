@@ -124,8 +124,9 @@ pub fn runtime_version_changed(
         return false;
     }
 
-    declared_tool_version(check, previous_tools).is_some()
-        && declared_tool_version(check, current_tools).is_some()
+    let previous_tool = declared_tool_version(check, previous_tools);
+    let current_tool = declared_tool_version(check, current_tools);
+    previous_tool.is_some() && current_tool.is_some() && previous_tool == current_tool
 }
 
 pub fn full_baseline_runtime_changed(

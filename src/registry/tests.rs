@@ -632,6 +632,42 @@ fn runtime_version_changed_detects_node_updates_for_npm_checks() {
 }
 
 #[test]
+fn runtime_version_changed_detects_node_patch_updates_for_npm_checks() {
+    let check = builtin()
+        .into_iter()
+        .find(|check| check.name == "renovate-deps")
+        .expect("renovate-deps check");
+    let previous = HashMap::from([
+        ("node".to_string(), "24.0.0".to_string()),
+        ("npm:renovate".to_string(), "43.136.3".to_string()),
+    ]);
+    let current = HashMap::from([
+        ("node".to_string(), "24.0.1".to_string()),
+        ("npm:renovate".to_string(), "43.136.3".to_string()),
+    ]);
+
+    assert!(runtime_version_changed(&check, &previous, &current));
+}
+
+#[test]
+fn runtime_version_changed_ignores_node_updates_when_npm_tool_version_changed() {
+    let check = builtin()
+        .into_iter()
+        .find(|check| check.name == "renovate-deps")
+        .expect("renovate-deps check");
+    let previous = HashMap::from([
+        ("node".to_string(), "22.0.0".to_string()),
+        ("npm:renovate".to_string(), "43.136.3".to_string()),
+    ]);
+    let current = HashMap::from([
+        ("node".to_string(), "24.0.0".to_string()),
+        ("npm:renovate".to_string(), "43.136.4".to_string()),
+    ]);
+
+    assert!(!runtime_version_changed(&check, &previous, &current));
+}
+
+#[test]
 fn runtime_version_changed_ignores_node_updates_for_non_npm_checks() {
     let check = builtin()
         .into_iter()

@@ -491,3 +491,13 @@ length**: today that means `rumdl` for `*.md`, `rustfmt` for `*.rs`, and
 intent instead of relying on checker-specific JSON excludes. If a matching
 section already exists, `flint init` rewrites its `max_line_length` to `off`
 instead of leaving a formatter-conflicting numeric value in place.
+
+**`zizmor` can drift without file changes**: zizmor's
+`ref-version-mismatch` audit resolves pinned action hashes against
+GitHub's tag API at run-time. When a maintainer moves a mutable tag
+(e.g. `v6` advances to a new patch), workflows pinned to the old
+commit but commented `# v6` become inconsistent without any local
+file change. Flint scans only files changed in the PR, so drift in
+untouched workflows stays invisible until something edits them.
+Run `flint run --full` periodically (e.g. weekly `schedule:` workflow)
+to catch this.

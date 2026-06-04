@@ -138,6 +138,20 @@ Format C# code
 
 Check files comply with EditorConfig settings
 
+`editorconfig-checker` defers to formatters: it runs on all files
+but automatically skips file types owned by an active formatter. If
+none of those formatters are installed, `editorconfig-checker` checks
+those files itself.
+
+Flint writes shared `.editorconfig` carve-outs for known
+formatter-owned line length: today that means `rumdl` for `*.md`,
+`rustfmt` for `*.rs`, and `google-java-format` for `*.java`. Those
+sections use `max_line_length = off` so editors and
+`editorconfig-checker` share the same intent instead of relying on
+checker-specific JSON excludes. If a matching section already
+exists, `flint init` rewrites its `max_line_length` to `off`
+instead of leaving a formatter-conflicting numeric value in place.
+
 ### `flint-setup`
 
 |          |                         |
@@ -453,6 +467,15 @@ Validate XML files are well-formed
 | Config   | [`zizmor.yml`](https://docs.zizmor.sh/configuration/) |
 
 Audit GitHub Actions workflows for security issues
+
+zizmor can drift without file changes: its `ref-version-mismatch`
+audit resolves pinned action hashes against GitHub's tag API at
+run-time. When a maintainer moves a mutable tag (e.g. `v6` advances
+to a new patch), workflows pinned to the old commit but commented
+`# v6` become inconsistent without any local file change. Flint
+scans only files changed in the PR, so drift in untouched workflows
+stays invisible until something edits them. Run `flint run --full`
+periodically (e.g. weekly `schedule:` workflow) to catch this.
 <!-- linter-details-end -->
 
 ## Scopes
@@ -478,26 +501,3 @@ Implemented in-process rather than via a command template. These checks may run
 without file arguments or use custom orchestration logic. See
 [How Flint runs checks](check-model.md) for the higher-level model and when to
 choose native vs template checks.
-
-**`editorconfig-checker` defers to formatters**: `editorconfig-checker` runs on
-all files, but automatically skips file types owned by an active formatter. If
-none of those formatters are installed, `editorconfig-checker` checks those
-files itself.
-
-**Flint writes shared `.editorconfig` carve-outs for known formatter-owned line
-length**: today that means `rumdl` for `*.md`, `rustfmt` for `*.rs`, and
-`google-java-format` for `*.java`. Those sections use
-`max_line_length = off` so editors and `editorconfig-checker` share the same
-intent instead of relying on checker-specific JSON excludes. If a matching
-section already exists, `flint init` rewrites its `max_line_length` to `off`
-instead of leaving a formatter-conflicting numeric value in place.
-
-**`zizmor` can drift without file changes**: zizmor's
-`ref-version-mismatch` audit resolves pinned action hashes against
-GitHub's tag API at run-time. When a maintainer moves a mutable tag
-(e.g. `v6` advances to a new patch), workflows pinned to the old
-commit but commented `# v6` become inconsistent without any local
-file change. Flint scans only files changed in the PR, so drift in
-untouched workflows stays invisible until something edits them.
-Run `flint run --full` periodically (e.g. weekly `schedule:` workflow)
-to catch this.

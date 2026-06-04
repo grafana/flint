@@ -308,6 +308,16 @@ fn check_zizmor() -> Check {
         None,
     )
     .desc("Audit GitHub Actions workflows for security issues")
+    .docs(
+        "zizmor can drift without file changes: its `ref-version-mismatch`\n\
+        audit resolves pinned action hashes against GitHub's tag API at\n\
+        run-time. When a maintainer moves a mutable tag (e.g. `v6` advances\n\
+        to a new patch), workflows pinned to the old commit but commented\n\
+        `# v6` become inconsistent without any local file change. Flint\n\
+        scans only files changed in the PR, so drift in untouched workflows\n\
+        stays invisible until something edits them. Run `flint run --full`\n\
+        periodically (e.g. weekly `schedule:` workflow) to catch this.",
+    )
     .style()
 }
 
@@ -387,6 +397,21 @@ fn check_editorconfig_checker() -> Check {
             Some("EditorConfig compliance"),
         )
         .desc("Check files comply with EditorConfig settings")
+        .docs(
+            "`editorconfig-checker` defers to formatters: it runs on all files\n\
+            but automatically skips file types owned by an active formatter. If\n\
+            none of those formatters are installed, `editorconfig-checker` checks\n\
+            those files itself.\n\
+            \n\
+            Flint writes shared `.editorconfig` carve-outs for known\n\
+            formatter-owned line length: today that means `rumdl` for `*.md`,\n\
+            `rustfmt` for `*.rs`, and `google-java-format` for `*.java`. Those\n\
+            sections use `max_line_length = off` so editors and\n\
+            `editorconfig-checker` share the same intent instead of relying on\n\
+            checker-specific JSON excludes. If a matching section already\n\
+            exists, `flint init` rewrites its `max_line_length` to `off`\n\
+            instead of leaving a formatter-conflicting numeric value in place.",
+        )
 }
 
 fn check_golangci_lint() -> Check {

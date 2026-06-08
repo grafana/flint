@@ -183,10 +183,11 @@ fn renovate_deps_local_default_runs_for_deleted_tracked_file() {
     std::fs::write(
         repo.path().join("mise.toml"),
         r#"[tools]
+aube = "latest"
 node = "22.0.0"
 
 # Linters
-"npm:renovate" = "43.136.3"
+"npm:renovate" = { version = "43.136.3", allow_builds = ["re2"] }
 "#,
     )
     .unwrap();

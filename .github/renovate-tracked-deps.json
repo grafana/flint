@@ -102,6 +102,7 @@
         "actionlint",
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
+        "aube",
         "biome",
         "dotnet",
         "editorconfig-checker",

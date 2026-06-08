@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::path::PathBuf;
 
-use crate::init::generation::needs_node_for_npm;
+use crate::init::generation::{needs_aube_for_renovate, needs_node_for_npm};
 use crate::init::generation::{normalize_tools_section, tools_section_needs_normalization};
 use crate::linters::LinterOutput;
 use crate::registry::{
@@ -70,6 +70,14 @@ pub async fn run(fix: bool, project_root: &Path, config_dir: &Path) -> LinterOut
     if needs_node_for_npm(&mise_content) {
         setup_outcome = setup_outcome.at_least(SetupOutcome::Blocking);
         errors.push("mise.toml is missing `node` for npm: backend tools.".to_string());
+    }
+    if needs_aube_for_renovate(&mise_content) {
+        setup_outcome = setup_outcome.at_least(SetupOutcome::Blocking);
+        errors.push(
+            "mise.toml has npm:renovate but is missing `aube` or `allow_builds = [\"re2\"]` — \
+             run `flint run --fix flint-setup` to add them."
+                .to_string(),
+        );
     }
 
     match tools_section_needs_normalization(&path) {
@@ -203,7 +211,7 @@ mod tests {
         let tmp = tempfile::TempDir::new().unwrap();
         std::fs::write(
             tmp.path().join("mise.toml"),
-            "[tools]\nnode = \"24\"\n\n# Linters\n\"npm:renovate\" = \"latest\"\n",
+            "[tools]\naube = \"1.0.0\"\nnode = \"24\"\n\n# Linters\n\"npm:renovate\" = { version = \"latest\", allow_builds = [\"re2\"] }\n",
         )
         .unwrap();
         std::fs::write(

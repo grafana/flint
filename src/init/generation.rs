@@ -6,10 +6,11 @@ use std::process::Command;
 use super::LinterGroup;
 
 pub(super) use super::mise_tools::{
-    apply_changes, ensure_flint_self_pin, ensure_node_for_npm, remove_tool_keys,
+    apply_changes, ensure_aube_for_renovate, ensure_flint_self_pin, ensure_node_for_npm,
+    remove_tool_keys,
 };
 pub(crate) use super::mise_tools::{
-    needs_node_for_npm, normalize_tools_section, replace_obsolete_keys,
+    needs_aube_for_renovate, needs_node_for_npm, normalize_tools_section, replace_obsolete_keys,
     tools_section_needs_normalization,
 };
 

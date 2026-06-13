@@ -21,9 +21,9 @@ use detection::{
     build_linter_groups, detect_obsolete_keys, detect_present_patterns, parse_tool_keys,
 };
 use generation::{
-    apply_changes, detect_base_branch, ensure_flint_self_pin, ensure_node_for_npm,
-    get_existing_config_dir, has_slow_selected, normalize_tools_section, prompt_config_dir,
-    remove_tool_keys,
+    apply_changes, detect_base_branch, ensure_aube_for_renovate, ensure_flint_self_pin,
+    ensure_node_for_npm, get_existing_config_dir, has_slow_selected, normalize_tools_section,
+    prompt_config_dir, remove_tool_keys,
 };
 use migrations::{
     apply_repo_migrations, selected_editorconfig_cleanup_sections,
@@ -369,6 +369,10 @@ Add and stage your source files before running init so the detection is accurate
     if node_added {
         println!("  added node (LTS) — required by npm: backend tools");
     }
+    let aube_added = ensure_aube_for_renovate(project_root)?;
+    if aube_added {
+        println!("  added aube — npm:renovate needs allow_builds for re2 native binary");
+    }
     let tools_normalized = normalize_tools_section(&mise_path)?;
 
     interactive_note(yes, "\nScaffolding flint config and workflow...");
@@ -413,6 +417,7 @@ Add and stage your source files before running init so the detection is accurate
         && !flint_pinned
         && !meta_changed
         && !node_added
+        && !aube_added
         && !tools_normalized
         && !toml_generated
         && !workflow_generated

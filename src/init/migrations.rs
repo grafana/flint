@@ -11,13 +11,14 @@ use super::config_files::{
 };
 use super::detection::parse_tool_keys;
 use super::generation;
-use super::generation::needs_node_for_npm;
-use super::{ensure_node_for_npm, install_key, remove_tool_keys};
+use super::generation::{needs_aube_for_renovate, needs_node_for_npm};
+use super::{ensure_aube_for_renovate, ensure_node_for_npm, install_key, remove_tool_keys};
 
 pub(super) struct RepoMigrationSummary {
     replaced_obsolete: Vec<(String, String)>,
     removed_unsupported: Vec<String>,
     node_added: bool,
+    aube_added: bool,
     legacy_files_removed: Vec<String>,
     stale_md013_comments_removed: Vec<String>,
     stale_editorconfig_checker_comments_removed: Vec<String>,
@@ -34,6 +35,7 @@ impl RepoMigrationSummary {
         self.replaced_obsolete.is_empty()
             && self.removed_unsupported.is_empty()
             && !self.node_added
+            && !self.aube_added
             && self.legacy_files_removed.is_empty()
             && self.stale_md013_comments_removed.is_empty()
             && self.stale_editorconfig_checker_comments_removed.is_empty()
@@ -49,6 +51,9 @@ impl RepoMigrationSummary {
         }
         if self.node_added {
             println!("  added node (LTS) — required by npm: backend tools");
+        }
+        if self.aube_added {
+            println!("  added aube — npm:renovate needs allow_builds for re2 native binary");
         }
         for rel in &self.legacy_files_removed {
             println!("  removed <REPO>/{rel} (legacy flint file)");
@@ -220,10 +225,12 @@ fn detect_setup_migrations_with_keys(
         .map(|(old_key, _)| (*old_key).to_string())
         .collect();
     let node_added = needs_node_for_npm(mise_content);
+    let aube_added = needs_aube_for_renovate(mise_content);
     RepoMigrationSummary {
         replaced_obsolete,
         removed_unsupported,
         node_added,
+        aube_added,
         legacy_files_removed: vec![],
         stale_md013_comments_removed: vec![],
         stale_editorconfig_checker_comments_removed: vec![],
@@ -248,6 +255,7 @@ fn apply_repo_migrations_with_keys(
             .collect::<Vec<_>>(),
     )?;
     let node_added = ensure_node_for_npm(project_root)?;
+    let aube_added = ensure_aube_for_renovate(project_root)?;
     let legacy_files_removed = if include_repo_cleanup {
         remove_legacy_lint_files(project_root)?
     } else {
@@ -271,6 +279,7 @@ fn apply_repo_migrations_with_keys(
         replaced_obsolete,
         removed_unsupported,
         node_added,
+        aube_added,
         legacy_files_removed,
         stale_md013_comments_removed,
         stale_editorconfig_checker_comments_removed,

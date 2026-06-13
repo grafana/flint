@@ -73,6 +73,104 @@ fn ensure_node_for_npm_with(
     Ok(true)
 }
 
+/// True when `[tools]` contains `npm:renovate` but either `aube` is absent or
+/// `npm:renovate` lacks an `allow_builds` key. Mise's npm backend runs with
+/// `--ignore-scripts=true`; renovate's `re2` dependency needs its postinstall
+/// script to download the native binary. `aube` (picked up automatically by mise
+/// when present) supports per-tool `allow_builds` allowlisting.
+pub(crate) fn needs_aube_for_renovate(content: &str) -> bool {
+    let Ok(doc) = content.parse::<toml_edit::DocumentMut>() else {
+        return false;
+    };
+    let Some(tools) = doc.get("tools").and_then(|t| t.as_table()) else {
+        return false;
+    };
+    if !tools.contains_key("npm:renovate") {
+        return false;
+    }
+    !tools.contains_key("aube") || !renovate_has_allow_builds(tools)
+}
+
+fn renovate_has_allow_builds(tools: &toml_edit::Table) -> bool {
+    tools
+        .get("npm:renovate")
+        .and_then(|item| item.as_value())
+        .and_then(|v| {
+            if let toml_edit::Value::InlineTable(tbl) = v {
+                Some(tbl)
+            } else {
+                None
+            }
+        })
+        .is_some_and(|tbl| tbl.contains_key("allow_builds"))
+}
+
+/// Ensures `aube` is present and `npm:renovate` has `allow_builds = ["re2"]`
+/// when renovate is a configured tool. Prefers `mise use --pin aube@latest` for
+/// the aube pin; falls back to writing `aube = "latest"` directly when mise
+/// isn't available.
+///
+/// Returns `true` if any change was written.
+pub(crate) fn ensure_aube_for_renovate(project_root: &Path) -> Result<bool> {
+    ensure_aube_for_renovate_with(project_root, run_mise_use)
+}
+
+fn ensure_aube_for_renovate_with(
+    project_root: &Path,
+    mut runner: impl FnMut(&Path, &str, &str),
+) -> Result<bool> {
+    let mise_path = project_root.join("mise.toml");
+    let content = std::fs::read_to_string(&mise_path).unwrap_or_default();
+    if !needs_aube_for_renovate(&content) {
+        return Ok(false);
+    }
+
+    // Add aube if missing.
+    let content = std::fs::read_to_string(&mise_path).unwrap_or_default();
+    let doc: toml_edit::DocumentMut = content.parse().context("failed to parse mise.toml")?;
+    let has_aube = doc
+        .get("tools")
+        .and_then(|t| t.as_table())
+        .is_some_and(|tools| tools.contains_key("aube"));
+
+    if !has_aube && !pin_tool_via_mise_with(project_root, "aube", "latest", &mut runner) {
+        let content = std::fs::read_to_string(&mise_path).unwrap_or_default();
+        let mut doc: toml_edit::DocumentMut =
+            content.parse().context("failed to parse mise.toml")?;
+        let tools = doc["tools"]
+            .as_table_mut()
+            .context("[tools] is not a table")?;
+        tools.insert("aube", toml_edit::value("latest"));
+        std::fs::write(&mise_path, doc.to_string())?;
+    }
+
+    // Update npm:renovate to add allow_builds = ["re2"].
+    let content = std::fs::read_to_string(&mise_path).context("failed to read mise.toml")?;
+    let mut doc: toml_edit::DocumentMut = content.parse().context("failed to parse mise.toml")?;
+    let tools = doc["tools"]
+        .as_table_mut()
+        .context("[tools] is not a table")?;
+    if !renovate_has_allow_builds(tools) {
+        let version = tool_version(tools, "npm:renovate").unwrap_or_else(|| "latest".to_string());
+        insert_renovate_with_allow_builds(tools, &version);
+        std::fs::write(&mise_path, doc.to_string())?;
+    }
+
+    Ok(true)
+}
+
+fn insert_renovate_with_allow_builds(tools: &mut toml_edit::Table, version: &str) {
+    let mut tbl = toml_edit::InlineTable::new();
+    tbl.insert("version", toml_edit::Value::from(version));
+    let mut arr = toml_edit::Array::new();
+    arr.push("re2");
+    tbl.insert("allow_builds", toml_edit::Value::Array(arr));
+    tools.insert(
+        "npm:renovate",
+        toml_edit::Item::Value(toml_edit::Value::InlineTable(tbl)),
+    );
+}
+
 /// Pins `aqua:grafana/flint` in mise.toml at the calling binary's version so
 /// contributors all run the same flint release. Skips when the key already
 /// exists (any pin — never overwrite the user's explicit choice). Pre-release
@@ -519,8 +617,9 @@ fn sort_and_group_tools(tools: &mut toml_edit::Table, original: &str) {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_changes_with, ensure_flint_self_pin, ensure_flint_self_pin_with, ensure_node_for_npm,
-        ensure_node_for_npm_with, needs_node_for_npm, pin_tool_via_mise_with, remove_tool_keys,
+        apply_changes_with, ensure_aube_for_renovate_with, ensure_flint_self_pin,
+        ensure_flint_self_pin_with, ensure_node_for_npm, ensure_node_for_npm_with,
+        needs_aube_for_renovate, needs_node_for_npm, pin_tool_via_mise_with, remove_tool_keys,
         replace_obsolete_keys, replace_obsolete_keys_with,
     };
 
@@ -544,6 +643,72 @@ mod tests {
         std::fs::write(&path, original).unwrap();
 
         let added = ensure_node_for_npm(dir.path()).unwrap();
+
+        assert!(!added);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+    }
+
+    #[test]
+    fn needs_aube_when_renovate_without_aube() {
+        let content = "[tools]\nnode = \"24\"\n\"npm:renovate\" = \"43.0.0\"\n";
+        assert!(needs_aube_for_renovate(content));
+    }
+
+    #[test]
+    fn needs_aube_when_renovate_has_aube_but_no_allow_builds() {
+        let content = "[tools]\naube = \"1.0.0\"\nnode = \"24\"\n\"npm:renovate\" = \"43.0.0\"\n";
+        assert!(needs_aube_for_renovate(content));
+    }
+
+    #[test]
+    fn no_aube_needed_when_fully_configured() {
+        let content = "[tools]\naube = \"1.0.0\"\nnode = \"24\"\n\"npm:renovate\" = { version = \"43.0.0\", allow_builds = [\"re2\"] }\n";
+        assert!(!needs_aube_for_renovate(content));
+    }
+
+    #[test]
+    fn no_aube_needed_when_no_renovate() {
+        let content = "[tools]\nnode = \"24\"\nshellcheck = \"v0.11.0\"\n";
+        assert!(!needs_aube_for_renovate(content));
+    }
+
+    #[test]
+    fn ensure_aube_adds_aube_and_allow_builds() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        std::fs::write(
+            &path,
+            "[tools]\nnode = \"24\"\n\"npm:renovate\" = \"43.100.0\"\n",
+        )
+        .unwrap();
+
+        let added = ensure_aube_for_renovate_with(dir.path(), |project_root, key, _| {
+            let content = std::fs::read_to_string(project_root.join("mise.toml")).unwrap();
+            let mut doc: toml_edit::DocumentMut = content.parse().unwrap();
+            doc["tools"]
+                .as_table_mut()
+                .unwrap()
+                .insert(key, toml_edit::value("1.2.3"));
+            std::fs::write(project_root.join("mise.toml"), doc.to_string()).unwrap();
+        })
+        .unwrap();
+
+        let result = std::fs::read_to_string(&path).unwrap();
+        assert!(added);
+        assert!(result.contains("aube"));
+        assert!(result.contains("allow_builds"));
+        assert!(result.contains("re2"));
+        assert!(result.contains("43.100.0"));
+    }
+
+    #[test]
+    fn ensure_aube_noop_when_already_configured() {
+        let original = "[tools]\naube = \"1.0.0\"\nnode = \"24\"\n\"npm:renovate\" = { version = \"43.0.0\", allow_builds = [\"re2\"] }\n";
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        std::fs::write(&path, original).unwrap();
+
+        let added = ensure_aube_for_renovate_with(dir.path(), |_, _, _| {}).unwrap();
 
         assert!(!added);
         assert_eq!(std::fs::read_to_string(&path).unwrap(), original);

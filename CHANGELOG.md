@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.22.6](https://github.com/grafana/flint/compare/v0.22.5...v0.22.6) - 2026-06-14
+
+### Other
+
+- *(deps)* update taiki-e/install-action action to v2.81.10 ([#351](https://github.com/grafana/flint/pull/351))
+- *(deps)* update grafana/shared-workflows/lint-pr-title action to v1.2.3 ([#350](https://github.com/grafana/flint/pull/350))
+- *(deps)* update taiki-e/install-action action to v2.81.9 ([#349](https://github.com/grafana/flint/pull/349))
+- *(deps)* update taiki-e/install-action action to v2.81.8 ([#347](https://github.com/grafana/flint/pull/347))
+- *(deps)* update taiki-e/install-action action to v2.81.7 ([#346](https://github.com/grafana/flint/pull/346))
+- *(deps)* update taiki-e/install-action action to v2.81.6 ([#345](https://github.com/grafana/flint/pull/345))
+- *(deps)* lock file maintenance ([#342](https://github.com/grafana/flint/pull/342))
+- *(deps)* update dependency mise to v2026.6.0 ([#341](https://github.com/grafana/flint/pull/341))
+- *(deps)* update taiki-e/install-action action to v2.81.5 ([#343](https://github.com/grafana/flint/pull/343))
+- *(deps)* update dependency jdx/mise-action to v4.1.0 ([#340](https://github.com/grafana/flint/pull/340))
+- *(deps)* update taiki-e/install-action action to v2.81.4 ([#339](https://github.com/grafana/flint/pull/339))
+- *(deps)* update taiki-e/install-action action to v2.81.3 ([#338](https://github.com/grafana/flint/pull/338))
+- *(deps)* update dependency go to v1.26.4 ([#337](https://github.com/grafana/flint/pull/337))
+- *(deps)* update dependency actions/checkout to v6.0.3 ([#336](https://github.com/grafana/flint/pull/336))
+- *(deps)* update taiki-e/install-action action to v2.81.2 ([#335](https://github.com/grafana/flint/pull/335))
+- use shared workflow for PR title lint ([#318](https://github.com/grafana/flint/pull/318))
+- note zizmor drift from upstream tag movement ([#334](https://github.com/grafana/flint/pull/334))
+- *(deps)* update taiki-e/install-action action to v2.81.1 ([#333](https://github.com/grafana/flint/pull/333))
+- *(deps)* update taiki-e/install-action action to v2.81.0 ([#332](https://github.com/grafana/flint/pull/332))
+- *(deps)* update taiki-e/install-action action to v2.80.0 ([#331](https://github.com/grafana/flint/pull/331))
+
 ## [0.22.5](https://github.com/grafana/flint/compare/v0.22.4...v0.22.5) - 2026-06-02
 
 ### Fixed

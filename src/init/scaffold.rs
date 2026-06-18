@@ -37,7 +37,7 @@ on:
   pull_request:
     branches: [{base_branch}]
 
-permissions: {}
+permissions: {{}}
 
 jobs:
   lint:

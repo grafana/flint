@@ -37,12 +37,14 @@ on:
   pull_request:
     branches: [{base_branch}]
 
-permissions:
-  contents: read
+permissions: {{}}
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3

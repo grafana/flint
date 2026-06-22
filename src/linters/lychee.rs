@@ -46,7 +46,6 @@ struct CachePreference {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FollowUpMode {
-    AllLinks,
     LocalOnly,
 }
 
@@ -231,7 +230,7 @@ pub async fn run(
     }
 }
 
-fn should_check_all_links_in_ci_from<F>(env: F) -> bool
+fn is_ci_from<F>(env: F) -> bool
 where
     F: Fn(&str) -> Option<String>,
 {
@@ -246,9 +245,7 @@ fn follow_up_mode_from<F>(cfg: &LycheeConfig, env: F) -> Option<FollowUpMode>
 where
     F: Fn(&str) -> Option<String>,
 {
-    if should_check_all_links_in_ci_from(env) {
-        Some(FollowUpMode::AllLinks)
-    } else if cfg.check_all_local {
+    if is_ci_from(env) || cfg.check_all_local {
         Some(FollowUpMode::LocalOnly)
     } else {
         None
@@ -257,9 +254,6 @@ where
 
 fn follow_up_mode_args(mode: Option<FollowUpMode>) -> Option<(&'static str, bool)> {
     match mode {
-        Some(FollowUpMode::AllLinks) => {
-            Some(("Checking all links in all files (CI safeguard)", false))
-        }
         Some(FollowUpMode::LocalOnly) => Some(("Checking local links in all files", true)),
         None => None,
     }
@@ -837,8 +831,8 @@ mod tests {
     }
 
     #[test]
-    fn ci_enables_all_links_safeguard() {
-        assert!(should_check_all_links_in_ci_from(|name| match name {
+    fn ci_enables_local_links_safeguard() {
+        assert!(is_ci_from(|name| match name {
             "CI" => Some("true".to_string()),
             _ => None,
         }));
@@ -846,11 +840,11 @@ mod tests {
 
     #[test]
     fn non_ci_does_not_enable_all_links_safeguard() {
-        assert!(!should_check_all_links_in_ci_from(|_| None));
+        assert!(!is_ci_from(|_| None));
     }
 
     #[test]
-    fn follow_up_mode_prefers_ci_all_links_over_local_only() {
+    fn follow_up_mode_uses_local_only_in_ci() {
         let mode = follow_up_mode_from(
             &LycheeConfig {
                 config: None,
@@ -862,7 +856,7 @@ mod tests {
             },
         );
 
-        assert_eq!(mode, Some(FollowUpMode::AllLinks));
+        assert_eq!(mode, Some(FollowUpMode::LocalOnly));
     }
 
     #[test]

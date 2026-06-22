@@ -180,6 +180,8 @@ pub async fn run(
     let mut combined_stdout = Vec::new();
     let mut combined_stderr = Vec::new();
 
+    let ci_all_links = should_check_all_links_in_ci();
+
     if !checkable_inputs.is_empty() {
         let file_refs: Vec<&str> = checkable_inputs.iter().map(String::as_str).collect();
         let out = run_lychee_cmd(
@@ -195,11 +197,25 @@ pub async fn run(
         all_ok &= out.ok;
         combined_stdout.extend_from_slice(&out.stdout);
         combined_stderr.extend_from_slice(&out.stderr);
-    } else {
+    } else if !ci_all_links {
         combined_stdout.extend_from_slice(b"No modified files to check for all links.\n");
     }
 
-    if cfg.check_all_local {
+    if ci_all_links {
+        let out = run_lychee_cmd(
+            "Checking all links in all files (CI safeguard)",
+            &lychee_cfg,
+            &remap_args,
+            &checkable_all_file_refs,
+            false,
+            project_root,
+            cache_preference,
+        )
+        .await;
+        all_ok &= out.ok;
+        combined_stdout.extend_from_slice(&out.stdout);
+        combined_stderr.extend_from_slice(&out.stderr);
+    } else if cfg.check_all_local {
         let out = run_lychee_cmd(
             "Checking local links in all files",
             &lychee_cfg,
@@ -221,6 +237,10 @@ pub async fn run(
         stderr: combined_stderr,
         setup_outcome: None,
     }
+}
+
+fn should_check_all_links_in_ci() -> bool {
+    env::is_ci_from(|name| std::env::var(name).ok())
 }
 
 fn validate_runtime_env(file_list: &FileList) -> Result<Option<String>, String> {
@@ -792,6 +812,28 @@ mod tests {
         let warning = validate_env(false, true, &[]).unwrap().unwrap();
 
         assert!(warning.contains("GITHUB_TOKEN"));
+    }
+
+    #[test]
+    fn ci_enables_all_links_safeguard() {
+        unsafe {
+            std::env::set_var("CI", "true");
+        }
+
+        assert!(should_check_all_links_in_ci());
+
+        unsafe {
+            std::env::remove_var("CI");
+        }
+    }
+
+    #[test]
+    fn non_ci_does_not_enable_all_links_safeguard() {
+        unsafe {
+            std::env::remove_var("CI");
+        }
+
+        assert!(!should_check_all_links_in_ci());
     }
 
     #[test]

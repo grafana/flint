@@ -692,10 +692,11 @@ fn check_lychee() -> Check {
             "Orchestrates [lychee](https://lychee.cli.rs/) for link checking. \
             Requires `lychee` in `[tools]`.\n\
             \n\
-            Default behavior: checks all links in changed files. When\n\
-            `check_all_local = true` in `flint.toml`, adds a second pass over local links\n\
-            in all files — useful when broken internal links from unchanged files also\n\
-            matter.\n\
+            Default behavior: checks all links in changed files. In CI, Flint also adds a\n\
+            full-repository safeguard pass over all links in all files so stale links in\n\
+            unchanged docs still fail the build. Outside that CI safeguard, setting\n\
+            `check_all_local = true` in `flint.toml` adds a second pass over local links in\n\
+            all files — useful when broken internal links from unchanged files also matter.\n\
             \n\
             Outside CI, flint also enables a local lychee request cache by default to\n\
             speed up repeated runs. Flint stores that cache under `.lychee_cache/` and\n\
@@ -707,8 +708,8 @@ fn check_lychee() -> Check {
             On GitHub Actions PR runs in changed-file mode, link remaps also require\n\
             `GITHUB_REPOSITORY`, `GITHUB_BASE_REF`, `GITHUB_HEAD_REF`, and `PR_HEAD_REPO`.\n\
             GitHub Actions provides the first three; set `PR_HEAD_REPO` from\n\
-            `github.event.pull_request.head.repo.full_name`. `--full` does not require\n\
-            the PR remap metadata.\n\
+            `github.event.pull_request.head.repo.full_name`. The CI safeguard full pass and\n\
+            `--full` do not require the PR remap metadata.\n\
             \n\
             Configure via `flint.toml`:\n\
             \n\

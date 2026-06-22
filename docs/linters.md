@@ -274,10 +274,11 @@ Check for broken links
 
 Orchestrates [lychee](https://lychee.cli.rs/) for link checking. Requires `lychee` in `[tools]`.
 
-Default behavior: checks all links in changed files. When
-`check_all_local = true` in `flint.toml`, adds a second pass over local links
-in all files — useful when broken internal links from unchanged files also
-matter.
+Default behavior: checks all links in changed files. In CI, Flint also adds a
+full-repository safeguard pass over all links in all files so stale links in
+unchanged docs still fail the build. Outside that CI safeguard, setting
+`check_all_local = true` in `flint.toml` adds a second pass over local links in
+all files — useful when broken internal links from unchanged files also matter.
 
 Outside CI, flint also enables a local lychee request cache by default to
 speed up repeated runs. Flint stores that cache under `.lychee_cache/` and
@@ -289,8 +290,8 @@ In CI, `lychee` requires `GITHUB_TOKEN` so GitHub link checks can authenticate.
 On GitHub Actions PR runs in changed-file mode, link remaps also require
 `GITHUB_REPOSITORY`, `GITHUB_BASE_REF`, `GITHUB_HEAD_REF`, and `PR_HEAD_REPO`.
 GitHub Actions provides the first three; set `PR_HEAD_REPO` from
-`github.event.pull_request.head.repo.full_name`. `--full` does not require
-the PR remap metadata.
+`github.event.pull_request.head.repo.full_name`. The CI safeguard full pass and
+`--full` do not require the PR remap metadata.
 
 Configure via `flint.toml`:
 

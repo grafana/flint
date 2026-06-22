@@ -89,7 +89,7 @@ Read the [background and principles](docs/why.md) and
    For a real setup example, see grafana/docker-otel-lgtm's
    [`mise.toml`](https://github.com/grafana/docker-otel-lgtm/blob/main/mise.toml),
    [`flint.toml`](https://github.com/grafana/docker-otel-lgtm/blob/main/.github/config/flint.toml), and
-   [lint workflow](https://github.com/grafana/docker-otel-lgtm/blob/main/.github/workflows/lint.yml).
+   [CI workflow](https://github.com/grafana/docker-otel-lgtm/blob/main/.github/workflows/ci.yml).
 
 5. Optional: install a git hook that runs `flint run --fix` before each commit:
 

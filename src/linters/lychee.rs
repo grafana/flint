@@ -240,7 +240,14 @@ pub async fn run(
 }
 
 fn should_check_all_links_in_ci() -> bool {
-    env::is_ci_from(|name| std::env::var(name).ok())
+    should_check_all_links_in_ci_from(|name| std::env::var(name).ok())
+}
+
+fn should_check_all_links_in_ci_from<F>(env: F) -> bool
+where
+    F: Fn(&str) -> Option<String>,
+{
+    env::is_ci_from(env)
 }
 
 fn validate_runtime_env(file_list: &FileList) -> Result<Option<String>, String> {
@@ -816,24 +823,15 @@ mod tests {
 
     #[test]
     fn ci_enables_all_links_safeguard() {
-        unsafe {
-            std::env::set_var("CI", "true");
-        }
-
-        assert!(should_check_all_links_in_ci());
-
-        unsafe {
-            std::env::remove_var("CI");
-        }
+        assert!(should_check_all_links_in_ci_from(|name| match name {
+            "CI" => Some("true".to_string()),
+            _ => None,
+        }));
     }
 
     #[test]
     fn non_ci_does_not_enable_all_links_safeguard() {
-        unsafe {
-            std::env::remove_var("CI");
-        }
-
-        assert!(!should_check_all_links_in_ci());
+        assert!(!should_check_all_links_in_ci_from(|_| None));
     }
 
     #[test]

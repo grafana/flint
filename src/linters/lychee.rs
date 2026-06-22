@@ -44,6 +44,12 @@ struct CachePreference {
     allowed: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FollowUpMode {
+    AllLinks,
+    LocalOnly,
+}
+
 #[derive(Debug)]
 struct PreparedLychee {
     name: String,
@@ -180,7 +186,7 @@ pub async fn run(
     let mut combined_stdout = Vec::new();
     let mut combined_stderr = Vec::new();
 
-    let ci_all_links = should_check_all_links_in_ci();
+    let follow_up_mode = follow_up_mode(cfg);
 
     if !checkable_inputs.is_empty() {
         let file_refs: Vec<&str> = checkable_inputs.iter().map(String::as_str).collect();
@@ -197,31 +203,17 @@ pub async fn run(
         all_ok &= out.ok;
         combined_stdout.extend_from_slice(&out.stdout);
         combined_stderr.extend_from_slice(&out.stderr);
-    } else if !ci_all_links {
+    } else if follow_up_mode.is_none() {
         combined_stdout.extend_from_slice(b"No modified files to check for all links.\n");
     }
 
-    if ci_all_links {
+    if let Some((description, local_only)) = follow_up_mode_args(follow_up_mode) {
         let out = run_lychee_cmd(
-            "Checking all links in all files (CI safeguard)",
+            description,
             &lychee_cfg,
             &remap_args,
             &checkable_all_file_refs,
-            false,
-            project_root,
-            cache_preference,
-        )
-        .await;
-        all_ok &= out.ok;
-        combined_stdout.extend_from_slice(&out.stdout);
-        combined_stderr.extend_from_slice(&out.stderr);
-    } else if cfg.check_all_local {
-        let out = run_lychee_cmd(
-            "Checking local links in all files",
-            &lychee_cfg,
-            &remap_args,
-            &checkable_all_file_refs,
-            true,
+            local_only,
             project_root,
             cache_preference,
         )
@@ -239,15 +231,38 @@ pub async fn run(
     }
 }
 
-fn should_check_all_links_in_ci() -> bool {
-    should_check_all_links_in_ci_from(|name| std::env::var(name).ok())
-}
-
 fn should_check_all_links_in_ci_from<F>(env: F) -> bool
 where
     F: Fn(&str) -> Option<String>,
 {
     env::is_ci_from(env)
+}
+
+fn follow_up_mode(cfg: &LycheeConfig) -> Option<FollowUpMode> {
+    follow_up_mode_from(cfg, |name| std::env::var(name).ok())
+}
+
+fn follow_up_mode_from<F>(cfg: &LycheeConfig, env: F) -> Option<FollowUpMode>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    if should_check_all_links_in_ci_from(env) {
+        Some(FollowUpMode::AllLinks)
+    } else if cfg.check_all_local {
+        Some(FollowUpMode::LocalOnly)
+    } else {
+        None
+    }
+}
+
+fn follow_up_mode_args(mode: Option<FollowUpMode>) -> Option<(&'static str, bool)> {
+    match mode {
+        Some(FollowUpMode::AllLinks) => {
+            Some(("Checking all links in all files (CI safeguard)", false))
+        }
+        Some(FollowUpMode::LocalOnly) => Some(("Checking local links in all files", true)),
+        None => None,
+    }
 }
 
 fn validate_runtime_env(file_list: &FileList) -> Result<Option<String>, String> {
@@ -832,6 +847,35 @@ mod tests {
     #[test]
     fn non_ci_does_not_enable_all_links_safeguard() {
         assert!(!should_check_all_links_in_ci_from(|_| None));
+    }
+
+    #[test]
+    fn follow_up_mode_prefers_ci_all_links_over_local_only() {
+        let mode = follow_up_mode_from(
+            &LycheeConfig {
+                config: None,
+                check_all_local: true,
+            },
+            |name| match name {
+                "CI" => Some("true".to_string()),
+                _ => None,
+            },
+        );
+
+        assert_eq!(mode, Some(FollowUpMode::AllLinks));
+    }
+
+    #[test]
+    fn follow_up_mode_uses_local_only_when_configured_outside_ci() {
+        let mode = follow_up_mode_from(
+            &LycheeConfig {
+                config: None,
+                check_all_local: true,
+            },
+            |_| None,
+        );
+
+        assert_eq!(mode, Some(FollowUpMode::LocalOnly));
     }
 
     #[test]

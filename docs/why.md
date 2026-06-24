@@ -1,5 +1,7 @@
 # Why Flint
 
+> 📖 Blog post: [Flint — a linter setup that doesn't slow down your AI agent](https://medium.com/grafana-labs/flint-a-linter-setup-that-doesnt-slow-down-your-ai-agent-e3a85044c4c2)
+
 Flint exists to make repository linting fast, predictable, and easy to keep
 consistent between local development, hooks, CI, and agentic workflows.
 

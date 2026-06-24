@@ -484,9 +484,11 @@ fn write_snapshot_serializes_canonical_dep_order() {
     write_snapshot(&path, &deps).unwrap();
 
     let contents = std::fs::read_to_string(&path).unwrap();
-    assert!(contents.contains(
-        "\"npm\": [\n        \"alpha\",\n        \"moose\",\n        \"zebra\"\n      ]"
-    ));
+    let written: serde_json::Value = serde_json::from_str(&contents).unwrap();
+    assert_eq!(
+        written["files"]["package.json"]["npm"],
+        serde_json::json!(["alpha", "moose", "zebra"])
+    );
 }
 
 #[test]
@@ -1045,6 +1047,33 @@ fn unified_diff_header_uses_display_path() {
     let new = snapshot(&[("y", None, None)], &[("a.json", &[("npm", &["y"])])]);
     let diff = unified_diff(&old, &new, "renovate-tracked-deps.json");
     assert!(diff.contains("renovate-tracked-deps.json"));
+}
+
+#[test]
+fn unified_diff_ignores_dep_order_only_changes() {
+    let old = snapshot(
+        &[
+            ("alpha", None, None),
+            ("moose", None, None),
+            ("zebra", None, None),
+        ],
+        &[("package.json", &[("npm", &["zebra", "alpha", "moose"])])],
+    );
+    let new = snapshot(
+        &[
+            ("alpha", None, None),
+            ("moose", None, None),
+            ("zebra", None, None),
+        ],
+        &[("package.json", &[("npm", &["moose", "zebra", "alpha"])])],
+    );
+
+    let diff = unified_diff(&old, &new, ".github/renovate-tracked-deps.json");
+
+    assert!(
+        diff.is_empty(),
+        "ordering-only changes should not diff: {diff}"
+    );
 }
 
 #[test]

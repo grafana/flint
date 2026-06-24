@@ -22,4 +22,6 @@ exclude = [
   "https://docs.google.com/.*",
   # Release Please generates compare links for future releases that 404 until the release is published
   "https://github.com/.*/compare/.*",
+  # Medium blocks automated link checkers with 403
+  "https://medium.com/.*",
 ]

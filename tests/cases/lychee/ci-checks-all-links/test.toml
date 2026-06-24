@@ -1,0 +1,28 @@
+[expected]
+args = "run lychee"
+exit = 1
+stderr = """
+[lychee]
+==> Checking local links in all files
+ARGS: --config <REPO>/lychee.toml --scheme file --include-fragments -- README.md
+
+flint: 1 check failed (lychee)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+"""
+
+[env]
+CI = "true"
+GITHUB_TOKEN = "token"
+LYCHEE_SKIP_GITHUB_REMAPS = "true"
+
+[fake_bins]
+lychee = '''
+#!/bin/sh
+set -eu
+printf 'ARGS:'
+for arg in "$@"; do
+	printf ' %s' "$arg"
+done
+printf '\n'
+exit 1
+'''

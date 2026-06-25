@@ -440,12 +440,55 @@ fn reads_legacy_snapshot_format() {
 }
 
 #[test]
+fn read_snapshot_normalizes_dep_order() {
+    let current = r#"{
+  "meta": {},
+  "files": {
+    "package.json": {
+      "npm": [
+        "zebra",
+        "alpha",
+        "moose"
+      ]
+    }
+  }
+}
+"#;
+    let snapshot = read_snapshot(current).unwrap();
+    assert_eq!(
+        snapshot.files,
+        dep_files(&[("package.json", &[("npm", &["alpha", "moose", "zebra"])])])
+    );
+}
+
+#[test]
 fn write_snapshot_ends_with_newline() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("out.json");
     write_snapshot(&path, &Snapshot::default()).unwrap();
     let contents = std::fs::read_to_string(&path).unwrap();
     assert!(contents.ends_with('\n'));
+}
+
+#[test]
+fn write_snapshot_serializes_canonical_dep_order() {
+    use std::collections::BTreeMap;
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("out.json");
+    let deps = Snapshot {
+        meta: BTreeMap::new(),
+        files: dep_files(&[("package.json", &[("npm", &["zebra", "alpha", "moose"])])]),
+    };
+
+    write_snapshot(&path, &deps).unwrap();
+
+    let contents = std::fs::read_to_string(&path).unwrap();
+    let written: serde_json::Value = serde_json::from_str(&contents).unwrap();
+    assert_eq!(
+        written["files"]["package.json"]["npm"],
+        serde_json::json!(["alpha", "moose", "zebra"])
+    );
 }
 
 #[test]
@@ -1004,6 +1047,33 @@ fn unified_diff_header_uses_display_path() {
     let new = snapshot(&[("y", None, None)], &[("a.json", &[("npm", &["y"])])]);
     let diff = unified_diff(&old, &new, "renovate-tracked-deps.json");
     assert!(diff.contains("renovate-tracked-deps.json"));
+}
+
+#[test]
+fn unified_diff_ignores_dep_order_only_changes() {
+    let old = snapshot(
+        &[
+            ("alpha", None, None),
+            ("moose", None, None),
+            ("zebra", None, None),
+        ],
+        &[("package.json", &[("npm", &["zebra", "alpha", "moose"])])],
+    );
+    let new = snapshot(
+        &[
+            ("alpha", None, None),
+            ("moose", None, None),
+            ("zebra", None, None),
+        ],
+        &[("package.json", &[("npm", &["moose", "zebra", "alpha"])])],
+    );
+
+    let diff = unified_diff(&old, &new, ".github/renovate-tracked-deps.json");
+
+    assert!(
+        diff.is_empty(),
+        "ordering-only changes should not diff: {diff}"
+    );
 }
 
 #[test]

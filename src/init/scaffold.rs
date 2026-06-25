@@ -47,16 +47,16 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           persist-credentials: false
           fetch-depth: 0
 
       - name: Setup mise
-        uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
         with:
-          version: v2026.6.5
-          sha256: 9ca3e4e25c26c64886d036fe9ddb2e5415a204f2d5b9c35bf67abd4f15f0f768
+          version: v2026.6.11
+          sha256: 4c1036af15efea3a4d83f13481132ec7d7dda15e7ec5869dd70a64072bf1a6c9
 {rust_steps}
       - name: Lint
         env:

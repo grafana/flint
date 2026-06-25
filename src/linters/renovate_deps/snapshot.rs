@@ -51,6 +51,14 @@ impl Snapshot {
         self.files.is_empty()
     }
 
+    pub(crate) fn normalize(&mut self) {
+        for managers in self.files.values_mut() {
+            for deps in managers.values_mut() {
+                deps.sort();
+            }
+        }
+    }
+
     pub(crate) fn strip_lookup_meta(&mut self) {
         for meta in self.meta.values_mut() {
             meta.clear_version_context();
@@ -60,13 +68,16 @@ impl Snapshot {
 
 pub(crate) fn read_snapshot(contents: &str) -> anyhow::Result<Snapshot> {
     let parsed: serde_json::Value = serde_json::from_str(contents)?;
-    if parsed.get("files").is_some() || parsed.get("meta").is_some() {
-        return Ok(serde_json::from_value(parsed)?);
-    }
-    Ok(Snapshot {
-        meta: BTreeMap::new(),
-        files: serde_json::from_value(parsed)?,
-    })
+    let mut snapshot = if parsed.get("files").is_some() || parsed.get("meta").is_some() {
+        serde_json::from_value(parsed)?
+    } else {
+        Snapshot {
+            meta: BTreeMap::new(),
+            files: serde_json::from_value(parsed)?,
+        }
+    };
+    snapshot.normalize();
+    Ok(snapshot)
 }
 
 /// Parses Renovate's NDJSON log and returns the dependency snapshot.
@@ -243,14 +254,21 @@ fn collapse_unique(values: BTreeSet<String>) -> Option<String> {
 }
 
 pub(crate) fn write_snapshot(path: &Path, deps: &Snapshot) -> anyhow::Result<()> {
-    let json = serde_json::to_string_pretty(deps)?;
+    let mut deps = deps.clone();
+    deps.normalize();
+    let json = serde_json::to_string_pretty(&deps)?;
     std::fs::write(path, json + "\n")?;
     Ok(())
 }
 
 pub(crate) fn unified_diff(old: &Snapshot, new: &Snapshot, committed_display: &str) -> String {
-    let old_text = serde_json::to_string_pretty(old).unwrap_or_default() + "\n";
-    let new_text = serde_json::to_string_pretty(new).unwrap_or_default() + "\n";
+    let mut old = old.clone();
+    old.normalize();
+    let mut new = new.clone();
+    new.normalize();
+
+    let old_text = serde_json::to_string_pretty(&old).unwrap_or_default() + "\n";
+    let new_text = serde_json::to_string_pretty(&new).unwrap_or_default() + "\n";
 
     let diff = similar::TextDiff::from_lines(&old_text, &new_text);
     diff.unified_diff()

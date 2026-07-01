@@ -94,6 +94,8 @@ vars control its behaviour:
 To regenerate README + docs tables from the registry/CLI, run
 `mise run generate`.
 
+To regenerate test snapshots, run `mise run generate:snapshots`.
+
 On failure the test prints a rerun hint, e.g.:
 `FLINT_CASES=shellcheck/clean cargo test cases`
 

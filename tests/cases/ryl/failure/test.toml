@@ -4,7 +4,7 @@ exit = 1
 stderr = '''
 [ryl]
 <REPO>/config.yml
-  2:1       error    syntax error: while parsing a node, did not find expected node content (syntax)
+  1:6       error    syntax error: unclosed bracket '[' (syntax)
 
 
 flint: 1 check failed (ryl)

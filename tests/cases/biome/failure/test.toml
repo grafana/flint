@@ -5,7 +5,7 @@ stderr = '''
 [biome]
 Checked N file(s) in Xµs. No fixes applied.
 Found 1 error.
-main.js:1:1 lint/suspicious/noDebugger  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ at main.js:1:1 lint/suspicious/noDebugger  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   × This is an unexpected use of the debugger statement.
   

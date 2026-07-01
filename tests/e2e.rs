@@ -946,81 +946,61 @@ fn run_case(case: &Path, name: &str, update: bool) {
 }
 
 /// Rewrites test.toml updating snapshot fields ([expected].exit/stderr/stdout)
-/// while preserving everything else (args, env, fake_bins, expected.files).
+/// while preserving existing formatting and unrelated sections.
 fn write_test_toml(path: &Path, cfg: &toml::Value, exit: i32, stderr: &str, stdout: &str) {
     let expected = &cfg["expected"];
-    let args_str = expected["args"].as_str().unwrap_or("");
-    let existing_files = expected.get("files").and_then(|v| v.as_table());
     let existing_stderr_contains = expected.get("stderr_contains").and_then(|v| v.as_array());
     let existing_stdout_contains = expected.get("stdout_contains").and_then(|v| v.as_array());
 
-    let mut out = String::from("[expected]\n");
-    out += &format!("args = \"{}\"\n", toml_escape(args_str));
-    out += &format!("exit = {exit}\n");
-    if let Some(contains) = existing_stderr_contains {
-        out += &format!("stderr_contains = {}\n", toml_string_array(contains));
-    } else if !stderr.is_empty() {
-        out += &format!("stderr = '''\n{stderr}'''\n");
+    let existing_exit = expected
+        .get("exit")
+        .and_then(|v| v.as_integer())
+        .unwrap_or(0) as i32;
+    let existing_stderr = expected
+        .get("stderr")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let existing_stdout = expected
+        .get("stdout")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let stderr_matches = existing_stderr_contains.is_some() || existing_stderr == stderr;
+    let stdout_matches = existing_stdout_contains.is_some() || existing_stdout == stdout;
+    if existing_exit == exit && stderr_matches && stdout_matches {
+        return;
     }
-    if let Some(contains) = existing_stdout_contains {
-        out += &format!("stdout_contains = {}\n", toml_string_array(contains));
-    } else if !stdout.is_empty() {
-        out += &format!("stdout = '''\n{stdout}'''\n");
-    }
-    if let Some(files) = existing_files {
-        out += "\n[expected.files]\n";
-        for (k, v) in files {
-            if let Some(s) = v.as_str() {
-                // Literal multi-line strings ('''…''') to avoid escape processing.
-                out += &format!("\"{k}\" = '''\n{s}'''\n");
-            }
+
+    let raw = std::fs::read_to_string(path).expect("read existing test.toml");
+    let mut doc: toml_edit::DocumentMut = raw.parse().expect("parse existing test.toml");
+    let expected = doc["expected"]
+        .as_table_mut()
+        .expect("existing [expected] table");
+
+    expected["exit"] = parsed_toml_item(&format!("value = {exit}\n"), "value");
+
+    if existing_stderr_contains.is_none() {
+        if stderr.is_empty() {
+            expected.remove("stderr");
+        } else {
+            expected["stderr"] = parsed_toml_item(&format!("value = '''\n{stderr}'''\n"), "value");
         }
     }
 
-    if let Some(env) = cfg.get("env").and_then(|v| v.as_table())
-        && !env.is_empty()
-    {
-        out += "\n\n[env]\n";
-        for (k, v) in env {
-            if let Some(s) = v.as_str() {
-                out += &format!("{k} = \"{}\"\n", toml_escape(s));
-            }
+    if existing_stdout_contains.is_none() {
+        if stdout.is_empty() {
+            expected.remove("stdout");
+        } else {
+            expected["stdout"] = parsed_toml_item(&format!("value = '''\n{stdout}'''\n"), "value");
         }
     }
 
-    // Serialize as multiline literal strings so shell scripts stay readable.
-    // TOML trims the first newline after ''', so '''\n{s}''' roundtrips cleanly.
-    if let Some(bins) = cfg.get("fake_bins").and_then(|v| v.as_table())
-        && !bins.is_empty()
-    {
-        out += "\n[fake_bins]\n";
-        for (k, v) in bins {
-            if let Some(s) = v.as_str() {
-                out += &format!("{k} = '''\n{s}'''\n");
-            }
-        }
-    }
-
-    std::fs::write(path, out).unwrap();
+    std::fs::write(path, doc.to_string()).expect("write updated test.toml");
 }
 
-/// Escapes a string for use inside TOML basic double-quoted strings.
-fn toml_escape(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"")
-}
-
-fn toml_string_array(values: &[toml::Value]) -> String {
-    let values = values
-        .iter()
-        .map(|value| {
-            let value = value
-                .as_str()
-                .expect("expected string entries in TOML string array");
-            format!("\"{}\"", toml_escape(value))
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
-    format!("[{values}]")
+fn parsed_toml_item(snippet: &str, key: &str) -> toml_edit::Item {
+    let doc: toml_edit::DocumentMut = snippet.parse().expect("parse synthetic TOML snippet");
+    doc[key].clone()
 }
 
 #[test]
@@ -1044,6 +1024,56 @@ stdout_contains = ["keep stdout"]
     assert!(updated.contains("stdout_contains = [\"keep stdout\"]"));
     assert!(!updated.contains("new stderr"));
     assert!(!updated.contains("new stdout"));
+}
+
+#[test]
+fn write_test_toml_preserves_unrelated_formatting() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("test.toml");
+    let src = r#"[expected]
+args = "run --fix renovate-deps"
+exit = 1
+stderr = '''
+old stderr
+'''
+
+[expected.files]
+".reno-count" = "3\n"
+
+[env]
+GITHUB_TOKEN = "token"
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+echo hi
+'''
+"#;
+    std::fs::write(&path, src).expect("write test.toml");
+
+    let cfg: toml::Value = toml::from_str(src).expect("parse test.toml");
+    write_test_toml(&path, &cfg, 0, "new stderr\n", "");
+
+    let updated = std::fs::read_to_string(&path).expect("read updated test.toml");
+    assert!(updated.contains("exit = 0"));
+    assert!(updated.contains("stderr = '''\nnew stderr\n'''"));
+    assert!(updated.contains("[expected.files]\n\".reno-count\" = \"3\\n\""));
+    assert!(updated.contains("\n[env]\nGITHUB_TOKEN = \"token\"\n"));
+    assert!(updated.contains("\n[fake_bins]\nrenovate = '''\n#!/bin/sh\necho hi\n'''"));
+}
+
+#[test]
+fn write_test_toml_is_noop_when_snapshot_is_unchanged() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("test.toml");
+    let src = "[expected]\nargs = \"run --full biome\"\nexit = 1\nstderr = \"same stderr\"\n";
+    std::fs::write(&path, src).expect("write test.toml");
+
+    let cfg: toml::Value = toml::from_str(src).expect("parse test.toml");
+    write_test_toml(&path, &cfg, 1, "same stderr", "");
+
+    let updated = std::fs::read_to_string(&path).expect("read updated test.toml");
+    assert_eq!(updated, src);
 }
 
 /// Normalises timing suffixes on check header lines so snapshots are stable.

@@ -18,7 +18,7 @@
 //! skipped; those changes fall back to the existing CI-only detection.
 
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Component, Path};
 
 use globset::GlobBuilder;
 use regex::Regex;
@@ -99,15 +99,23 @@ fn collect_patterns(
         }
     }
 
-    if let Some(extends) = parsed.get("extends").and_then(|v| v.as_array()) {
-        for entry in extends.iter().filter_map(|v| v.as_str()) {
-            if let Some(resolved) = resolve_extend(project_root, entry, visited) {
-                patterns.extend(collect_patterns(project_root, &resolved, visited));
-            }
+    for entry in extends_entries(&parsed) {
+        if let Some(resolved) = resolve_extend(project_root, entry, visited) {
+            patterns.extend(collect_patterns(project_root, &resolved, visited));
         }
     }
 
     patterns
+}
+
+fn extends_entries(parsed: &serde_json::Value) -> Vec<&str> {
+    match parsed.get("extends") {
+        Some(serde_json::Value::String(entry)) => vec![entry.as_str()],
+        Some(serde_json::Value::Array(entries)) => {
+            entries.iter().filter_map(|v| v.as_str()).collect()
+        }
+        _ => Vec::new(),
+    }
 }
 
 /// Resolves an `extends` entry to its config content, if we can do so
@@ -126,8 +134,7 @@ fn resolve_extend(
     }
 
     let rel_path = entry.strip_prefix("local>").unwrap_or(entry);
-    if rel_path.contains('>') || rel_path.starts_with(':') {
-        // Unresolvable preset reference (e.g. `github>org/repo`, `config:recommended`).
+    if !is_safe_local_extend_path(rel_path) {
         return None;
     }
 
@@ -144,6 +151,20 @@ fn resolve_extend(
         return None;
     }
     std::fs::read_to_string(&candidate).ok()
+}
+
+fn is_safe_local_extend_path(rel_path: &str) -> bool {
+    if rel_path.is_empty() || rel_path.contains(':') {
+        return false;
+    }
+
+    let path = Path::new(rel_path);
+    if path.is_absolute() {
+        return false;
+    }
+
+    path.components()
+        .all(|component| matches!(component, Component::Normal(_)))
 }
 
 fn is_flint_preset_extend(entry: &str) -> bool {

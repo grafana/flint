@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 use self::install_patch::configure_extract_workaround_env;
+use self::manager_patterns::changed_matches_manager_file_patterns;
 use self::mise_normalize::patch_semver_equivalent_mise_values;
 use self::rules::{
     ExtractVersionMismatch, comparable_package_rules_for_config, extract_version_mismatches,
@@ -21,6 +22,7 @@ use crate::registry::{
 };
 
 mod install_patch;
+mod manager_patterns;
 mod mise_normalize;
 mod rules;
 mod snapshot;
@@ -172,7 +174,17 @@ pub(crate) fn is_relevant(file_list: &FileList, project_root: &Path) -> bool {
         None => return true,
     };
 
-    committed.files.keys().any(|path| changed.contains(path))
+    if committed.files.keys().any(|path| changed.contains(path)) {
+        return true;
+    }
+
+    let Some(config_path) = find_renovate_config(project_root) else {
+        return false;
+    };
+    let Ok(config_content) = std::fs::read_to_string(&config_path) else {
+        return false;
+    };
+    changed_matches_manager_file_patterns(project_root, &config_content, &changed)
 }
 
 fn changed_rel_paths(file_list: &FileList, project_root: &Path) -> HashSet<String> {

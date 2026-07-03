@@ -1,0 +1,7 @@
+{
+  "mise.toml": {
+    "mise": [
+      "npm:renovate"
+    ]
+  }
+}

@@ -291,10 +291,21 @@ fn deps_are_sorted() {
 #[test]
 fn filters_skip_reasons() {
     let log = log(
-        r#"{"npm":[{"packageFile":"package.json","deps":[{"depName":"keep"},{"depName":"bad1","skipReason":"contains-variable"},{"depName":"bad2","skipReason":"invalid-value"},{"depName":"bad3","skipReason":"invalid-version"}]}]}"#,
+        r#"{"npm":[{"packageFile":"package.json","deps":[{"depName":"keep"},{"depName":"bad1","skipReason":"contains-variable"},{"depName":"bad2","skipReason":"invalid-value"}]}]}"#,
     );
     let result = extract_deps(&log, &[]).unwrap();
     assert_eq!(result.files["package.json"]["npm"], vec!["keep"]);
+}
+
+#[test]
+fn invalid_version_is_kept() {
+    // Lookup-time versioning failures (e.g. java-jdk `temurin-*` currentVersion
+    // rejected by workarounds:javaLTSVersions regex) must not drop the dep.
+    let log = log(
+        r#"{"mise":[{"packageFile":"mise.toml","deps":[{"depName":"java","skipReason":"invalid-version"}]}]}"#,
+    );
+    let result = extract_deps(&log, &[]).unwrap();
+    assert_eq!(result.files["mise.toml"]["mise"], vec!["java"]);
 }
 
 #[test]

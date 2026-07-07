@@ -3,7 +3,12 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 
 const PACKAGE_FILES_MSGS: &[&str] = &["Extracted dependencies", "packageFiles with updates"];
-const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value", "invalid-version"];
+// `invalid-version` is intentionally NOT filtered: it is set at lookup time when
+// Renovate's versioning rejects the resolved `currentVersion` (e.g. mise.lock
+// forwarding `temurin-*` as currentVersion for java-jdk). The dep is still
+// declared in the config and must remain tracked; filtering it here caused
+// `--fix` (lookup) to silently drop deps that verify (extract) keeps.
+const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value"];
 
 /// `{file_path: {manager: [dep_name, ...]}}` — all collections sorted.
 pub(crate) type DepFiles = BTreeMap<String, BTreeMap<String, Vec<String>>>;

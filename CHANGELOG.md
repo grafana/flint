@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.22.7](https://github.com/grafana/flint/compare/v0.22.6...v0.22.7) - 2026-07-07
+
+### Added
+
+- *(renovate-deps)* detect new files matching customManagers patterns locally ([#379](https://github.com/grafana/flint/pull/379))
+
+### Fixed
+
+- *(renovate-deps)* keep deps with skipReason=invalid-version ([#385](https://github.com/grafana/flint/pull/385))
+
+### Other
+
+- *(deps)* update taiki-e/install-action action to v2.82.8 ([#384](https://github.com/grafana/flint/pull/384))
+- *(deps)* update linters ([#382](https://github.com/grafana/flint/pull/382))
+- *(deps)* update dependency mise to v2026.7.0 ([#383](https://github.com/grafana/flint/pull/383))
+- *(deps)* update taiki-e/install-action action to v2.82.7 ([#381](https://github.com/grafana/flint/pull/381))
+- *(deps)* update dependency rust to v1.96.1 ([#380](https://github.com/grafana/flint/pull/380))
+- *(deps)* update taiki-e/install-action action to v2.82.6 ([#378](https://github.com/grafana/flint/pull/378))
+- *(deps)* update linters ([#375](https://github.com/grafana/flint/pull/375))
+- *(deps)* update taiki-e/install-action action to v2.82.4 ([#373](https://github.com/grafana/flint/pull/373))
+- *(deps)* lock file maintenance ([#377](https://github.com/grafana/flint/pull/377))
+- *(deps)* update mise to v2026.6.14 ([#376](https://github.com/grafana/flint/pull/376))
+- *(deps)* update taiki-e/install-action action to v2.82.3 ([#372](https://github.com/grafana/flint/pull/372))
+- *(deps)* update actions/attest-build-provenance digest to 0f67c3f ([#371](https://github.com/grafana/flint/pull/371))
+- *(deps)* update node.js to v24.18.0 ([#370](https://github.com/grafana/flint/pull/370))
+
 ## [0.22.6](https://github.com/grafana/flint/compare/v0.22.5...v0.22.6) - 2026-06-25
 
 ### Added

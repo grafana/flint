@@ -226,11 +226,14 @@ fn generated_paths(project_root: &Path, names: &BTreeSet<String>) -> Result<Hash
         Ok(())
     });
 
-    let out = child.wait_with_output().context("git check-attr")?;
-    writer
+    // Always join the writer before propagating any error, so it's never left detached: an
+    // early `?` return on a `wait_with_output` failure would otherwise skip the join below.
+    let wait_result = child.wait_with_output().context("git check-attr");
+    let write_result = writer
         .join()
-        .expect("git check-attr stdin writer thread panicked")
-        .context("git check-attr: writing stdin")?;
+        .expect("git check-attr stdin writer thread panicked");
+    let out = wait_result?;
+    write_result.context("git check-attr: writing stdin")?;
     if !out.status.success() {
         let stderr = String::from_utf8_lossy(&out.stderr);
         anyhow::bail!("git check-attr failed ({}): {}", out.status, stderr.trim());
@@ -411,7 +414,7 @@ mod tests {
     /// limits are much higher and wouldn't have caught this. Also verifies large-N correctness
     /// and that writing stdin doesn't deadlock against a filled stdout pipe.
     #[test]
-    fn filter_names_handles_many_long_paths_via_stdin() {
+    fn generated_paths_handles_many_long_paths_via_stdin() {
         let tmp = tempfile::TempDir::new().unwrap();
 
         for args in [
@@ -433,28 +436,27 @@ mod tests {
         )
         .unwrap();
 
-        // Long names (well under the 255-char filesystem component limit) so even a single
-        // argv-based batch of 256 paths would total ~256 * 220 chars ~= 56KB — comfortably over
+        // `git check-attr` matches paths against .gitattributes patterns regardless of whether
+        // the path exists on disk, so these names are synthetic (not created as real files) —
+        // this keeps the test from tripping Windows' legacy 260-char MAX_PATH limit on CI
+        // runners while still exercising long paths through the actual `git check-attr`
+        // subprocess. Long enough that a single argv-based batch of 256 paths (the old
+        // implementation's batch size) would total ~256 * 220 chars ~= 56KB — comfortably over
         // Windows' ~32KB command-line limit, not just barely over it.
         let long_prefix = "a".repeat(200);
         let mut names = BTreeSet::new();
-        let mut expected_kept = Vec::new();
+        let mut expected_generated = HashSet::new();
         for i in 0..2000 {
             let generated_name = format!("{long_prefix}-{i}.generated.txt");
-            std::fs::write(tmp.path().join(&generated_name), "generated\n").unwrap();
-            names.insert(generated_name);
+            names.insert(generated_name.clone());
+            expected_generated.insert(generated_name);
 
             let kept_name = format!("{long_prefix}-{i}.txt");
-            std::fs::write(tmp.path().join(&kept_name), "kept\n").unwrap();
-            names.insert(kept_name.clone());
-            expected_kept.push(tmp.path().join(kept_name));
+            names.insert(kept_name);
         }
-        expected_kept.sort();
 
-        let mut files =
-            filter_names(tmp.path(), &GlobSetBuilder::new().build().unwrap(), names).unwrap();
-        files.sort();
+        let generated = generated_paths(tmp.path(), &names).unwrap();
 
-        assert_eq!(files, expected_kept);
+        assert_eq!(generated, expected_generated);
     }
 }

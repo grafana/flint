@@ -1,8 +1,9 @@
 use anyhow::{Context, Result};
 use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 use std::collections::{BTreeSet, HashSet};
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use crate::config::Config;
 use crate::linters::renovate_deps::COMMITTED_PATHS;
@@ -199,34 +200,49 @@ fn generated_paths(project_root: &Path, names: &BTreeSet<String>) -> Result<Hash
         return Ok(HashSet::new());
     }
 
-    const CHECK_ATTR_BATCH_SIZE: usize = 256;
-    let mut generated = HashSet::new();
+    // Feed paths via stdin (`--stdin -z`) instead of as CLI args. Passing many/long paths as
+    // argv batches hit Windows' ~32KB CreateProcess command-line limit on repos with long paths
+    // (os error 206, ERROR_FILENAME_EXCED_RANGE) even with modest batch sizes; stdin has no such
+    // limit on any platform.
+    let mut child = Command::new("git")
+        .args(["check-attr", "--stdin", "-z", "linguist-generated"])
+        .current_dir(project_root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("git check-attr")?;
 
-    for batch in names
-        .iter()
-        .collect::<Vec<_>>()
-        .chunks(CHECK_ATTR_BATCH_SIZE)
-    {
-        let mut args = vec!["check-attr", "-z", "linguist-generated", "--"];
-        args.extend(batch.iter().copied().map(String::as_str));
-
-        let out = Command::new("git")
-            .args(&args)
-            .current_dir(project_root)
-            .output()
-            .context("git check-attr")?;
-        if !out.status.success() {
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            anyhow::bail!("git check-attr failed ({}): {}", out.status, stderr.trim());
+    // Write on a separate thread: git may start writing output before we finish writing input,
+    // and the stdout pipe can fill up (typical OS pipe buffers are 4-64KB) well before all paths
+    // are written for a large repo, which would deadlock if done sequentially on this thread.
+    let mut stdin = child.stdin.take().expect("stdin was piped");
+    let names_for_writer: Vec<String> = names.iter().cloned().collect();
+    let writer = std::thread::spawn(move || -> std::io::Result<()> {
+        for name in &names_for_writer {
+            stdin.write_all(name.as_bytes())?;
+            stdin.write_all(b"\0")?;
         }
+        Ok(())
+    });
 
-        let fields: Vec<&[u8]> = out.stdout.split(|byte| *byte == 0).collect();
-        for chunk in fields.chunks_exact(3) {
-            let path = String::from_utf8_lossy(chunk[0]);
-            let info = String::from_utf8_lossy(chunk[2]);
-            if matches!(info.as_ref(), "set" | "true") {
-                generated.insert(path.into_owned());
-            }
+    let out = child.wait_with_output().context("git check-attr")?;
+    writer
+        .join()
+        .expect("git check-attr stdin writer thread panicked")
+        .context("git check-attr: writing stdin")?;
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        anyhow::bail!("git check-attr failed ({}): {}", out.status, stderr.trim());
+    }
+
+    let mut generated = HashSet::new();
+    let fields: Vec<&[u8]> = out.stdout.split(|byte| *byte == 0).collect();
+    for chunk in fields.chunks_exact(3) {
+        let path = String::from_utf8_lossy(chunk[0]);
+        let info = String::from_utf8_lossy(chunk[2]);
+        if matches!(info.as_ref(), "set" | "true") {
+            generated.insert(path.into_owned());
         }
     }
 
@@ -382,5 +398,63 @@ mod tests {
             filter_names(tmp.path(), &GlobSetBuilder::new().build().unwrap(), names).unwrap();
 
         assert_eq!(files, vec![tmp.path().join("tracked.sh")]);
+    }
+
+    /// Regression test for os error 206 (ERROR_FILENAME_EXCED_RANGE) on Windows: the previous
+    /// implementation passed paths as CLI args in batches of 256, which overflowed Windows'
+    /// ~32KB CreateProcess command-line limit for repos with many/long paths (this is exactly
+    /// what broke on a real large checkout — see the PR this test was added in). Names here are
+    /// long enough that a single 256-path argv batch would total well over 32KB, so this test
+    /// would fail with os error 206 under the old implementation when run on Windows — this
+    /// crate's CI matrix (.github/workflows/test.yml) already runs `cargo test` on windows-2025,
+    /// so this test exercises the real failure mode there, not just on Linux/macOS where argv
+    /// limits are much higher and wouldn't have caught this. Also verifies large-N correctness
+    /// and that writing stdin doesn't deadlock against a filled stdout pipe.
+    #[test]
+    fn filter_names_handles_many_long_paths_via_stdin() {
+        let tmp = tempfile::TempDir::new().unwrap();
+
+        for args in [
+            ["init", "-b", "main"].as_slice(),
+            ["config", "user.email", "test@test.com"].as_slice(),
+            ["config", "user.name", "Test"].as_slice(),
+        ] {
+            let out = Command::new("git")
+                .args(args)
+                .current_dir(tmp.path())
+                .output()
+                .unwrap();
+            assert!(out.status.success(), "git {:?} failed", args);
+        }
+
+        std::fs::write(
+            tmp.path().join(".gitattributes"),
+            "*.generated.txt linguist-generated=true\n",
+        )
+        .unwrap();
+
+        // Long names (well under the 255-char filesystem component limit) so even a single
+        // argv-based batch of 256 paths would total ~256 * 220 chars ~= 56KB — comfortably over
+        // Windows' ~32KB command-line limit, not just barely over it.
+        let long_prefix = "a".repeat(200);
+        let mut names = BTreeSet::new();
+        let mut expected_kept = Vec::new();
+        for i in 0..2000 {
+            let generated_name = format!("{long_prefix}-{i}.generated.txt");
+            std::fs::write(tmp.path().join(&generated_name), "generated\n").unwrap();
+            names.insert(generated_name);
+
+            let kept_name = format!("{long_prefix}-{i}.txt");
+            std::fs::write(tmp.path().join(&kept_name), "kept\n").unwrap();
+            names.insert(kept_name.clone());
+            expected_kept.push(tmp.path().join(kept_name));
+        }
+        expected_kept.sort();
+
+        let mut files =
+            filter_names(tmp.path(), &GlobSetBuilder::new().build().unwrap(), names).unwrap();
+        files.sort();
+
+        assert_eq!(files, expected_kept);
     }
 }

@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.22.8](https://github.com/grafana/flint/compare/v0.22.7...v0.22.8) - 2026-07-13
+
+### Fixed
+
+- avoid Windows arg-length limits in git check-attr and Scope::Files checks ([#390](https://github.com/grafana/flint/pull/390))
+
+### Other
+
+- *(deps)* lock file maintenance ([#397](https://github.com/grafana/flint/pull/397))
+- *(deps)* update dependency mise to v2026.7.5 ([#395](https://github.com/grafana/flint/pull/395))
+- *(deps)* update linters ([#396](https://github.com/grafana/flint/pull/396))
+- *(deps)* update taiki-e/install-action action to v2.83.0 ([#394](https://github.com/grafana/flint/pull/394))
+- *(deps)* update dependency rust to v1.97.0 ([#392](https://github.com/grafana/flint/pull/392))
+- *(deps)* update taiki-e/install-action action to v2.82.11 ([#391](https://github.com/grafana/flint/pull/391))
+- *(deps)* update dependency go to v1.26.5 ([#389](https://github.com/grafana/flint/pull/389))
+- *(deps)* update taiki-e/install-action action to v2.82.10 ([#388](https://github.com/grafana/flint/pull/388))
+- *(deps)* update taiki-e/install-action action to v2.82.9 ([#387](https://github.com/grafana/flint/pull/387))
+
 ## [0.22.7](https://github.com/grafana/flint/compare/v0.22.6...v0.22.7) - 2026-07-07
 
 ### Added

@@ -30,25 +30,25 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-24.04
-            mise_version: v2026.7.0
-            mise_sha256: 0744cb3c303baf0d308ff7b112ed41f22abb6029cb5644fd3a8ce74b29f16a68
+            mise_version: v2026.7.5
+            mise_sha256: 5f7ab76afdf0780d12edeaa67e908094e9ccf7924cfe203e415c1cfb87bbf778
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04
             build-tool: cross
-            mise_version: v2026.7.0
-            mise_sha256: 0744cb3c303baf0d308ff7b112ed41f22abb6029cb5644fd3a8ce74b29f16a68
+            mise_version: v2026.7.5
+            mise_sha256: 5f7ab76afdf0780d12edeaa67e908094e9ccf7924cfe203e415c1cfb87bbf778
           - target: x86_64-apple-darwin
             runner: macos-15-intel
-            mise_version: v2026.7.0
-            mise_sha256: c0debad068ea3e1e525d6580168e0be4759295cdd9049b6ab1aac37d90e952de
+            mise_version: v2026.7.5
+            mise_sha256: 62fe1fe9dbc32c6ce1388ee23df4a0862d3d7f40a6820b40c2f1cbab995dc1d4
           - target: aarch64-apple-darwin
             runner: macos-latest
-            mise_version: v2026.7.0
-            mise_sha256: cc5a708f75e9a84e007a650c23b127e79e54aacf0e41378d75bb15795e9ed54d
+            mise_version: v2026.7.5
+            mise_sha256: a456c65907e8334619d77fa152bdcf9023fddc0daa03d47fbe86d032dbf565b0
           - target: x86_64-pc-windows-msvc
             runner: windows-latest
-            mise_version: v2026.7.0
-            mise_sha256: 7fddd61617c88945cc754a6dfcc44b92767973a8ffab221229c4f9cb6ec888e7
+            mise_version: v2026.7.5
+            mise_sha256: 1840f167ec8b161598e08b8ede769cf9954c0239b25bb7bdf0b326124b548c32
 
     steps:
       - name: Checkout code

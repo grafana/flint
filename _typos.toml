@@ -1,0 +1,3 @@
+[default.extend-words]
+# Genuine (misspelled) Win32 error constant name, not a typo of "exceed".
+exced = "exced"

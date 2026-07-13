@@ -401,29 +401,72 @@ fn build_invocations(
                 }
             }
             let edition_flag = resolve_cargo_edition_flag(project_root);
-            let files_arg: String = matched
-                .iter()
-                .map(|f| quote_path(f))
-                .collect::<Vec<_>>()
-                .join(" ");
-            let rel_files_arg: String = matched
-                .iter()
-                .map(|f| quote_path(f.strip_prefix(project_root).unwrap_or(f)))
-                .collect::<Vec<_>>()
-                .join(" ");
-            let cmd = cmd_template
-                .replace("{CARGO_EDITION_FLAG}", &edition_flag)
-                .replace("{FILES}", &files_arg)
-                .replace("{RELFILES}", &rel_files_arg)
-                .replace("{CONFIG_ARGS}", &rendered_config_args);
-            let argv = shell_words(cmd);
-            vec![if inject_config_args {
-                inject_config(argv, &config_args)
-            } else {
-                argv
-            }]
+            chunk_files_by_length(&matched, project_root)
+                .into_iter()
+                .map(|chunk| {
+                    let files_arg: String = chunk
+                        .iter()
+                        .map(|f| quote_path(f))
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    let rel_files_arg: String = chunk
+                        .iter()
+                        .map(|f| quote_path(f.strip_prefix(project_root).unwrap_or(f)))
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    let cmd = cmd_template
+                        .replace("{CARGO_EDITION_FLAG}", &edition_flag)
+                        .replace("{FILES}", &files_arg)
+                        .replace("{RELFILES}", &rel_files_arg)
+                        .replace("{CONFIG_ARGS}", &rendered_config_args);
+                    let argv = shell_words(cmd);
+                    if inject_config_args {
+                        inject_config(argv, &config_args)
+                    } else {
+                        argv
+                    }
+                })
+                .collect()
         }
     }
+}
+
+/// Maximum characters to put in a single `{FILES}`/`{RELFILES}` substitution. Chosen well under
+/// cmd.exe's ~8191-char command-line buffer — some `Scope::Files` checks are mise shims that
+/// `spawn_command` routes through `cmd.exe /C` on Windows, which is a tighter limit than
+/// `CreateProcessW`'s ~32KB — leaving headroom for the command template itself, quoting, and the
+/// other substitutions applied afterward (`{CONFIG_ARGS}`, `{CARGO_EDITION_FLAG}`).
+const MAX_FILES_ARG_CHARS: usize = 6000;
+
+/// Splits `files` into groups whose rendered `{FILES}`/`{RELFILES}` argument stays under
+/// [`MAX_FILES_ARG_CHARS`], so `Scope::Files` checks issue multiple invocations instead of one
+/// unbounded one. Without this, a large PR (or full run) touching many/long-path files could
+/// overflow Windows' command-line length limits — see the `git check-attr` bug this pattern was
+/// extracted from.
+fn chunk_files_by_length<'a>(files: &[&'a PathBuf], project_root: &Path) -> Vec<Vec<&'a PathBuf>> {
+    let mut chunks: Vec<Vec<&PathBuf>> = vec![];
+    let mut current: Vec<&PathBuf> = vec![];
+    let mut current_len = 0usize;
+
+    for f in files.iter().copied() {
+        // Use the longer of the absolute/quoted-relative representations as a conservative
+        // per-file length estimate, since the template may substitute either {FILES} or
+        // {RELFILES} (or both).
+        let abs_len = quote_path(f).len();
+        let rel_len = quote_path(f.strip_prefix(project_root).unwrap_or(f)).len();
+        let len = abs_len.max(rel_len) + 1; // +1 for the joining space
+
+        if !current.is_empty() && current_len + len > MAX_FILES_ARG_CHARS {
+            chunks.push(std::mem::take(&mut current));
+            current_len = 0;
+        }
+        current.push(f);
+        current_len += len;
+    }
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+    chunks
 }
 
 /// Returns `--edition <edition>` if a Rust edition is declared in the project's
@@ -873,6 +916,19 @@ mod tests {
         }
     }
 
+    fn files_check(patterns: &'static [&'static str]) -> Check {
+        Check {
+            kind: CheckKind::Template {
+                check_cmd: "run-it {FILES}",
+                fix_cmd: "",
+                full_cmd: "",
+                full_fix_cmd: "",
+                scope: Scope::Files,
+            },
+            ..project_check(patterns)
+        }
+    }
+
     fn file_list(paths: &[&str]) -> FileList {
         FileList {
             files: paths
@@ -930,6 +986,61 @@ mod tests {
             Path::new("/repo"),
         );
         assert_eq!(inv, vec![vec!["run-it".to_string()]]);
+    }
+
+    /// Regression test for the same class of bug fixed in `git check-attr` (os error 206,
+    /// `ERROR_FILENAME_EXCED_RANGE` on Windows): `Scope::Files` checks used to join every
+    /// matched file into a single invocation with no length cap, which could overflow Windows'
+    /// command-line limits (cmd.exe's ~8191 chars, tighter than `CreateProcessW`'s ~32KB) for a
+    /// PR touching many/long-path files. Verifies `build_invocations` now splits into multiple
+    /// invocations that together cover every matched file exactly once, each within the cap.
+    #[test]
+    fn files_scope_batches_when_files_arg_would_be_too_long() {
+        let check = files_check(&["*.txt"]);
+        // Long-enough names that all 100 in one invocation would exceed MAX_FILES_ARG_CHARS.
+        let long_prefix = "a".repeat(200);
+        let paths: Vec<String> = (0..100).map(|i| format!("{long_prefix}-{i}.txt")).collect();
+        let path_refs: Vec<&str> = paths.iter().map(String::as_str).collect();
+        let fl = file_list(&path_refs);
+
+        let inv = build_invocations(
+            &check,
+            &fl,
+            false,
+            Path::new("/repo"),
+            &[],
+            Path::new("/repo"),
+        );
+
+        assert!(
+            inv.len() > 1,
+            "expected multiple invocations, got {}",
+            inv.len()
+        );
+        for argv in &inv {
+            let joined = argv.join(" ");
+            assert!(
+                joined.len() <= MAX_FILES_ARG_CHARS + 100,
+                "invocation exceeded length cap: {} chars",
+                joined.len()
+            );
+        }
+
+        // Every invocation must start with the binary name.
+        for argv in &inv {
+            assert_eq!(argv[0], "run-it");
+        }
+
+        // The union of files across all invocations must equal the original set exactly,
+        // with no duplicates or omissions.
+        let mut seen: Vec<String> = inv
+            .iter()
+            .flat_map(|argv| argv[1..].iter().cloned())
+            .collect();
+        seen.sort();
+        let mut expected: Vec<String> = paths.iter().map(|p| format!("/repo/{p}")).collect();
+        expected.sort();
+        assert_eq!(seen, expected);
     }
 
     #[test]

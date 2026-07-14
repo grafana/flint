@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
 use crate::config::{Config, LycheeConfig, Settings};
@@ -375,33 +376,46 @@ async fn run_lychee_cmd(
     cache_preference: CachePreference,
 ) -> LinterOutput {
     let cache_plan = prepare_cache_plan(project_root, cache_preference);
-    let mut argv: Vec<String> = vec![
-        "lychee".to_string(),
-        "--config".to_string(),
-        lychee_cfg.to_string(),
-    ];
-
-    if cache_plan.plan.add_cache_flag {
-        argv.push("--cache".to_string());
-    }
-
-    if local_only {
-        argv.push("--scheme".to_string());
-        argv.push("file".to_string());
-        argv.push("--include-fragments".to_string());
-    }
-
-    argv.extend_from_slice(remap_args);
-    argv.push("--".to_string());
-    argv.extend(files.iter().map(|s| s.to_string()));
+    let argv = build_lychee_argv(
+        lychee_cfg,
+        remap_args,
+        local_only,
+        cache_plan.plan.add_cache_flag,
+    );
+    let file_list = build_lychee_file_list(files);
 
     let mut stdout = format!("==> {description}\n").into_bytes();
-
-    let result = super::spawn_command(&argv, false)
+    let mut command = super::spawn_command(&argv, false);
+    command
         .current_dir(&cache_plan.plan.working_dir)
-        .stdin(Stdio::null())
-        .output()
-        .await;
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let result = match command.spawn() {
+        Ok(mut child) => {
+            let mut stdin = child
+                .stdin
+                .take()
+                .expect("stdin is available because it was configured as piped");
+            let writer = tokio::spawn(async move {
+                stdin.write_all(&file_list).await?;
+                stdin.shutdown().await
+            });
+            let output_result = child.wait_with_output().await;
+            let writer_result = writer.await;
+
+            match (output_result, writer_result) {
+                (Err(e), _) => Err(e),
+                (Ok(_), Err(e)) => Err(std::io::Error::other(format!(
+                    "failed to join lychee input writer: {e}"
+                ))),
+                (Ok(_), Ok(Err(e))) => Err(e),
+                (Ok(out), Ok(Ok(()))) => Ok(out),
+            }
+        }
+        Err(e) => Err(e),
+    };
 
     match result {
         Ok(out) => {
@@ -420,6 +434,41 @@ async fn run_lychee_cmd(
             setup_outcome: None,
         },
     }
+}
+
+fn build_lychee_argv(
+    lychee_cfg: &str,
+    remap_args: &[String],
+    local_only: bool,
+    add_cache_flag: bool,
+) -> Vec<String> {
+    let mut argv: Vec<String> = vec![
+        "lychee".to_string(),
+        "--config".to_string(),
+        lychee_cfg.to_string(),
+    ];
+
+    if add_cache_flag {
+        argv.push("--cache".to_string());
+    }
+
+    if local_only {
+        argv.push("--scheme".to_string());
+        argv.push("file".to_string());
+        argv.push("--include-fragments".to_string());
+    }
+
+    argv.extend_from_slice(remap_args);
+    argv.extend(["--files-from".to_string(), "-".to_string()]);
+    argv
+}
+
+fn build_lychee_file_list(files: &[&str]) -> Vec<u8> {
+    let mut file_list = files.join("\n").into_bytes();
+    if !file_list.is_empty() {
+        file_list.push(b'\n');
+    }
+    file_list
 }
 
 fn lychee_input_paths(
@@ -761,6 +810,24 @@ mod tests {
             .map(|(name, value)| (name.to_string(), value.to_string()))
             .collect();
         validate_runtime_env_from(full, github_remaps_enabled, |name| vars.get(name).cloned())
+    }
+
+    #[test]
+    fn lychee_reads_large_file_lists_from_stdin() {
+        let files: Vec<String> = (0..400)
+            .map(|index| format!("docs/{index:03}-{}.md", "long-name".repeat(10)))
+            .collect();
+        let file_refs: Vec<&str> = files.iter().map(String::as_str).collect();
+
+        let argv = build_lychee_argv("lychee.toml", &[], false, false);
+        let file_list = build_lychee_file_list(&file_refs);
+
+        assert_eq!(
+            argv,
+            ["lychee", "--config", "lychee.toml", "--files-from", "-"]
+        );
+        assert!(file_list.len() > 32_767);
+        assert_eq!(file_list.split(|byte| *byte == b'\n').count(), 401);
     }
 
     #[test]

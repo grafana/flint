@@ -166,11 +166,26 @@ fn flint_tool_identity(tools: &HashMap<String, String>) -> Option<String> {
         .min()
 }
 
-fn is_flint_tool_key(key: &str) -> bool {
-    key == "aqua:grafana/flint"
-        || key == "github:grafana/flint"
-        || key == "cargo:https://github.com/grafana/flint"
-        || key == "cargo:https://github.com/grafana/flint.git"
+pub(crate) fn is_flint_tool_key(key: &str) -> bool {
+    key == "aqua:grafana/flint" || github_backend_flint_key(key) || cargo_github_flint_key(key)
+}
+
+fn github_backend_flint_key(key: &str) -> bool {
+    key.strip_prefix("github:")
+        .is_some_and(is_github_owner_and_flint_repo)
+}
+
+fn cargo_github_flint_key(key: &str) -> bool {
+    key.strip_prefix("cargo:https://github.com/")
+        .is_some_and(is_github_owner_and_flint_repo_or_git)
+}
+
+fn is_github_owner_and_flint_repo(path: &str) -> bool {
+    matches!(path.split_once('/'), Some((owner, "flint")) if !owner.is_empty())
+}
+
+fn is_github_owner_and_flint_repo_or_git(path: &str) -> bool {
+    matches!(path.split_once('/'), Some((owner, "flint" | "flint.git")) if !owner.is_empty())
 }
 
 fn declared_tool_version<'a>(

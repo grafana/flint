@@ -8,7 +8,8 @@ use tempfile::TempDir;
 fn flint_with_env(args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Output {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_flint"));
     cmd.args(args)
-        .env("MISE_PROJECT_ROOT", cwd)
+        .env_remove("MISE_CONFIG_ROOT")
+        .env_remove("MISE_PROJECT_ROOT")
         .env_remove("FLINT_CONFIG_DIR")
         // Keep test output stable regardless of whether the outer runner is CI.
         .env_remove("CI")
@@ -272,6 +273,42 @@ printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"mise":[{"package
         "expected stale renovate snapshot failure; stdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
+fn linters_detect_active_tools_from_nested_working_directory() {
+    let repo = git_repo();
+
+    std::fs::write(
+        repo.path().join("mise.toml"),
+        r#"[tools]
+shellcheck = "v0.11.0"
+"#,
+    )
+    .unwrap();
+    std::fs::create_dir_all(repo.path().join("nested/deeper")).unwrap();
+
+    let out = flint_with_env(&["linters"], &repo.path().join("nested/deeper"), &[]);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    assert!(
+        out.status.success(),
+        "flint linters failed; stdout:\n{}\nstderr:\n{}",
+        stdout,
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let shellcheck_row = stdout
+        .lines()
+        .find(|line| line.split_whitespace().next() == Some("shellcheck"))
+        .unwrap_or_else(|| panic!("expected a shellcheck row; stdout:\n{}", stdout));
+    let columns: Vec<_> = shellcheck_row.split_whitespace().collect();
+    assert_eq!(
+        columns.get(2).copied(),
+        Some("active"),
+        "expected shellcheck to be active; row:\n{}\n\nstdout:\n{}",
+        shellcheck_row,
+        stdout
     );
 }
 

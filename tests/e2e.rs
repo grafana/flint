@@ -298,9 +298,16 @@ shellcheck = "v0.11.0"
         stdout,
         String::from_utf8_lossy(&out.stderr)
     );
-    assert!(
-        stdout.contains("shellcheck") && stdout.contains("active"),
-        "expected shellcheck to be active; stdout:\n{}",
+    let shellcheck_row = stdout
+        .lines()
+        .find(|line| line.split_whitespace().next() == Some("shellcheck"))
+        .unwrap_or_else(|| panic!("expected a shellcheck row; stdout:\n{}", stdout));
+    let columns: Vec<_> = shellcheck_row.split_whitespace().collect();
+    assert_eq!(
+        columns.get(2).copied(),
+        Some("active"),
+        "expected shellcheck to be active; row:\n{}\n\nstdout:\n{}",
+        shellcheck_row,
         stdout
     );
 }

@@ -24,13 +24,13 @@ cargo run -- run --fix
 
 ## Testing an unreleased branch in a consumer repo
 
-If you do **not** have Flint checked out locally and want to test a branch in a
-consumer repo, pin a cargo git dependency in that repo's `mise.toml`:
+If you do **not** have Flint checked out locally and want to test an unreleased
+Flint branch in a consumer repo, pin a cargo git dependency in that repo's
+`mise.toml`:
 
 ```toml
 [tools]
-"cargo:https://github.com/trask/flint" = { version = "branch:fix-lychee-windows-arg-limit", crate = "flint", bin = "flint" }
+"cargo:https://github.com/grafana/flint" = "rev:<git-ref>"
 ```
 
-That `trask/flint` example is just a fork used for branch testing; use your own
-fork/branch as needed.
+Replace `<git-ref>` with the branch, tag, or commit you want to test.

@@ -197,11 +197,12 @@ example:
 
 ```toml
 [tools]
-"cargo:https://github.com/trask/flint" = { version = "branch:fix-lychee-windows-arg-limit", crate = "flint", bin = "flint" }
+"cargo:https://github.com/grafana/flint" = "rev:<git-ref>"
 ```
 
-That `trask/flint` example is just a fork used for branch testing; if you have
-Flint checked out locally, prefer `cargo run` / `cargo test` there instead.
+Replace `<git-ref>` with the branch, tag, or commit you want to test. If you
+have Flint checked out locally, prefer `cargo run` / `cargo test` there
+instead.
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for the broader local development
 workflow.
 

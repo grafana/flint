@@ -136,6 +136,9 @@ For more commands and flags, see the [CLI reference](docs/cli.md).
 > [adaptive runs](docs/cli.md#adaptive-runs). When it happens, flint prints the
 > command to reproduce locally (usually `--full` or the linter name).
 
+For Flint contributor workflow and local testing tips, see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Linters
 
 <!-- registry-table-start -->

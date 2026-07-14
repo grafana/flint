@@ -179,8 +179,8 @@ fn check_shfmt() -> Check {
 }
 
 fn check_rumdl() -> Check {
-    Check::file("rumdl", "rumdl check {FILE}", &["*.md"])
-        .fix("rumdl check --fix {FILE}")
+    Check::files("rumdl", "rumdl check {FILES}", &["*.md"])
+        .fix("rumdl check --fix {FILES}")
         .linter_config(".rumdl.toml", "--config")
         .baseline_config(ConfigFile::config_dir(".rumdl.toml"))
         .unsupported_configs(RUMDL_UNSUPPORTED_CONFIGS)

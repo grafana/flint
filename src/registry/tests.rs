@@ -101,6 +101,24 @@ fn registry_tool_key_migrations_are_unique_and_have_targets() {
 }
 
 #[test]
+fn rumdl_batches_matching_files() {
+    let check = builtin()
+        .into_iter()
+        .find(|check| check.name == "rumdl")
+        .unwrap();
+
+    assert!(matches!(
+        check.kind,
+        CheckKind::Template {
+            check_cmd: "rumdl check {FILES}",
+            fix_cmd: "rumdl check --fix {FILES}",
+            scope: Scope::Files,
+            ..
+        }
+    ));
+}
+
+#[test]
 fn find_unsupported_key_detects_markdownlint_stack() {
     let mut tools = HashMap::new();
     tools.insert("npm:markdownlint-cli2".to_string(), "0.18.1".to_string());

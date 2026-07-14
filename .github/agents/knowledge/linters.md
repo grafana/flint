@@ -54,10 +54,10 @@ remains in effect.
 
 ```rust
 // Example: rumdl accepts --config <path>
-Check::file("rumdl", "rumdl check {FILE}", &["*.md"])
-    .fix("rumdl check --fix {FILE}")
+Check::files("rumdl", "rumdl check {FILES}", &["*.md"])
+    .fix("rumdl check --fix {FILES}")
     .linter_config(".rumdl.toml", "--config"),
-// → rumdl --config /repo/.github/config/.rumdl.toml check <file>
+// → rumdl --config /repo/.github/config/.rumdl.toml check <files...>
 ```
 
 **When NOT to use it:**

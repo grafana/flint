@@ -410,6 +410,7 @@ async fn run_lychee_cmd(
                 (Ok(_), Err(e)) => Err(std::io::Error::other(format!(
                     "failed to join lychee input writer: {e}"
                 ))),
+                (Ok(out), Ok(Err(e))) if e.kind() == std::io::ErrorKind::BrokenPipe => Ok(out),
                 (Ok(_), Ok(Err(e))) => Err(e),
                 (Ok(out), Ok(Ok(()))) => Ok(out),
             }

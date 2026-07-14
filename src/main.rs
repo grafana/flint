@@ -5,6 +5,7 @@ mod files;
 mod hook;
 mod init;
 mod linters;
+mod project_root;
 mod registry;
 mod runner;
 mod setup;
@@ -138,9 +139,7 @@ fn use_filtered_run_policy(args: &RunArgs, explicit: bool, is_ci: bool) -> bool 
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let project_root = std::env::var("MISE_PROJECT_ROOT")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| std::env::current_dir().expect("cannot determine working directory"));
+    let project_root = project_root::detect();
     // Canonicalize to resolve symlinks (e.g. /private/... on macOS).
     // dunce::canonicalize strips the \\?\ verbatim prefix on Windows that
     // git and other tools don't handle.

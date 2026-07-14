@@ -46,5 +46,9 @@ pub fn linter_keys() -> std::collections::HashSet<&'static str> {
     keys
 }
 
+pub(crate) fn is_flint_tool_key(key: &str) -> bool {
+    mise::is_flint_tool_key(key)
+}
+
 #[cfg(test)]
 mod tests;

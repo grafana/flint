@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.22.9](https://github.com/grafana/flint/compare/v0.22.8...v0.22.9) - 2026-07-14
+
+### Fixed
+
+- stream lychee input files through stdin ([#400](https://github.com/grafana/flint/pull/400))
+- discover flint project root from parent mise files ([#401](https://github.com/grafana/flint/pull/401))
+
+### Other
+
+- add local flint testing guidance ([#402](https://github.com/grafana/flint/pull/402))
+- *(deps)* update taiki-e/install-action action to v2.83.1 ([#399](https://github.com/grafana/flint/pull/399))
+
 ## [0.22.8](https://github.com/grafana/flint/compare/v0.22.7...v0.22.8) - 2026-07-13
 
 ### Fixed

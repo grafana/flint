@@ -191,6 +191,20 @@ flint init -y --flint-rev <git-rev>
 That writes a cargo-backed Flint pin. To return to the released Flint backend
 after the release is cut, run `flint init` again without `--flint-rev`.
 
+If you want to test an unreleased Flint branch in a consumer repo without
+checking Flint out locally, you can also pin it directly in `mise.toml`, for
+example:
+
+```toml
+[tools]
+"cargo:https://github.com/trask/flint" = { version = "branch:fix-lychee-windows-arg-limit", crate = "flint", bin = "flint" }
+```
+
+That `trask/flint` example is just a fork used for branch testing; if you have
+Flint checked out locally, prefer `cargo run` / `cargo test` there instead.
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for the broader local development
+workflow.
+
 `flint init` is also the explicit way to reconcile a repo with the latest Flint
 setup defaults. Routine lint runs use `flint-setup` and only fail when an
 actionable setup migration applies to the repo.

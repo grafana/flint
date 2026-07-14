@@ -4,7 +4,7 @@ exit = 1
 stderr = """
 [lychee]
 ==> Checking local links in all files
-ARGS: --config <REPO>/lychee.toml --scheme file --include-fragments -- README.md
+ARGS: --config <REPO>/lychee.toml --scheme file --include-fragments --files-from -
 
 flint: 1 check failed (lychee)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.

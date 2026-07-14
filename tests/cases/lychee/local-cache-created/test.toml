@@ -6,7 +6,7 @@ flint: links: created local lychee cache dir at .lychee_cache; opt out globally 
 [lychee]
 ==> Checking all links in all files
 PWD=<REPO>/.lychee_cache
-ARGS: --config <REPO>/lychee.toml --cache -- <REPO>/README.md
+ARGS: --config <REPO>/lychee.toml --cache --files-from -
 
 flint: 1 check failed (lychee)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.

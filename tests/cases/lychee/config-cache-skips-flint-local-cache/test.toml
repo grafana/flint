@@ -5,7 +5,7 @@ stderr = """
 [lychee]
 ==> Checking all links in all files
 PWD=<REPO>
-ARGS: --config <REPO>/lychee.toml -- README.md
+ARGS: --config <REPO>/lychee.toml --files-from -
 
 flint: 1 check failed (lychee)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.

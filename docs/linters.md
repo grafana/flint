@@ -372,7 +372,7 @@ Format Python code
 | -------- | --------------------------------------------------------------------- |
 | Fix      | yes                                                                   |
 | Binary   | `rumdl`                                                               |
-| Scope    | [file](#scope-file)                                                   |
+| Scope    | [files](#scope-files)                                                 |
 | Patterns | `*.md`                                                                |
 | Config   | [`.rumdl.toml`](https://rumdl.dev/mdformat-comparison/#configuration) |
 

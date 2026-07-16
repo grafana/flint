@@ -6,6 +6,7 @@ mod hook;
 mod init;
 mod linters;
 mod project_root;
+mod regions;
 mod registry;
 mod runner;
 mod setup;
@@ -1291,6 +1292,7 @@ biome-format          biome               active         fast      yes  Format J
 cargo-clippy          cargo-clippy        active         fast      yes  Lint Rust code; runs on all .rs files, not just changed              *.rs
 cargo-fmt             rustfmt             active         fast      yes  Format Rust code; runs on all .rs files, not just changed            *.rs
 gofmt                 gofmt               missing        fast      yes  Format Go code                                                       *.go
+regex-replace         (built-in)          not configured  fast      yes  Apply configured regular-expression replacements to source files
 google-java-format    google-java-format  missing        fast      yes  Format Java code                                                     *.java
 ktlint                ktlint              missing        fast      yes  Lint and format Kotlin code                                          *.kt *.kts
 dotnet-format         dotnet              missing        fast      yes  Format C# code                                                       *.cs

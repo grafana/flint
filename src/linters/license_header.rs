@@ -33,10 +33,19 @@ fn prepare(ctx: NativePrepareContext<'_>) -> Option<Box<dyn PreparedNativeCheck>
         .iter()
         .map(String::as_str)
         .collect();
-    let files: Vec<PathBuf> = match_files(&ctx.file_list.files, &patterns, &[], ctx.project_root)
-        .into_iter()
-        .cloned()
+    let excludes: Vec<&str> = ctx
+        .cfg
+        .checks
+        .license_header
+        .exclude
+        .iter()
+        .map(String::as_str)
         .collect();
+    let files: Vec<PathBuf> =
+        match_files(&ctx.file_list.files, &patterns, &excludes, ctx.project_root)
+            .into_iter()
+            .cloned()
+            .collect();
     if files.is_empty() {
         return None;
     }

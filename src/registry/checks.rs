@@ -2,7 +2,7 @@ use super::types::{
     Check, ConfigFile, EditorconfigDirectiveStyle, OverviewRole, OverviewSection, WorkflowSetup,
 };
 use crate::linters::{
-    biome, flint_setup, license_header, lychee, renovate_deps,
+    biome, flint_setup, google_java_format, license_header, lychee, regex_replace, renovate_deps,
     renovate_deps::RENOVATE_CONFIG_PATTERNS, rumdl, rustfmt, taplo, typos, yamllint,
 };
 const TOOL_RUMDL: &[&str] = &["tool", "rumdl"];
@@ -600,32 +600,89 @@ fn check_gofmt() -> Check {
 }
 
 fn check_google_java_format() -> Check {
-    Check::files(
-        "google-java-format",
-        "google-java-format --dry-run --set-exit-if-changed {FILES}",
-        &["*.java"],
-    )
-    .fix("google-java-format -i {FILES}")
-    .mise_tool("google-java-format")
-    .formatter()
-    .editorconfig_line_length_off(
-        &["*.java"],
-        "Java line length is handled by google-java-format",
-        Some(EditorconfigDirectiveStyle::Slash),
-    )
-    .migrate_tool_keys(&[
-        "ubi:google/google-java-format",
-        "github:google/google-java-format",
-    ])
-    .project_url(GOOGLE_JAVA_FORMAT_URL)
-    .overview(
-        OverviewSection::Languages,
-        "Java",
-        OverviewRole::Formatter,
-        None,
-    )
-    .desc("Format Java code")
-    .lang()
+    Check::native(&google_java_format::CHECK_TYPE)
+        .patterns(&["*.java"])
+        .mise_tool("google-java-format")
+        .formatter()
+        .editorconfig_line_length_off(
+            &["*.java"],
+            "Java line length is handled by google-java-format",
+            Some(EditorconfigDirectiveStyle::Slash),
+        )
+        .migrate_tool_keys(&[
+            "ubi:google/google-java-format",
+            "github:google/google-java-format",
+        ])
+        .project_url(GOOGLE_JAVA_FORMAT_URL)
+        .overview(
+            OverviewSection::Languages,
+            "Java",
+            OverviewRole::Formatter,
+            None,
+        )
+        .desc("Format Java code")
+        .docs(concat!(
+            "Format Java with google-java-format. Configure upstream options in `flint.toml`:\n\n",
+            "```toml\n",
+            "[checks.google-java-format]\n",
+            "skip_reflowing_long_strings = true\n",
+            "skip_sorting_imports = true\n",
+            "skip_removing_unused_imports = true\n",
+            "skip_javadoc_formatting = true\n",
+            "aosp = false\n",
+            "```\n\n",
+            "`skip_reflowing_long_strings` defaults to `true` in Flint to match the\n",
+            "current Spotless behavior. Set it to `false` to use google-java-format's\n",
+            "upstream default. The other options default to `false`.\n\n",
+            "`off_on_markers` accepts `{ off = \"...\", on = \"...\" }` pairs for\n",
+            "formatter-off regions that google-java-format does not understand.\n",
+            "`patterns` and `exclude` control file ownership. Exclude patterns use\n",
+            "the same glob syntax as `[settings].exclude`.",
+        ))
+        .lang()
+}
+
+fn check_regex_replace() -> Check {
+    Check::native(&regex_replace::CHECK_TYPE)
+        .activate_unconditionally()
+        .status_hook(regex_replace::status)
+        .desc("Apply configured regular-expression replacements to source files")
+        .docs(concat!(
+            "Applies ordered regular-expression replacement rule sets to source files.\n",
+            "Each set has its own file scope, replacement default, line filters, ignored regions,\n",
+            "import insertion policy, and rules.\n\n",
+            "```toml\n",
+            "[checks.regex-replace]\n",
+            "patterns = [\"*.txt\"]\n",
+            "exclude = [\"generated/**\"]\n\n",
+            "[[checks.regex-replace.sets]]\n",
+            "name = \"example\"\n",
+            "replacement = '$1'\n",
+            "add_lines_before_pattern = '^use '\n\n",
+            "[[checks.regex-replace.sets.rules]]\n",
+            "pattern = '\\bfoo\\.(bar)\\b'\n",
+            "add_lines = ['use foo.$1;']\n",
+            "```\n\n",
+            "Top-level `patterns` and `exclude` select files for the check; a set's optional\n",
+            "`patterns` and `exclude` further restrict that set. Rules inherit the set's\n",
+            "`replacement`; a rule can override it. If neither is configured, replacement\n",
+            "defaults to `$0` (the original match). `pattern` is matched line by line.\n",
+            "Capture groups can be used in replacements and `add_lines`.\n\n",
+            "Use `derived_rules` when a rule must be generated from named captures in a\n",
+            "`source_pattern`; `{name}` placeholders are substituted into the generated rule.\n",
+            "`content_pattern`, `content_exclude_pattern`, `line_exclude_pattern`, and\n",
+            "`file_pattern` are rule-level filters. `skip_line_pattern` and `ignore_regions`\n",
+            "are set-level filters; an ignored region is defined by configurable\n",
+            "`start_pattern` and `end_pattern` regexes matched against whole lines; the\n",
+            "markers and all lines between them are ignored, and the pair must be balanced.\n",
+            "`add_lines_before_pattern` inserts\n",
+            "unique added lines before the first matching line;\n",
+            "`add_lines_fallback_after_pattern` inserts them after its first match when\n",
+            "there is no before-pattern match. Derived rules also support\n",
+            "`source_exclude_pattern`. Set and check file exclusions use the same glob\n",
+            "syntax as `[settings].exclude`. See [the regex-replace guide](linters/regex-replace.md)\n",
+            "for a complete static-import example.",
+        ))
 }
 
 fn check_ktlint() -> Check {
@@ -784,12 +841,14 @@ fn check_license_header() -> Check {
             ```toml\n\
             [checks.license-header]\n\
             text = \"SPDX-License-Identifier: Apache-2.0\"\n\
-            patterns = [\"*.java\", \"*.kt\"]\n\
+            patterns = [\"*.java\", \"*.kt\", \"*.scala\", \"*.groovy\"]\n\
+            exclude = [\"package-info.java\"]\n\
             lines_to_check = 5\n\
             ```\n\
             \n\
             - `text` — required header text to find near the top of each file\n\
             - `patterns` — glob patterns selecting which files to check\n\
+            - `exclude` — glob patterns excluded after `patterns`\n\
             - `lines_to_check` — how many leading lines to search; defaults to `5`\n\
             \n\
             `text` may be multi-line. Flint joins the first `lines_to_check` lines with\n\
@@ -846,6 +905,7 @@ pub fn builtin() -> Vec<Check> {
         check_cargo_clippy(),
         check_cargo_fmt(),
         check_gofmt(),
+        check_regex_replace(),
         check_google_java_format(),
         check_ktlint(),
         check_dotnet_format(),

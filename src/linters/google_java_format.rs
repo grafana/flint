@@ -300,7 +300,7 @@ fn format_marker_error(error: RegionError, markers: &[OffOnMarkerConfig]) -> Str
         RegionError::EndWithoutStart { marker_index, .. } => {
             let marker = &markers[marker_index];
             format!(
-                "formatter-off marker {:?} has no matching {:?}",
+                "formatter-on marker {:?} has no matching formatter-off marker {:?}",
                 marker.on, marker.off
             )
         }

@@ -48,11 +48,12 @@ impl fmt::Display for RegionError {
     }
 }
 
-/// Finds non-nested regions in `lines` using caller-provided marker matching.
+/// Finds marked regions in `lines` using caller-provided marker matching.
 ///
 /// Keeping matching outside this utility makes it usable with literal marker
 /// strings, regular expressions, or another syntax-aware matcher without
-/// making the region handling language-specific.
+/// making the region handling language-specific. Each marker pair is tracked
+/// independently, so regions from different pairs may overlap.
 pub(crate) fn find_region_spans<T>(
     lines: &[&str],
     markers: &[T],

@@ -26,4 +26,4 @@ dunce = "1.0.5"
 tempfile = "3"
 
 [dev-dependencies]
-regex = "=1.12.4"
+regex = "=1.13.1"

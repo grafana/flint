@@ -20,4 +20,6 @@ flint: 1 check failed (zizmor)
 '''
 
 [env]
+# Tests intentionally omit GitHub credentials; make zizmor's offline mode explicit
+# so fixture output stays deterministic and does not include an implicit-mode warning.
 ZIZMOR_OFFLINE = "true"

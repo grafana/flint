@@ -4,3 +4,4 @@ exit = 0
 
 [env]
 FLINT_CONFIG_DIR = ".github/config"
+ZIZMOR_OFFLINE = "true"

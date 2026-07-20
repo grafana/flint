@@ -18,3 +18,6 @@ warning[artipacked]: credential persistence through GitHub Actions artifacts
 flint: 1 check failed (zizmor)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
 '''
+
+[env]
+ZIZMOR_OFFLINE = "true"

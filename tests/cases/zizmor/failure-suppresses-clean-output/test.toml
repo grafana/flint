@@ -33,6 +33,5 @@ printf '%s\n' 'No findings to report. Good job! (6 suppressed)'
 printf '%s\n' 'No findings to report. Good job! (3 suppressed)' >&2
 printf '%s\n' ' INFO zizmor: 🌈 zizmor v1.25.2' >&2
 printf '%s\n' ' INFO audit: zizmor: 🌈 completed /repo/.github/workflows/one.yml' >&2
-printf '%s\n' ' WARN audit: zizmor: zizmor is running in offline mode by default; some audits and auto-fixes will not be available. see https://docs.zizmor.sh/usage/#operating-modes' >&2
 exit 0
 '''

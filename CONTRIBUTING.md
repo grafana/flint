@@ -4,7 +4,7 @@ Pull request titles should follow the
 [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/#summary) format:
 
 ```text
-<type>[optional scope]: <description>
+<type>(optional scope): <description>
 ```
 
 For example: `feat(format): support Java formatting`. Common types include `feat`, `fix`,

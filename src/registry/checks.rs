@@ -298,6 +298,7 @@ fn check_zizmor() -> Check {
         "No fixes available to apply.",
         " INFO zizmor:",
         " INFO audit: zizmor:",
+        " WARN audit: zizmor: zizmor is running in offline mode by default;",
     ])
     .project_url(ZIZMOR_URL)
     .config_doc_url(ZIZMOR_CONFIG_URL)

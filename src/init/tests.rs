@@ -109,6 +109,33 @@ fn all_registry_checks_have_install_key_or_none() {
 }
 
 #[test]
+fn resolve_only_checks_rejects_unknown_names() {
+    let err = resolve_only_checks(&builtin(), &["not-a-check".to_string()]).unwrap_err();
+
+    assert!(err.to_string().contains("unknown check"));
+    assert!(err.to_string().contains("not-a-check"));
+}
+
+#[test]
+fn resolve_only_checks_preserves_registry_order_and_deduplicates() {
+    let registry = builtin();
+    let checks = resolve_only_checks(
+        &registry,
+        &[
+            "typos".to_string(),
+            "rumdl".to_string(),
+            "typos".to_string(),
+        ],
+    )
+    .unwrap();
+
+    assert_eq!(
+        checks.iter().map(|check| check.name).collect::<Vec<_>>(),
+        ["rumdl", "typos"]
+    );
+}
+
+#[test]
 fn apply_check_type_init_hooks_runs_shared_hook_once() {
     CHECK_TYPE_INIT_CALLS.store(0, Ordering::SeqCst);
     let first = Check::file("first", "first {FILE}", &["*"]).check_type(&COUNTING_CHECK_TYPE);
@@ -297,6 +324,33 @@ fn init_run_normalizes_node_added_for_existing_npm_tool() {
         node_pos < header_pos && header_pos < renovate_pos,
         "init::run must keep node above the linter block:\n{result}"
     );
+}
+
+#[test]
+fn focused_init_adds_requested_check_without_removing_unrelated_tools() {
+    let dir = tempfile::TempDir::new().unwrap();
+    init_git_repo(dir.path());
+    std::fs::write(
+        dir.path().join("mise.toml"),
+        "[tools]\n\n# Linters\nshellcheck = \"0.11.0\"\n",
+    )
+    .unwrap();
+
+    with_fake_mise(|| {
+        run_with_only(
+            dir.path(),
+            None,
+            &["rumdl".to_string()],
+            true,
+            Some("rev:test"),
+        )
+        .unwrap();
+    });
+
+    let mise = std::fs::read_to_string(dir.path().join("mise.toml")).unwrap();
+    assert!(mise.contains("shellcheck = \"0.11.0\""));
+    assert!(mise.contains("rumdl ="));
+    assert!(dir.path().join(".github/config/.rumdl.toml").exists());
 }
 
 #[test]

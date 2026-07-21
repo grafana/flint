@@ -47,6 +47,7 @@ struct InvocationOutputPolicy<'a> {
     env: &'a [(&'static str, &'static str)],
     nonverbose_filter_prefixes: &'a [&'static str],
     stderr_filter_prefixes: &'a [&'static str],
+    failure_output_patterns: &'a [&'static str],
 }
 
 /// A check with all inputs pre-resolved, ready to execute without borrowing
@@ -60,6 +61,7 @@ enum PreparedCheck {
         env: &'static [(&'static str, &'static str)],
         nonverbose_filter_prefixes: &'static [&'static str],
         stderr_filter_prefixes: &'static [&'static str],
+        failure_output_patterns: &'static [&'static str],
         nonverbose_failure_output: Option<NonverboseFailureOutputHook>,
         missing_component_hint: Option<MissingComponentHint>,
     },
@@ -85,6 +87,7 @@ impl PreparedCheck {
                 env,
                 nonverbose_filter_prefixes,
                 stderr_filter_prefixes,
+                failure_output_patterns,
                 nonverbose_failure_output,
                 missing_component_hint,
                 ..
@@ -107,6 +110,7 @@ impl PreparedCheck {
                             nonverbose_filter_prefixes
                         },
                         stderr_filter_prefixes: if verbose { &[] } else { stderr_filter_prefixes },
+                        failure_output_patterns,
                     },
                     nonverbose_failure_output,
                     missing_component_hint,
@@ -159,7 +163,15 @@ pub async fn run(
         short,
         time,
     } = opts;
-    let prepared: Vec<PreparedCheck> = checks
+    let mut ordered_checks = checks.to_vec();
+    if fix {
+        // Fix-capable checks are serialized below. An explicit order makes the
+        // precedence visible in the registry instead of relying on incidental
+        // registry construction order when checks overlap.
+        ordered_checks.sort_by_key(|check| check.fix_order.unwrap_or(u16::MAX));
+    }
+
+    let prepared: Vec<PreparedCheck> = ordered_checks
         .iter()
         .filter_map(|&check| {
             prepare(
@@ -247,6 +259,7 @@ fn prepare(
                 env: check.env,
                 nonverbose_filter_prefixes: check.nonverbose_filter_prefixes,
                 stderr_filter_prefixes: check.stderr_filter_prefixes,
+                failure_output_patterns: check.failure_output_patterns,
                 nonverbose_failure_output: check.nonverbose_failure_output,
                 missing_component_hint: check.missing_component_hint,
             })
@@ -563,6 +576,9 @@ async fn run_invocations(
         let result = cmd.output().await;
         match result {
             Ok(out) => {
+                let output_policy_failed =
+                    output_contains_any(&out.stdout, output_policy.failure_output_patterns)
+                        || output_contains_any(&out.stderr, output_policy.failure_output_patterns);
                 if output_policy.nonverbose
                     && !out.status.success()
                     && let Some(normalize) = nonverbose_failure_output
@@ -603,7 +619,7 @@ async fn run_invocations(
                         combined_stderr.extend_from_slice(&stderr);
                     }
                 }
-                if !out.status.success() {
+                if !out.status.success() || output_policy_failed {
                     all_ok = false;
                 }
             }
@@ -623,6 +639,17 @@ async fn run_invocations(
         stderr: combined_stderr,
         setup_outcome: None,
     }
+}
+
+fn output_contains_any(output: &[u8], patterns: &[&str]) -> bool {
+    patterns
+        .iter()
+        .filter(|pattern| !pattern.is_empty())
+        .any(|pattern| {
+            output
+                .windows(pattern.len())
+                .any(|window| window == pattern.as_bytes())
+        })
 }
 
 fn filter_stderr_lines(stderr: &[u8], prefixes: &[&str]) -> Vec<u8> {
@@ -890,9 +917,11 @@ mod tests {
             adaptive_relevance: None,
             status_hook: None,
             nonverbose_failure_output: None,
+            failure_output_patterns: &[],
             missing_component_hint: None,
             baseline_triggers: &[],
             is_formatter: false,
+            ownership: crate::registry::types::Ownership::Generic,
             defers_to_formatters: false,
             editorconfig_line_length_policy: crate::registry::EditorconfigLineLengthPolicy::Default,
             activate_unconditionally: false,
@@ -901,6 +930,7 @@ mod tests {
             windows_java_jar: false,
             workflow_setup: None,
             fix_behavior: crate::registry::FixBehavior::Definitive,
+            fix_order: None,
             kind: CheckKind::Template {
                 check_cmd: "run-it",
                 fix_cmd: "",
@@ -927,6 +957,17 @@ mod tests {
             },
             ..project_check(patterns)
         }
+    }
+
+    #[test]
+    fn failure_output_patterns_match_stdout_and_stderr() {
+        assert!(output_contains_any(b"[WARN] violation\n", &["[WARN]"]));
+        assert!(output_contains_any(
+            b"error: [WARN] violation\n",
+            &["[WARN]"]
+        ));
+        assert!(!output_contains_any(b"clean\n", &["[WARN]"]));
+        assert!(!output_contains_any(b"anything\n", &[""]));
     }
 
     fn file_list(paths: &[&str]) -> FileList {

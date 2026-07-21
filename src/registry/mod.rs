@@ -2,7 +2,7 @@ mod checks;
 mod mise;
 mod obsolete;
 mod resolve;
-mod types;
+pub(crate) mod types;
 
 pub use checks::builtin;
 pub use mise::{

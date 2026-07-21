@@ -51,3 +51,7 @@ run = "UPDATE_README=1 cargo test -q -- readme_linter_table_in_sync cli_docs_in_
 [tasks."generate:snapshots"]
 description = "Regenerate golden stdout/stderr/exit in tests/cases/*/test.toml"
 run = "UPDATE_SNAPSHOTS=1 cargo test -q cases"
+
+[tasks."check:mise-registry"]
+description = "Resolve curated external linter backends through mise"
+run = "./scripts/validate-mise-registry.sh"

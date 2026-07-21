@@ -101,6 +101,55 @@ fn registry_tool_key_migrations_are_unique_and_have_targets() {
 }
 
 #[test]
+fn registry_entries_have_complete_metadata() {
+    for check in builtin() {
+        assert!(
+            !check.desc.is_empty(),
+            "{} is missing a description",
+            check.name
+        );
+
+        if check.uses_binary() {
+            assert!(
+                check.install_key().is_some() || check.activate_unconditionally,
+                "{} uses a binary but has no install key",
+                check.name
+            );
+            assert!(
+                check.project_url.is_some(),
+                "{} uses a binary but has no upstream project URL",
+                check.name
+            );
+        }
+
+        if check.linter_config.is_some() {
+            assert!(
+                check.config_doc_url.is_some(),
+                "{} has a config file but no config documentation URL",
+                check.name
+            );
+        }
+    }
+}
+
+#[test]
+fn fixers_declare_deterministic_serial_order() {
+    let registry = builtin();
+    let mut orders = HashMap::new();
+
+    for check in registry.iter().filter(|check| check.has_fix()) {
+        let order = check
+            .fix_order
+            .unwrap_or_else(|| panic!("{} is fix-capable but has no fix order", check.name));
+        assert_eq!(
+            orders.insert(order, check.name),
+            None,
+            "fix order {order} is shared by multiple checks"
+        );
+    }
+}
+
+#[test]
 fn rumdl_batches_matching_files() {
     let check = builtin()
         .into_iter()

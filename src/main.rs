@@ -61,8 +61,12 @@ struct LintersArgs {
 #[derive(Args, Debug)]
 struct InitArgs {
     /// Profile to configure: lang, default, or comprehensive.
-    #[arg(long, value_enum)]
+    #[arg(long, value_enum, conflicts_with = "only")]
     profile: Option<init::Profile>,
+
+    /// Configure only the named checks. May be followed by multiple check names.
+    #[arg(long, value_name = "CHECK", num_args = 1.., conflicts_with = "profile")]
+    only: Vec<String>,
 
     /// Pin flint itself through cargo at this git revision for prerelease validation.
     #[arg(long, value_name = "REV")]
@@ -161,18 +165,28 @@ async fn main() -> Result<()> {
             let cfg = config::load(&config_dir).unwrap_or_default();
             let mise_tools = registry::read_mise_tools(&project_root);
             if args.json {
-                print_linters_json(&registry);
+                print_linters_json(&registry, &mise_tools, &cfg);
             } else {
                 print_linters(&registry, &mise_tools, &cfg);
             }
         }
         SubCommand::Init(args) => {
-            init::run(
-                &project_root,
-                args.profile,
-                args.yes,
-                args.flint_rev.as_deref(),
-            )?;
+            if args.only.is_empty() {
+                init::run(
+                    &project_root,
+                    args.profile,
+                    args.yes,
+                    args.flint_rev.as_deref(),
+                )?;
+            } else {
+                init::run_with_only(
+                    &project_root,
+                    None,
+                    &args.only,
+                    args.yes,
+                    args.flint_rev.as_deref(),
+                )?;
+            }
         }
         SubCommand::Hook(args) => match args.command {
             HookCommand::Install => hook::install(&project_root)?,
@@ -1004,29 +1018,79 @@ fn normalize_path(path: &Path) -> String {
         .join("/")
 }
 
-fn print_linters_json(registry: &[registry::Check]) {
-    let entries: Vec<serde_json::Value> = registry.iter().map(linter_json).collect();
+fn print_linters_json(
+    registry: &[registry::Check],
+    mise_tools: &HashMap<String, String>,
+    cfg: &config::Config,
+) {
+    let entries: Vec<serde_json::Value> = registry
+        .iter()
+        .map(|check| {
+            let status = linter_status(check, mise_tools, cfg, registry::binary_on_path);
+            let declared_version = check
+                .install_key()
+                .and_then(|key| mise_tools.get(key))
+                .map(String::as_str);
+            linter_json(check, status, declared_version)
+        })
+        .collect();
     println!("{}", serde_json::to_string_pretty(&entries).unwrap());
 }
 
-pub fn linter_json(check: &registry::Check) -> serde_json::Value {
+pub fn linter_json(
+    check: &registry::Check,
+    status: &str,
+    declared_version: Option<&str>,
+) -> serde_json::Value {
     let scope = check.kind.scope_name();
     let patterns: Vec<&str> = check.patterns.to_vec();
     let config_file = check
         .linter_config
         .as_ref()
         .map(LinterConfig::canonical_location);
+    let baseline_config = check
+        .baseline_config
+        .map(|config| config_file_location(&config));
+    let baseline_triggers: Vec<String> = check
+        .baseline_triggers
+        .iter()
+        .map(config_file_location)
+        .collect();
+    let fix_behavior = check.has_fix().then(|| match check.fix_behavior() {
+        FixBehavior::Definitive => "definitive",
+        FixBehavior::PartialNeedsVerify => "partial-needs-verify",
+    });
     serde_json::json!({
         "name": check.name,
         "description": check.desc,
         "binary": if check.uses_binary() { check.bin_name } else { "(built-in)" },
+        "install_key": check.install_key(),
+        "status": status,
+        "declared_version": declared_version,
         "patterns": patterns,
         "fix": check.has_fix(),
+        "fix_behavior": fix_behavior,
         "run_policy": run_policy_label(check),
         "slow": check.category == registry::Category::Slow,
+        "category": check.category.name(),
+        "ownership": check.ownership.name(),
         "scope": scope,
         "config_file": config_file,
+        "config_doc_url": check.config_doc_url,
+        "project_url": check.project_url,
+        "formatter": check.is_formatter,
+        "defers_to_formatters": check.defers_to_formatters,
+        "baseline_config": baseline_config,
+        "baseline_triggers": baseline_triggers,
+        "fix_order": check.fix_order,
     })
+}
+
+fn config_file_location(config: &registry::ConfigFile) -> String {
+    match config.base {
+        registry::ConfigBase::ProjectRoot => config.path.to_string(),
+        registry::ConfigBase::ConfigDir => format!("FLINT_CONFIG_DIR/{}", config.path),
+    }
 }
 
 fn canonical_config_path(config: &LinterConfig) -> String {
@@ -1180,7 +1244,10 @@ where
         } else {
             "no binary"
         }
-    } else if mise_tools.contains_key(check.bin_name) {
+    } else if check
+        .install_key()
+        .is_some_and(|key| mise_tools.contains_key(key))
+    {
         "wrong version"
     } else {
         "missing"
@@ -1299,6 +1366,24 @@ renovate-deps         renovate            active         adaptive  yes  Verify R
 license-header        (built-in)          not configured  fast      no   Check source files have the required license header
 "#
         );
+    }
+
+    #[test]
+    fn linter_json_exposes_registry_metadata() {
+        let check = registry::builtin()
+            .into_iter()
+            .find(|check| check.name == "rumdl")
+            .expect("rumdl check");
+
+        let json = super::linter_json(&check, "active", Some("0.2.31"));
+
+        assert_eq!(json["status"], "active");
+        assert_eq!(json["declared_version"], "0.2.31");
+        assert_eq!(json["install_key"], "rumdl");
+        assert_eq!(json["scope"], "files");
+        assert_eq!(json["formatter"], true);
+        assert!(json["project_url"].as_str().is_some());
+        assert!(json["baseline_config"].as_str().is_some());
     }
 
     #[test]

@@ -150,7 +150,7 @@ For Flint contributor workflow and local testing tips, see
 | ----------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
 | C#                      | —                                                | [`dotnet-format`](docs/linters.md#dotnet-format)           |
 | Go                      | [`golangci-lint`](docs/linters.md#golangci-lint) | [`gofmt`](docs/linters.md#gofmt)                           |
-| Java                    | —                                                | [`google-java-format`](docs/linters.md#google-java-format) |
+| Java                    | [`checkstyle`](docs/linters.md#checkstyle)       | [`google-java-format`](docs/linters.md#google-java-format) |
 | JavaScript / TypeScript | [`biome`](docs/linters.md#biome)                 | [`biome-format`](docs/linters.md#biome-format)             |
 | Kotlin                  | [`ktlint`](docs/linters.md#ktlint)               | [`ktlint`](docs/linters.md#ktlint)                         |
 | Python                  | [`ruff`](docs/linters.md#ruff)                   | [`ruff-format`](docs/linters.md#ruff-format)               |
@@ -158,21 +158,23 @@ For Flint contributor workflow and local testing tips, see
 
 ### Files / Formats
 
-| Name     | Linter                                     | Formatter                                      |
-| -------- | ------------------------------------------ | ---------------------------------------------- |
-| JSON     | [`biome`](docs/linters.md#biome)           | [`biome-format`](docs/linters.md#biome-format) |
-| Markdown | [`rumdl`](docs/linters.md#rumdl)           | [`rumdl`](docs/linters.md#rumdl)               |
-| Shell    | [`shellcheck`](docs/linters.md#shellcheck) | [`shfmt`](docs/linters.md#shfmt)               |
-| TOML     | —                                          | [`taplo`](docs/linters.md#taplo)               |
-| XML      | [`xmllint`](docs/linters.md#xmllint)       | —                                              |
-| YAML     | [`ryl`](docs/linters.md#ryl)               | [`ryl`](docs/linters.md#ryl)                   |
+| Name     | Linter                                           | Formatter                                        |
+| -------- | ------------------------------------------------ | ------------------------------------------------ |
+| Dotenv   | [`dotenv-linter`](docs/linters.md#dotenv-linter) | [`dotenv-linter`](docs/linters.md#dotenv-linter) |
+| JSON     | [`biome`](docs/linters.md#biome)                 | [`biome-format`](docs/linters.md#biome-format)   |
+| Markdown | [`rumdl`](docs/linters.md#rumdl)                 | [`rumdl`](docs/linters.md#rumdl)                 |
+| Shell    | [`shellcheck`](docs/linters.md#shellcheck)       | [`shfmt`](docs/linters.md#shfmt)                 |
+| TOML     | —                                                | [`taplo`](docs/linters.md#taplo)                 |
+| XML      | [`xmllint`](docs/linters.md#xmllint)             | —                                                |
+| YAML     | [`ryl`](docs/linters.md#ryl)                     | [`ryl`](docs/linters.md#ryl)                     |
 
 ### Tooling / CI
 
-| Name           | Check                                                                           |
-| -------------- | ------------------------------------------------------------------------------- |
-| Dockerfile     | [`hadolint`](docs/linters.md#hadolint)                                          |
-| GitHub Actions | [`actionlint`](docs/linters.md#actionlint) / [`zizmor`](docs/linters.md#zizmor) |
+| Name                 | Check                                                                           |
+| -------------------- | ------------------------------------------------------------------------------- |
+| Dockerfile           | [`hadolint`](docs/linters.md#hadolint)                                          |
+| GitHub Actions       | [`actionlint`](docs/linters.md#actionlint) / [`zizmor`](docs/linters.md#zizmor) |
+| Kubernetes manifests | [`kube-linter`](docs/linters.md#kube-linter)                                    |
 
 ### General
 

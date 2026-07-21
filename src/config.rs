@@ -36,12 +36,29 @@ impl Default for Settings {
 #[serde(default)]
 pub struct ChecksConfig {
     pub lychee: LycheeConfig,
+    #[serde(rename = "kube-linter", alias = "kube_linter")]
+    pub kube_linter: KubeLinterConfig,
     // The alias allows the underscore form used in env var keys alongside the
     // hyphenated form used in flint.toml.
     #[serde(rename = "renovate-deps", alias = "renovate_deps")]
     pub renovate_deps: RenovateDepsConfig,
     #[serde(rename = "license-header", alias = "license_header")]
     pub license_header: LicenseHeaderConfig,
+}
+
+/// Configuration for the report-only Kubernetes manifest check.
+///
+/// When `paths` is empty, Flint considers only conventional Kubernetes
+/// directories that exist in the project. It deliberately does not discover
+/// YAML files from the repository at large, which keeps Compose and unrelated
+/// YAML out of kube-linter's input set.
+#[derive(Debug, Default, Deserialize, Clone)]
+#[serde(default)]
+pub struct KubeLinterConfig {
+    /// Files or directories to inspect, relative to the project root.
+    pub paths: Vec<String>,
+    /// Optional kube-linter config filename, relative to `FLINT_CONFIG_DIR`.
+    pub config: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize, Clone)]

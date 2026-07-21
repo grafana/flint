@@ -597,9 +597,9 @@ pub struct Check {
     /// Toolchain keys stay above the `# Linters` header in `mise.toml` so they're
     /// visually separated from lint-only entries.
     pub toolchain: Option<Option<&'static str>>,
-    /// On Windows, the binary is a self-executing JAR that cannot be run directly
-    /// or via cmd.exe — invoke as `java -jar <resolved-path>` instead.
-    pub windows_java_jar: bool,
+    /// The binary is a self-executing JAR that must be invoked as
+    /// `java -jar <resolved-path>` instead of directly.
+    pub java_jar: bool,
     /// Extra generated workflow setup needed when this check is selected by `flint init`.
     pub workflow_setup: Option<WorkflowSetup>,
     pub fix_behavior: FixBehavior,
@@ -736,7 +736,7 @@ impl Check {
                 full_fix_cmd: "",
                 scope,
             },
-            windows_java_jar: false,
+            java_jar: false,
             workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
             fix_order: None,
@@ -785,7 +785,7 @@ impl Check {
             activate_unconditionally: false,
             category: Category::Default,
             toolchain: None,
-            windows_java_jar: false,
+            java_jar: false,
             workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
             fix_order: None,
@@ -854,10 +854,10 @@ impl Check {
         self
     }
 
-    /// On Windows, invoke this binary via `java -jar <path>` rather than directly.
-    /// Use for self-executing JARs (e.g. ktlint) that cmd.exe cannot run.
-    pub fn windows_java_jar(mut self) -> Self {
-        self.windows_java_jar = true;
+    /// Invoke this binary via `java -jar <path>` rather than directly.
+    /// Use for self-executing JARs (e.g. ktlint and Checkstyle).
+    pub fn java_jar(mut self) -> Self {
+        self.java_jar = true;
         self
     }
 

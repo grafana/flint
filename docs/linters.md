@@ -15,7 +15,7 @@ links to the relevant upstream configuration docs.
 | ----------------------- | --------------------------------- | ------------------------------------------- |
 | C#                      | —                                 | [`dotnet-format`](#dotnet-format)           |
 | Go                      | [`golangci-lint`](#golangci-lint) | [`gofmt`](#gofmt)                           |
-| Java                    | —                                 | [`google-java-format`](#google-java-format) |
+| Java                    | [`checkstyle`](#checkstyle)       | [`google-java-format`](#google-java-format) |
 | JavaScript / TypeScript | [`biome`](#biome)                 | [`biome-format`](#biome-format)             |
 | Kotlin                  | [`ktlint`](#ktlint)               | [`ktlint`](#ktlint)                         |
 | Python                  | [`ruff`](#ruff)                   | [`ruff-format`](#ruff-format)               |
@@ -23,21 +23,23 @@ links to the relevant upstream configuration docs.
 
 ### Files / Formats
 
-| Name     | Linter                      | Formatter                       |
-| -------- | --------------------------- | ------------------------------- |
-| JSON     | [`biome`](#biome)           | [`biome-format`](#biome-format) |
-| Markdown | [`rumdl`](#rumdl)           | [`rumdl`](#rumdl)               |
-| Shell    | [`shellcheck`](#shellcheck) | [`shfmt`](#shfmt)               |
-| TOML     | —                           | [`taplo`](#taplo)               |
-| XML      | [`xmllint`](#xmllint)       | —                               |
-| YAML     | [`ryl`](#ryl)               | [`ryl`](#ryl)                   |
+| Name     | Linter                            | Formatter                         |
+| -------- | --------------------------------- | --------------------------------- |
+| Dotenv   | [`dotenv-linter`](#dotenv-linter) | [`dotenv-linter`](#dotenv-linter) |
+| JSON     | [`biome`](#biome)                 | [`biome-format`](#biome-format)   |
+| Markdown | [`rumdl`](#rumdl)                 | [`rumdl`](#rumdl)                 |
+| Shell    | [`shellcheck`](#shellcheck)       | [`shfmt`](#shfmt)                 |
+| TOML     | —                                 | [`taplo`](#taplo)                 |
+| XML      | [`xmllint`](#xmllint)             | —                                 |
+| YAML     | [`ryl`](#ryl)                     | [`ryl`](#ryl)                     |
 
 ### Tooling / CI
 
-| Name           | Check                                             |
-| -------------- | ------------------------------------------------- |
-| Dockerfile     | [`hadolint`](#hadolint)                           |
-| GitHub Actions | [`actionlint`](#actionlint) / [`zizmor`](#zizmor) |
+| Name                 | Check                                             |
+| -------------------- | ------------------------------------------------- |
+| Dockerfile           | [`hadolint`](#hadolint)                           |
+| GitHub Actions       | [`actionlint`](#actionlint) / [`zizmor`](#zizmor) |
+| Kubernetes manifests | [`kube-linter`](#kube-linter)                     |
 
 ### General
 
@@ -114,6 +116,44 @@ Lint Rust code; runs on all .rs files, not just changed
 | Config   | [`rustfmt.toml`](https://github.com/rust-lang/rustfmt?tab=readme-ov-file#configuring-rustfmt) |
 
 Format Rust code; runs on all .rs files, not just changed
+
+### [`checkstyle`](https://github.com/checkstyle/checkstyle)
+
+|          |                                                        |
+| -------- | ------------------------------------------------------ |
+| Fix      | no                                                     |
+| Binary   | `checkstyle`                                           |
+| Scope    | [files](#scope-files)                                  |
+| Patterns | `*.java`                                               |
+| Config   | [`checkstyle.xml`](https://checkstyle.org/config.html) |
+
+Check Java source against a repository-owned Checkstyle configuration
+
+Runs the standalone Checkstyle CLI against selected Java files.
+A Java runtime must be available on PATH because the curated
+Checkstyle distribution is a JAR.
+The repository must provide checkstyle.xml at its root; a root-level
+checkstyle-suppressions.xml is also supported by Checkstyle's normal
+property default. Flint does not infer Maven or Gradle source roots,
+and Checkstyle is report-only: use a formatter such as
+google-java-format for safe formatting fixes.
+
+### [`dotenv-linter`](https://github.com/dotenv-linter/dotenv-linter)
+
+|          |                       |
+| -------- | --------------------- |
+| Fix      | yes                   |
+| Binary   | `dotenv-linter`       |
+| Scope    | [files](#scope-files) |
+| Patterns | `.env .env.* *.env`   |
+
+Lint dotenv environment files without printing their values
+
+Checks only explicit .env-style files: .env, .env.* and files ending in .env.
+Flint passes file paths rather than a directory, so an unrelated YAML, Compose,
+or application config file is never scanned. Check mode is read-only; fix mode
+uses dotenv-linter's no-backup option and remains serialized with other Flint
+fixers. Do not commit secret-bearing .env files.
 
 ### [`dotnet-format`](https://learn.microsoft.com/dotnet/core/tools/dotnet-format)
 
@@ -233,6 +273,25 @@ Lint Dockerfiles
 | Patterns | `*.kt *.kts`          |
 
 Lint and format Kotlin code
+
+### [`kube-linter`](https://github.com/stackrox/kube-linter)
+
+|          |                                                                                            |
+| -------- | ------------------------------------------------------------------------------------------ |
+| Fix      | no                                                                                         |
+| Binary   | `kube-linter`                                                                              |
+| Scope    | [native](#scope-native)                                                                    |
+| Patterns | `k8s/*.yml k8s/*.yaml kubernetes/*.yml kubernetes/*.yaml manifests/*.yml manifests/*.yaml` |
+| Config   | [`kube-linter.yaml`](https://docs.kubelinter.io/)                                          |
+
+Lint explicitly selected Kubernetes resources
+
+KubeLinter is report-only and only runs on files selected by
+[checks.kube-linter].paths (or existing conventional k8s/,
+kubernetes/, or manifests/ directories). Flint parses YAML documents
+and passes only documents containing apiVersion and kind, so ordinary
+YAML and Docker Compose files are not treated as Kubernetes resources.
+Helm/Kustomize rendering remains an explicit separate workflow.
 
 ### `license-header`
 

@@ -57,7 +57,7 @@ enum PreparedCheck {
         name: String,
         argv_list: Vec<Vec<String>>,
         tracked_files: Vec<PathBuf>,
-        windows_java_jar: bool,
+        java_jar: bool,
         env: &'static [(&'static str, &'static str)],
         nonverbose_filter_prefixes: &'static [&'static str],
         stderr_filter_prefixes: &'static [&'static str],
@@ -83,7 +83,7 @@ impl PreparedCheck {
             Self::Invocations {
                 argv_list,
                 tracked_files,
-                windows_java_jar,
+                java_jar,
                 env,
                 nonverbose_filter_prefixes,
                 stderr_filter_prefixes,
@@ -100,7 +100,7 @@ impl PreparedCheck {
                 let out = run_invocations(
                     &name,
                     &argv_list,
-                    windows_java_jar,
+                    java_jar,
                     InvocationOutputPolicy {
                         nonverbose: !verbose,
                         env: if verbose { &[] } else { env },
@@ -255,7 +255,7 @@ fn prepare(
                 name,
                 argv_list,
                 tracked_files,
-                windows_java_jar: check.windows_java_jar,
+                java_jar: check.java_jar,
                 env: check.env,
                 nonverbose_filter_prefixes: check.nonverbose_filter_prefixes,
                 stderr_filter_prefixes: check.stderr_filter_prefixes,
@@ -555,7 +555,7 @@ fn render_config_args(config_args: &[String]) -> String {
 async fn run_invocations(
     name: &str,
     invocations: &[Vec<String>],
-    windows_java_jar: bool,
+    java_jar: bool,
     output_policy: InvocationOutputPolicy<'_>,
     nonverbose_failure_output: Option<NonverboseFailureOutputHook>,
     missing_component_hint: Option<MissingComponentHint>,
@@ -569,7 +569,7 @@ async fn run_invocations(
         if argv.is_empty() {
             continue;
         }
-        let mut cmd = crate::linters::spawn_command(argv, windows_java_jar);
+        let mut cmd = crate::linters::spawn_command(argv, java_jar);
         cmd.current_dir(root)
             .stdin(Stdio::null())
             .envs(output_policy.env.iter().copied());
@@ -927,7 +927,7 @@ mod tests {
             activate_unconditionally: false,
             category: Category::Default,
             toolchain: None,
-            windows_java_jar: false,
+            java_jar: false,
             workflow_setup: None,
             fix_behavior: crate::registry::FixBehavior::Definitive,
             fix_order: None,

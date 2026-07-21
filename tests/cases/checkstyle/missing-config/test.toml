@@ -1,0 +1,21 @@
+[expected]
+args = "run --full checkstyle"
+exit = 1
+stderr = '''
+[checkstyle]
+Could not find config XML file 'checkstyle.xml'.
+
+flint: 1 check failed (checkstyle)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''
+
+[fake_bins]
+checkstyle = '''
+#!/bin/sh
+exit 0
+'''
+java = '''
+#!/bin/sh
+printf "Could not find config XML file 'checkstyle.xml'.\\n"
+exit 1
+'''

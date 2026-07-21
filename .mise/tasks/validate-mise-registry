@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+#MISE description="Validate curated mise registry backends"
 set -euo pipefail
 
 # This is intentionally a networked compatibility check. The normal Rust

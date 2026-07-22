@@ -19,6 +19,12 @@ Flint is not a generic command wrapper, a repo-local plugin loader, or a
 replacement for a build system. New built-in checks must be implemented in the
 Flint codebase and reviewed as part of the registry.
 
+The registry also owns canonical external backend keys. A scheduled
+`mise run validate-mise-registry` file task resolves those backends through the
+current mise registry, while normal registry tests remain network-free.
+Non-Aqua backends are explicit, documented exceptions rather than accidental
+registry lookups.
+
 ## Consequences
 
 - Every check can have consistent local/CI behavior and cross-platform handling.

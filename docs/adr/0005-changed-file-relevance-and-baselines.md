@@ -26,6 +26,11 @@ Adaptive checks may skip local runs only when their relevance hook says the
 changed paths cannot affect the result. CI includes those checks, but is not
 equivalent to `--full`: file coverage remains diff-aware where supported.
 
+Adaptive relevance is a speculative optimization for local feedback speed, not
+a correctness boundary. A hook may skip an expensive check only when it can
+conservatively establish that the changed paths cannot affect the result.
+Uncertain or malformed state must trigger the check rather than skip it.
+
 ## Consequences
 
 - Deleting a file can correctly trigger a check without passing a missing path

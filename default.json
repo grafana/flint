@@ -21,10 +21,13 @@
     {
       "matchDepNames": [
         "actionlint",
+        "aqua:dotenv-linter/dotenv-linter",
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
+        "aqua:stackrox/kube-linter",
         "biome",
         "editorconfig-checker",
+        "github:checkstyle/checkstyle[matching=all.jar,rename_exe=checkstyle]",
         "golangci-lint",
         "google-java-format",
         "hadolint",

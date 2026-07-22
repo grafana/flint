@@ -26,6 +26,12 @@ const GOFMT_URL: &str = "https://pkg.go.dev/cmd/gofmt";
 const GOLANGCI_LINT_URL: &str = "https://golangci-lint.run/";
 const GOLANGCI_LINT_CONFIG_URL: &str = "https://golangci-lint.run/usage/configuration/";
 const GOOGLE_JAVA_FORMAT_URL: &str = "https://github.com/google/google-java-format";
+const CHECKSTYLE_URL: &str = "https://github.com/checkstyle/checkstyle";
+const CHECKSTYLE_CONFIG_URL: &str = "https://checkstyle.org/config.html";
+const DOTENV_LINTER_URL: &str = "https://github.com/dotenv-linter/dotenv-linter";
+const DOTENV_LINTER_CONFIG_URL: &str = "https://dotenv-linter.github.io/";
+const KUBE_LINTER_URL: &str = "https://github.com/stackrox/kube-linter";
+const KUBE_LINTER_CONFIG_URL: &str = "https://docs.kubelinter.io/";
 const HADOLINT_URL: &str = "https://github.com/hadolint/hadolint";
 const HADOLINT_CONFIG_URL: &str =
     "https://github.com/hadolint/hadolint?tab=readme-ov-file#configure";
@@ -52,6 +58,19 @@ const TYPOS_CONFIG_URL: &str = "https://github.com/crate-ci/typos/blob/master/do
 const XMLLINT_URL: &str = "https://github.com/jonwiggins/xmloxide";
 const YAMLLINT_CONFIG_URL: &str = "https://yamllint.readthedocs.io/en/stable/configuration.html";
 const RYL_URL: &str = "https://github.com/owenlamont/ryl";
+
+const CHECKSTYLE_TOOL_KEY: &str =
+    "github:checkstyle/checkstyle[matching=all.jar,rename_exe=checkstyle]";
+const KUBE_LINTER_PATTERNS: &[&str] = &[
+    "k8s/*.yml",
+    "k8s/*.yaml",
+    "kubernetes/*.yml",
+    "kubernetes/*.yaml",
+    "manifests/*.yml",
+    "manifests/*.yaml",
+];
+const CHECKSTYLE_BASELINE_TRIGGERS: &[ConfigFile] =
+    &[ConfigFile::project("checkstyle-suppressions.xml")];
 
 const SHELLCHECK_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir("shellcheckrc"),
@@ -224,6 +243,36 @@ fn check_yaml_lint() -> Check {
         .migrate_tool_keys(&["cargo:yaml-lint", "github:owenlamont/ryl"])
 }
 
+fn check_kube_linter() -> Check {
+    Check::native(&crate::linters::kube_linter::CHECK_TYPE)
+        .patterns(KUBE_LINTER_PATTERNS)
+        .mise_tool("aqua:stackrox/kube-linter")
+        .baseline_config(ConfigFile::config_dir("kube-linter.yaml"))
+        .project_url(KUBE_LINTER_URL)
+        .config_doc_url(KUBE_LINTER_CONFIG_URL)
+        .overview(
+            OverviewSection::ToolingCi,
+            "Kubernetes manifests",
+            OverviewRole::Check,
+            Some("Kubernetes security and production-readiness policy"),
+        )
+        .desc("Lint explicitly selected Kubernetes resources")
+        .docs(
+            "KubeLinter is report-only and only runs on files selected by\
+            \n\
+            [checks.kube-linter].paths (or existing conventional k8s/,\
+            \n\
+            kubernetes/, or manifests/ directories). Flint parses YAML documents\
+            \n\
+            and passes only documents containing apiVersion and kind, so ordinary\
+            \n\
+            YAML and Docker Compose files are not treated as Kubernetes resources.\
+            \n\
+            Helm/Kustomize rendering remains an explicit separate workflow.",
+        )
+        .style()
+}
+
 fn check_taplo() -> Check {
     Check::file(
         "taplo",
@@ -375,6 +424,37 @@ fn check_typos() -> Check {
         .migrate_tool_keys(&["codespell", "pipx:codespell", "aqua:crate-ci/typos"])
         .desc("Check for common spelling mistakes")
         .mise_tool("typos")
+}
+
+fn check_dotenv_linter() -> Check {
+    Check::files(
+        "dotenv-linter",
+        "dotenv-linter check --plain --skip-updates {FILES}",
+        &[".env", ".env.*", "*.env"],
+    )
+    .fix("dotenv-linter fix --plain --no-backup {FILES}")
+    .mise_tool("aqua:dotenv-linter/dotenv-linter")
+    .project_url(DOTENV_LINTER_URL)
+    .config_doc_url(DOTENV_LINTER_CONFIG_URL)
+    .overview(
+        OverviewSection::FilesFormats,
+        "Dotenv",
+        OverviewRole::Both,
+        Some("Environment-file syntax and consistency"),
+    )
+    .desc("Lint dotenv environment files without printing their values")
+    .docs(
+        "Checks only explicit .env-style files: .env, .env.* and files ending in .env.\
+        \n\
+        Flint passes file paths rather than a directory, so an unrelated YAML, Compose,\
+        \n\
+        or application config file is never scanned. Check mode is read-only; fix mode\
+        \n\
+        uses dotenv-linter's no-backup option and remains serialized with other Flint\
+        \n\
+        fixers. Do not commit secret-bearing .env files.",
+    )
+    .style()
 }
 
 fn check_editorconfig_checker() -> Check {
@@ -631,6 +711,46 @@ fn check_google_java_format() -> Check {
     .lang()
 }
 
+fn check_checkstyle() -> Check {
+    Check::files(
+        "checkstyle",
+        "checkstyle -c checkstyle.xml {FILES}",
+        &["*.java"],
+    )
+    .java_jar()
+    .mise_tool(CHECKSTYLE_TOOL_KEY)
+    .baseline_config(ConfigFile::project("checkstyle.xml"))
+    .baseline_triggers(CHECKSTYLE_BASELINE_TRIGGERS)
+    .failure_output_patterns(&["[WARN]", "[ERROR]"])
+    .project_url(CHECKSTYLE_URL)
+    .config_doc_url(CHECKSTYLE_CONFIG_URL)
+    .overview(
+        OverviewSection::Languages,
+        "Java",
+        OverviewRole::Linter,
+        Some("Java coding standard"),
+    )
+    .desc("Check Java source against a repository-owned Checkstyle configuration")
+    .docs(
+        "Runs the standalone Checkstyle CLI against selected Java files.\
+        \n\
+        A Java runtime must be available on PATH because the curated\
+        \n\
+        Checkstyle distribution is a JAR.\
+        \n\
+        The repository must provide checkstyle.xml at its root; a root-level\
+        \n\
+        checkstyle-suppressions.xml is also supported by Checkstyle's normal\
+        \n\
+        property default. Flint does not infer Maven or Gradle source roots,\
+        \n\
+        and Checkstyle is report-only: use a formatter such as\
+        \n\
+        google-java-format for safe formatting fixes.",
+    )
+    .lang()
+}
+
 fn check_ktlint() -> Check {
     Check::files(
         "ktlint",
@@ -834,12 +954,14 @@ pub fn builtin() -> Vec<Check> {
         check_shfmt(),
         check_rumdl(),
         check_yaml_lint(),
+        check_kube_linter(),
         check_taplo(),
         check_actionlint(),
         check_zizmor(),
         check_hadolint(),
         check_xmllint(),
         check_typos(),
+        check_dotenv_linter(),
         check_editorconfig_checker(),
         check_golangci_lint(),
         check_ruff(),
@@ -850,6 +972,7 @@ pub fn builtin() -> Vec<Check> {
         check_cargo_fmt(),
         check_gofmt(),
         check_google_java_format(),
+        check_checkstyle(),
         check_ktlint(),
         check_dotnet_format(),
         check_lychee(),

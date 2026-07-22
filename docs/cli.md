@@ -186,6 +186,7 @@ use `--only`:
 
 ```bash
 flint init --only rumdl
+flint init --only checkstyle dotenv
 ```
 
 Focused init preserves unrelated tools and configuration, rejects unknown

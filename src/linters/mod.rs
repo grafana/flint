@@ -1,6 +1,7 @@
 pub mod biome;
 pub mod env;
 pub mod flint_setup;
+pub mod kube_linter;
 pub mod license_header;
 pub mod lychee;
 pub mod renovate_deps;
@@ -21,13 +22,13 @@ pub use crate::registry::LinterOutput;
 /// - PE binary without extension → execute directly by full path
 /// - Everything else → route through `cmd.exe /C` to handle `.cmd` shims
 ///
-/// Self-executing JARs (e.g. ktlint) cannot run via cmd.exe at all.
-/// When `windows_java_jar` is true the binary is resolved to its full path
-/// and invoked as `java -jar <path>`.
-pub fn spawn_command(argv: &[String], windows_java_jar: bool) -> tokio::process::Command {
+/// Self-executing JARs (e.g. ktlint and Checkstyle) need to be invoked through
+/// the JVM. When `java_jar` is true the resolved tool path is invoked as
+/// `java -jar <path>` on every platform.
+pub fn spawn_command(argv: &[String], java_jar: bool) -> tokio::process::Command {
     #[cfg(windows)]
     {
-        if windows_java_jar {
+        if java_jar {
             if let Some(path) = find_file_in_path(&argv[0]) {
                 let mut cmd = tokio::process::Command::new("java");
                 cmd.arg("-jar").arg(path).args(&argv[1..]);
@@ -44,7 +45,12 @@ pub fn spawn_command(argv: &[String], windows_java_jar: bool) -> tokio::process:
     }
     #[cfg(not(windows))]
     {
-        let _ = windows_java_jar;
+        if java_jar {
+            let jar = find_file_in_path(&argv[0]).unwrap_or_else(|| argv[0].clone().into());
+            let mut cmd = tokio::process::Command::new("java");
+            cmd.arg("-jar").arg(jar).args(&argv[1..]);
+            return cmd;
+        }
         let mut cmd = tokio::process::Command::new(&argv[0]);
         cmd.args(&argv[1..]);
         cmd
@@ -79,8 +85,17 @@ fn find_pe_binary(binary: &str) -> Option<std::path::PathBuf> {
 
 /// On Windows, return the full path of `binary` from PATH without inspecting
 /// its contents. Used for self-executing JARs where the caller already knows
-/// the invocation style (i.e. `windows_java_jar` is set in the registry).
+/// the invocation style (i.e. `java_jar` is set in the registry).
 #[cfg(windows)]
+fn find_file_in_path(binary: &str) -> Option<std::path::PathBuf> {
+    let path_var = std::env::var("PATH").ok()?;
+    std::env::split_paths(&path_var).find_map(|dir| {
+        let candidate = dir.join(binary);
+        candidate.is_file().then_some(candidate)
+    })
+}
+
+#[cfg(not(windows))]
 fn find_file_in_path(binary: &str) -> Option<std::path::PathBuf> {
     let path_var = std::env::var("PATH").ok()?;
     std::env::split_paths(&path_var).find_map(|dir| {

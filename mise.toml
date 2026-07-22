@@ -10,10 +10,13 @@ rust = { version = "1.97.1", components = "clippy,rustfmt" }
 
 # Linters
 actionlint = "1.7.12"
+"aqua:dotenv-linter/dotenv-linter" = "4.0.0"
 "aqua:jonwiggins/xmloxide" = "0.4.3"
 "aqua:owenlamont/ryl" = "0.21.0"
+"aqua:stackrox/kube-linter" = "0.8.3"
 biome = "2.5.4"
 editorconfig-checker = "3.8.0"
+"github:checkstyle/checkstyle[matching=all.jar,rename_exe=checkstyle]" = "checkstyle-13.8.0"
 golangci-lint = "2.12.2"
 google-java-format = "1.35.0"
 hadolint = "2.14.0"

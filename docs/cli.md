@@ -2,7 +2,7 @@
 
 ```text
 flint run [OPTIONS] [LINTERS...]
-flint init
+flint init [OPTIONS]
 flint hook install
 flint linters
 flint version
@@ -181,6 +181,17 @@ flint run --fix rumdl             # fix only Markdown issues
 
 ## `flint init`
 
+To add or refresh only selected checks without removing unrelated Flint setup,
+use `--only`:
+
+```bash
+flint init --only rumdl
+```
+
+Focused init preserves unrelated tools and configuration, rejects unknown
+check names, and remains idempotent. The existing no-argument and profile-based
+forms continue to discover and reconcile the repository's complete Flint setup.
+
 `flint init` pins Flint itself in `mise.toml` so every contributor uses the same
 lint binary. For unreleased consumer validation, pass an explicit git revision:
 
@@ -234,3 +245,7 @@ cargo-fmt       cargo-fmt       missing    fast   *.rs
 renovate-deps   renovate        installed  fast
 ...
 ```
+
+Use `--json` for complete registry and setup metadata, including the declared
+version, canonical install key, config locations, upstream links, fix behavior,
+formatter relationships, and baseline triggers.

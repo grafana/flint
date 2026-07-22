@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
 #[cfg(test)]
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -18,12 +18,13 @@ use config_files::{
     disable_editorconfig_line_length_for_patterns, generate_editorconfig, generate_flint_toml,
 };
 use detection::{
-    build_linter_groups, detect_obsolete_keys, detect_present_patterns, parse_tool_keys,
+    build_explicit_linter_groups, build_linter_groups, detect_obsolete_keys,
+    detect_present_patterns, parse_tool_keys,
 };
 use generation::{
-    apply_changes, detect_base_branch, ensure_flint_self_pin, ensure_node_for_npm,
-    get_existing_config_dir, has_slow_selected, normalize_tools_section, prompt_config_dir,
-    remove_tool_keys,
+    apply_changes, detect_base_branch, ensure_flint_self_pin, ensure_flint_self_pin_additive,
+    ensure_node_for_npm, get_existing_config_dir, has_slow_selected, normalize_tools_section,
+    prompt_config_dir, remove_tool_keys,
 };
 use migrations::{
     apply_repo_migrations, selected_editorconfig_cleanup_sections,
@@ -66,6 +67,84 @@ fn profile_to_categories(profile: Profile) -> HashSet<Category> {
         ]
         .into(),
     }
+}
+
+fn resolve_only_checks<'a>(registry: &'a [Check], names: &[String]) -> Result<Vec<&'a Check>> {
+    let requested: HashSet<&str> = names.iter().map(String::as_str).collect();
+    let unknown: Vec<&str> = names
+        .iter()
+        .filter_map(|name| {
+            (!registry.iter().any(|check| check.name == name)).then_some(name.as_str())
+        })
+        .collect();
+    if !unknown.is_empty() {
+        let noun = if unknown.len() == 1 {
+            "check"
+        } else {
+            "checks"
+        };
+        bail!(
+            "flint: unknown {noun}: {}",
+            unknown
+                .iter()
+                .map(|name| format!("{name:?}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+
+    // Follow registry order rather than CLI order. This keeps shared tool
+    // components and setup hooks deterministic, and naturally de-duplicates
+    // repeated names.
+    Ok(registry
+        .iter()
+        .filter(|check| requested.contains(check.name))
+        .collect())
+}
+
+fn merge_components(current: Option<&str>, required: &str) -> String {
+    let mut components: Vec<&str> = current
+        .into_iter()
+        .flat_map(|components| components.split(','))
+        .map(str::trim)
+        .filter(|component| !component.is_empty())
+        .collect();
+
+    for required_component in required.split(',').map(str::trim) {
+        if !required_component.is_empty() && !components.contains(&required_component) {
+            components.push(required_component);
+        }
+    }
+    components.join(",")
+}
+
+type ToolAdd = (String, Option<String>);
+type ToolUpgrade = (String, String);
+
+fn explicit_tool_changes(groups: &[LinterGroup<'_>]) -> (Vec<ToolAdd>, Vec<ToolUpgrade>) {
+    let mut to_add = vec![];
+    let mut to_upgrade = vec![];
+
+    for group in groups {
+        let Some(required) = group.selected_components() else {
+            if !group.installed {
+                to_add.push((group.key.to_string(), None));
+            }
+            continue;
+        };
+
+        if !group.installed {
+            to_add.push((group.key.to_string(), Some(required)));
+            continue;
+        }
+
+        let merged = merge_components(group.current_components.as_deref(), &required);
+        if group.current_components.as_deref() != Some(merged.as_str()) {
+            to_upgrade.push((group.key.to_string(), merged));
+        }
+    }
+
+    (to_add, to_upgrade)
 }
 
 fn selected_checks<'a>(groups: &'a [LinterGroup<'a>]) -> Vec<&'a Check> {
@@ -222,21 +301,51 @@ pub fn run(
     yes: bool,
     flint_rev: Option<&str>,
 ) -> Result<()> {
+    run_with_only(project_root, profile_arg, &[], yes, flint_rev)
+}
+
+pub fn run_with_only(
+    project_root: &Path,
+    profile_arg: Option<Profile>,
+    only_names: &[String],
+    yes: bool,
+    flint_rev: Option<&str>,
+) -> Result<()> {
+    let registry = builtin();
+    let only_checks = resolve_only_checks(&registry, only_names)?;
+    let only_mode = !only_names.is_empty();
+    if only_mode {
+        let builtins: Vec<&str> = only_checks
+            .iter()
+            .filter(|check| install_key(check).is_none())
+            .map(|check| check.name)
+            .collect();
+        if !builtins.is_empty() {
+            bail!(
+                "flint: --only cannot install built-in or config-only checks: {}",
+                builtins.join(", ")
+            );
+        }
+    }
+
     println!(
         "Tip: flint init detects languages from tracked files (`git ls-files`). \
 Add and stage your source files before running init so the detection is accurate."
     );
     println!();
 
-    let registry = builtin();
-    let mut present_patterns = detect_present_patterns(project_root, &registry)?;
+    let mut present_patterns = if only_mode {
+        HashSet::new()
+    } else {
+        detect_present_patterns(project_root, &registry)?
+    };
 
     // If init will generate `.github/workflows/lint.yml`, treat both the workflow-
     // specific patterns and generic YAML patterns as present so actionlint and
     // ryl get selected in the same run. Without this, init would be
     // non-idempotent: the second run would see the newly-generated workflow and
     // add extra linters then.
-    if !project_root.join(".github/workflows/lint.yml").exists() {
+    if !only_mode && !project_root.join(".github/workflows/lint.yml").exists() {
         present_patterns.insert(".github/workflows/*.yml".to_string());
         present_patterns.insert(".github/workflows/*.yaml".to_string());
         present_patterns.insert("*.yml".to_string());
@@ -245,7 +354,9 @@ Add and stage your source files before running init so the detection is accurate
 
     // Step 1: determine which categories set the initial pre-selection.
     let mut line_length = DEFAULT_LINE_LENGTH;
-    let default_categories: HashSet<Category> = if let Some(profile) = profile_arg {
+    let default_categories: HashSet<Category> = if only_mode {
+        HashSet::new()
+    } else if let Some(profile) = profile_arg {
         profile_to_categories(profile)
     } else if yes {
         profile_to_categories(Profile::Default)
@@ -268,33 +379,43 @@ Add and stage your source files before running init so the detection is accurate
     let known_keys: HashSet<&str> = registry.iter().filter_map(install_key).collect();
     let unsupported_keys: Vec<&str> = crate::registry::unsupported_keys()
         .into_iter()
-        .filter_map(|(old_key, _)| current_tool_keys.contains(old_key).then_some(old_key))
+        .filter_map(|(old_key, _)| {
+            (!only_mode && current_tool_keys.contains(old_key)).then_some(old_key)
+        })
         .collect();
 
     // Step 2: build one group per install key, covering all checks whose files are
     // present in the repo or which are already installed.
-    let mut groups = build_linter_groups(
-        &registry,
-        &present_patterns,
-        &current_tool_keys,
-        &current_content,
-        &default_categories,
-    );
+    let mut groups = if only_mode {
+        build_explicit_linter_groups(&only_checks, &current_tool_keys, &current_content)
+    } else {
+        build_linter_groups(
+            &registry,
+            &present_patterns,
+            &current_tool_keys,
+            &current_content,
+            &default_categories,
+        )
+    };
 
-    if groups.is_empty() {
+    if groups.is_empty() && !only_mode {
         println!("No applicable linters found for this project.");
         return Ok(());
     }
 
     // Step 3: interactive linter table (skipped with --yes).
-    if !yes && !interactive_select_linters(&mut groups)? {
+    if !only_mode && !yes && !interactive_select_linters(&mut groups)? {
         println!("Aborted.");
         return Ok(());
     }
 
     // Detect obsolete tool keys (e.g. github:mvdan/sh → shfmt).
     // These are removed regardless of the interactive selection — keeping them serves no purpose.
-    let obsolete = detect_obsolete_keys(&current_tool_keys);
+    let obsolete = if only_mode {
+        vec![]
+    } else {
+        detect_obsolete_keys(&current_tool_keys)
+    };
     for (old_key, replacement) in &obsolete {
         println!("  removing obsolete linter {old_key} (replaced by {replacement})");
     }
@@ -307,23 +428,29 @@ Add and stage your source files before running init so the detection is accurate
     let mut final_remove: Vec<String> = Vec::new();
     let mut final_upgrade: Vec<(String, String)> = Vec::new();
 
-    for group in &groups {
-        if group.any_selected() {
-            if !group.installed {
-                final_add.push((group.key.to_string(), group.selected_components()));
-            } else {
-                let target = group.selected_components();
-                if target != group.current_components {
-                    // Upgrade: components changed (added, removed, or reordered).
-                    // If the target has no components (e.g. all component-bearing checks
-                    // deselected), treat as a plain-version install via add+remove.
-                    if let Some(comps) = target {
-                        final_upgrade.push((group.key.to_string(), comps));
+    if only_mode {
+        let (add, upgrade) = explicit_tool_changes(&groups);
+        final_add = add;
+        final_upgrade = upgrade;
+    } else {
+        for group in &groups {
+            if group.any_selected() {
+                if !group.installed {
+                    final_add.push((group.key.to_string(), group.selected_components()));
+                } else {
+                    let target = group.selected_components();
+                    if target != group.current_components {
+                        // Upgrade: components changed (added, removed, or reordered).
+                        // If the target has no components (e.g. all component-bearing checks
+                        // deselected), treat as a plain-version install via add+remove.
+                        if let Some(comps) = target {
+                            final_upgrade.push((group.key.to_string(), comps));
+                        }
                     }
                 }
+            } else if group.installed && known_keys.contains(group.key) {
+                final_remove.push(group.key.to_string());
             }
-        } else if group.installed && known_keys.contains(group.key) {
-            final_remove.push(group.key.to_string());
         }
     }
 
@@ -360,7 +487,11 @@ Add and stage your source files before running init so the detection is accurate
             &final_upgrade,
         )?;
     }
-    let flint_pinned = ensure_flint_self_pin(project_root, flint_rev)?;
+    let flint_pinned = if only_mode {
+        ensure_flint_self_pin_additive(project_root, flint_rev)?
+    } else {
+        ensure_flint_self_pin(project_root, flint_rev)?
+    };
     if flint_pinned {
         println!("  pinned flint itself — reproducible lint runs across contributors");
     }
@@ -390,18 +521,26 @@ Add and stage your source files before running init so the detection is accurate
     let editorconfig_line_length_sections =
         selected_editorconfig_line_length_sections(&selected_checks);
     let editorconfig_cleanup_sections = selected_editorconfig_cleanup_sections(&selected_checks);
-    let migration_summary = apply_repo_migrations(
-        project_root,
-        &config_dir_path,
-        &editorconfig_cleanup_sections,
-    )?;
+    let migration_summary = if only_mode {
+        migrations::RepoMigrationSummary::noop()
+    } else {
+        apply_repo_migrations(
+            project_root,
+            &config_dir_path,
+            &editorconfig_cleanup_sections,
+        )?
+    };
     migration_summary.print_messages();
     let editorconfig_generated = generate_editorconfig(project_root, line_length)?;
     let editorconfig_line_length_disabled = disable_editorconfig_line_length_for_patterns(
         project_root,
         &editorconfig_line_length_sections,
     )?;
-    let agent_guidance_changed = ensure_agent_linting_guidance(project_root)?;
+    let agent_guidance_changed = if only_mode {
+        false
+    } else {
+        ensure_agent_linting_guidance(project_root)?
+    };
     if !editorconfig_line_length_disabled.is_empty() {
         println!(
             "  patched <REPO>/.editorconfig — disable max_line_length for {}",

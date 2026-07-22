@@ -83,6 +83,11 @@
         "mise"
       ]
     },
+    ".github/workflows/mise-registry.yml": {
+      "regex": [
+        "mise"
+      ]
+    },
     ".github/workflows/release-plz.yml": {
       "regex": [
         "mise"

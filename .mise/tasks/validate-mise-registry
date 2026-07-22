@@ -14,6 +14,15 @@ command -v mise >/dev/null || {
 }
 
 failures=0
+
+# Keep the registry query separate from the validation loop so it is clear
+# which checks are being validated.
+external_linter_backends="$(
+    cargo run -q --bin flint -- linters --json |
+        jq -r '.[] | select(.install_key != null and .binary != "(built-in)") |
+      [.name, .install_key] | @tsv'
+)"
+
 while IFS=$'\t' read -r name install_key; do
 	case "$install_key" in
 	cargo:* | npm:* | pipx:* | rust | go | dotnet)
@@ -28,11 +37,7 @@ while IFS=$'\t' read -r name install_key; do
 		fi
 		;;
 	esac
-done < <(
-	cargo run -q --bin flint -- linters --json |
-		jq -r '.[] | select(.install_key != null and .binary != "(built-in)") |
-      [.name, .install_key] | @tsv'
-)
+done <<< "$external_linter_backends"
 
 if ((failures > 0)); then
 	printf 'validate-mise-registry: %d backend lookup(s) failed\n' "$failures" >&2

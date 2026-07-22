@@ -165,6 +165,7 @@ fn check_shellcheck() -> Check {
 fn check_shfmt() -> Check {
     Check::file("shfmt", "shfmt -d {FILE}", &["*.sh", "*.bash"])
         .fix("shfmt -w {FILE}")
+        .fix_order(10)
         .project_url(SHFMT_URL)
         .overview(
             OverviewSection::FilesFormats,
@@ -181,6 +182,7 @@ fn check_shfmt() -> Check {
 fn check_rumdl() -> Check {
     Check::files("rumdl", "rumdl check {FILES}", &["*.md"])
         .fix("rumdl check --fix {FILES}")
+        .fix_order(20)
         .linter_config(".rumdl.toml", "--config")
         .baseline_config(ConfigFile::config_dir(".rumdl.toml"))
         .unsupported_configs(RUMDL_UNSUPPORTED_CONFIGS)
@@ -206,6 +208,7 @@ fn check_rumdl() -> Check {
 fn check_yaml_lint() -> Check {
     Check::files("ryl", "ryl {FILES}", &["*.yml", "*.yaml"])
         .fix("ryl --fix {FILES}")
+        .fix_order(30)
         .linter_config(".yamllint.yml", "-c")
         .baseline_config(ConfigFile::config_dir(".yamllint.yml"))
         .unsupported_configs(YAMLLINT_UNSUPPORTED_CONFIGS)
@@ -231,6 +234,7 @@ fn check_taplo() -> Check {
         &["*.toml"],
     )
     .fix("taplo fmt {CONFIG_ARGS} {FILE}")
+    .fix_order(40)
     .linter_config(".taplo.toml", "--config")
     .baseline_config(ConfigFile::config_dir(".taplo.toml"))
     .unsupported_configs(TAPLO_UNSUPPORTED_CONFIGS)
@@ -279,6 +283,7 @@ fn check_actionlint() -> Check {
         None,
     )
     .desc("Lint GitHub Actions workflow files")
+    .semantic()
     .style()
 }
 
@@ -289,6 +294,7 @@ fn check_zizmor() -> Check {
         &[".github/workflows/*.yml", ".github/workflows/*.yaml"],
     )
     .fix("zizmor --fix {FILES}")
+    .fix_order(50)
     .linter_config("zizmor.yml", "--config")
     .baseline_config(ConfigFile::config_dir("zizmor.yml"))
     .unsupported_configs(ZIZMOR_UNSUPPORTED_CONFIGS)
@@ -318,6 +324,7 @@ fn check_zizmor() -> Check {
         stays invisible until something edits them. Run `flint run --full`\n\
         periodically (e.g. weekly `schedule:` workflow) to catch this.",
     )
+    .semantic()
     .style()
 }
 
@@ -359,6 +366,7 @@ fn check_xmllint() -> Check {
 fn check_typos() -> Check {
     Check::files("typos", "typos --force-exclude {FILES}", &["*"])
         .fix("typos --write-changes --force-exclude {FILES}")
+        .fix_order(60)
         .linter_config("_typos.toml", "--config")
         .baseline_config(ConfigFile::config_dir("_typos.toml"))
         .unsupported_configs(TYPOS_UNSUPPORTED_CONFIGS)
@@ -427,12 +435,14 @@ fn check_golangci_lint() -> Check {
     .config_doc_url(GOLANGCI_LINT_CONFIG_URL)
     .overview(OverviewSection::Languages, "Go", OverviewRole::Linter, None)
     .desc("Lint Go code; uses --new-from-rev to scope analysis to changed code")
+    .project_ownership()
     .lang()
 }
 
 fn check_ruff() -> Check {
     Check::file("ruff", "ruff check {FILE}", &["*.py"])
         .fix("ruff check --fix {FILE}")
+        .fix_order(70)
         .linter_config("ruff.toml", "--config")
         .baseline_config(RUFF_BASELINE_CONFIG)
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
@@ -453,6 +463,7 @@ fn check_ruff_format() -> Check {
     Check::file("ruff-format", "ruff format --check {FILE}", &["*.py"])
         .bin("ruff")
         .fix("ruff format {FILE}")
+        .fix_order(80)
         .linter_config("ruff.toml", "--config")
         .baseline_config(RUFF_BASELINE_CONFIG)
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
@@ -477,6 +488,7 @@ fn check_biome() -> Check {
         &["*.json", "*.jsonc", "*.js", "*.ts", "*.jsx", "*.tsx"],
     )
     .fix("biome check --fix {FILE}")
+    .fix_order(90)
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
     .project_url(BIOME_URL)
@@ -507,6 +519,7 @@ fn check_biome_format() -> Check {
     )
     .bin("biome")
     .fix("biome format --write {FILE}")
+    .fix_order(100)
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
     .project_url(BIOME_URL)
@@ -537,6 +550,7 @@ fn check_cargo_clippy() -> Check {
         &["*.rs"],
     )
     .fix("cargo clippy -q --all-targets --fix --allow-dirty --allow-staged -- -D warnings")
+    .fix_order(110)
     .partial_fix()
     .mise_tool("rust")
     .toolchain_components("clippy")
@@ -553,12 +567,14 @@ fn check_cargo_clippy() -> Check {
         None,
     )
     .desc("Lint Rust code; runs on all .rs files, not just changed")
+    .project_ownership()
     .lang()
 }
 
 fn check_cargo_fmt() -> Check {
     Check::project("cargo-fmt", "cargo fmt -- {CONFIG_ARGS} --check", &["*.rs"])
         .fix("cargo fmt -- {CONFIG_ARGS}")
+        .fix_order(120)
         .linter_config("rustfmt.toml", "--config-path")
         .baseline_config(RUSTFMT_BASELINE_CONFIG)
         .unsupported_configs(RUSTFMT_UNSUPPORTED_CONFIGS)
@@ -585,6 +601,7 @@ fn check_cargo_fmt() -> Check {
 fn check_gofmt() -> Check {
     Check::file("gofmt", "gofmt -d {FILE}", &["*.go"])
         .fix("gofmt -w {FILE}")
+        .fix_order(130)
         .mise_tool("go")
         .toolchain()
         .project_url(GOFMT_URL)
@@ -606,6 +623,7 @@ fn check_google_java_format() -> Check {
         &["*.java"],
     )
     .fix("google-java-format -i {FILES}")
+    .fix_order(140)
     .mise_tool("google-java-format")
     .formatter()
     .editorconfig_line_length_off(
@@ -635,6 +653,7 @@ fn check_ktlint() -> Check {
         &["*.kt", "*.kts"],
     )
     .fix("ktlint --format --log-level=error {FILES}")
+    .fix_order(150)
     .full_cmd(
         "ktlint --log-level=error {ROOT}",
         "ktlint --format --log-level=error {ROOT}",
@@ -662,6 +681,7 @@ fn check_dotnet_format() -> Check {
         &["*.cs"],
     )
     .fix("dotnet format --include {RELFILES}")
+    .fix_order(160)
     .full_cmd("dotnet format --verify-no-changes", "dotnet format")
     .bin("dotnet")
     .mise_tool("dotnet")
@@ -688,6 +708,7 @@ fn check_lychee() -> Check {
             Some("Broken links"),
         )
         .desc("Check for broken links")
+        .project_ownership()
         .docs(
             "Orchestrates [lychee](https://lychee.cli.rs/) for link checking. \
             Requires `lychee` in `[tools]`.\n\
@@ -723,6 +744,7 @@ fn check_lychee() -> Check {
 
 fn check_renovate_deps() -> Check {
     Check::native(&renovate_deps::CHECK_TYPE)
+        .fix_order(170)
         .slow()
         .adaptive_relevance(renovate_deps::adaptive_relevance)
         .mise_tool("npm:renovate")
@@ -735,6 +757,7 @@ fn check_renovate_deps() -> Check {
             Some("Dependency update configuration"),
         )
         .desc("Verify Renovate dependency snapshot is up to date")
+        .project_ownership()
         .docs(
             "Verifies `renovate-tracked-deps.json` next to the active Renovate\n\
             config is up to date by running Renovate locally and comparing its\n\
@@ -799,6 +822,7 @@ fn check_license_header() -> Check {
 
 fn check_flint_setup() -> Check {
     Check::native(&flint_setup::CHECK_TYPE)
+        .fix_order(0)
         .activate_unconditionally()
         .patterns(&["mise.toml"])
         .overview(
@@ -808,6 +832,7 @@ fn check_flint_setup() -> Check {
             Some("Flint-managed setup and `mise.toml` layout"),
         )
         .desc("Keep Flint setup current and mise.toml lint tooling canonical")
+        .project_ownership()
         .docs(
             "Checks the repo's Flint-managed setup state and `mise.toml` layout.\n\
             \n\

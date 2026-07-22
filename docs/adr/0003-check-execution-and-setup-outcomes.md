@@ -8,7 +8,8 @@
 Read-only checks benefit from parallel execution, but concurrent fixers can
 corrupt or overwrite each other's changes. Flint setup drift also differs from
 ordinary lint failures: some setup changes are safe to apply before continuing,
-while migrations can change the active check set.
+while setup migrations can add, remove, or replace the lint tools that
+determine which checks are enabled.
 
 ## Decision
 

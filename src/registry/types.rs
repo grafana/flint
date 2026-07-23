@@ -527,13 +527,6 @@ pub struct Check {
     pub status_hook: Option<StatusHook>,
     /// Optional output normalizer used for non-verbose failing process runs.
     pub nonverbose_failure_output: Option<NonverboseFailureOutputHook>,
-    /// Output markers that make an otherwise successful process invocation fail.
-    ///
-    /// Some tools are configured to report violations with a zero exit status
-    /// (for example, Checkstyle with warning severity), while their host build
-    /// plugin treats that output as a failure. These markers preserve that
-    /// repository-level contract in Flint.
-    pub failure_output_patterns: &'static [&'static str],
     /// Optional hint appended when a known toolchain component is missing.
     pub missing_component_hint: Option<MissingComponentHint>,
     /// Additional config-like files that trigger an all-files baseline run when changed.
@@ -678,7 +671,6 @@ impl Check {
             adaptive_relevance: None,
             status_hook: None,
             nonverbose_failure_output: None,
-            failure_output_patterns: &[],
             missing_component_hint: None,
             baseline_triggers: &[],
             is_formatter: false,
@@ -733,7 +725,6 @@ impl Check {
             adaptive_relevance: None,
             status_hook: None,
             nonverbose_failure_output: None,
-            failure_output_patterns: &[],
             missing_component_hint: None,
             baseline_triggers: &[],
             is_formatter: false,
@@ -1011,11 +1002,6 @@ impl Check {
 
     pub fn nonverbose_failure_output(mut self, hook: NonverboseFailureOutputHook) -> Self {
         self.nonverbose_failure_output = Some(hook);
-        self
-    }
-
-    pub fn failure_output_patterns(mut self, patterns: &'static [&'static str]) -> Self {
-        self.failure_output_patterns = patterns;
         self
     }
 

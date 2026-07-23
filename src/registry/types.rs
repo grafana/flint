@@ -40,17 +40,6 @@ pub enum Category {
     Slow,
 }
 
-impl Category {
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Lang => "lang",
-            Self::Style => "style",
-            Self::Default => "default",
-            Self::Slow => "slow",
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum OverviewSection {
     Languages,

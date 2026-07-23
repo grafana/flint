@@ -453,6 +453,7 @@ fn check_ruff_format() -> Check {
     Check::file("ruff-format", "ruff format --check {FILE}", &["*.py"])
         .bin("ruff")
         .fix("ruff format {FILE}")
+        .fix_after("ruff")
         .linter_config("ruff.toml", "--config")
         .baseline_config(RUFF_BASELINE_CONFIG)
         .unsupported_configs(RUFF_UNSUPPORTED_CONFIGS)
@@ -507,6 +508,7 @@ fn check_biome_format() -> Check {
     )
     .bin("biome")
     .fix("biome format --write {FILE}")
+    .fix_after("biome")
     .baseline_config(BIOME_BASELINE_CONFIG)
     .unsupported_configs(BIOME_UNSUPPORTED_CONFIGS)
     .project_url(BIOME_URL)
@@ -559,6 +561,7 @@ fn check_cargo_clippy() -> Check {
 fn check_cargo_fmt() -> Check {
     Check::project("cargo-fmt", "cargo fmt -- {CONFIG_ARGS} --check", &["*.rs"])
         .fix("cargo fmt -- {CONFIG_ARGS}")
+        .fix_after("cargo-clippy")
         .linter_config("rustfmt.toml", "--config-path")
         .baseline_config(RUSTFMT_BASELINE_CONFIG)
         .unsupported_configs(RUSTFMT_UNSUPPORTED_CONFIGS)

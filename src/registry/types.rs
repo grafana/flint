@@ -556,6 +556,8 @@ pub struct Check {
     /// Extra generated workflow setup needed when this check is selected by `flint init`.
     pub workflow_setup: Option<WorkflowSetup>,
     pub fix_behavior: FixBehavior,
+    /// Fixers that must complete before this check runs in fix mode.
+    pub fix_after: Vec<&'static str>,
     pub kind: CheckKind,
     /// Plain-text description of what the check does — shown in `flint linters` and the README table.
     pub desc: &'static str,
@@ -687,6 +689,7 @@ impl Check {
             windows_java_jar: false,
             workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
+            fix_after: vec![],
             desc: "",
             project_url: None,
             config_doc_url: None,
@@ -733,6 +736,7 @@ impl Check {
             windows_java_jar: false,
             workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
+            fix_after: vec![],
             kind: CheckKind::Native(NativeCheckRef::new(native)),
             desc: "",
             project_url: None,
@@ -815,6 +819,12 @@ impl Check {
     /// Mark as a formatter — files it owns are excluded from ec when both are active.
     pub fn formatter(mut self) -> Self {
         self.is_formatter = true;
+        self
+    }
+
+    /// Run this fixer after the named fixer when both are active.
+    pub fn fix_after(mut self, check: &'static str) -> Self {
+        self.fix_after.push(check);
         self
     }
 

@@ -101,6 +101,77 @@ fn registry_tool_key_migrations_are_unique_and_have_targets() {
 }
 
 #[test]
+fn registry_entries_have_complete_metadata() {
+    for check in builtin() {
+        assert!(
+            !check.desc.is_empty(),
+            "{} is missing a description",
+            check.name
+        );
+
+        if check.uses_binary() {
+            assert!(
+                check.install_key().is_some() || check.activate_unconditionally,
+                "{} uses a binary but has no install key",
+                check.name
+            );
+            assert!(
+                check.project_url.is_some(),
+                "{} uses a binary but has no upstream project URL",
+                check.name
+            );
+        }
+
+        if check.linter_config.is_some() {
+            assert!(
+                check.config_doc_url.is_some(),
+                "{} has a config file but no config documentation URL",
+                check.name
+            );
+        }
+    }
+}
+
+#[test]
+fn fixer_dependencies_are_valid_and_acyclic() {
+    let registry = builtin();
+    let fixers: Vec<&Check> = registry.iter().filter(|check| check.has_fix()).collect();
+
+    for check in &fixers {
+        for dependency in &check.fix_after {
+            assert_ne!(check.name, *dependency, "{} depends on itself", check.name);
+            assert!(
+                fixers.iter().any(|candidate| candidate.name == *dependency),
+                "{} must run after unknown or non-fix-capable check {}",
+                check.name,
+                dependency
+            );
+        }
+    }
+
+    let mut remaining = fixers;
+    while !remaining.is_empty() {
+        let next = remaining.iter().position(|check| {
+            check.fix_after.iter().all(|dependency| {
+                !remaining
+                    .iter()
+                    .any(|candidate| candidate.name == *dependency)
+            })
+        });
+        assert!(
+            next.is_some(),
+            "cyclic fixer ordering involving: {}",
+            remaining
+                .iter()
+                .map(|check| check.name)
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        remaining.remove(next.unwrap());
+    }
+}
+
+#[test]
 fn rumdl_batches_matching_files() {
     let check = builtin()
         .into_iter()
@@ -273,19 +344,10 @@ fn test_case_groups_match_registered_checks() {
     );
 }
 
-/// Guardrail: two different fixer tools should not claim the same declared file
-/// pattern. Overlap between checks from the same underlying tool is still
-/// allowed for now (e.g. `biome` + `biome-format`, `ruff` + `ruff-format`)
-/// because those pairs are intentionally split into lint and format modes.
+/// Guardrail: two fixers may claim the same declared file pattern only when
+/// their required precedence is explicit in registry metadata.
 #[test]
 fn competing_fixers_must_not_share_declared_patterns() {
-    const ALLOWED_OVERLAPS: &[(&str, &str)] = &[
-        // markdownlint enforces rules; prettier canonicalizes formatting.
-        ("markdownlint-cli2", "prettier"),
-        // clippy and rustfmt both fix Rust files, but serve distinct purposes.
-        ("cargo-clippy", "cargo-fmt"),
-    ];
-
     let registry = builtin();
     let fixers: Vec<&Check> = registry
         .iter()
@@ -295,15 +357,7 @@ fn competing_fixers_must_not_share_declared_patterns() {
     let mut conflicts = vec![];
     for (i, left) in fixers.iter().enumerate() {
         for right in fixers.iter().skip(i + 1) {
-            if left.bin_name == right.bin_name {
-                continue;
-            }
-            let pair = if left.name < right.name {
-                (left.name, right.name)
-            } else {
-                (right.name, left.name)
-            };
-            if ALLOWED_OVERLAPS.contains(&pair) {
+            if left.fix_after.contains(&right.name) || right.fix_after.contains(&left.name) {
                 continue;
             }
 

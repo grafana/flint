@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -159,7 +159,13 @@ pub async fn run(
         short,
         time,
     } = opts;
-    let prepared: Vec<PreparedCheck> = checks
+    let ordered_checks = if fix {
+        order_checks_for_fix(checks)?
+    } else {
+        checks.to_vec()
+    };
+
+    let prepared: Vec<PreparedCheck> = ordered_checks
         .iter()
         .filter_map(|&check| {
             prepare(
@@ -213,6 +219,31 @@ pub async fn run(
     }
 
     Ok(collected)
+}
+
+fn order_checks_for_fix<'a>(checks: &[&'a Check]) -> Result<Vec<&'a Check>> {
+    let mut remaining = checks.to_vec();
+    let mut ordered = Vec::with_capacity(remaining.len());
+
+    while !remaining.is_empty() {
+        let Some(index) = remaining.iter().position(|check| {
+            check.fix_after.iter().all(|dependency| {
+                !remaining
+                    .iter()
+                    .any(|candidate| candidate.name == *dependency)
+            })
+        }) else {
+            let names = remaining
+                .iter()
+                .map(|check| check.name)
+                .collect::<Vec<_>>()
+                .join(", ");
+            bail!("cyclic fixer ordering involving: {names}");
+        };
+        ordered.push(remaining.remove(index));
+    }
+
+    Ok(ordered)
 }
 
 fn prepare(
@@ -901,6 +932,7 @@ mod tests {
             windows_java_jar: false,
             workflow_setup: None,
             fix_behavior: crate::registry::FixBehavior::Definitive,
+            fix_after: vec![],
             kind: CheckKind::Template {
                 check_cmd: "run-it",
                 fix_cmd: "",
@@ -927,6 +959,34 @@ mod tests {
             },
             ..project_check(patterns)
         }
+    }
+
+    #[test]
+    fn fix_order_follows_declared_dependencies() {
+        let mut first = project_check(&[]);
+        first.name = "first";
+        let mut second = project_check(&[]);
+        second.name = "second";
+        second.fix_after.push("first");
+
+        let ordered = order_checks_for_fix(&[&second, &first]).unwrap();
+        assert_eq!(
+            ordered.iter().map(|check| check.name).collect::<Vec<_>>(),
+            ["first", "second"]
+        );
+    }
+
+    #[test]
+    fn fix_order_rejects_cycles() {
+        let mut first = project_check(&[]);
+        first.name = "first";
+        first.fix_after.push("second");
+        let mut second = project_check(&[]);
+        second.name = "second";
+        second.fix_after.push("first");
+
+        let error = order_checks_for_fix(&[&first, &second]).unwrap_err();
+        assert!(error.to_string().contains("cyclic fixer ordering"));
     }
 
     fn file_list(paths: &[&str]) -> FileList {

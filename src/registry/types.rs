@@ -40,33 +40,6 @@ pub enum Category {
     Slow,
 }
 
-/// The kind of responsibility a check has when multiple checks inspect a file.
-///
-/// This is deliberately separate from [`Scope`]: a file-scoped check can still
-/// be semantic, and a project-scoped check can still be a generic validator.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Ownership {
-    /// General syntax, spelling, or style validation.
-    Generic,
-    /// The check owns formatting for the files it matches.
-    Formatter,
-    /// Domain-specific policy or security validation.
-    Semantic,
-    /// Repository-wide or build-graph-oriented validation.
-    Project,
-}
-
-impl Ownership {
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Generic => "generic",
-            Self::Formatter => "formatter",
-            Self::Semantic => "semantic",
-            Self::Project => "project",
-        }
-    }
-}
-
 impl Category {
     pub fn name(self) -> &'static str {
         match self {
@@ -578,8 +551,6 @@ pub struct Check {
     pub baseline_triggers: &'static [ConfigFile],
     /// This check is a formatter — it owns certain file types for formatting purposes.
     pub is_formatter: bool,
-    /// Broad responsibility category used to document legitimate overlap.
-    pub ownership: Ownership,
     /// Skip files owned by active formatters (used by ec to avoid double-checking).
     pub defers_to_formatters: bool,
     /// Optional `.editorconfig` line-length carve-out owned by this check.
@@ -603,9 +574,8 @@ pub struct Check {
     /// Extra generated workflow setup needed when this check is selected by `flint init`.
     pub workflow_setup: Option<WorkflowSetup>,
     pub fix_behavior: FixBehavior,
-    /// Deterministic order for fix-capable checks. Checks that can touch the
-    /// same file must declare an explicit order; fixes are still run serially.
-    pub fix_order: Option<u16>,
+    /// Fixers that must complete before this check runs in fix mode.
+    pub fix_after: Vec<&'static str>,
     pub kind: CheckKind,
     /// Plain-text description of what the check does — shown in `flint linters` and the README table.
     pub desc: &'static str,
@@ -723,7 +693,6 @@ impl Check {
             missing_component_hint: None,
             baseline_triggers: &[],
             is_formatter: false,
-            ownership: Ownership::Generic,
             defers_to_formatters: false,
             editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
             activate_unconditionally: false,
@@ -739,7 +708,7 @@ impl Check {
             windows_java_jar: false,
             workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
-            fix_order: None,
+            fix_after: vec![],
             desc: "",
             project_url: None,
             config_doc_url: None,
@@ -779,7 +748,6 @@ impl Check {
             missing_component_hint: None,
             baseline_triggers: &[],
             is_formatter: false,
-            ownership: Ownership::Generic,
             defers_to_formatters: false,
             editorconfig_line_length_policy: EditorconfigLineLengthPolicy::Default,
             activate_unconditionally: false,
@@ -788,7 +756,7 @@ impl Check {
             windows_java_jar: false,
             workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
-            fix_order: None,
+            fix_after: vec![],
             kind: CheckKind::Native(NativeCheckRef::new(native)),
             desc: "",
             project_url: None,
@@ -871,25 +839,12 @@ impl Check {
     /// Mark as a formatter — files it owns are excluded from ec when both are active.
     pub fn formatter(mut self) -> Self {
         self.is_formatter = true;
-        self.ownership = Ownership::Formatter;
         self
     }
 
-    /// Mark this check as a domain-specific policy or security check.
-    pub fn semantic(mut self) -> Self {
-        self.ownership = Ownership::Semantic;
-        self
-    }
-
-    /// Mark this check as a repository-wide/project check.
-    pub fn project_ownership(mut self) -> Self {
-        self.ownership = Ownership::Project;
-        self
-    }
-
-    /// Set the explicit serial fix order for this check.
-    pub fn fix_order(mut self, order: u16) -> Self {
-        self.fix_order = Some(order);
+    /// Run this fixer after the named fixer when both are active.
+    pub fn fix_after(mut self, check: &'static str) -> Self {
+        self.fix_after.push(check);
         self
     }
 

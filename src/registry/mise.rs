@@ -188,7 +188,7 @@ fn is_github_owner_and_flint_repo_or_git(path: &str) -> bool {
     matches!(path.split_once('/'), Some((owner, "flint" | "flint.git")) if !owner.is_empty())
 }
 
-fn declared_tool_version<'a>(
+pub(crate) fn declared_tool_version<'a>(
     check: &Check,
     mise_tools: &'a HashMap<String, String>,
 ) -> Option<&'a str> {

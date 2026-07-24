@@ -1025,16 +1025,23 @@ fn print_linters_json(
 ) {
     let entries: Vec<serde_json::Value> = registry
         .iter()
-        .map(|check| {
-            let status = linter_status(check, mise_tools, cfg, registry::binary_on_path);
-            let declared_version = check
-                .install_key()
-                .and_then(|key| mise_tools.get(key))
-                .map(String::as_str);
-            linter_json(check, status, declared_version)
-        })
+        .map(|check| linter_json_for(check, mise_tools, cfg, registry::binary_on_path))
         .collect();
     println!("{}", serde_json::to_string_pretty(&entries).unwrap());
+}
+
+fn linter_json_for<F>(
+    check: &registry::Check,
+    mise_tools: &HashMap<String, String>,
+    cfg: &config::Config,
+    binary_on_path: F,
+) -> serde_json::Value
+where
+    F: Fn(&str) -> bool,
+{
+    let status = linter_status(check, mise_tools, cfg, binary_on_path);
+    let declared_version = registry::declared_tool_version(check, mise_tools);
+    linter_json(check, status, declared_version)
 }
 
 pub fn linter_json(
@@ -1252,10 +1259,7 @@ where
         } else {
             "no binary"
         }
-    } else if check
-        .install_key()
-        .is_some_and(|key| mise_tools.contains_key(key))
-    {
+    } else if registry::declared_tool_version(check, mise_tools).is_some() {
         "wrong version"
     } else {
         "missing"
@@ -1392,6 +1396,25 @@ license-header        (built-in)          not configured  fast      no   Check s
         assert_eq!(json["formatter"], true);
         assert!(json["project_url"].as_str().is_some());
         assert!(json["baseline_config"].as_str().is_some());
+    }
+
+    #[test]
+    fn linter_json_and_status_use_bare_tool_alias_fallback() {
+        let check = registry::Check::files("ryl", "ryl {FILES}", &["*.yml"])
+            .mise_tool("aqua:owenlamont/ryl")
+            .version_req(">=1.0.0");
+        let cfg = config::Config::default();
+
+        let active_tools = mise_tools_from("[tools]\nryl = \"1.2.3\"\n");
+        let json = super::linter_json_for(&check, &active_tools, &cfg, |_| true);
+        assert_eq!(json["status"], "active");
+        assert_eq!(json["declared_version"], "1.2.3");
+
+        let wrong_version_tools = mise_tools_from("[tools]\nryl = \"0.6.0\"\n");
+        assert_eq!(
+            linter_status(&check, &wrong_version_tools, &cfg, |_| true),
+            "wrong version"
+        );
     }
 
     #[test]

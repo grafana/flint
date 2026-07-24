@@ -1,0 +1,20 @@
+[expected]
+args = "run --full --fix dotenv-linter"
+exit = 1
+stderr = '''
+flint: fixed: dotenv-linter — commit before pushing
+'''
+
+[expected.files]
+".env" = "PORT=8080\n"
+
+[fake_bins]
+dotenv-linter = '''
+#!/bin/sh
+set -eu
+case "$1" in
+  check) exit 1 ;;
+  fix) printf 'PORT=8080\n' > .env ;;
+  *) exit 1 ;;
+esac
+'''

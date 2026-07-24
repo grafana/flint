@@ -26,6 +26,8 @@ const GOFMT_URL: &str = "https://pkg.go.dev/cmd/gofmt";
 const GOLANGCI_LINT_URL: &str = "https://golangci-lint.run/";
 const GOLANGCI_LINT_CONFIG_URL: &str = "https://golangci-lint.run/usage/configuration/";
 const GOOGLE_JAVA_FORMAT_URL: &str = "https://github.com/google/google-java-format";
+const DOTENV_LINTER_URL: &str = "https://github.com/dotenv-linter/dotenv-linter";
+const DOTENV_LINTER_CONFIG_URL: &str = "https://dotenv-linter.github.io/";
 const HADOLINT_URL: &str = "https://github.com/hadolint/hadolint";
 const HADOLINT_CONFIG_URL: &str =
     "https://github.com/hadolint/hadolint?tab=readme-ov-file#configure";
@@ -375,6 +377,37 @@ fn check_typos() -> Check {
         .migrate_tool_keys(&["codespell", "pipx:codespell", "aqua:crate-ci/typos"])
         .desc("Check for common spelling mistakes")
         .mise_tool("typos")
+}
+
+fn check_dotenv_linter() -> Check {
+    Check::files(
+        "dotenv-linter",
+        "dotenv-linter check --plain --skip-updates {FILES}",
+        &[".env", ".env.*", "*.env"],
+    )
+    .fix("dotenv-linter fix --plain --no-backup {FILES}")
+    .mise_tool("dotenv-linter")
+    .project_url(DOTENV_LINTER_URL)
+    .config_doc_url(DOTENV_LINTER_CONFIG_URL)
+    .overview(
+        OverviewSection::FilesFormats,
+        "Dotenv",
+        OverviewRole::Both,
+        Some("Environment-file syntax and consistency"),
+    )
+    .desc("Lint dotenv environment files without printing their values")
+    .docs(
+        "Checks only explicit .env-style files: .env, .env.* and files ending in .env.\
+        \n\
+        Flint passes file paths rather than a directory, so an unrelated YAML, Compose,\
+        \n\
+        or application config file is never scanned. Check mode is read-only; fix mode\
+        \n\
+        uses dotenv-linter's no-backup option and remains serialized with other Flint\
+        \n\
+        fixers. Do not commit secret-bearing .env files.",
+    )
+    .style()
 }
 
 fn check_editorconfig_checker() -> Check {
@@ -840,6 +873,7 @@ pub fn builtin() -> Vec<Check> {
         check_hadolint(),
         check_xmllint(),
         check_typos(),
+        check_dotenv_linter(),
         check_editorconfig_checker(),
         check_golangci_lint(),
         check_ruff(),

@@ -158,14 +158,15 @@ For Flint contributor workflow and local testing tips, see
 
 ### Files / Formats
 
-| Name     | Linter                                     | Formatter                                      |
-| -------- | ------------------------------------------ | ---------------------------------------------- |
-| JSON     | [`biome`](docs/linters.md#biome)           | [`biome-format`](docs/linters.md#biome-format) |
-| Markdown | [`rumdl`](docs/linters.md#rumdl)           | [`rumdl`](docs/linters.md#rumdl)               |
-| Shell    | [`shellcheck`](docs/linters.md#shellcheck) | [`shfmt`](docs/linters.md#shfmt)               |
-| TOML     | —                                          | [`taplo`](docs/linters.md#taplo)               |
-| XML      | [`xmllint`](docs/linters.md#xmllint)       | —                                              |
-| YAML     | [`ryl`](docs/linters.md#ryl)               | [`ryl`](docs/linters.md#ryl)                   |
+| Name     | Linter                                           | Formatter                                        |
+| -------- | ------------------------------------------------ | ------------------------------------------------ |
+| Dotenv   | [`dotenv-linter`](docs/linters.md#dotenv-linter) | [`dotenv-linter`](docs/linters.md#dotenv-linter) |
+| JSON     | [`biome`](docs/linters.md#biome)                 | [`biome-format`](docs/linters.md#biome-format)   |
+| Markdown | [`rumdl`](docs/linters.md#rumdl)                 | [`rumdl`](docs/linters.md#rumdl)                 |
+| Shell    | [`shellcheck`](docs/linters.md#shellcheck)       | [`shfmt`](docs/linters.md#shfmt)                 |
+| TOML     | —                                                | [`taplo`](docs/linters.md#taplo)                 |
+| XML      | [`xmllint`](docs/linters.md#xmllint)             | —                                                |
+| YAML     | [`ryl`](docs/linters.md#ryl)                     | [`ryl`](docs/linters.md#ryl)                     |
 
 ### Tooling / CI
 

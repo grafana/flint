@@ -159,3 +159,40 @@ pub(super) fn build_linter_groups<'a>(
     groups.sort_by_key(|g| g.checks.first().map_or(g.key, |c| c.name));
     groups
 }
+
+/// Builds groups for explicitly requested checks, even when their file patterns
+/// are not present or their tool is not currently installed.
+pub(super) fn build_explicit_linter_groups<'a>(
+    checks: &[&'a Check],
+    current_tool_keys: &HashSet<String>,
+    current_content: &str,
+) -> Vec<LinterGroup<'a>> {
+    let mut by_key: HashMap<&'static str, Vec<&'a Check>> = HashMap::new();
+    for check in checks {
+        let Some(key) = install_key(check) else {
+            continue;
+        };
+        by_key.entry(key).or_default().push(check);
+    }
+
+    let mut groups: Vec<LinterGroup<'a>> = by_key
+        .into_iter()
+        .map(|(key, mut checks)| {
+            checks.sort_by_key(|check| check.name);
+            let installed = current_tool_keys.contains(key);
+            let current_components = installed
+                .then(|| get_entry_components(current_content, key))
+                .flatten();
+            LinterGroup {
+                key,
+                check_selected: vec![true; checks.len()],
+                checks,
+                installed,
+                current_components,
+            }
+        })
+        .collect();
+
+    groups.sort_by_key(|group| group.checks.first().map_or(group.key, |check| check.name));
+    groups
+}

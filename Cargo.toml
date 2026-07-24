@@ -24,6 +24,3 @@ similar = "3"
 toml_edit = "0.25"
 dunce = "1.0.5"
 tempfile = "3"
-
-[dev-dependencies]
-regex = "=1.12.4"

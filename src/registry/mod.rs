@@ -5,6 +5,7 @@ mod resolve;
 mod types;
 
 pub use checks::builtin;
+pub(crate) use mise::declared_tool_version;
 pub use mise::{
     check_active, flint_version_changed, full_baseline_runtime_changed, read_mise_tools,
     read_mise_tools_at_ref, runtime_version_changed, tool_version_changed,

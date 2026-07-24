@@ -55,8 +55,7 @@ const XMLLINT_URL: &str = "https://github.com/jonwiggins/xmloxide";
 const YAMLLINT_CONFIG_URL: &str = "https://yamllint.readthedocs.io/en/stable/configuration.html";
 const RYL_URL: &str = "https://github.com/owenlamont/ryl";
 
-const CHECKSTYLE_TOOL_KEY: &str =
-    "github:checkstyle/checkstyle[matching=all.jar,rename_exe=checkstyle]";
+const CHECKSTYLE_TOOL_KEY: &str = "aqua:checkstyle/checkstyle";
 const CHECKSTYLE_BASELINE_TRIGGERS: &[ConfigFile] =
     &[ConfigFile::project("checkstyle-suppressions.xml")];
 

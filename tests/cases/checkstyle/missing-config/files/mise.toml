@@ -1,2 +1,2 @@
 [tools]
-"github:checkstyle/checkstyle[matching=all.jar,rename_exe=checkstyle]" = "checkstyle-13.8.0"
+"aqua:checkstyle/checkstyle" = "checkstyle-13.8.0"

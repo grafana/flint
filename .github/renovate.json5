@@ -57,11 +57,11 @@
     {
       matchDepNames: [
         "actionlint",
+        "aqua:checkstyle/checkstyle",
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",
         "editorconfig-checker",
-        "github:checkstyle/checkstyle[matching=all.jar,rename_exe=checkstyle]",
         "golangci-lint",
         "google-java-format",
         "hadolint",

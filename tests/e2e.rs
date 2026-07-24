@@ -776,10 +776,11 @@ fn collect_cases(dir: &Path) -> Vec<PathBuf> {
 /// relying on reviewers to notice a missing happy-path case.
 #[test]
 fn every_check_has_a_silent_happy_path_case() {
-    let output = Command::new(env!("CARGO_BIN_EXE_flint"))
-        .args(["linters", "--json"])
-        .output()
-        .expect("failed to list checks");
+    let output = flint_with_env(
+        &["linters", "--json"],
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+        &[],
+    );
     assert!(
         output.status.success(),
         "flint linters --json failed: {}",

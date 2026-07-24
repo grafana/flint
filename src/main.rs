@@ -1355,6 +1355,7 @@ shellcheck            shellcheck          active         fast      no   Lint she
 shfmt                 shfmt               active         fast      yes  Format shell scripts                                                 *.sh *.bash
 rumdl                 rumdl               active         fast      yes  Lint Markdown files for style and consistency                        *.md
 ryl                   ryl                 active         fast      yes  Lint YAML files for style and consistency                            *.yml *.yaml
+kube-linter           kube-linter         missing        fast      no   Lint explicitly selected Kubernetes resources                        k8s/*.yml k8s/*.yaml kubernetes/*.yml kubernetes/*.yaml manifests/*.yml manifests/*.yaml
 taplo                 taplo               active         fast      yes  Format TOML files                                                    *.toml
 actionlint            actionlint          active         fast      no   Lint GitHub Actions workflow files                                   .github/workflows/*.yml .github/workflows/*.yaml
 zizmor                zizmor              active         fast      yes  Audit GitHub Actions workflows for security issues                   .github/workflows/*.yml .github/workflows/*.yaml

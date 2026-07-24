@@ -4,6 +4,10 @@
       "packageName": "rhysd/actionlint",
       "datasource": "github-releases"
     },
+    "aqua:dotenv-linter/dotenv-linter": {
+      "packageName": "dotenv-linter/dotenv-linter",
+      "datasource": "github-tags"
+    },
     "aqua:jonwiggins/xmloxide": {
       "packageName": "jonwiggins/xmloxide",
       "datasource": "github-tags"
@@ -106,6 +110,7 @@
     "mise.toml": {
       "mise": [
         "actionlint",
+        "aqua:dotenv-linter/dotenv-linter",
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",

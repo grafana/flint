@@ -57,6 +57,7 @@
     {
       matchDepNames: [
         "actionlint",
+        "aqua:dotenv-linter/dotenv-linter",
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",

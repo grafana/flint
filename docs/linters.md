@@ -23,14 +23,15 @@ links to the relevant upstream configuration docs.
 
 ### Files / Formats
 
-| Name     | Linter                      | Formatter                       |
-| -------- | --------------------------- | ------------------------------- |
-| JSON     | [`biome`](#biome)           | [`biome-format`](#biome-format) |
-| Markdown | [`rumdl`](#rumdl)           | [`rumdl`](#rumdl)               |
-| Shell    | [`shellcheck`](#shellcheck) | [`shfmt`](#shfmt)               |
-| TOML     | —                           | [`taplo`](#taplo)               |
-| XML      | [`xmllint`](#xmllint)       | —                               |
-| YAML     | [`ryl`](#ryl)               | [`ryl`](#ryl)                   |
+| Name     | Linter                            | Formatter                         |
+| -------- | --------------------------------- | --------------------------------- |
+| Dotenv   | [`dotenv-linter`](#dotenv-linter) | [`dotenv-linter`](#dotenv-linter) |
+| JSON     | [`biome`](#biome)                 | [`biome-format`](#biome-format)   |
+| Markdown | [`rumdl`](#rumdl)                 | [`rumdl`](#rumdl)                 |
+| Shell    | [`shellcheck`](#shellcheck)       | [`shfmt`](#shfmt)                 |
+| TOML     | —                                 | [`taplo`](#taplo)                 |
+| XML      | [`xmllint`](#xmllint)             | —                                 |
+| YAML     | [`ryl`](#ryl)                     | [`ryl`](#ryl)                     |
 
 ### Tooling / CI
 
@@ -114,6 +115,23 @@ Lint Rust code; runs on all .rs files, not just changed
 | Config   | [`rustfmt.toml`](https://github.com/rust-lang/rustfmt?tab=readme-ov-file#configuring-rustfmt) |
 
 Format Rust code; runs on all .rs files, not just changed
+
+### [`dotenv-linter`](https://github.com/dotenv-linter/dotenv-linter)
+
+|          |                       |
+| -------- | --------------------- |
+| Fix      | yes                   |
+| Binary   | `dotenv-linter`       |
+| Scope    | [files](#scope-files) |
+| Patterns | `.env .env.* *.env`   |
+
+Lint dotenv environment files without printing their values
+
+Checks only explicit .env-style files: .env, .env.* and files ending in .env.
+Flint passes file paths rather than a directory, so an unrelated YAML, Compose,
+or application config file is never scanned. Check mode is read-only; fix mode
+uses dotenv-linter's no-backup option and remains serialized with other Flint
+fixers. Do not commit secret-bearing .env files.
 
 ### [`dotnet-format`](https://learn.microsoft.com/dotnet/core/tools/dotnet-format)
 

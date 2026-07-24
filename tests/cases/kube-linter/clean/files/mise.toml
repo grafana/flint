@@ -1,2 +1,2 @@
 [tools]
-"aqua:stackrox/kube-linter" = "0.8.3"
+"kube-linter" = "0.8.3"

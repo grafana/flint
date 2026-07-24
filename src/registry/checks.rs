@@ -238,7 +238,7 @@ fn check_yaml_lint() -> Check {
 fn check_kube_linter() -> Check {
     Check::native(&crate::linters::kube_linter::CHECK_TYPE)
         .patterns(KUBE_LINTER_PATTERNS)
-        .mise_tool("aqua:stackrox/kube-linter")
+        .mise_tool("kube-linter")
         .baseline_config(ConfigFile::config_dir("kube-linter.yaml"))
         .project_url(KUBE_LINTER_URL)
         .config_doc_url(KUBE_LINTER_CONFIG_URL)

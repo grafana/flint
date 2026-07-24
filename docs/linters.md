@@ -34,10 +34,11 @@ links to the relevant upstream configuration docs.
 
 ### Tooling / CI
 
-| Name           | Check                                             |
-| -------------- | ------------------------------------------------- |
-| Dockerfile     | [`hadolint`](#hadolint)                           |
-| GitHub Actions | [`actionlint`](#actionlint) / [`zizmor`](#zizmor) |
+| Name                 | Check                                             |
+| -------------------- | ------------------------------------------------- |
+| Dockerfile           | [`hadolint`](#hadolint)                           |
+| GitHub Actions       | [`actionlint`](#actionlint) / [`zizmor`](#zizmor) |
+| Kubernetes manifests | [`kube-linter`](#kube-linter)                     |
 
 ### General
 
@@ -233,6 +234,25 @@ Lint Dockerfiles
 | Patterns | `*.kt *.kts`          |
 
 Lint and format Kotlin code
+
+### [`kube-linter`](https://github.com/stackrox/kube-linter)
+
+|          |                                                                                            |
+| -------- | ------------------------------------------------------------------------------------------ |
+| Fix      | no                                                                                         |
+| Binary   | `kube-linter`                                                                              |
+| Scope    | [native](#scope-native)                                                                    |
+| Patterns | `k8s/*.yml k8s/*.yaml kubernetes/*.yml kubernetes/*.yaml manifests/*.yml manifests/*.yaml` |
+| Config   | [`kube-linter.yaml`](https://docs.kubelinter.io/)                                          |
+
+Lint explicitly selected Kubernetes resources
+
+KubeLinter is report-only and only runs on files selected by
+[checks.kube-linter].paths (or existing conventional k8s/,
+kubernetes/, or manifests/ directories). Flint parses YAML documents
+and passes only documents containing apiVersion and kind, so ordinary
+YAML and Docker Compose files are not treated as Kubernetes resources.
+Helm/Kustomize rendering remains an explicit separate workflow.
 
 ### `license-header`
 

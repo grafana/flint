@@ -1,0 +1,13 @@
+[expected]
+args = "run --full kube-linter"
+exit = 0
+
+[expected.files]
+".kube-linter-args" = "lint k8s/deployment.yaml\n"
+
+[fake_bins]
+kube-linter = '''
+#!/bin/sh
+set -eu
+printf '%s\n' "$*" > .kube-linter-args
+'''

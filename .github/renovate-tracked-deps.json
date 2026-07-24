@@ -12,6 +12,10 @@
       "packageName": "owenlamont/ryl",
       "datasource": "github-tags"
     },
+    "aqua:stackrox/kube-linter": {
+      "packageName": "stackrox/kube-linter",
+      "datasource": "github-tags"
+    },
     "biome": {
       "packageName": "biomejs/biome",
       "datasource": "github-tags"
@@ -108,6 +112,7 @@
         "actionlint",
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
+        "aqua:stackrox/kube-linter",
         "biome",
         "dotnet",
         "editorconfig-checker",

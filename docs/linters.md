@@ -202,14 +202,34 @@ Lint Go code; uses --new-from-rev to scope analysis to changed code
 
 ### [`google-java-format`](https://github.com/google/google-java-format)
 
-|          |                       |
-| -------- | --------------------- |
-| Fix      | yes                   |
-| Binary   | `google-java-format`  |
-| Scope    | [files](#scope-files) |
-| Patterns | `*.java`              |
+|          |                         |
+| -------- | ----------------------- |
+| Fix      | yes                     |
+| Binary   | `google-java-format`    |
+| Scope    | [native](#scope-native) |
+| Patterns | `*.java`                |
 
 Format Java code
+
+Format Java with google-java-format. Configure upstream options in `flint.toml`:
+
+```toml
+[checks.google-java-format]
+skip_reflowing_long_strings = true
+skip_sorting_imports = true
+skip_removing_unused_imports = true
+skip_javadoc_formatting = true
+aosp = false
+```
+
+`skip_reflowing_long_strings` defaults to `true` in Flint to match the
+current Spotless behavior. Set it to `false` to use google-java-format's
+upstream default. The other options default to `false`.
+
+`off_on_markers` accepts `{ off = "...", on = "..." }` pairs for
+formatter-off regions that google-java-format does not understand.
+`patterns` and `exclude` control file ownership. Exclude patterns use
+the same glob syntax as `[settings].exclude`.
 
 ### [`hadolint`](https://github.com/hadolint/hadolint)
 
@@ -250,12 +270,14 @@ Disabled by default. Configure in `flint.toml`:
 ```toml
 [checks.license-header]
 text = "SPDX-License-Identifier: Apache-2.0"
-patterns = ["*.java", "*.kt"]
+patterns = ["*.java", "*.kt", "*.scala", "*.groovy"]
+exclude = ["package-info.java"]
 lines_to_check = 5
 ```
 
 - `text` — required header text to find near the top of each file
 - `patterns` — glob patterns selecting which files to check
+- `exclude` — glob patterns excluded after `patterns`
 - `lines_to_check` — how many leading lines to search; defaults to `5`
 
 `text` may be multi-line. Flint joins the first `lines_to_check` lines with
@@ -300,6 +322,57 @@ Configure via `flint.toml`:
 config = ".github/config/lychee.toml"
 check_all_local = true
 ```
+
+### `regex-replace`
+
+|        |                                            |
+| ------ | ------------------------------------------ |
+| Fix    | yes                                        |
+| Binary | (built-in)                                 |
+| Scope  | [native](#scope-native)                    |
+| Config | via `[checks.regex-replace]` in flint.toml |
+
+Apply configured regular-expression replacements to source files
+
+Applies ordered regular-expression replacement rule sets to source files.
+Each set has its own file scope, replacement default, line filters, ignored regions,
+import insertion policy, and rules.
+
+```toml
+[checks.regex-replace]
+patterns = ["*.txt"]
+exclude = ["generated/**"]
+
+[[checks.regex-replace.sets]]
+name = "example"
+replacement = '$1'
+add_lines_before_pattern = '^use '
+
+[[checks.regex-replace.sets.rules]]
+pattern = '\bfoo\.(bar)\b'
+add_lines = ['use foo.$1;']
+```
+
+Top-level `patterns` and `exclude` select files for the check; a set's optional
+`patterns` and `exclude` further restrict that set. Rules inherit the set's
+`replacement`; a rule can override it. If neither is configured, replacement
+defaults to `$0` (the original match). `pattern` is matched line by line.
+Capture groups can be used in replacements and `add_lines`.
+
+Use `derived_rules` when a rule must be generated from named captures in a
+`source_pattern`; `{name}` placeholders are substituted into the generated rule.
+`content_pattern`, `content_exclude_pattern`, `line_exclude_pattern`, and
+`file_pattern` are rule-level filters. `skip_line_pattern` and `ignore_regions`
+are set-level filters; an ignored region is defined by configurable
+`start_pattern` and `end_pattern` regexes matched against whole lines; the
+markers and all lines between them are ignored, and the pair must be balanced.
+`add_lines_before_pattern` inserts
+unique added lines before the first matching line;
+`add_lines_fallback_after_pattern` inserts them after its first match when
+there is no before-pattern match. Derived rules also support
+`source_exclude_pattern`. Set and check file exclusions use the same glob
+syntax as `[settings].exclude`. See [the regex-replace guide](linters/regex-replace.md)
+for a complete static-import example.
 
 ### [`renovate-deps`](https://docs.renovatebot.com/)
 

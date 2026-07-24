@@ -1,0 +1,10 @@
+[expected]
+args = "run --full regex-replace"
+exit = 1
+stderr = '''
+[regex-replace]
+Main.txt: regex replacements are not formatted
+
+flint: 1 check failed (regex-replace)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''

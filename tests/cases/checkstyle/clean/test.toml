@@ -1,0 +1,15 @@
+[expected]
+args = "run --full checkstyle"
+exit = 0
+
+[fake_bins]
+checkstyle = '''
+#!/bin/sh
+exit 0
+'''
+java = '''
+#!/bin/sh
+echo "Starting audit..."
+echo "Audit done." >&2
+exit 0
+'''

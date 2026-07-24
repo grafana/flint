@@ -15,7 +15,7 @@ links to the relevant upstream configuration docs.
 | ----------------------- | --------------------------------- | ------------------------------------------- |
 | C#                      | —                                 | [`dotnet-format`](#dotnet-format)           |
 | Go                      | [`golangci-lint`](#golangci-lint) | [`gofmt`](#gofmt)                           |
-| Java                    | —                                 | [`google-java-format`](#google-java-format) |
+| Java                    | [`checkstyle`](#checkstyle)       | [`google-java-format`](#google-java-format) |
 | JavaScript / TypeScript | [`biome`](#biome)                 | [`biome-format`](#biome-format)             |
 | Kotlin                  | [`ktlint`](#ktlint)               | [`ktlint`](#ktlint)                         |
 | Python                  | [`ruff`](#ruff)                   | [`ruff-format`](#ruff-format)               |
@@ -114,6 +114,27 @@ Lint Rust code; runs on all .rs files, not just changed
 | Config   | [`rustfmt.toml`](https://github.com/rust-lang/rustfmt?tab=readme-ov-file#configuring-rustfmt) |
 
 Format Rust code; runs on all .rs files, not just changed
+
+### [`checkstyle`](https://github.com/checkstyle/checkstyle)
+
+|          |                                                        |
+| -------- | ------------------------------------------------------ |
+| Fix      | no                                                     |
+| Binary   | `checkstyle`                                           |
+| Scope    | [files](#scope-files)                                  |
+| Patterns | `*.java`                                               |
+| Config   | [`checkstyle.xml`](https://checkstyle.org/config.html) |
+
+Check Java source against a repository-owned Checkstyle configuration
+
+Runs the standalone Checkstyle CLI against selected Java files.
+A Java runtime must be available on PATH because the curated
+Checkstyle distribution is a JAR.
+The repository must provide checkstyle.xml at its root; a root-level
+checkstyle-suppressions.xml is also supported by Checkstyle's normal
+property default. Flint does not infer Maven or Gradle source roots,
+and Checkstyle is report-only: use a formatter such as
+google-java-format for safe formatting fixes.
 
 ### [`dotnet-format`](https://learn.microsoft.com/dotnet/core/tools/dotnet-format)
 

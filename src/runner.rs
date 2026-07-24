@@ -47,6 +47,7 @@ struct InvocationOutputPolicy<'a> {
     env: &'a [(&'static str, &'static str)],
     nonverbose_filter_prefixes: &'a [&'static str],
     stderr_filter_prefixes: &'a [&'static str],
+    failure_output_patterns: &'a [&'static str],
 }
 
 /// A check with all inputs pre-resolved, ready to execute without borrowing
@@ -56,10 +57,11 @@ enum PreparedCheck {
         name: String,
         argv_list: Vec<Vec<String>>,
         tracked_files: Vec<PathBuf>,
-        windows_java_jar: bool,
+        java_jar: bool,
         env: &'static [(&'static str, &'static str)],
         nonverbose_filter_prefixes: &'static [&'static str],
         stderr_filter_prefixes: &'static [&'static str],
+        failure_output_patterns: &'static [&'static str],
         nonverbose_failure_output: Option<NonverboseFailureOutputHook>,
         missing_component_hint: Option<MissingComponentHint>,
     },
@@ -81,10 +83,11 @@ impl PreparedCheck {
             Self::Invocations {
                 argv_list,
                 tracked_files,
-                windows_java_jar,
+                java_jar,
                 env,
                 nonverbose_filter_prefixes,
                 stderr_filter_prefixes,
+                failure_output_patterns,
                 nonverbose_failure_output,
                 missing_component_hint,
                 ..
@@ -97,7 +100,7 @@ impl PreparedCheck {
                 let out = run_invocations(
                     &name,
                     &argv_list,
-                    windows_java_jar,
+                    java_jar,
                     InvocationOutputPolicy {
                         nonverbose: !verbose,
                         env: if verbose { &[] } else { env },
@@ -107,6 +110,7 @@ impl PreparedCheck {
                             nonverbose_filter_prefixes
                         },
                         stderr_filter_prefixes: if verbose { &[] } else { stderr_filter_prefixes },
+                        failure_output_patterns,
                     },
                     nonverbose_failure_output,
                     missing_component_hint,
@@ -274,10 +278,11 @@ fn prepare(
                 name,
                 argv_list,
                 tracked_files,
-                windows_java_jar: check.windows_java_jar,
+                java_jar: check.java_jar || (cfg!(windows) && check.windows_java_jar),
                 env: check.env,
                 nonverbose_filter_prefixes: check.nonverbose_filter_prefixes,
                 stderr_filter_prefixes: check.stderr_filter_prefixes,
+                failure_output_patterns: check.failure_output_patterns,
                 nonverbose_failure_output: check.nonverbose_failure_output,
                 missing_component_hint: check.missing_component_hint,
             })
@@ -573,7 +578,7 @@ fn render_config_args(config_args: &[String]) -> String {
 async fn run_invocations(
     name: &str,
     invocations: &[Vec<String>],
-    windows_java_jar: bool,
+    java_jar: bool,
     output_policy: InvocationOutputPolicy<'_>,
     nonverbose_failure_output: Option<NonverboseFailureOutputHook>,
     missing_component_hint: Option<MissingComponentHint>,
@@ -587,13 +592,16 @@ async fn run_invocations(
         if argv.is_empty() {
             continue;
         }
-        let mut cmd = crate::linters::spawn_command(argv, windows_java_jar);
+        let mut cmd = crate::linters::spawn_command(argv, java_jar);
         cmd.current_dir(root)
             .stdin(Stdio::null())
             .envs(output_policy.env.iter().copied());
         let result = cmd.output().await;
         match result {
             Ok(out) => {
+                let output_policy_failed =
+                    output_contains_any(&out.stdout, output_policy.failure_output_patterns)
+                        || output_contains_any(&out.stderr, output_policy.failure_output_patterns);
                 if output_policy.nonverbose
                     && !out.status.success()
                     && let Some(normalize) = nonverbose_failure_output
@@ -634,7 +642,7 @@ async fn run_invocations(
                         combined_stderr.extend_from_slice(&stderr);
                     }
                 }
-                if !out.status.success() {
+                if !out.status.success() || output_policy_failed {
                     all_ok = false;
                 }
             }
@@ -654,6 +662,17 @@ async fn run_invocations(
         stderr: combined_stderr,
         setup_outcome: None,
     }
+}
+
+fn output_contains_any(output: &[u8], patterns: &[&str]) -> bool {
+    patterns
+        .iter()
+        .filter(|pattern| !pattern.is_empty())
+        .any(|pattern| {
+            output
+                .windows(pattern.len())
+                .any(|window| window == pattern.as_bytes())
+        })
 }
 
 fn filter_stderr_lines(stderr: &[u8], prefixes: &[&str]) -> Vec<u8> {
@@ -921,6 +940,7 @@ mod tests {
             adaptive_relevance: None,
             status_hook: None,
             nonverbose_failure_output: None,
+            failure_output_patterns: &[],
             missing_component_hint: None,
             baseline_triggers: &[],
             is_formatter: false,
@@ -929,6 +949,7 @@ mod tests {
             activate_unconditionally: false,
             category: Category::Default,
             toolchain: None,
+            java_jar: false,
             windows_java_jar: false,
             workflow_setup: None,
             fix_behavior: crate::registry::FixBehavior::Definitive,
@@ -959,6 +980,17 @@ mod tests {
             },
             ..project_check(patterns)
         }
+    }
+
+    #[test]
+    fn failure_output_patterns_match_stdout_and_stderr() {
+        assert!(output_contains_any(b"[WARN] violation\n", &["[WARN]"]));
+        assert!(output_contains_any(
+            b"error: [WARN] violation\n",
+            &["[WARN]"]
+        ));
+        assert!(!output_contains_any(b"clean\n", &["[WARN]"]));
+        assert!(!output_contains_any(b"anything\n", &[""]));
     }
 
     #[test]

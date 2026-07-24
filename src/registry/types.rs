@@ -527,6 +527,8 @@ pub struct Check {
     pub status_hook: Option<StatusHook>,
     /// Optional output normalizer used for non-verbose failing process runs.
     pub nonverbose_failure_output: Option<NonverboseFailureOutputHook>,
+    /// Output markers that make an otherwise successful process invocation fail.
+    pub failure_output_patterns: &'static [&'static str],
     /// Optional hint appended when a known toolchain component is missing.
     pub missing_component_hint: Option<MissingComponentHint>,
     /// Additional config-like files that trigger an all-files baseline run when changed.
@@ -550,8 +552,10 @@ pub struct Check {
     /// Toolchain keys stay above the `# Linters` header in `mise.toml` so they're
     /// visually separated from lint-only entries.
     pub toolchain: Option<Option<&'static str>>,
-    /// On Windows, the binary is a self-executing JAR that cannot be run directly
-    /// or via cmd.exe — invoke as `java -jar <resolved-path>` instead.
+    /// The binary is a self-executing JAR that must be invoked as
+    /// `java -jar <resolved-path>` instead of directly.
+    pub java_jar: bool,
+    /// On Windows, invoke this self-executing JAR through `java -jar`.
     pub windows_java_jar: bool,
     /// Extra generated workflow setup needed when this check is selected by `flint init`.
     pub workflow_setup: Option<WorkflowSetup>,
@@ -671,6 +675,7 @@ impl Check {
             adaptive_relevance: None,
             status_hook: None,
             nonverbose_failure_output: None,
+            failure_output_patterns: &[],
             missing_component_hint: None,
             baseline_triggers: &[],
             is_formatter: false,
@@ -686,6 +691,7 @@ impl Check {
                 full_fix_cmd: "",
                 scope,
             },
+            java_jar: false,
             windows_java_jar: false,
             workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
@@ -725,6 +731,7 @@ impl Check {
             adaptive_relevance: None,
             status_hook: None,
             nonverbose_failure_output: None,
+            failure_output_patterns: &[],
             missing_component_hint: None,
             baseline_triggers: &[],
             is_formatter: false,
@@ -733,6 +740,7 @@ impl Check {
             activate_unconditionally: false,
             category: Category::Default,
             toolchain: None,
+            java_jar: false,
             windows_java_jar: false,
             workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
@@ -802,8 +810,14 @@ impl Check {
         self
     }
 
+    /// Invoke this binary via `java -jar <path>` rather than directly.
+    /// Use for self-executing JARs (e.g. ktlint and Checkstyle).
+    pub fn java_jar(mut self) -> Self {
+        self.java_jar = true;
+        self
+    }
+
     /// On Windows, invoke this binary via `java -jar <path>` rather than directly.
-    /// Use for self-executing JARs (e.g. ktlint) that cmd.exe cannot run.
     pub fn windows_java_jar(mut self) -> Self {
         self.windows_java_jar = true;
         self
@@ -1002,6 +1016,11 @@ impl Check {
 
     pub fn nonverbose_failure_output(mut self, hook: NonverboseFailureOutputHook) -> Self {
         self.nonverbose_failure_output = Some(hook);
+        self
+    }
+
+    pub fn failure_output_patterns(mut self, patterns: &'static [&'static str]) -> Self {
+        self.failure_output_patterns = patterns;
         self
     }
 

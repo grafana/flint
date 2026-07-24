@@ -1348,33 +1348,34 @@ rust = { version = "1.94.1", components = "clippy,rustfmt" }
 
         assert_eq!(
             table,
-            r#"NAME                  BINARY              STATUS         SPEED     FIX  DESCRIPTION                                                          PATTERNS
--------------------------------------------------------------------------------------------------------------------------------------------------------
-flint-setup           (built-in)          active         fast      yes  Keep Flint setup current and mise.toml lint tooling canonical        mise.toml
-shellcheck            shellcheck          active         fast      no   Lint shell scripts for common mistakes                               *.sh *.bash *.bats
-shfmt                 shfmt               active         fast      yes  Format shell scripts                                                 *.sh *.bash
-rumdl                 rumdl               active         fast      yes  Lint Markdown files for style and consistency                        *.md
-ryl                   ryl                 active         fast      yes  Lint YAML files for style and consistency                            *.yml *.yaml
-taplo                 taplo               active         fast      yes  Format TOML files                                                    *.toml
-actionlint            actionlint          active         fast      no   Lint GitHub Actions workflow files                                   .github/workflows/*.yml .github/workflows/*.yaml
-zizmor                zizmor              active         fast      yes  Audit GitHub Actions workflows for security issues                   .github/workflows/*.yml .github/workflows/*.yaml
-hadolint              hadolint            missing        fast      no   Lint Dockerfiles                                                     Dockerfile Dockerfile.* *.dockerfile
-xmllint               xmllint             missing        fast      no   Validate XML files are well-formed                                   *.xml
-typos                 typos               active         fast      yes  Check for common spelling mistakes                                   *
-editorconfig-checker  ec                  active         fast      no   Check files comply with EditorConfig settings                        *
-golangci-lint         golangci-lint       missing        fast      no   Lint Go code; uses --new-from-rev to scope analysis to changed code  *.go
-ruff                  ruff                active         fast      yes  Lint Python code                                                     *.py
-ruff-format           ruff                active         fast      yes  Format Python code                                                   *.py
-biome                 biome               active         fast      yes  Lint JS/TS/JSON files                                                *.json *.jsonc *.js *.ts *.jsx *.tsx
-biome-format          biome               active         fast      yes  Format JS/TS/JSON files                                              *.json *.jsonc *.js *.ts *.jsx *.tsx
-cargo-clippy          cargo-clippy        active         fast      yes  Lint Rust code; runs on all .rs files, not just changed              *.rs
-cargo-fmt             rustfmt             active         fast      yes  Format Rust code; runs on all .rs files, not just changed            *.rs
-gofmt                 gofmt               missing        fast      yes  Format Go code                                                       *.go
-google-java-format    google-java-format  missing        fast      yes  Format Java code                                                     *.java
-ktlint                ktlint              missing        fast      yes  Lint and format Kotlin code                                          *.kt *.kts
-dotnet-format         dotnet              missing        fast      yes  Format C# code                                                       *.cs
+            r#"NAME                  BINARY              STATUS         SPEED     FIX  DESCRIPTION                                                            PATTERNS
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+flint-setup           (built-in)          active         fast      yes  Keep Flint setup current and mise.toml lint tooling canonical          mise.toml
+shellcheck            shellcheck          active         fast      no   Lint shell scripts for common mistakes                                 *.sh *.bash *.bats
+shfmt                 shfmt               active         fast      yes  Format shell scripts                                                   *.sh *.bash
+rumdl                 rumdl               active         fast      yes  Lint Markdown files for style and consistency                          *.md
+ryl                   ryl                 active         fast      yes  Lint YAML files for style and consistency                              *.yml *.yaml
+taplo                 taplo               active         fast      yes  Format TOML files                                                      *.toml
+actionlint            actionlint          active         fast      no   Lint GitHub Actions workflow files                                     .github/workflows/*.yml .github/workflows/*.yaml
+zizmor                zizmor              active         fast      yes  Audit GitHub Actions workflows for security issues                     .github/workflows/*.yml .github/workflows/*.yaml
+hadolint              hadolint            missing        fast      no   Lint Dockerfiles                                                       Dockerfile Dockerfile.* *.dockerfile
+xmllint               xmllint             missing        fast      no   Validate XML files are well-formed                                     *.xml
+typos                 typos               active         fast      yes  Check for common spelling mistakes                                     *
+editorconfig-checker  ec                  active         fast      no   Check files comply with EditorConfig settings                          *
+golangci-lint         golangci-lint       missing        fast      no   Lint Go code; uses --new-from-rev to scope analysis to changed code    *.go
+ruff                  ruff                active         fast      yes  Lint Python code                                                       *.py
+ruff-format           ruff                active         fast      yes  Format Python code                                                     *.py
+biome                 biome               active         fast      yes  Lint JS/TS/JSON files                                                  *.json *.jsonc *.js *.ts *.jsx *.tsx
+biome-format          biome               active         fast      yes  Format JS/TS/JSON files                                                *.json *.jsonc *.js *.ts *.jsx *.tsx
+cargo-clippy          cargo-clippy        active         fast      yes  Lint Rust code; runs on all .rs files, not just changed                *.rs
+cargo-fmt             rustfmt             active         fast      yes  Format Rust code; runs on all .rs files, not just changed              *.rs
+gofmt                 gofmt               missing        fast      yes  Format Go code                                                         *.go
+google-java-format    google-java-format  missing        fast      yes  Format Java code                                                       *.java
+checkstyle            checkstyle          missing        fast      no   Check Java source against a repository-owned Checkstyle configuration  *.java
+ktlint                ktlint              missing        fast      yes  Lint and format Kotlin code                                            *.kt *.kts
+dotnet-format         dotnet              missing        fast      yes  Format C# code                                                         *.cs
 lychee                lychee              active         fast      no   Check for broken links
-renovate-deps         renovate            active         adaptive  yes  Verify Renovate dependency snapshot is up to date                    renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5
+renovate-deps         renovate            active         adaptive  yes  Verify Renovate dependency snapshot is up to date                      renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5
 license-header        (built-in)          not configured  fast      no   Check source files have the required license header
 "#
         );

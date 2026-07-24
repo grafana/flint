@@ -57,6 +57,7 @@
     {
       matchDepNames: [
         "actionlint",
+        "aqua:checkstyle/checkstyle",
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",

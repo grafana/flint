@@ -769,6 +769,79 @@ fn collect_cases(dir: &Path) -> Vec<PathBuf> {
     cases
 }
 
+/// Every user-facing check must have a successful fixture whose default output is empty.
+///
+/// The `cases` test executes these fixtures and defaults omitted stdout/stderr expectations to
+/// empty strings. This guardrail makes that convention mandatory for new checks instead of
+/// relying on reviewers to notice a missing happy-path case.
+#[test]
+fn every_check_has_a_silent_happy_path_case() {
+    let output = Command::new(env!("CARGO_BIN_EXE_flint"))
+        .args(["linters", "--json"])
+        .output()
+        .expect("failed to list checks");
+    assert!(
+        output.status.success(),
+        "flint linters --json failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let checks: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("parse flint linters --json");
+    let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/cases");
+
+    for check in checks.as_array().expect("linters JSON array") {
+        let name = check["name"].as_str().expect("check name");
+        if name == "flint-setup" {
+            // This built-in setup check has no standalone linter invocation. Its clean/no-op
+            // behavior is covered by the flint-setup unit and general setup fixture cases.
+            continue;
+        }
+
+        let case_name = if name == "renovate-deps" {
+            "up-to-date"
+        } else {
+            "clean"
+        };
+        let test_path = cases_dir.join(name).join(case_name).join("test.toml");
+        let raw = std::fs::read_to_string(&test_path).unwrap_or_else(|error| {
+            panic!(
+                "{name}: missing silent happy-path fixture {}: {error}",
+                test_path.display()
+            )
+        });
+        let cfg: toml::Value =
+            toml::from_str(&raw).unwrap_or_else(|error| panic!("{name}: invalid fixture: {error}"));
+        let expected = cfg
+            .get("expected")
+            .and_then(toml::Value::as_table)
+            .unwrap_or_else(|| panic!("{name}: missing [expected] table"));
+
+        assert_eq!(
+            expected
+                .get("exit")
+                .and_then(toml::Value::as_integer)
+                .unwrap_or(0),
+            0,
+            "{name}: happy-path fixture must exit successfully"
+        );
+        for key in ["stdout", "stderr"] {
+            assert!(
+                expected
+                    .get(key)
+                    .and_then(toml::Value::as_str)
+                    .is_none_or(str::is_empty),
+                "{name}: happy-path fixture must expect empty {key}"
+            );
+        }
+        for key in ["stdout_contains", "stderr_contains"] {
+            assert!(
+                expected.get(key).is_none(),
+                "{name}: happy-path fixture must not expect {key}"
+            );
+        }
+    }
+}
+
 fn run_case(case: &Path, name: &str, update: bool) {
     let toml_path = case.join("test.toml");
     let raw =

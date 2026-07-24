@@ -83,6 +83,27 @@ pub(crate) fn ensure_flint_self_pin(project_root: &Path, flint_rev: Option<&str>
     ensure_flint_self_pin_with(project_root, flint_rev, run_mise_use)
 }
 
+/// Adds Flint's self-pin only when no Flint tool key exists yet.
+///
+/// Focused `init --only` runs are additive: an existing release or prerelease
+/// pin is left untouched rather than being replaced by the requested backend.
+pub(crate) fn ensure_flint_self_pin_additive(
+    project_root: &Path,
+    flint_rev: Option<&str>,
+) -> Result<bool> {
+    let path = project_root.join("mise.toml");
+    let content = std::fs::read_to_string(&path).unwrap_or_default();
+    let has_pin = content
+        .parse::<toml_edit::DocumentMut>()
+        .ok()
+        .and_then(|doc| doc.get("tools").and_then(|tools| tools.as_table()).cloned())
+        .is_some_and(|tools| tools.iter().any(|(key, _)| is_flint_tool_key(key)));
+    if has_pin {
+        return Ok(false);
+    }
+    ensure_flint_self_pin(project_root, flint_rev)
+}
+
 fn ensure_flint_self_pin_with(
     project_root: &Path,
     flint_rev: Option<&str>,

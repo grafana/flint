@@ -111,6 +111,7 @@
         "biome",
         "dotnet",
         "editorconfig-checker",
+        "github:checkstyle/checkstyle",
         "go",
         "golangci-lint",
         "google-java-format",

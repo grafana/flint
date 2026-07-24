@@ -150,7 +150,7 @@ For Flint contributor workflow and local testing tips, see
 | ----------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
 | C#                      | —                                                | [`dotnet-format`](docs/linters.md#dotnet-format)           |
 | Go                      | [`golangci-lint`](docs/linters.md#golangci-lint) | [`gofmt`](docs/linters.md#gofmt)                           |
-| Java                    | —                                                | [`google-java-format`](docs/linters.md#google-java-format) |
+| Java                    | [`checkstyle`](docs/linters.md#checkstyle)       | [`google-java-format`](docs/linters.md#google-java-format) |
 | JavaScript / TypeScript | [`biome`](docs/linters.md#biome)                 | [`biome-format`](docs/linters.md#biome-format)             |
 | Kotlin                  | [`ktlint`](docs/linters.md#ktlint)               | [`ktlint`](docs/linters.md#ktlint)                         |
 | Python                  | [`ruff`](docs/linters.md#ruff)                   | [`ruff-format`](docs/linters.md#ruff-format)               |

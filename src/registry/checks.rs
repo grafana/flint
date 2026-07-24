@@ -26,6 +26,8 @@ const GOFMT_URL: &str = "https://pkg.go.dev/cmd/gofmt";
 const GOLANGCI_LINT_URL: &str = "https://golangci-lint.run/";
 const GOLANGCI_LINT_CONFIG_URL: &str = "https://golangci-lint.run/usage/configuration/";
 const GOOGLE_JAVA_FORMAT_URL: &str = "https://github.com/google/google-java-format";
+const CHECKSTYLE_URL: &str = "https://github.com/checkstyle/checkstyle";
+const CHECKSTYLE_CONFIG_URL: &str = "https://checkstyle.org/config.html";
 const HADOLINT_URL: &str = "https://github.com/hadolint/hadolint";
 const HADOLINT_CONFIG_URL: &str =
     "https://github.com/hadolint/hadolint?tab=readme-ov-file#configure";
@@ -52,6 +54,11 @@ const TYPOS_CONFIG_URL: &str = "https://github.com/crate-ci/typos/blob/master/do
 const XMLLINT_URL: &str = "https://github.com/jonwiggins/xmloxide";
 const YAMLLINT_CONFIG_URL: &str = "https://yamllint.readthedocs.io/en/stable/configuration.html";
 const RYL_URL: &str = "https://github.com/owenlamont/ryl";
+
+const CHECKSTYLE_TOOL_KEY: &str =
+    "github:checkstyle/checkstyle[matching=all.jar,rename_exe=checkstyle]";
+const CHECKSTYLE_BASELINE_TRIGGERS: &[ConfigFile] =
+    &[ConfigFile::project("checkstyle-suppressions.xml")];
 
 const SHELLCHECK_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir("shellcheckrc"),
@@ -631,6 +638,46 @@ fn check_google_java_format() -> Check {
     .lang()
 }
 
+fn check_checkstyle() -> Check {
+    Check::files(
+        "checkstyle",
+        "checkstyle -c checkstyle.xml {FILES}",
+        &["*.java"],
+    )
+    .java_jar()
+    .mise_tool(CHECKSTYLE_TOOL_KEY)
+    .baseline_config(ConfigFile::project("checkstyle.xml"))
+    .baseline_triggers(CHECKSTYLE_BASELINE_TRIGGERS)
+    .failure_output_patterns(&["[WARN]", "[ERROR]"])
+    .project_url(CHECKSTYLE_URL)
+    .config_doc_url(CHECKSTYLE_CONFIG_URL)
+    .overview(
+        OverviewSection::Languages,
+        "Java",
+        OverviewRole::Linter,
+        Some("Java coding standard"),
+    )
+    .desc("Check Java source against a repository-owned Checkstyle configuration")
+    .docs(
+        "Runs the standalone Checkstyle CLI against selected Java files.\
+        \n\
+        A Java runtime must be available on PATH because the curated\
+        \n\
+        Checkstyle distribution is a JAR.\
+        \n\
+        The repository must provide checkstyle.xml at its root; a root-level\
+        \n\
+        checkstyle-suppressions.xml is also supported by Checkstyle's normal\
+        \n\
+        property default. Flint does not infer Maven or Gradle source roots,\
+        \n\
+        and Checkstyle is report-only: use a formatter such as\
+        \n\
+        google-java-format for safe formatting fixes.",
+    )
+    .lang()
+}
+
 fn check_ktlint() -> Check {
     Check::files(
         "ktlint",
@@ -850,6 +897,7 @@ pub fn builtin() -> Vec<Check> {
         check_cargo_fmt(),
         check_gofmt(),
         check_google_java_format(),
+        check_checkstyle(),
         check_ktlint(),
         check_dotnet_format(),
         check_lychee(),

@@ -57,10 +57,10 @@
     {
       matchDepNames: [
         "actionlint",
-        "aqua:dotenv-linter/dotenv-linter",
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",
+        "dotenv-linter",
         "editorconfig-checker",
         "golangci-lint",
         "google-java-format",

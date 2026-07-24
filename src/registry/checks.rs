@@ -386,7 +386,7 @@ fn check_dotenv_linter() -> Check {
         &[".env", ".env.*", "*.env"],
     )
     .fix("dotenv-linter fix --plain --no-backup {FILES}")
-    .mise_tool("aqua:dotenv-linter/dotenv-linter")
+    .mise_tool("dotenv-linter")
     .project_url(DOTENV_LINTER_URL)
     .config_doc_url(DOTENV_LINTER_CONFIG_URL)
     .overview(

@@ -4,10 +4,6 @@
       "packageName": "rhysd/actionlint",
       "datasource": "github-releases"
     },
-    "aqua:dotenv-linter/dotenv-linter": {
-      "packageName": "dotenv-linter/dotenv-linter",
-      "datasource": "github-tags"
-    },
     "aqua:jonwiggins/xmloxide": {
       "packageName": "jonwiggins/xmloxide",
       "datasource": "github-tags"
@@ -18,6 +14,10 @@
     },
     "biome": {
       "packageName": "biomejs/biome",
+      "datasource": "github-tags"
+    },
+    "dotenv-linter": {
+      "packageName": "dotenv-linter/dotenv-linter",
       "datasource": "github-tags"
     },
     "editorconfig-checker": {
@@ -110,10 +110,10 @@
     "mise.toml": {
       "mise": [
         "actionlint",
-        "aqua:dotenv-linter/dotenv-linter",
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",
+        "dotenv-linter",
         "dotnet",
         "editorconfig-checker",
         "go",

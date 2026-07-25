@@ -2,6 +2,7 @@
 
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
+
 |          |                                      |
 | -------- | ------------------------------------ |
 | Fix      | yes                                  |
@@ -15,6 +16,7 @@ Keep Flint setup current and mise.toml lint tooling canonical
 Checks the repo's Flint-managed setup state and `mise.toml` layout.
 
 This verifies and fixes Flint-managed setup:
+
 - apply versioned Flint setup migrations
 - replace obsolete lint tool keys with their supported successors
 - reject unsupported legacy lint tools that need repo migrations

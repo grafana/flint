@@ -2,6 +2,7 @@
 
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
+
 |          |                                                                                               |
 | -------- | --------------------------------------------------------------------------------------------- |
 | Fix      | yes                                                                                           |

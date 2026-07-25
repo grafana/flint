@@ -1,4 +1,18 @@
-# `renovate-deps`
+# [`renovate-deps`](https://docs.renovatebot.com/)
+
+<!-- linter-metadata-start -->
+<!-- Generated. Run `mise run generate` to regenerate. -->
+
+|            |                                                                                                                            |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Fix        | yes                                                                                                                        |
+| Binary     | `renovate`                                                                                                                 |
+| Scope      | [native](../linters.md#scope-native)                                                                                       |
+| Patterns   | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
+| Run policy | adaptive — see [when does this run?](#when-does-this-run)                                                                  |
+
+Verify Renovate dependency snapshot is up to date
+<!-- linter-metadata-end -->
 
 `renovate-deps` does three related checks:
 
@@ -11,6 +25,23 @@
 
 The second and third checks are there to catch configuration mistakes before
 they show up as separate Renovate PRs, stalled updates, or README drift.
+
+## Configuration and CI
+
+The check requires `renovate` in `[tools]`. To exclude managers from the
+snapshot and consistency checks, configure:
+
+```toml
+[checks.renovate-deps]
+exclude_managers = ["github-actions", "github-runners"]
+```
+
+In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN` so
+Renovate can authenticate GitHub requests. When only `GITHUB_TOKEN` is set,
+Flint forwards it to Renovate as `GITHUB_COM_TOKEN`.
+
+When `flint init` writes a new `flint.toml`, it includes the
+`[checks.renovate-deps]` section when this check is selected.
 
 ## When does this run?
 

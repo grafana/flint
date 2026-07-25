@@ -148,42 +148,42 @@ For Flint contributor workflow and local testing tips, see
 
 | Name                    | Linter                                           | Formatter                                                  |
 | ----------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
-| C#                      | —                                                | [`dotnet-format`](docs/linters.md#dotnet-format)           |
-| Go                      | [`golangci-lint`](docs/linters.md#golangci-lint) | [`gofmt`](docs/linters.md#gofmt)                           |
-| Java                    | —                                                | [`google-java-format`](docs/linters.md#google-java-format) |
-| JavaScript / TypeScript | [`biome`](docs/linters.md#biome)                 | [`biome-format`](docs/linters.md#biome-format)             |
-| Kotlin                  | [`ktlint`](docs/linters.md#ktlint)               | [`ktlint`](docs/linters.md#ktlint)                         |
-| Python                  | [`ruff`](docs/linters.md#ruff)                   | [`ruff-format`](docs/linters.md#ruff-format)               |
-| Rust                    | [`cargo-clippy`](docs/linters.md#cargo-clippy)   | [`cargo-fmt`](docs/linters.md#cargo-fmt)                   |
+| C#                      | —                                                | [`dotnet-format`](docs/linters/dotnet-format.md)           |
+| Go                      | [`golangci-lint`](docs/linters/golangci-lint.md) | [`gofmt`](docs/linters/gofmt.md)                           |
+| Java                    | —                                                | [`google-java-format`](docs/linters/google-java-format.md) |
+| JavaScript / TypeScript | [`biome`](docs/linters/biome.md)                 | [`biome-format`](docs/linters/biome-format.md)             |
+| Kotlin                  | [`ktlint`](docs/linters/ktlint.md)               | [`ktlint`](docs/linters/ktlint.md)                         |
+| Python                  | [`ruff`](docs/linters/ruff.md)                   | [`ruff-format`](docs/linters/ruff-format.md)               |
+| Rust                    | [`cargo-clippy`](docs/linters/cargo-clippy.md)   | [`cargo-fmt`](docs/linters/cargo-fmt.md)                   |
 
 ### Files / Formats
 
 | Name     | Linter                                     | Formatter                                      |
 | -------- | ------------------------------------------ | ---------------------------------------------- |
-| JSON     | [`biome`](docs/linters.md#biome)           | [`biome-format`](docs/linters.md#biome-format) |
-| Markdown | [`rumdl`](docs/linters.md#rumdl)           | [`rumdl`](docs/linters.md#rumdl)               |
-| Shell    | [`shellcheck`](docs/linters.md#shellcheck) | [`shfmt`](docs/linters.md#shfmt)               |
-| TOML     | —                                          | [`taplo`](docs/linters.md#taplo)               |
-| XML      | [`xmllint`](docs/linters.md#xmllint)       | —                                              |
-| YAML     | [`ryl`](docs/linters.md#ryl)               | [`ryl`](docs/linters.md#ryl)                   |
+| JSON     | [`biome`](docs/linters/biome.md)           | [`biome-format`](docs/linters/biome-format.md) |
+| Markdown | [`rumdl`](docs/linters/rumdl.md)           | [`rumdl`](docs/linters/rumdl.md)               |
+| Shell    | [`shellcheck`](docs/linters/shellcheck.md) | [`shfmt`](docs/linters/shfmt.md)               |
+| TOML     | —                                          | [`taplo`](docs/linters/taplo.md)               |
+| XML      | [`xmllint`](docs/linters/xmllint.md)       | —                                              |
+| YAML     | [`ryl`](docs/linters/ryl.md)               | [`ryl`](docs/linters/ryl.md)                   |
 
 ### Tooling / CI
 
 | Name           | Check                                                                           |
 | -------------- | ------------------------------------------------------------------------------- |
-| Dockerfile     | [`hadolint`](docs/linters.md#hadolint)                                          |
-| GitHub Actions | [`actionlint`](docs/linters.md#actionlint) / [`zizmor`](docs/linters.md#zizmor) |
+| Dockerfile     | [`hadolint`](docs/linters/hadolint.md)                                          |
+| GitHub Actions | [`actionlint`](docs/linters/actionlint.md) / [`zizmor`](docs/linters/zizmor.md) |
 
 ### General
 
 | Name            | Check                                                          | Description                                |
 | --------------- | -------------------------------------------------------------- | ------------------------------------------ |
-| EditorConfig    | [`editorconfig-checker`](docs/linters.md#editorconfig-checker) | EditorConfig compliance                    |
-| Flint setup     | [`flint-setup`](docs/linters.md#flint-setup)                   | Flint-managed setup and `mise.toml` layout |
-| License headers | [`license-header`](docs/linters.md#license-header)             | Required file header text                  |
-| Links           | [`lychee`](docs/linters.md#lychee)                             | Broken links                               |
-| Renovate        | [`renovate-deps`](docs/linters.md#renovate-deps)               | Dependency update configuration            |
-| Spelling        | [`typos`](docs/linters.md#typos)                               | Spelling in source and text files          |
+| EditorConfig    | [`editorconfig-checker`](docs/linters/editorconfig-checker.md) | EditorConfig compliance                    |
+| Flint setup     | [`flint-setup`](docs/linters/flint-setup.md)                   | Flint-managed setup and `mise.toml` layout |
+| License headers | [`license-header`](docs/linters/license-header.md)             | Required file header text                  |
+| Links           | [`lychee`](docs/linters/lychee.md)                             | Broken links                               |
+| Renovate        | [`renovate-deps`](docs/linters/renovate-deps.md)               | Dependency update configuration            |
+| Spelling        | [`typos`](docs/linters/typos.md)                               | Spelling in source and text files          |
 
 <!-- registry-table-end -->
 

@@ -3,14 +3,14 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|        |                                      |
-| ------ | ------------------------------------ |
-| Fix    | no                                   |
-| Binary | `lychee`                             |
-| Scope  | [native](../linters.md#scope-native) |
-| Config | via `[checks.links]` in flint.toml   |
+|             |                                      |
+| ----------- | ------------------------------------ |
+| Fix         | no                                   |
+| Binary      | `lychee`                             |
+| Scope       | [native](../linters.md#scope-native) |
+| Config      | via `[checks.links]` in flint.toml   |
+| Description | Check for broken links               |
 
-Check for broken links
 <!-- linter-metadata-end -->
 
 Orchestrates [lychee](https://lychee.cli.rs/) for link checking. Requires `lychee` in `[tools]`.

@@ -3,14 +3,14 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|        |                                             |
-| ------ | ------------------------------------------- |
-| Fix    | no                                          |
-| Binary | (built-in)                                  |
-| Scope  | [native](../linters.md#scope-native)        |
-| Config | via `[checks.license-header]` in flint.toml |
+|             |                                                     |
+| ----------- | --------------------------------------------------- |
+| Fix         | no                                                  |
+| Binary      | (built-in)                                          |
+| Scope       | [native](../linters.md#scope-native)                |
+| Config      | via `[checks.license-header]` in flint.toml         |
+| Description | Check source files have the required license header |
 
-Check source files have the required license header
 <!-- linter-metadata-end -->
 
 Disabled by default. Configure in `flint.toml`:

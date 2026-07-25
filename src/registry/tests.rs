@@ -1196,10 +1196,6 @@ fn generate_linter_metadata(check: &Check) -> String {
     for (k, v) in &rows {
         lines.push(fmt(k, v));
     }
-    if !check.desc.is_empty() {
-        lines.push(String::new());
-        lines.push(check.desc.to_string());
-    }
     lines.join("\n")
 }
 
@@ -1349,6 +1345,10 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
             "adaptive — runs on local default runs only when changed files are relevant".to_string()
         };
         rows.push(("Run policy", label));
+    }
+
+    if !check.desc.is_empty() {
+        rows.push(("Description", check.desc.to_string()));
     }
 
     rows

@@ -3,12 +3,12 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|          |                                    |
-| -------- | ---------------------------------- |
-| Fix      | yes                                |
-| Binary   | `google-java-format`               |
-| Scope    | [files](../linters.md#scope-files) |
-| Patterns | `*.java`                           |
+|             |                                    |
+| ----------- | ---------------------------------- |
+| Fix         | yes                                |
+| Binary      | `google-java-format`               |
+| Scope       | [files](../linters.md#scope-files) |
+| Patterns    | `*.java`                           |
+| Description | Format Java code                   |
 
-Format Java code
 <!-- linter-metadata-end -->

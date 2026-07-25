@@ -3,15 +3,15 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|          |                                                                    |
-| -------- | ------------------------------------------------------------------ |
-| Fix      | yes                                                                |
-| Binary   | `taplo`                                                            |
-| Scope    | [file](../linters.md#scope-file)                                   |
-| Patterns | `*.toml`                                                           |
-| Config   | [`.taplo.toml`](https://taplo.tamasfe.dev/configuration/file.html) |
+|             |                                                                    |
+| ----------- | ------------------------------------------------------------------ |
+| Fix         | yes                                                                |
+| Binary      | `taplo`                                                            |
+| Scope       | [file](../linters.md#scope-file)                                   |
+| Patterns    | `*.toml`                                                           |
+| Config      | [`.taplo.toml`](https://taplo.tamasfe.dev/configuration/file.html) |
+| Description | Format TOML files                                                  |
 
-Format TOML files
 <!-- linter-metadata-end -->
 
 Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).

@@ -3,15 +3,15 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|            |                                                                                                                            |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Fix        | yes                                                                                                                        |
-| Binary     | `renovate`                                                                                                                 |
-| Scope      | [native](../linters.md#scope-native)                                                                                       |
-| Patterns   | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
-| Run policy | adaptive — see [when does this run?](#when-does-this-run)                                                                  |
+|             |                                                                                                                            |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Fix         | yes                                                                                                                        |
+| Binary      | `renovate`                                                                                                                 |
+| Scope       | [native](../linters.md#scope-native)                                                                                       |
+| Patterns    | `renovate.json renovate.json5 .github/renovate.json .github/renovate.json5 .renovaterc .renovaterc.json .renovaterc.json5` |
+| Run policy  | adaptive — see [when does this run?](#when-does-this-run)                                                                  |
+| Description | Verify Renovate dependency snapshot is up to date                                                                          |
 
-Verify Renovate dependency snapshot is up to date
 <!-- linter-metadata-end -->
 
 `renovate-deps` does three related checks:

@@ -3,14 +3,14 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|          |                                      |
-| -------- | ------------------------------------ |
-| Fix      | yes                                  |
-| Binary   | (built-in)                           |
-| Scope    | [native](../linters.md#scope-native) |
-| Patterns | `mise.toml`                          |
+|             |                                                               |
+| ----------- | ------------------------------------------------------------- |
+| Fix         | yes                                                           |
+| Binary      | (built-in)                                                    |
+| Scope       | [native](../linters.md#scope-native)                          |
+| Patterns    | `mise.toml`                                                   |
+| Description | Keep Flint setup current and mise.toml lint tooling canonical |
 
-Keep Flint setup current and mise.toml lint tooling canonical
 <!-- linter-metadata-end -->
 
 Checks the repo's Flint-managed setup state and `mise.toml` layout.

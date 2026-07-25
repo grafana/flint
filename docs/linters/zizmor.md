@@ -3,15 +3,15 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|          |                                                       |
-| -------- | ----------------------------------------------------- |
-| Fix      | yes                                                   |
-| Binary   | `zizmor`                                              |
-| Scope    | [files](../linters.md#scope-files)                    |
-| Patterns | `.github/workflows/*.yml .github/workflows/*.yaml`    |
-| Config   | [`zizmor.yml`](https://docs.zizmor.sh/configuration/) |
+|             |                                                       |
+| ----------- | ----------------------------------------------------- |
+| Fix         | yes                                                   |
+| Binary      | `zizmor`                                              |
+| Scope       | [files](../linters.md#scope-files)                    |
+| Patterns    | `.github/workflows/*.yml .github/workflows/*.yaml`    |
+| Config      | [`zizmor.yml`](https://docs.zizmor.sh/configuration/) |
+| Description | Audit GitHub Actions workflows for security issues    |
 
-Audit GitHub Actions workflows for security issues
 <!-- linter-metadata-end -->
 
 zizmor can drift without file changes: its `ref-version-mismatch`

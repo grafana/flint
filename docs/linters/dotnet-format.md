@@ -3,13 +3,12 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|             |                                    |
-| ----------- | ---------------------------------- |
-| Fix         | yes                                |
-| Binary      | `dotnet`                           |
-| Scope       | [files](../linters.md#scope-files) |
-| Patterns    | `*.cs`                             |
-| Description | Format C# code                     |
+|          |                                    |
+| -------- | ---------------------------------- |
+| Fix      | yes                                |
+| Binary   | `dotnet`                           |
+| Scope    | [files](../linters.md#scope-files) |
+| Patterns | `*.cs`                             |
 
 <!-- linter-metadata-end -->
 

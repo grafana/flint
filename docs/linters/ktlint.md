@@ -3,13 +3,12 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|             |                                    |
-| ----------- | ---------------------------------- |
-| Fix         | yes                                |
-| Binary      | `ktlint`                           |
-| Scope       | [files](../linters.md#scope-files) |
-| Patterns    | `*.kt *.kts`                       |
-| Description | Lint and format Kotlin code        |
+|          |                                    |
+| -------- | ---------------------------------- |
+| Fix      | yes                                |
+| Binary   | `ktlint`                           |
+| Scope    | [files](../linters.md#scope-files) |
+| Patterns | `*.kt *.kts`                       |
 
 <!-- linter-metadata-end -->
 

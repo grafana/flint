@@ -3,13 +3,12 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|             |                                  |
-| ----------- | -------------------------------- |
-| Fix         | yes                              |
-| Binary      | `shfmt`                          |
-| Scope       | [file](../linters.md#scope-file) |
-| Patterns    | `*.sh *.bash`                    |
-| Description | Format shell scripts             |
+|          |                                  |
+| -------- | -------------------------------- |
+| Fix      | yes                              |
+| Binary   | `shfmt`                          |
+| Scope    | [file](../linters.md#scope-file) |
+| Patterns | `*.sh *.bash`                    |
 
 <!-- linter-metadata-end -->
 

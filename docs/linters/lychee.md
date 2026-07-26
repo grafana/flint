@@ -3,13 +3,12 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|             |                                      |
-| ----------- | ------------------------------------ |
-| Fix         | no                                   |
-| Binary      | `lychee`                             |
-| Scope       | [native](../linters.md#scope-native) |
-| Config      | via `[checks.links]` in flint.toml   |
-| Description | Check for broken links               |
+|        |                                      |
+| ------ | ------------------------------------ |
+| Fix    | no                                   |
+| Binary | `lychee`                             |
+| Scope  | [native](../linters.md#scope-native) |
+| Config | via `[checks.links]` in flint.toml   |
 
 <!-- linter-metadata-end -->
 

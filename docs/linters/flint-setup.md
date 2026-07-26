@@ -3,13 +3,12 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|             |                                                               |
-| ----------- | ------------------------------------------------------------- |
-| Fix         | yes                                                           |
-| Binary      | (built-in)                                                    |
-| Scope       | [native](../linters.md#scope-native)                          |
-| Patterns    | `mise.toml`                                                   |
-| Description | Keep Flint setup current and mise.toml lint tooling canonical |
+|          |                                      |
+| -------- | ------------------------------------ |
+| Fix      | yes                                  |
+| Binary   | (built-in)                           |
+| Scope    | [native](../linters.md#scope-native) |
+| Patterns | `mise.toml`                          |
 
 <!-- linter-metadata-end -->
 

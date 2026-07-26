@@ -3,14 +3,13 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|             |                                                       |
-| ----------- | ----------------------------------------------------- |
-| Fix         | yes                                                   |
-| Binary      | `zizmor`                                              |
-| Scope       | [files](../linters.md#scope-files)                    |
-| Patterns    | `.github/workflows/*.yml .github/workflows/*.yaml`    |
-| Config      | [`zizmor.yml`](https://docs.zizmor.sh/configuration/) |
-| Description | Audit GitHub Actions workflows for security issues    |
+|          |                                                       |
+| -------- | ----------------------------------------------------- |
+| Fix      | yes                                                   |
+| Binary   | `zizmor`                                              |
+| Scope    | [files](../linters.md#scope-files)                    |
+| Patterns | `.github/workflows/*.yml .github/workflows/*.yaml`    |
+| Config   | [`zizmor.yml`](https://docs.zizmor.sh/configuration/) |
 
 <!-- linter-metadata-end -->
 

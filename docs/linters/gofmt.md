@@ -3,13 +3,12 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|             |                                  |
-| ----------- | -------------------------------- |
-| Fix         | yes                              |
-| Binary      | `gofmt`                          |
-| Scope       | [file](../linters.md#scope-file) |
-| Patterns    | `*.go`                           |
-| Description | Format Go code                   |
+|          |                                  |
+| -------- | -------------------------------- |
+| Fix      | yes                              |
+| Binary   | `gofmt`                          |
+| Scope    | [file](../linters.md#scope-file) |
+| Patterns | `*.go`                           |
 
 <!-- linter-metadata-end -->
 

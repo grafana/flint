@@ -3,14 +3,13 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|             |                                                                                                                               |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Fix         | no                                                                                                                            |
-| Binary      | `ec`                                                                                                                          |
-| Scope       | [files](../linters.md#scope-files)                                                                                            |
-| Patterns    | `*`                                                                                                                           |
-| Config      | [`.editorconfig-checker.json`](https://github.com/editorconfig-checker/editorconfig-checker?tab=readme-ov-file#configuration) |
-| Description | Check files comply with EditorConfig settings                                                                                 |
+|          |                                                                                                                               |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Fix      | no                                                                                                                            |
+| Binary   | `ec`                                                                                                                          |
+| Scope    | [files](../linters.md#scope-files)                                                                                            |
+| Patterns | `*`                                                                                                                           |
+| Config   | [`.editorconfig-checker.json`](https://github.com/editorconfig-checker/editorconfig-checker?tab=readme-ov-file#configuration) |
 
 <!-- linter-metadata-end -->
 

@@ -3,14 +3,13 @@
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|             |                                                                    |
-| ----------- | ------------------------------------------------------------------ |
-| Fix         | yes                                                                |
-| Binary      | `taplo`                                                            |
-| Scope       | [file](../linters.md#scope-file)                                   |
-| Patterns    | `*.toml`                                                           |
-| Config      | [`.taplo.toml`](https://taplo.tamasfe.dev/configuration/file.html) |
-| Description | Format TOML files                                                  |
+|          |                                                                    |
+| -------- | ------------------------------------------------------------------ |
+| Fix      | yes                                                                |
+| Binary   | `taplo`                                                            |
+| Scope    | [file](../linters.md#scope-file)                                   |
+| Patterns | `*.toml`                                                           |
+| Config   | [`.taplo.toml`](https://taplo.tamasfe.dev/configuration/file.html) |
 
 <!-- linter-metadata-end -->
 

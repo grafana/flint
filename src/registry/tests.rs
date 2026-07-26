@@ -1347,10 +1347,6 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
         rows.push(("Run policy", label));
     }
 
-    if !check.desc.is_empty() {
-        rows.push(("Description", check.desc.to_string()));
-    }
-
     rows
 }
 /// Smoke test: every check whose tool key resolves in this repo's expanded

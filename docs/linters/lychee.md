@@ -26,8 +26,7 @@ make changed-file runs reliable locally and in CI:
 - **Git-aware scope:** a normal run checks every link in changed,
   link-checkable files. A config change or `--full` triggers a full-repository
   check.
-- **Repository-wide local-link safeguard:** [CI always activates the full
-  linter set](../cli.md#adaptive-runs); Flint also checks local links and
+- **Repository-wide local-link safeguard:** CI also checks local links and
   fragments across all files, catching links from unchanged documents to files
   changed or removed by the PR. Set `check_all_local = true` to add the same
   safeguard outside CI.
@@ -40,6 +39,21 @@ make changed-file runs reliable locally and in CI:
 - **CI authentication guardrails:** Flint requires `GITHUB_TOKEN` in CI and
   reports missing PR metadata before running link remaps, instead of allowing
   unauthenticated GitHub requests to fail ambiguously.
+
+## Local vs CI
+
+CI [activates the full linter set](../cli.md#adaptive-runs), but still keeps
+lychee's file coverage diff-aware. Flint adds a second, local-links-only pass in
+CI rather than checking every remote link in the repository on every PR.
+
+| Behavior                                   | Local default                         | CI changed-file run                   |
+| ------------------------------------------ | ------------------------------------- | ------------------------------------- |
+| All links in changed, link-checkable files | ✅                                    | ✅                                    |
+| Local links and fragments across all files | only with `check_all_local = true`    | ✅                                    |
+| Remote links in unchanged files            | only with `--full` or a config change | only with `--full` or a config change |
+| GitHub URL and PR-branch remapping         | ✅ when Git context is available      | ✅ with required PR metadata          |
+| Flint-managed request cache                | ✅ unless disabled or configured      | ❌                                    |
+| Missing `GITHUB_TOKEN`                     | warning                               | error                                 |
 
 ## Configuration
 

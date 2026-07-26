@@ -46,8 +46,9 @@ When `flint init` writes a new `flint.toml`, it includes the
 
 ## When does this run?
 
-CI always runs `renovate-deps`. Locally `flint run` only runs it when the
-changed files plausibly affect the snapshot. `--full` or naming the
+CI always runs `renovate-deps`. As an
+[adaptive check](../cli.md#adaptive-runs), a local `flint run` only runs it
+when the changed files plausibly affect the snapshot. `--full` or naming the
 linter explicitly bypass the skip.
 
 | Change                                                              | Local | CI  |

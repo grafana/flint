@@ -1219,6 +1219,19 @@ fn generated_metadata_body(check: &Check) -> String {
 fn update_linter_pages(manifest_dir: &Path, registry: &[Check]) {
     let pages_dir = manifest_dir.join("docs/linters");
     std::fs::create_dir_all(&pages_dir).expect("failed to create docs/linters");
+    let expected_names = expected_linter_page_names(registry);
+
+    for entry in std::fs::read_dir(&pages_dir).expect("docs/linters must be readable") {
+        let entry = entry.expect("failed to read docs/linters entry");
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if path.extension().and_then(|extension| extension.to_str()) == Some("md")
+            && !expected_names.contains(&name)
+        {
+            std::fs::remove_file(&path)
+                .unwrap_or_else(|error| panic!("failed to remove {}: {error}", path.display()));
+        }
+    }
 
     for check in registry {
         let path = linter_page_path(manifest_dir, check);
@@ -1250,6 +1263,20 @@ fn update_linter_pages(manifest_dir: &Path, registry: &[Check]) {
     }
 }
 
+#[test]
+fn update_linter_pages_removes_stale_markdown_pages() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let pages_dir = temp.path().join("docs/linters");
+    std::fs::create_dir_all(&pages_dir).expect("create docs/linters");
+    std::fs::write(pages_dir.join("stale.md"), "stale").expect("write stale page");
+    std::fs::write(pages_dir.join("README.txt"), "keep").expect("write non-markdown file");
+
+    update_linter_pages(temp.path(), &[]);
+
+    assert!(!pages_dir.join("stale.md").exists());
+    assert!(pages_dir.join("README.txt").exists());
+}
+
 fn replace_first_line(content: &str, heading: &str) -> String {
     content
         .split_once('\n')
@@ -1259,10 +1286,7 @@ fn replace_first_line(content: &str, heading: &str) -> String {
 
 fn verify_linter_pages(manifest_dir: &Path, registry: &[Check]) {
     let pages_dir = manifest_dir.join("docs/linters");
-    let expected_names: BTreeSet<String> = registry
-        .iter()
-        .map(|check| format!("{}.md", check.name))
-        .collect();
+    let expected_names = expected_linter_page_names(registry);
     let actual_names: BTreeSet<String> = std::fs::read_dir(&pages_dir)
         .expect("docs/linters must be readable")
         .filter_map(Result::ok)
@@ -1291,6 +1315,13 @@ fn verify_linter_pages(manifest_dir: &Path, registry: &[Check]) {
             path.display()
         );
     }
+}
+
+fn expected_linter_page_names(registry: &[Check]) -> BTreeSet<String> {
+    registry
+        .iter()
+        .map(|check| format!("{}.md", check.name))
+        .collect()
 }
 
 fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {

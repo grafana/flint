@@ -77,7 +77,8 @@ under test:
 | `/<repo>/blob/<ref>/<path>`                         | the raw file                                           | bypasses GitHub's HTML and JavaScript file viewer          |
 | `/<base-repo>/blob/<base>/<path>` in a same-repo PR | `<path>` in the local checkout                         | checks files added or changed by the PR                    |
 | `/<base-repo>/blob/<base>/<path>` in a fork PR      | the raw file from the fork's head branch               | checks the fork content that will be merged                |
-| `/<base-repo>/tree/<base>/<path>`                   | the local directory, or the fork's head-branch tree    | checks the directory against the branch under test         |
+| `/<base-repo>/tree/<base>/<path>` in a same-repo PR | `<path>` in the local checkout                         | checks the directory against the branch under test         |
+| `/<base-repo>/tree/<base>/<path>` in a fork PR      | the tree on the fork's head branch                     | checks the fork directory that will be merged              |
 | `.../blob/...#L<n>` or `...#:~:text=...`            | the underlying raw or local file without the UI anchor | avoids anchors handled by GitHub's client-side file viewer |
 | `/(issues\\|pull)/<n>#issuecomment-...`             | the parent issue or pull request                       | checks the stable resource instead of a client-side anchor |
 

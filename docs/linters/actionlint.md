@@ -13,3 +13,17 @@
 | Description | Lint GitHub Actions workflow files                                               |
 
 <!-- linter-metadata-end -->
+
+Flint runs `actionlint` on changed workflow files under `.github/workflows/`.
+This catches workflow syntax errors, invalid expressions, and common GitHub
+Actions mistakes before the workflow reaches GitHub.
+
+Put project-specific actionlint settings in
+`$FLINT_CONFIG_DIR/actionlint.yml`; Flint passes that file explicitly when it
+exists. For example:
+
+```yaml
+self-hosted-runner:
+  labels:
+    - linux-arm64
+```

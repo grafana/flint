@@ -13,3 +13,11 @@
 | Description | Lint Dockerfiles                                                                      |
 
 <!-- linter-metadata-end -->
+
+Flint runs `hadolint` for changed files named `Dockerfile`, `Dockerfile.*`, or
+`*.dockerfile`. For example, it can flag unpinned packages, fragile shell
+commands, and Dockerfile instructions that work against container best
+practices.
+
+Put repository-specific rules in `$FLINT_CONFIG_DIR/.hadolint.yaml`; Flint
+passes that file explicitly when it exists.

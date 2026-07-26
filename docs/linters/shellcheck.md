@@ -13,3 +13,15 @@
 | Description | Lint shell scripts for common mistakes                                                |
 
 <!-- linter-metadata-end -->
+
+Flint runs ShellCheck on each changed shell script with external-source
+following enabled. `SCRIPTDIR` is added to the source path so a script can
+resolve files sourced from its own directory.
+
+Put project-specific rules in `$FLINT_CONFIG_DIR/.shellcheckrc`; Flint passes
+that file with `--rcfile`. For example:
+
+```text
+shell=bash
+disable=SC1091
+```

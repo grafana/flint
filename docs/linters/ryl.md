@@ -13,3 +13,13 @@
 | Description | Lint YAML files for style and consistency                                       |
 
 <!-- linter-metadata-end -->
+
+`ryl` checks changed YAML files for syntax and style consistency and applies
+supported formatting changes in fix mode:
+
+```bash
+flint run --fix ryl
+```
+
+Flint uses `$FLINT_CONFIG_DIR/.yamllint.yml` for the rule set. The check keeps
+the familiar yamllint configuration format while using `ryl` as the runner.

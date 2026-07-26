@@ -13,3 +13,11 @@
 | Description | Format JS/TS/JSON files                                      |
 
 <!-- linter-metadata-end -->
+
+`biome-format` is the formatting half of Flint's Biome integration. It checks
+changed JavaScript, TypeScript, JSX, TSX, JSON, and JSONC files without writing
+them; use `flint run --fix biome-format` to apply Biome's formatter.
+
+Flint uses the repository-root `biome.jsonc` as the single Biome configuration
+for both [`biome`](biome.md) and `biome-format`. When both checks need fixes,
+Flint applies lint fixes first and formatting second.

@@ -13,3 +13,15 @@
 | Description | Format Rust code; runs on all .rs files, not just changed                                     |
 
 <!-- linter-metadata-end -->
+
+`cargo-fmt` starts when Rust files change and checks the whole Cargo project,
+because `cargo fmt` operates on crates rather than a changed-file list. Use fix
+mode to write rustfmt's result:
+
+```bash
+flint run --fix cargo-fmt
+```
+
+Flint reads `rustfmt.toml` from `$FLINT_CONFIG_DIR` and passes it explicitly.
+It also disables EditorConfig line-length enforcement for Rust files so
+rustfmt remains the formatting authority.

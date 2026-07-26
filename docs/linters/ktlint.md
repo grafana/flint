@@ -12,3 +12,15 @@
 | Description | Lint and format Kotlin code        |
 
 <!-- linter-metadata-end -->
+
+On a normal run, Flint passes only changed Kotlin source and script files to
+`ktlint`. A full run passes the project root instead, which is useful after
+changing ktlint rules:
+
+```bash
+flint run --full ktlint
+flint run --full --fix ktlint
+```
+
+The same check both reports style violations and applies ktlint formatting in
+fix mode.

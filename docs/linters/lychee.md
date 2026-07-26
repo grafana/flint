@@ -33,9 +33,8 @@ make changed-file runs reliable locally and in CI:
 - **PR-aware GitHub remapping:** Flint remaps GitHub blob, tree, line, and text
   fragment URLs so links are checked against the current branch or fork content
   rather than only the base branch.
-- **Managed local cache:** outside CI, Flint enables lychee's request cache in
-  `.lychee_cache/` by default. It leaves caching to lychee when the selected
-  lychee config already sets `cache = true`.
+- **Managed local cache:** repeated local runs reuse responses without enabling
+  CI caching; see [Local cache](#local-cache).
 - **CI authentication guardrails:** Flint requires `GITHUB_TOKEN` in CI and
   reports missing PR metadata before running link remaps, instead of allowing
   unauthenticated GitHub requests to fail ambiguously.
@@ -73,19 +72,38 @@ removed by the PR.
 Flint passes `--remap` rules to lychee so repository links follow the content
 under test:
 
-| Link written against the base repository | Same-repository PR                 | Fork PR                              |
-| ---------------------------------------- | ---------------------------------- | ------------------------------------ |
-| GitHub `blob` URL                        | file in the local checkout         | raw file from the fork's head branch |
-| GitHub `tree` URL                        | directory in the local checkout    | tree on the fork's head branch       |
-| GitHub line or text-fragment URL         | underlying file under test         | underlying raw file on the fork      |
+| GitHub URL pattern                                  | Flint checks                                           | Why                                                        |
+| --------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------- |
+| `/<repo>/blob/<ref>/<path>`                         | the raw file                                           | bypasses GitHub's HTML and JavaScript file viewer          |
+| `/<base-repo>/blob/<base>/<path>` in a same-repo PR | `<path>` in the local checkout                         | checks files added or changed by the PR                    |
+| `/<base-repo>/blob/<base>/<path>` in a fork PR      | the raw file from the fork's head branch               | checks the fork content that will be merged                |
+| `/<base-repo>/tree/<base>/<path>`                   | the local directory, or the fork's head-branch tree    | checks the directory against the branch under test         |
+| `.../blob/...#L<n>` or `...#:~:text=...`            | the underlying raw or local file without the UI anchor | avoids anchors handled by GitHub's client-side file viewer |
+| `/(issues\\|pull)/<n>#issuecomment-...`             | the parent issue or pull request                       | checks the stable resource instead of a client-side anchor |
 
-Flint also converts ordinary GitHub `blob` links to raw-content URLs and
-normalizes issue or pull-request comment links to their parent issue or PR.
 These are lychee command-line remaps only; Flint does not rewrite repository
 files.
 
 Set `LYCHEE_SKIP_GITHUB_REMAPS=true` to disable these rules and use vanilla
 lychee URL behavior.
+
+### Local cache
+
+Outside CI, Flint enables lychee's request cache by default to speed up repeated
+runs. It creates `.lychee_cache/` with an internal `.gitignore`, runs lychee
+from that directory, and passes `--cache`.
+
+If the selected lychee config already sets `cache = true`, Flint leaves cache
+location and behavior to lychee instead. Set
+`FLINT_LYCHEE_SKIP_LOCAL_CACHE=true` to disable Flint's managed cache. The
+global opt-out is:
+
+```bash
+mise set --global FLINT_LYCHEE_SKIP_LOCAL_CACHE=true
+```
+
+If Flint cannot initialize `.lychee_cache/`, it warns and continues without a
+cache rather than failing the link check.
 
 ## Configuration
 
@@ -96,13 +114,6 @@ Select the upstream lychee config and optional local-link safeguard in
 [checks.links]
 config = ".github/config/lychee.toml"
 check_all_local = true
-```
-
-Set `FLINT_LYCHEE_SKIP_LOCAL_CACHE=true` to disable Flint's local cache. The
-global opt-out is:
-
-```bash
-mise set --global FLINT_LYCHEE_SKIP_LOCAL_CACHE=true
 ```
 
 ## CI environment

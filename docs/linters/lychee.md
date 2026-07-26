@@ -65,7 +65,10 @@ https://github.com/acme/widget/blob/main/docs/setup.md
 ```
 
 still reads `docs/setup.md` from `main`, not from the commit being checked.
-That can hide a link target renamed or removed by the PR.
+Most importantly, a PR that adds both this link and `docs/setup.md` gets a
+false failure because the new file does not exist on `main` yet. The reverse
+can also happen: checking the old file on `main` can hide a target renamed or
+removed by the PR.
 
 Flint passes `--remap` rules to lychee so repository links follow the content
 under test:

@@ -55,6 +55,35 @@ CI rather than checking every remote link in the repository on every PR.
 | Flint-managed request cache                | ✅ unless disabled or configured      | ❌                                    |
 | Missing `GITHUB_TOKEN`                     | warning                               | error                                 |
 
+### GitHub URL remapping
+
+Vanilla lychee requests a GitHub URL exactly as written. In a PR, a link such
+as:
+
+```text
+https://github.com/acme/widget/blob/main/docs/setup.md
+```
+
+still reads `docs/setup.md` from `main`, not from the commit being checked.
+That can hide a link target renamed or removed by the PR.
+
+Flint passes `--remap` rules to lychee so repository links follow the content
+under test:
+
+| Link written against the base repository | Same-repository PR                 | Fork PR                              |
+| ---------------------------------------- | ---------------------------------- | ------------------------------------ |
+| GitHub `blob` URL                        | file in the local checkout         | raw file from the fork's head branch |
+| GitHub `tree` URL                        | directory in the local checkout    | tree on the fork's head branch       |
+| GitHub line or text-fragment URL         | underlying file under test         | underlying raw file on the fork      |
+
+Flint also converts ordinary GitHub `blob` links to raw-content URLs and
+normalizes issue or pull-request comment links to their parent issue or PR.
+These are lychee command-line remaps only; Flint does not rewrite repository
+files.
+
+Set `LYCHEE_SKIP_GITHUB_REMAPS=true` to disable these rules and use vanilla
+lychee URL behavior.
+
 ## Configuration
 
 Select the upstream lychee config and optional local-link safeguard in

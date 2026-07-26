@@ -1,10 +1,11 @@
-# [`typos`](https://github.com/crate-ci/typos)
+# `typos`
 
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
 |          |                                                                                  |
 | -------- | -------------------------------------------------------------------------------- |
+| Project  | [typos](https://github.com/crate-ci/typos)                                       |
 | Fix      | yes                                                                              |
 | Binary   | `typos`                                                                          |
 | Scope    | [files](../linters.md#scope-files)                                               |

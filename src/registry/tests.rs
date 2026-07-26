@@ -1175,10 +1175,7 @@ fn detail_link(check: &Check) -> String {
 }
 
 fn linter_page_heading(check: &Check) -> String {
-    match check.project_url {
-        Some(url) => format!("# [`{}`]({url})", check.name),
-        None => format!("# `{}`", check.name),
-    }
+    format!("# `{}`", check.name)
 }
 
 fn generate_linter_metadata(check: &Check) -> String {
@@ -1326,6 +1323,10 @@ fn expected_linter_page_names(registry: &[Check]) -> BTreeSet<String> {
 
 fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     let mut rows: Vec<(&'static str, String)> = vec![];
+
+    if let Some(url) = check.project_url {
+        rows.push(("Project", format!("[{}]({url})", check.name)));
+    }
 
     rows.push((
         "Fix",

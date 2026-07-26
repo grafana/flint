@@ -12,7 +12,8 @@
 
 <!-- linter-metadata-end -->
 
-Disabled by default. Configure in `flint.toml`:
+`license-header` checks that selected source files contain the required header
+text near the top. It is disabled by default; configure it in `flint.toml`:
 
 ```toml
 [checks.license-header]

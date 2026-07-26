@@ -1,10 +1,11 @@
-# [`ruff`](https://docs.astral.sh/ruff/)
+# `ruff`
 
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
 |          |                                                           |
 | -------- | --------------------------------------------------------- |
+| Project  | [ruff](https://docs.astral.sh/ruff/)                      |
 | Fix      | yes                                                       |
 | Binary   | `ruff`                                                    |
 | Scope    | [file](../linters.md#scope-file)                          |

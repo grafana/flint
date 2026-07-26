@@ -1,10 +1,11 @@
-# [`rumdl`](https://rumdl.dev/)
+# `rumdl`
 
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
 |          |                                                                       |
 | -------- | --------------------------------------------------------------------- |
+| Project  | [rumdl](https://rumdl.dev/)                                           |
 | Fix      | yes                                                                   |
 | Binary   | `rumdl`                                                               |
 | Scope    | [files](../linters.md#scope-files)                                    |

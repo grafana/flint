@@ -1,10 +1,11 @@
-# [`biome`](https://biomejs.dev/)
+# `biome`
 
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
 |          |                                                              |
 | -------- | ------------------------------------------------------------ |
+| Project  | [biome](https://biomejs.dev/)                                |
 | Fix      | yes                                                          |
 | Binary   | `biome`                                                      |
 | Scope    | [file](../linters.md#scope-file)                             |

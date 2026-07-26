@@ -1,18 +1,20 @@
-# [`lychee`](https://lychee.cli.rs/)
+# `lychee`
 
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|        |                                      |
-| ------ | ------------------------------------ |
-| Fix    | no                                   |
-| Binary | `lychee`                             |
-| Scope  | [native](../linters.md#scope-native) |
-| Config | via `[checks.links]` in flint.toml   |
+|         |                                      |
+| ------- | ------------------------------------ |
+| Project | [lychee](https://lychee.cli.rs/)     |
+| Fix     | no                                   |
+| Binary  | `lychee`                             |
+| Scope   | [native](../linters.md#scope-native) |
+| Config  | via `[checks.links]` in flint.toml   |
 
 <!-- linter-metadata-end -->
 
-Orchestrates [lychee](https://lychee.cli.rs/) for link checking. Requires `lychee` in `[tools]`.
+`lychee` checks source and documentation files for broken links. Flint
+orchestrates the upstream tool and requires `lychee` in `[tools]`.
 
 Default behavior: checks all links in changed files. In CI, Flint also adds a
 full-repository safeguard pass over local links in all files so broken internal

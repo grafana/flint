@@ -1,10 +1,11 @@
-# [`ryl`](https://github.com/owenlamont/ryl)
+# `ryl`
 
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
 |          |                                                                                 |
 | -------- | ------------------------------------------------------------------------------- |
+| Project  | [ryl](https://github.com/owenlamont/ryl)                                        |
 | Fix      | yes                                                                             |
 | Binary   | `ryl`                                                                           |
 | Scope    | [files](../linters.md#scope-files)                                              |

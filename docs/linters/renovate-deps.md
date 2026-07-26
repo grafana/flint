@@ -1,10 +1,11 @@
-# [`renovate-deps`](https://docs.renovatebot.com/)
+# `renovate-deps`
 
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
 |            |                                                                                                                            |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Project    | [renovate-deps](https://docs.renovatebot.com/)                                                                             |
 | Fix        | yes                                                                                                                        |
 | Binary     | `renovate`                                                                                                                 |
 | Scope      | [native](../linters.md#scope-native)                                                                                       |
@@ -13,7 +14,8 @@
 
 <!-- linter-metadata-end -->
 
-`renovate-deps` does three related checks:
+`renovate-deps` verifies that Renovate's dependency snapshot and update rules
+remain consistent. It does three related checks:
 
 1. It verifies that `renovate-tracked-deps.json` next to the active Renovate
    config matches what Renovate currently extracts from the repo.

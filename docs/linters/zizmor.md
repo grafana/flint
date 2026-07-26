@@ -1,10 +1,11 @@
-# [`zizmor`](https://github.com/zizmorcore/zizmor)
+# `zizmor`
 
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
 |          |                                                       |
 | -------- | ----------------------------------------------------- |
+| Project  | [zizmor](https://github.com/zizmorcore/zizmor)        |
 | Fix      | yes                                                   |
 | Binary   | `zizmor`                                              |
 | Scope    | [files](../linters.md#scope-files)                    |
@@ -12,6 +13,8 @@
 | Config   | [`zizmor.yml`](https://docs.zizmor.sh/configuration/) |
 
 <!-- linter-metadata-end -->
+
+`zizmor` audits GitHub Actions workflows for security issues.
 
 zizmor can drift without file changes: its `ref-version-mismatch`
 audit resolves pinned action hashes against GitHub's tag API at

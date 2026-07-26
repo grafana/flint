@@ -12,7 +12,8 @@
 
 <!-- linter-metadata-end -->
 
-Checks the repo's Flint-managed setup state and `mise.toml` layout.
+`flint-setup` checks the repo's Flint-managed setup state and `mise.toml`
+layout.
 
 This verifies and fixes Flint-managed setup:
 

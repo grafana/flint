@@ -1,21 +1,22 @@
-# [`dotnet-format`](https://learn.microsoft.com/dotnet/core/tools/dotnet-format)
+# `dotnet-format`
 
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|          |                                    |
-| -------- | ---------------------------------- |
-| Fix      | yes                                |
-| Binary   | `dotnet`                           |
-| Scope    | [files](../linters.md#scope-files) |
-| Patterns | `*.cs`                             |
+|          |                                                                              |
+| -------- | ---------------------------------------------------------------------------- |
+| Project  | [dotnet-format](https://learn.microsoft.com/dotnet/core/tools/dotnet-format) |
+| Fix      | yes                                                                          |
+| Binary   | `dotnet`                                                                     |
+| Scope    | [files](../linters.md#scope-files)                                           |
+| Patterns | `*.cs`                                                                       |
 
 <!-- linter-metadata-end -->
 
-For a normal changed-files run, Flint passes the changed C# paths to
-`dotnet format --include`. The paths are relative to the project root, as
-required by the .NET CLI. A full run omits `--include` and checks the entire
-solution or project:
+`dotnet-format` checks and formats C# code. For a normal changed-files run,
+Flint passes the changed paths to `dotnet format --include`. The paths are
+relative to the project root, as required by the .NET CLI. A full run omits
+`--include` and checks the entire solution or project:
 
 ```bash
 flint run --full dotnet-format

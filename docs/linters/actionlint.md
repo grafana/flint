@@ -1,10 +1,11 @@
-# [`actionlint`](https://github.com/rhysd/actionlint)
+# `actionlint`
 
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
 |          |                                                                                  |
 | -------- | -------------------------------------------------------------------------------- |
+| Project  | [actionlint](https://github.com/rhysd/actionlint)                                |
 | Fix      | no                                                                               |
 | Binary   | `actionlint`                                                                     |
 | Scope    | [file](../linters.md#scope-file)                                                 |
@@ -13,9 +14,9 @@
 
 <!-- linter-metadata-end -->
 
-Flint runs `actionlint` on changed workflow files under `.github/workflows/`.
-This catches workflow syntax errors, invalid expressions, and common GitHub
-Actions mistakes before the workflow reaches GitHub.
+`actionlint` lints GitHub Actions workflows for syntax errors, invalid
+expressions, and common mistakes. Flint runs it on changed workflow files under
+`.github/workflows/` before the workflow reaches GitHub.
 
 Put project-specific actionlint settings in
 `$FLINT_CONFIG_DIR/actionlint.yml`; Flint passes that file explicitly when it

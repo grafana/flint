@@ -1,10 +1,11 @@
-# [`cargo-fmt`](https://github.com/rust-lang/rustfmt)
+# `cargo-fmt`
 
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
 |          |                                                                                               |
 | -------- | --------------------------------------------------------------------------------------------- |
+| Project  | [cargo-fmt](https://github.com/rust-lang/rustfmt)                                             |
 | Fix      | yes                                                                                           |
 | Binary   | `rustfmt`                                                                                     |
 | Scope    | [project](../linters.md#scope-project)                                                        |
@@ -13,9 +14,9 @@
 
 <!-- linter-metadata-end -->
 
-`cargo-fmt` starts when Rust files change and checks the whole Cargo project,
-because `cargo fmt` operates on crates rather than a changed-file list. Use fix
-mode to write rustfmt's result:
+`cargo-fmt` checks and formats Rust code with rustfmt. It starts when Rust files
+change and checks the whole Cargo project, because `cargo fmt` operates on
+crates rather than a changed-file list. Use fix mode to write rustfmt's result:
 
 ```bash
 flint run --fix cargo-fmt

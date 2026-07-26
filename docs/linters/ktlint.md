@@ -1,20 +1,21 @@
-# [`ktlint`](https://github.com/ktlint/ktlint)
+# `ktlint`
 
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
-|          |                                    |
-| -------- | ---------------------------------- |
-| Fix      | yes                                |
-| Binary   | `ktlint`                           |
-| Scope    | [files](../linters.md#scope-files) |
-| Patterns | `*.kt *.kts`                       |
+|          |                                            |
+| -------- | ------------------------------------------ |
+| Project  | [ktlint](https://github.com/ktlint/ktlint) |
+| Fix      | yes                                        |
+| Binary   | `ktlint`                                   |
+| Scope    | [files](../linters.md#scope-files)         |
+| Patterns | `*.kt *.kts`                               |
 
 <!-- linter-metadata-end -->
 
-On a normal run, Flint passes only changed Kotlin source and script files to
-`ktlint`. A full run passes the project root instead, which is useful after
-changing ktlint rules:
+`ktlint` lints and formats Kotlin source and script files. On a normal run,
+Flint passes only changed files to `ktlint`. A full run passes the project root
+instead, which is useful after changing ktlint rules:
 
 ```bash
 flint run --full ktlint

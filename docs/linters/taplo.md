@@ -1,10 +1,11 @@
-# [`taplo`](https://taplo.tamasfe.dev/)
+# `taplo`
 
 <!-- linter-metadata-start -->
 <!-- Generated. Run `mise run generate` to regenerate. -->
 
 |          |                                                                    |
 | -------- | ------------------------------------------------------------------ |
+| Project  | [taplo](https://taplo.tamasfe.dev/)                                |
 | Fix      | yes                                                                |
 | Binary   | `taplo`                                                            |
 | Scope    | [file](../linters.md#scope-file)                                   |
@@ -13,7 +14,7 @@
 
 <!-- linter-metadata-end -->
 
-Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).
+`taplo` checks and formats TOML files.
 
 This check intentionally stays basic: it uses `taplo fmt --check` for
 verification and `taplo fmt` for `--fix`. That keeps behavior aligned with

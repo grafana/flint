@@ -26,7 +26,8 @@ make changed-file runs reliable locally and in CI:
 - **Git-aware scope:** a normal run checks every link in changed,
   link-checkable files. A config change or `--full` triggers a full-repository
   check.
-- **Repository-wide local-link safeguard:** CI also checks local links and
+- **Repository-wide local-link safeguard:** [CI always activates the full
+  linter set](../cli.md#adaptive-runs); Flint also checks local links and
   fragments across all files, catching links from unchanged documents to files
   changed or removed by the PR. Set `check_all_local = true` to add the same
   safeguard outside CI.

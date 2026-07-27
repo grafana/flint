@@ -19,12 +19,23 @@ jobs:
           - os: ubuntu-24.04
             mise_version: v2026.7.12
             mise_sha256: dad54e0b843908324282b8673f9c0ebc3a4da0c49ad2da309a49bfbc918ba180
+            aube_node_linker: isolated
+            aube_package_import_method: auto
           - os: macos-15
             mise_version: v2026.7.12
             mise_sha256: 4268f41491bcb89e750951041d415a847495639a00e894075c62057633d06982
+            aube_node_linker: isolated
+            aube_package_import_method: auto
           - os: windows-2025
             mise_version: v2026.7.12
             mise_sha256: 50781ee1c71d3b19de5299fd6dba917489cd24127da2aa69ec03cc18074284a7
+            # Use a physical npm tree so mise-action can cache it reliably.
+            aube_node_linker: hoisted
+            aube_package_import_method: copy
+
+    env:
+      AUBE_NODE_LINKER: ${{ matrix.aube_node_linker }}
+      AUBE_PACKAGE_IMPORT_METHOD: ${{ matrix.aube_package_import_method }}
 
     permissions:
       contents: read
@@ -54,10 +65,7 @@ jobs:
         with:
           version: ${{ matrix.mise_version }}
           sha256: ${{ matrix.mise_sha256 }}
-          # Aube-backed npm installs use Windows links that do not survive
-          # mise-action's directory-only cache with all dependencies intact.
-          cache: ${{ runner.os != 'Windows' }}
-          cache_key_prefix: mise-v2
+          cache_key_prefix: mise-v3
 
       - name: Install mise tools
         run: mise install

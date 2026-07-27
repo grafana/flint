@@ -12,11 +12,13 @@
 
 <!-- linter-metadata-end -->
 
-`regex-replace` is Flint's built-in, line-oriented rewrite engine. It applies
-regular-expression rules to selected files and can add text when a rule
-matches. It does not parse a programming language or contain Java-specific
-logic; the language convention is expressed by the configured regular
-expressions.
+`regex-replace` is an opt-in, repository-configured rewrite check, not a
+general-purpose linter built into Flint. Flint provides the line-oriented
+execution engine and file scoping; the consuming repository provides every
+rule. The check applies regular-expression rules to selected files and can add
+text when a rule matches. It does not parse a programming language or contain
+Java-specific logic; the language convention is expressed by the configured
+regular expressions.
 
 This makes it useful for repository-specific mechanical changes that do not
 belong in a general-purpose formatter.

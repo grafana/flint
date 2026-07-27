@@ -16,6 +16,9 @@
 `dotenv-linter` checks and safely formats dotenv environment files without
 printing their values.
 
+> [!WARNING]
+> Do not commit secret-bearing `.env` files.
+
 Flint checks only explicit `.env`-style files: `.env`, `.env.*`, and files
 ending in `.env`. It passes those file paths rather than a directory, so
 unrelated YAML, Compose, and application configuration files are never scanned.
@@ -29,4 +32,3 @@ flint run --fix dotenv-linter
 ```
 
 The fixer is serialized with other Flint formatters that may own the same file.
-Do not commit secret-bearing `.env` files.

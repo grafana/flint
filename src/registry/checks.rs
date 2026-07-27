@@ -30,6 +30,8 @@ const CHECKSTYLE_URL: &str = "https://github.com/checkstyle/checkstyle";
 const CHECKSTYLE_CONFIG_URL: &str = "https://checkstyle.org/config.html";
 const DOTENV_LINTER_URL: &str = "https://github.com/dotenv-linter/dotenv-linter";
 const DOTENV_LINTER_CONFIG_URL: &str = "https://dotenv-linter.github.io/";
+const KUBE_LINTER_URL: &str = "https://github.com/stackrox/kube-linter";
+const KUBE_LINTER_CONFIG_URL: &str = "https://docs.kubelinter.io/";
 const HADOLINT_URL: &str = "https://github.com/hadolint/hadolint";
 const HADOLINT_CONFIG_URL: &str =
     "https://github.com/hadolint/hadolint?tab=readme-ov-file#configure";
@@ -59,6 +61,15 @@ const RYL_URL: &str = "https://github.com/owenlamont/ryl";
 
 const CHECKSTYLE_BASELINE_TRIGGERS: &[ConfigFile] =
     &[ConfigFile::project("checkstyle-suppressions.xml")];
+
+const KUBE_LINTER_PATTERNS: &[&str] = &[
+    "k8s/*.yml",
+    "k8s/*.yaml",
+    "kubernetes/*.yml",
+    "kubernetes/*.yaml",
+    "manifests/*.yml",
+    "manifests/*.yaml",
+];
 
 const SHELLCHECK_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir("shellcheckrc"),
@@ -229,6 +240,23 @@ fn check_yaml_lint() -> Check {
         .desc("Lint YAML files for style and consistency")
         .mise_tool("aqua:owenlamont/ryl")
         .migrate_tool_keys(&["cargo:yaml-lint", "github:owenlamont/ryl"])
+}
+
+fn check_kube_linter() -> Check {
+    Check::native(&crate::linters::kube_linter::CHECK_TYPE)
+        .patterns(KUBE_LINTER_PATTERNS)
+        .mise_tool("kube-linter")
+        .baseline_config(ConfigFile::config_dir("kube-linter.yaml"))
+        .project_url(KUBE_LINTER_URL)
+        .config_doc_url(KUBE_LINTER_CONFIG_URL)
+        .overview(
+            OverviewSection::ToolingCi,
+            "Kubernetes manifests",
+            OverviewRole::Check,
+            Some("Kubernetes security and production-readiness policy"),
+        )
+        .desc("Lint explicitly selected Kubernetes resources")
+        .style()
 }
 
 fn check_taplo() -> Check {
@@ -757,6 +785,7 @@ pub fn builtin() -> Vec<Check> {
         check_shfmt(),
         check_rumdl(),
         check_yaml_lint(),
+        check_kube_linter(),
         check_taplo(),
         check_actionlint(),
         check_zizmor(),

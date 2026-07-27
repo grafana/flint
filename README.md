@@ -170,10 +170,11 @@ For Flint contributor workflow and local testing tips, see
 
 ### Tooling / CI
 
-| Name           | Check                                                                           |
-| -------------- | ------------------------------------------------------------------------------- |
-| Dockerfile     | [`hadolint`](docs/linters/hadolint.md)                                          |
-| GitHub Actions | [`actionlint`](docs/linters/actionlint.md) / [`zizmor`](docs/linters/zizmor.md) |
+| Name                 | Check                                                                           |
+| -------------------- | ------------------------------------------------------------------------------- |
+| Dockerfile           | [`hadolint`](docs/linters/hadolint.md)                                          |
+| GitHub Actions       | [`actionlint`](docs/linters/actionlint.md) / [`zizmor`](docs/linters/zizmor.md) |
+| Kubernetes manifests | [`kube-linter`](docs/linters/kube-linter.md)                                    |
 
 ### General
 

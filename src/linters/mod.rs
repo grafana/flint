@@ -1,9 +1,11 @@
 pub mod biome;
 pub mod env;
 pub mod flint_setup;
+pub mod google_java_format;
 pub mod kube_linter;
 pub mod license_header;
 pub mod lychee;
+pub mod regex_replace;
 pub mod renovate_deps;
 pub mod rumdl;
 pub mod rustfmt;

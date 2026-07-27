@@ -1,0 +1,12 @@
+[expected]
+args = "run --full --fix regex-replace"
+exit = 1
+stderr = '''
+flint: fixed: regex-replace — commit before pushing
+'''
+
+[expected.files]
+"Main.txt" = """
+use static foo.bar;
+value = bar(value);
+"""

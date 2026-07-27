@@ -1,0 +1,12 @@
+[checks.regex-replace]
+patterns = ["*.txt"]
+
+[[checks.regex-replace.sets]]
+name = "test"
+replacement = '$1'
+add_lines_before_pattern = '^use '
+skip_line_pattern = '^use '
+
+[[checks.regex-replace.sets.rules]]
+pattern = '\bfoo\.(bar)\b'
+add_lines = ['use static foo.$1;']

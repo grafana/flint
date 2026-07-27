@@ -20,7 +20,7 @@ google-java-format = "1.35.0"
 hadolint = "2.14.0"
 ktlint = "1.8.0"
 lychee = "0.24.2"
-"npm:renovate" = "43.265.4"
+"npm:renovate" = { version = "43.265.4", trust_policy_excludes = ["@yarnpkg/libzip@3.2.2"] }
 ruff = "0.15.22"
 rumdl = "0.2.34"
 shellcheck = "0.11.0"

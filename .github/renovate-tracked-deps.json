@@ -16,6 +16,10 @@
       "packageName": "biomejs/biome",
       "datasource": "github-tags"
     },
+    "checkstyle": {
+      "packageName": "checkstyle/checkstyle",
+      "datasource": "github-releases"
+    },
     "editorconfig-checker": {
       "packageName": "editorconfig-checker/editorconfig-checker",
       "datasource": "github-releases"
@@ -109,6 +113,7 @@
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",
+        "checkstyle",
         "dotnet",
         "editorconfig-checker",
         "go",

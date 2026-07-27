@@ -67,6 +67,7 @@
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",
+        "checkstyle",
         "editorconfig-checker",
         "golangci-lint",
         "google-java-format",

@@ -17,14 +17,25 @@ jobs:
       matrix:
         include:
           - os: ubuntu-24.04
-            mise_version: v2026.7.12
-            mise_sha256: dad54e0b843908324282b8673f9c0ebc3a4da0c49ad2da309a49bfbc918ba180
+            mise_version: v2026.7.14
+            mise_sha256: fc96308f4fa085d7359892ac6351ededb35ecfabf1ddc34f5757bc755a2af8a6
+            aube_node_linker: isolated
+            aube_package_import_method: auto
           - os: macos-15
-            mise_version: v2026.7.12
-            mise_sha256: 4268f41491bcb89e750951041d415a847495639a00e894075c62057633d06982
+            mise_version: v2026.7.14
+            mise_sha256: 082262daa1cd73e22f71272c574afda560c4fcf39852bc18884eae9e13cd5f2c
+            aube_node_linker: isolated
+            aube_package_import_method: auto
           - os: windows-2025
-            mise_version: v2026.7.12
-            mise_sha256: 50781ee1c71d3b19de5299fd6dba917489cd24127da2aa69ec03cc18074284a7
+            mise_version: v2026.7.14
+            mise_sha256: acf83125cf0166701ffa661be72cbb26a852d31b22d2acc399a974f1d3812862
+            # Use a physical npm tree so mise-action can cache it reliably.
+            aube_node_linker: hoisted
+            aube_package_import_method: copy
+
+    env:
+      AUBE_NODE_LINKER: ${{ matrix.aube_node_linker }}
+      AUBE_PACKAGE_IMPORT_METHOD: ${{ matrix.aube_package_import_method }}
 
     permissions:
       contents: read
@@ -54,7 +65,7 @@ jobs:
         with:
           version: ${{ matrix.mise_version }}
           sha256: ${{ matrix.mise_sha256 }}
-          cache_key_prefix: mise-v2
+          cache_key_prefix: mise-v3
 
       - name: Install mise tools
         run: mise install

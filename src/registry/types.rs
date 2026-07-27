@@ -567,8 +567,6 @@ pub struct Check {
     pub config_doc_url: Option<&'static str>,
     /// Optional placements in generated overview tables.
     pub overviews: Vec<OverviewEntry>,
-    /// Extended markdown documentation shown in the README detail section (behaviour, config examples).
-    pub docs: &'static str,
 }
 
 impl Check {
@@ -694,7 +692,6 @@ impl Check {
             project_url: None,
             config_doc_url: None,
             overviews: vec![],
-            docs: "",
         }
     }
 
@@ -742,7 +739,6 @@ impl Check {
             project_url: None,
             config_doc_url: None,
             overviews: vec![],
-            docs: "",
         }
     }
 
@@ -888,12 +884,6 @@ impl Check {
             role,
             description,
         });
-        self
-    }
-
-    /// Set extended markdown documentation shown in the README detail section.
-    pub fn docs(mut self, docs: &'static str) -> Self {
-        self.docs = docs;
         self
     }
 

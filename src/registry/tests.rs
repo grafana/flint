@@ -871,11 +871,8 @@ fn sorted_rule_names(rule: &serde_json::Value) -> Vec<&str> {
     names
 }
 
-/// Verifies README summary table and docs/linters.md detail sections stay
-/// in sync with the registry. The summary table lives in README.md between
-/// `registry-table-*` markers; the same overview tables live in docs/linters.md
-/// between `linter-overview-*` markers; the per-linter detail sections live in
-/// docs/linters.md between `linter-details-*` markers.
+/// Verifies README and docs overview tables plus the metadata on each
+/// dedicated linter page stay in sync with the registry.
 ///
 /// Run `mise run generate` to regenerate.
 #[test]
@@ -889,7 +886,6 @@ fn readme_linter_table_in_sync() {
 
     let expected_summary = generate_overview_tables(&registry, OverviewLinkTarget::Readme);
     let expected_overview = generate_overview_tables(&registry, OverviewLinkTarget::LinterPage);
-    let expected_details = generate_linter_details(&registry);
 
     if std::env::var("UPDATE_README").is_ok() {
         let updated_readme = replace_section(
@@ -898,14 +894,12 @@ fn readme_linter_table_in_sync() {
             README_TABLE_END,
             &expected_summary,
         );
-        let updated_details = replace_section(
-            &replace_section(&details, OVERVIEW_START, OVERVIEW_END, &expected_overview),
-            DETAILS_START,
-            DETAILS_END,
-            &expected_details,
-        );
+        let updated_details =
+            replace_section(&details, OVERVIEW_START, OVERVIEW_END, &expected_overview);
         std::fs::write(&readme_path, updated_readme).expect("failed to write README.md");
         std::fs::write(&details_path, updated_details).expect("failed to write docs/linters.md");
+        update_linter_pages(manifest_dir, &registry);
+        verify_linter_pages(manifest_dir, &registry);
         return;
     }
 
@@ -914,10 +908,8 @@ fn readme_linter_table_in_sync() {
     // even when docs contain multi-paragraph content with blank lines.
     let actual_summary = extract_section(&readme, README_TABLE_START, README_TABLE_END);
     let actual_overview = extract_section(&details, OVERVIEW_START, OVERVIEW_END);
-    let actual_details = extract_section(&details, DETAILS_START, DETAILS_END);
     let expected_summary_norm = strip_blank_lines(&expected_summary);
     let expected_overview_norm = strip_blank_lines(&expected_overview);
-    let expected_details_norm = strip_blank_lines(&expected_details);
     if actual_summary != expected_summary_norm {
         panic!(
             "README summary table is out of sync with the registry.\n\
@@ -932,21 +924,15 @@ fn readme_linter_table_in_sync() {
              Expected:\n{expected_overview_norm}\n\nActual:\n{actual_overview}"
         );
     }
-    if actual_details != expected_details_norm {
-        panic!(
-            "docs/linters.md detail sections out of sync with the registry.\n\
-             Run `mise run generate` to regenerate.\n\n\
-             Expected:\n{expected_details_norm}\n\nActual:\n{actual_details}"
-        );
-    }
+    verify_linter_pages(manifest_dir, &registry);
 }
 
 const README_TABLE_START: &str = "<!-- registry-table-start -->";
 const README_TABLE_END: &str = "<!-- registry-table-end -->";
 const OVERVIEW_START: &str = "<!-- linter-overview-start -->";
 const OVERVIEW_END: &str = "<!-- linter-overview-end -->";
-const DETAILS_START: &str = "<!-- linter-details-start -->";
-const DETAILS_END: &str = "<!-- linter-details-end -->";
+const METADATA_START: &str = "<!-- linter-metadata-start -->";
+const METADATA_END: &str = "<!-- linter-metadata-end -->";
 const GENERATED_COMMENT: &str = "<!-- Generated. Run `mise run generate` to regenerate. -->";
 
 fn strip_blank_lines(s: &str) -> String {
@@ -1175,36 +1161,24 @@ fn render_markdown_table<const N: usize>(headers: &[&str; N], rows: &[[String; N
     lines.join("\n")
 }
 
-fn generate_linter_details(registry: &[Check]) -> String {
-    let mut sorted: Vec<&Check> = registry.iter().collect();
-    sorted.sort_by_key(|c| c.name);
-
-    let mut lines = vec![GENERATED_COMMENT.to_string()];
-    for check in &sorted {
-        let heading = match check.project_url {
-            Some(url) => format!("### [`{}`]({url})", check.name),
-            None => format!("### `{}`", check.name),
-        };
-        lines.push(heading);
-        lines.push(detail_table(check));
-    }
-    lines.join("\n")
-}
-
 fn overview_name_cell(check: &Check, link_target: OverviewLinkTarget) -> String {
     match link_target {
         OverviewLinkTarget::Readme => format!("[`{}`]({})", check.name, detail_link(check)),
-        OverviewLinkTarget::LinterPage => format!("[`{}`](#{})", check.name, check.name),
+        OverviewLinkTarget::LinterPage => {
+            format!("[`{}`](linters/{}.md)", check.name, check.name)
+        }
     }
 }
 
 fn detail_link(check: &Check) -> String {
-    // docs/linters.md uses `## `<name>`` — GitHub strips backticks and
-    // lowercases to produce the anchor `<name>`.
-    format!("docs/linters.md#{}", check.name)
+    format!("docs/linters/{}.md", check.name)
 }
 
-fn detail_table(check: &Check) -> String {
+fn linter_page_heading(check: &Check) -> String {
+    format!("# `{}`", check.name)
+}
+
+fn generate_linter_metadata(check: &Check) -> String {
     let rows = detail_rows(check);
 
     let col1_w = rows.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
@@ -1219,19 +1193,140 @@ fn detail_table(check: &Check) -> String {
     for (k, v) in &rows {
         lines.push(fmt(k, v));
     }
-    if !check.desc.is_empty() {
-        lines.push(String::new());
-        lines.push(check.desc.to_string());
-    }
-    if !check.docs.is_empty() {
-        lines.push(String::new());
-        lines.push(check.docs.to_string());
-    }
     lines.join("\n")
+}
+
+fn linter_page_path(manifest_dir: &Path, check: &Check) -> std::path::PathBuf {
+    manifest_dir
+        .join("docs/linters")
+        .join(format!("{}.md", check.name))
+}
+
+fn generated_metadata_section(check: &Check) -> String {
+    format!(
+        "{METADATA_START}\n{}\n{METADATA_END}",
+        generated_metadata_body(check)
+    )
+}
+
+fn generated_metadata_body(check: &Check) -> String {
+    format!("{GENERATED_COMMENT}\n{}", generate_linter_metadata(check))
+}
+
+fn update_linter_pages(manifest_dir: &Path, registry: &[Check]) {
+    let pages_dir = manifest_dir.join("docs/linters");
+    std::fs::create_dir_all(&pages_dir).expect("failed to create docs/linters");
+    let expected_names = expected_linter_page_names(registry);
+
+    for entry in std::fs::read_dir(&pages_dir).expect("docs/linters must be readable") {
+        let entry = entry.expect("failed to read docs/linters entry");
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if path.extension().and_then(|extension| extension.to_str()) == Some("md")
+            && !expected_names.contains(&name)
+        {
+            std::fs::remove_file(&path)
+                .unwrap_or_else(|error| panic!("failed to remove {}: {error}", path.display()));
+        }
+    }
+
+    for check in registry {
+        let path = linter_page_path(manifest_dir, check);
+        let heading = linter_page_heading(check);
+        let metadata = generated_metadata_section(check);
+        let existing = std::fs::read_to_string(&path).ok();
+
+        let body = match existing.as_deref() {
+            Some(content) if content.contains(METADATA_START) => {
+                let content = replace_first_line(content, &heading);
+                replace_section(
+                    &content,
+                    METADATA_START,
+                    METADATA_END,
+                    &generated_metadata_body(check),
+                )
+            }
+            Some(content) => {
+                let content = content
+                    .split_once('\n')
+                    .map(|(_, rest)| rest.trim_start_matches('\n'))
+                    .unwrap_or_default();
+                format!("{heading}\n\n{metadata}\n\n{content}")
+            }
+            None => format!("{heading}\n\n{metadata}\n"),
+        };
+
+        std::fs::write(&path, body).expect("failed to write dedicated linter page");
+    }
+}
+
+#[test]
+fn update_linter_pages_removes_stale_markdown_pages() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let pages_dir = temp.path().join("docs/linters");
+    std::fs::create_dir_all(&pages_dir).expect("create docs/linters");
+    std::fs::write(pages_dir.join("stale.md"), "stale").expect("write stale page");
+    std::fs::write(pages_dir.join("README.txt"), "keep").expect("write non-markdown file");
+
+    update_linter_pages(temp.path(), &[]);
+
+    assert!(!pages_dir.join("stale.md").exists());
+    assert!(pages_dir.join("README.txt").exists());
+}
+
+fn replace_first_line(content: &str, heading: &str) -> String {
+    content
+        .split_once('\n')
+        .map(|(_, rest)| format!("{heading}\n{rest}"))
+        .unwrap_or_else(|| heading.to_string())
+}
+
+fn verify_linter_pages(manifest_dir: &Path, registry: &[Check]) {
+    let pages_dir = manifest_dir.join("docs/linters");
+    let expected_names = expected_linter_page_names(registry);
+    let actual_names: BTreeSet<String> = std::fs::read_dir(&pages_dir)
+        .expect("docs/linters must be readable")
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let path = entry.path();
+            (path.extension().and_then(|extension| extension.to_str()) == Some("md"))
+                .then(|| entry.file_name().to_string_lossy().into_owned())
+        })
+        .collect();
+
+    assert_eq!(
+        actual_names, expected_names,
+        "dedicated linter pages do not match the registry; run `mise run generate`"
+    );
+
+    for check in registry {
+        let path = linter_page_path(manifest_dir, check);
+        let page = std::fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+        let actual = extract_section(&page, METADATA_START, METADATA_END);
+        let expected = strip_blank_lines(&generated_metadata_body(check));
+        assert_eq!(
+            actual,
+            expected,
+            "{} metadata is out of sync with the registry; run `mise run generate`",
+            path.display()
+        );
+    }
+}
+
+fn expected_linter_page_names(registry: &[Check]) -> BTreeSet<String> {
+    registry
+        .iter()
+        .map(|check| format!("{}.md", check.name))
+        .collect()
 }
 
 fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     let mut rows: Vec<(&'static str, String)> = vec![];
+
+    if let Some(url) = check.project_url {
+        rows.push(("Project", format!("[{}]({url})", check.name)));
+    }
 
     rows.push((
         "Fix",
@@ -1246,7 +1341,7 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
     rows.push(("Binary", binary));
 
     let scope = check.kind.scope_name();
-    rows.push(("Scope", format!("[{scope}](#scope-{scope})")));
+    rows.push(("Scope", format!("[{scope}](../linters.md#scope-{scope})")));
 
     if !check.patterns.is_empty() {
         rows.push(("Patterns", format!("`{}`", check.patterns.join(" "))));
@@ -1277,8 +1372,7 @@ fn detail_rows(check: &Check) -> Vec<(&'static str, String)> {
 
     if check.adaptive_relevance.is_some() {
         let label = if check.name == "renovate-deps" {
-            "adaptive — see [when does this run?](linters/renovate-deps.md#when-does-this-run)"
-                .to_string()
+            "adaptive — see [when does this run?](#when-does-this-run)".to_string()
         } else {
             "adaptive — runs on local default runs only when changed files are relevant".to_string()
         };

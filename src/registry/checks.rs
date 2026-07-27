@@ -248,16 +248,6 @@ fn check_taplo() -> Check {
     .formatter()
     .migrate_tool_keys(&["github:tamasfe/taplo"])
     .desc("Format TOML files")
-    .docs(
-        "Formats TOML files with [Taplo](https://taplo.tamasfe.dev/).\n\
-            \n\
-            This check intentionally stays basic: it uses `taplo fmt --check` for\n\
-            verification and `taplo fmt` for `--fix`. That keeps behavior aligned with\n\
-            flint's existing formatter-style checks.\n\
-            \n\
-            Current caveat: Taplo's published docs currently advertise TOML 1.0.0\n\
-            support, so treat this check as TOML 1.0-oriented for now.",
-    )
     .style()
 }
 
@@ -308,16 +298,6 @@ fn check_zizmor() -> Check {
         None,
     )
     .desc("Audit GitHub Actions workflows for security issues")
-    .docs(
-        "zizmor can drift without file changes: its `ref-version-mismatch`\n\
-        audit resolves pinned action hashes against GitHub's tag API at\n\
-        run-time. When a maintainer moves a mutable tag (e.g. `v6` advances\n\
-        to a new patch), workflows pinned to the old commit but commented\n\
-        `# v6` become inconsistent without any local file change. Flint\n\
-        scans only files changed in the PR, so drift in untouched workflows\n\
-        stays invisible until something edits them. Run `flint run --full`\n\
-        periodically (e.g. weekly `schedule:` workflow) to catch this.",
-    )
     .style()
 }
 
@@ -397,21 +377,6 @@ fn check_editorconfig_checker() -> Check {
             Some("EditorConfig compliance"),
         )
         .desc("Check files comply with EditorConfig settings")
-        .docs(
-            "`editorconfig-checker` defers to formatters: it runs on all files\n\
-            but automatically skips file types owned by an active formatter. If\n\
-            none of those formatters are installed, `editorconfig-checker` checks\n\
-            those files itself.\n\
-            \n\
-            Flint writes shared `.editorconfig` carve-outs for known\n\
-            formatter-owned line length: today that means `rumdl` for `*.md`,\n\
-            `rustfmt` for `*.rs`, and `google-java-format` for `*.java`. Those\n\
-            sections use `max_line_length = off` so editors and\n\
-            `editorconfig-checker` share the same intent instead of relying on\n\
-            checker-specific JSON excludes. If a matching section already\n\
-            exists, `flint init` rewrites its `max_line_length` to `off`\n\
-            instead of leaving a formatter-conflicting numeric value in place.",
-        )
 }
 
 fn check_golangci_lint() -> Check {
@@ -691,37 +656,6 @@ fn check_lychee() -> Check {
             Some("Broken links"),
         )
         .desc("Check for broken links")
-        .docs(
-            "Orchestrates [lychee](https://lychee.cli.rs/) for link checking. \
-            Requires `lychee` in `[tools]`.\n\
-            \n\
-            Default behavior: checks all links in changed files. In CI, Flint also adds a\n\
-            full-repository safeguard pass over local links in all files so broken internal\n\
-            links in unchanged docs still fail the build. Outside that CI safeguard, setting\n\
-            `check_all_local = true` in `flint.toml` adds the same local-links-only pass\n\
-            over all files.\n\
-            \n\
-            Outside CI, flint also enables a local lychee request cache by default to\n\
-            speed up repeated runs. Flint stores that cache under `.lychee_cache/` and\n\
-            creates the directory on first use. Set `FLINT_LYCHEE_SKIP_LOCAL_CACHE=true`\n\
-            to opt out. If your lychee config already sets `cache = true`, flint leaves\n\
-            caching to lychee instead.\n\
-            \n\
-            In CI, `lychee` requires `GITHUB_TOKEN` so GitHub link checks can authenticate.\n\
-            On GitHub Actions PR runs in changed-file mode, link remaps also require\n\
-            `GITHUB_REPOSITORY`, `GITHUB_BASE_REF`, `GITHUB_HEAD_REF`, and `PR_HEAD_REPO`.\n\
-            GitHub Actions provides the first three; set `PR_HEAD_REPO` from\n\
-            `github.event.pull_request.head.repo.full_name`. The CI local-links safeguard\n\
-            pass and `--full` do not require the PR remap metadata.\n\
-            \n\
-            Configure via `flint.toml`:\n\
-            \n\
-            ```toml\n\
-            [checks.links]\n\
-            config = \".github/config/lychee.toml\"\n\
-            check_all_local = true\n\
-            ```",
-        )
 }
 
 fn check_renovate_deps() -> Check {
@@ -738,36 +672,6 @@ fn check_renovate_deps() -> Check {
             Some("Dependency update configuration"),
         )
         .desc("Verify Renovate dependency snapshot is up to date")
-        .docs(
-            "Verifies `renovate-tracked-deps.json` next to the active Renovate\n\
-            config is up to date by running Renovate locally and comparing its\n\
-            output against the committed snapshot.\n\
-            It also checks that dependencies extracted from different files but\n\
-            resolving to the same upstream package match the same Renovate\n\
-            package rules. That catches config splits like `actionlint` vs\n\
-            `rhysd/actionlint` before Renovate stops grouping them consistently.\n\
-            Requires `renovate` in `[tools]`.\n\
-            \n\
-            In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN`\n\
-            so Renovate can authenticate GitHub requests. If `GITHUB_COM_TOKEN` is\n\
-            unset, flint forwards `GITHUB_TOKEN` to Renovate as `GITHUB_COM_TOKEN`.\n\
-            \n\
-            When `flint init` writes a new `flint.toml`, it includes this section if\n\
-            `renovate-deps` is selected.\n\
-            \n\
-            With `--fix`, automatically regenerates and commits the snapshot.\n\
-            For custom/regex managers, prefer canonical `depNameTemplate` values\n\
-            for grouping and explicit `packageNameTemplate` values for datasource\n\
-            lookups when those identities differ.\n\
-            See [the renovate-deps guide](linters/renovate-deps.md) for examples.\n\
-            \n\
-            Configure via `flint.toml`:\n\
-            \n\
-            ```toml\n\
-            [checks.renovate-deps]\n\
-            exclude_managers = [\"github-actions\", \"github-runners\"]\n\
-            ```",
-        )
 }
 
 fn check_license_header() -> Check {
@@ -781,23 +685,6 @@ fn check_license_header() -> Check {
             Some("Required file header text"),
         )
         .desc("Check source files have the required license header")
-        .docs(
-            "Disabled by default. Configure in `flint.toml`:\n\
-            \n\
-            ```toml\n\
-            [checks.license-header]\n\
-            text = \"SPDX-License-Identifier: Apache-2.0\"\n\
-            patterns = [\"*.java\", \"*.kt\"]\n\
-            lines_to_check = 5\n\
-            ```\n\
-            \n\
-            - `text` — required header text to find near the top of each file\n\
-            - `patterns` — glob patterns selecting which files to check\n\
-            - `lines_to_check` — how many leading lines to search; defaults to `5`\n\
-            \n\
-            `text` may be multi-line. Flint joins the first `lines_to_check` lines with\n\
-            newlines and checks whether that text contains the configured header snippet.",
-        )
 }
 
 fn check_flint_setup() -> Check {
@@ -811,20 +698,6 @@ fn check_flint_setup() -> Check {
             Some("Flint-managed setup and `mise.toml` layout"),
         )
         .desc("Keep Flint setup current and mise.toml lint tooling canonical")
-        .docs(
-            "Checks the repo's Flint-managed setup state and `mise.toml` layout.\n\
-            \n\
-            This verifies and fixes Flint-managed setup:\n\
-            - apply versioned Flint setup migrations\n\
-            - replace obsolete lint tool keys with their supported successors\n\
-            - reject unsupported legacy lint tools that need repo migrations\n\
-            - sort `[tools]` entries into Flint's canonical order\n\
-            - keep lint-managed tool entries under the `# Linters` header\n\
-            - keep runtime, SDK, and unknown tool entries above that header\n\
-            \n\
-            With `--fix`, rewrites Flint-managed config in place and applies any\n\
-            currently actionable setup migration.",
-        )
 }
 
 pub fn builtin() -> Vec<Check> {

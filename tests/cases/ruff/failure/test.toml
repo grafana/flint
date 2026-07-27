@@ -12,6 +12,10 @@ F401 [*] `os` imported but unused
 3 | print("hello")
   |
 help: Remove unused import: `os`
+  |
+  - import os
+1 |
+  |
 
 Found 1 error.
 [*] 1 fixable with the `--fix` option.

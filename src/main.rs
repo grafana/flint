@@ -1361,6 +1361,7 @@ zizmor                zizmor              active         fast      yes  Audit Gi
 hadolint              hadolint            missing        fast      no   Lint Dockerfiles                                                     Dockerfile Dockerfile.* *.dockerfile
 xmllint               xmllint             missing        fast      no   Validate XML files are well-formed                                   *.xml
 typos                 typos               active         fast      yes  Check for common spelling mistakes                                   *
+dotenv-linter         dotenv-linter       missing        fast      yes  Lint dotenv environment files without printing their values          .env .env.* *.env
 editorconfig-checker  ec                  active         fast      no   Check files comply with EditorConfig settings                        *
 golangci-lint         golangci-lint       missing        fast      no   Lint Go code; uses --new-from-rev to scope analysis to changed code  *.go
 ruff                  ruff                active         fast      yes  Lint Python code                                                     *.py

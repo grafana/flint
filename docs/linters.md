@@ -22,14 +22,15 @@ page with its behavior, configuration, and examples.
 
 ### Files / Formats
 
-| Name     | Linter                                | Formatter                                 |
-| -------- | ------------------------------------- | ----------------------------------------- |
-| JSON     | [`biome`](linters/biome.md)           | [`biome-format`](linters/biome-format.md) |
-| Markdown | [`rumdl`](linters/rumdl.md)           | [`rumdl`](linters/rumdl.md)               |
-| Shell    | [`shellcheck`](linters/shellcheck.md) | [`shfmt`](linters/shfmt.md)               |
-| TOML     | —                                     | [`taplo`](linters/taplo.md)               |
-| XML      | [`xmllint`](linters/xmllint.md)       | —                                         |
-| YAML     | [`ryl`](linters/ryl.md)               | [`ryl`](linters/ryl.md)                   |
+| Name     | Linter                                      | Formatter                                   |
+| -------- | ------------------------------------------- | ------------------------------------------- |
+| Dotenv   | [`dotenv-linter`](linters/dotenv-linter.md) | [`dotenv-linter`](linters/dotenv-linter.md) |
+| JSON     | [`biome`](linters/biome.md)                 | [`biome-format`](linters/biome-format.md)   |
+| Markdown | [`rumdl`](linters/rumdl.md)                 | [`rumdl`](linters/rumdl.md)                 |
+| Shell    | [`shellcheck`](linters/shellcheck.md)       | [`shfmt`](linters/shfmt.md)                 |
+| TOML     | —                                           | [`taplo`](linters/taplo.md)                 |
+| XML      | [`xmllint`](linters/xmllint.md)             | —                                           |
+| YAML     | [`ryl`](linters/ryl.md)                     | [`ryl`](linters/ryl.md)                     |
 
 ### Tooling / CI
 

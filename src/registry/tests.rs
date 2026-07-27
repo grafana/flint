@@ -571,6 +571,26 @@ fn repo_renovate_config_stays_aligned_with_shared_preset_contract() {
     }
 
     {
+        let description =
+            "Prefer Flint's checksum-aware mise manager over Renovate's native uses-with manager";
+        let default_rule = package_rule_by_description(&default_parsed, description)
+            .unwrap_or_else(|| panic!("default.json missing package rule {description:?}"));
+        let repo_rule =
+            package_rule_by_description(&repo_parsed, description).unwrap_or_else(|| {
+                panic!(".github/renovate.json5 missing package rule {description:?}")
+            });
+        assert_eq!(
+            default_rule, repo_rule,
+            "mise uses-with fallback rule drifted between default.json and .github/renovate.json5"
+        );
+        assert_eq!(
+            default_rule["enabled"].as_bool(),
+            Some(false),
+            "mise uses-with fallback rule must disable Renovate's overlapping native manager"
+        );
+    }
+
+    {
         let description = "Update mise version in GitHub Actions workflows";
         let default_manager = custom_manager_by_description(&default_parsed, description)
             .unwrap_or_else(|| panic!("default.json missing custom manager {description:?}"));

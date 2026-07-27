@@ -26,6 +26,8 @@ const GOFMT_URL: &str = "https://pkg.go.dev/cmd/gofmt";
 const GOLANGCI_LINT_URL: &str = "https://golangci-lint.run/";
 const GOLANGCI_LINT_CONFIG_URL: &str = "https://golangci-lint.run/usage/configuration/";
 const GOOGLE_JAVA_FORMAT_URL: &str = "https://github.com/google/google-java-format";
+const CHECKSTYLE_URL: &str = "https://github.com/checkstyle/checkstyle";
+const CHECKSTYLE_CONFIG_URL: &str = "https://checkstyle.org/config.html";
 const KUBE_LINTER_URL: &str = "https://github.com/stackrox/kube-linter";
 const KUBE_LINTER_CONFIG_URL: &str = "https://docs.kubelinter.io/";
 const HADOLINT_URL: &str = "https://github.com/hadolint/hadolint";
@@ -54,6 +56,9 @@ const TYPOS_CONFIG_URL: &str = "https://github.com/crate-ci/typos/blob/master/do
 const XMLLINT_URL: &str = "https://github.com/jonwiggins/xmloxide";
 const YAMLLINT_CONFIG_URL: &str = "https://yamllint.readthedocs.io/en/stable/configuration.html";
 const RYL_URL: &str = "https://github.com/owenlamont/ryl";
+
+const CHECKSTYLE_BASELINE_TRIGGERS: &[ConfigFile] =
+    &[ConfigFile::project("checkstyle-suppressions.xml")];
 
 const KUBE_LINTER_PATTERNS: &[&str] = &[
     "k8s/*.yml",
@@ -624,6 +629,28 @@ fn check_google_java_format() -> Check {
     .lang()
 }
 
+fn check_checkstyle() -> Check {
+    Check::files(
+        "checkstyle",
+        "checkstyle -c checkstyle.xml {FILES}",
+        &["*.java"],
+    )
+    .java_jar()
+    .baseline_config(ConfigFile::project("checkstyle.xml"))
+    .baseline_triggers(CHECKSTYLE_BASELINE_TRIGGERS)
+    .failure_output_patterns(&["[WARN]", "[ERROR]"])
+    .project_url(CHECKSTYLE_URL)
+    .config_doc_url(CHECKSTYLE_CONFIG_URL)
+    .overview(
+        OverviewSection::Languages,
+        "Java",
+        OverviewRole::Linter,
+        Some("Java coding standard"),
+    )
+    .desc("Check Java source against a repository-owned Checkstyle configuration")
+    .lang()
+}
+
 fn check_ktlint() -> Check {
     Check::files(
         "ktlint",
@@ -752,6 +779,7 @@ pub fn builtin() -> Vec<Check> {
         check_cargo_fmt(),
         check_gofmt(),
         check_google_java_format(),
+        check_checkstyle(),
         check_ktlint(),
         check_dotnet_format(),
         check_lychee(),

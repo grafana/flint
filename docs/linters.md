@@ -14,7 +14,7 @@ page with its behavior, configuration, and examples.
 | ----------------------- | ------------------------------------------- | ----------------------------------------------------- |
 | C#                      | —                                           | [`dotnet-format`](linters/dotnet-format.md)           |
 | Go                      | [`golangci-lint`](linters/golangci-lint.md) | [`gofmt`](linters/gofmt.md)                           |
-| Java                    | —                                           | [`google-java-format`](linters/google-java-format.md) |
+| Java                    | [`checkstyle`](linters/checkstyle.md)       | [`google-java-format`](linters/google-java-format.md) |
 | JavaScript / TypeScript | [`biome`](linters/biome.md)                 | [`biome-format`](linters/biome-format.md)             |
 | Kotlin                  | [`ktlint`](linters/ktlint.md)               | [`ktlint`](linters/ktlint.md)                         |
 | Python                  | [`ruff`](linters/ruff.md)                   | [`ruff-format`](linters/ruff-format.md)               |

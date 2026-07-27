@@ -527,6 +527,8 @@ pub struct Check {
     pub status_hook: Option<StatusHook>,
     /// Optional output normalizer used for non-verbose failing process runs.
     pub nonverbose_failure_output: Option<NonverboseFailureOutputHook>,
+    /// Output markers that make an otherwise successful process invocation fail.
+    pub failure_output_patterns: &'static [&'static str],
     /// Optional hint appended when a known toolchain component is missing.
     pub missing_component_hint: Option<MissingComponentHint>,
     /// Additional config-like files that trigger an all-files baseline run when changed.
@@ -550,9 +552,8 @@ pub struct Check {
     /// Toolchain keys stay above the `# Linters` header in `mise.toml` so they're
     /// visually separated from lint-only entries.
     pub toolchain: Option<Option<&'static str>>,
-    /// On Windows, the binary is a self-executing JAR that cannot be run directly
-    /// or via cmd.exe — invoke as `java -jar <resolved-path>` instead.
-    pub windows_java_jar: bool,
+    /// How to invoke the binary when it is a self-executing JAR.
+    pub java_jar: Option<JavaJarMode>,
     /// Extra generated workflow setup needed when this check is selected by `flint init`.
     pub workflow_setup: Option<WorkflowSetup>,
     pub fix_behavior: FixBehavior,
@@ -567,6 +568,35 @@ pub struct Check {
     pub config_doc_url: Option<&'static str>,
     /// Optional placements in generated overview tables.
     pub overviews: Vec<OverviewEntry>,
+}
+
+/// Controls where a self-executing JAR must be launched through `java -jar`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum JavaJarMode {
+    /// Use `java -jar` on every platform.
+    AllPlatforms,
+    /// Use `java -jar` only on Windows, where JAR shims cannot run directly.
+    WindowsOnly,
+}
+
+impl JavaJarMode {
+    pub(crate) const fn enabled_on_current_platform(self) -> bool {
+        matches!(self, Self::AllPlatforms) || (cfg!(windows) && matches!(self, Self::WindowsOnly))
+    }
+}
+
+#[cfg(test)]
+mod java_jar_mode_tests {
+    use super::JavaJarMode;
+
+    #[test]
+    fn enables_only_on_configured_platforms() {
+        assert!(JavaJarMode::AllPlatforms.enabled_on_current_platform());
+        assert_eq!(
+            JavaJarMode::WindowsOnly.enabled_on_current_platform(),
+            cfg!(windows)
+        );
+    }
 }
 
 impl Check {
@@ -669,6 +699,7 @@ impl Check {
             adaptive_relevance: None,
             status_hook: None,
             nonverbose_failure_output: None,
+            failure_output_patterns: &[],
             missing_component_hint: None,
             baseline_triggers: &[],
             is_formatter: false,
@@ -684,7 +715,7 @@ impl Check {
                 full_fix_cmd: "",
                 scope,
             },
-            windows_java_jar: false,
+            java_jar: None,
             workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
             fix_after: vec![],
@@ -722,6 +753,7 @@ impl Check {
             adaptive_relevance: None,
             status_hook: None,
             nonverbose_failure_output: None,
+            failure_output_patterns: &[],
             missing_component_hint: None,
             baseline_triggers: &[],
             is_formatter: false,
@@ -730,7 +762,7 @@ impl Check {
             activate_unconditionally: false,
             category: Category::Default,
             toolchain: None,
-            windows_java_jar: false,
+            java_jar: None,
             workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
             fix_after: vec![],
@@ -798,10 +830,16 @@ impl Check {
         self
     }
 
+    /// Invoke this binary via `java -jar <path>` rather than directly.
+    /// Use for self-executing JARs (e.g. ktlint and Checkstyle).
+    pub fn java_jar(mut self) -> Self {
+        self.java_jar = Some(JavaJarMode::AllPlatforms);
+        self
+    }
+
     /// On Windows, invoke this binary via `java -jar <path>` rather than directly.
-    /// Use for self-executing JARs (e.g. ktlint) that cmd.exe cannot run.
     pub fn windows_java_jar(mut self) -> Self {
-        self.windows_java_jar = true;
+        self.java_jar = Some(JavaJarMode::WindowsOnly);
         self
     }
 
@@ -992,6 +1030,11 @@ impl Check {
 
     pub fn nonverbose_failure_output(mut self, hook: NonverboseFailureOutputHook) -> Self {
         self.nonverbose_failure_output = Some(hook);
+        self
+    }
+
+    pub fn failure_output_patterns(mut self, patterns: &'static [&'static str]) -> Self {
+        self.failure_output_patterns = patterns;
         self
     }
 

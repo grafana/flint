@@ -32,6 +32,10 @@
       "packageName": "hadolint/hadolint",
       "datasource": "github-tags"
     },
+    "http:checkstyle": {
+      "packageName": "checkstyle/checkstyle",
+      "datasource": "github-releases"
+    },
     "ktlint": {
       "packageName": "pinterest/ktlint",
       "datasource": "github-releases"
@@ -115,6 +119,7 @@
         "golangci-lint",
         "google-java-format",
         "hadolint",
+        "http:checkstyle",
         "ktlint",
         "lychee",
         "node",

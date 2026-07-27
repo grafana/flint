@@ -28,6 +28,7 @@
         "golangci-lint",
         "google-java-format",
         "hadolint",
+        "http:checkstyle",
         "ktlint",
         "lychee",
         "npm:renovate",

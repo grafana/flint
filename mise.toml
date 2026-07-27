@@ -20,6 +20,8 @@ google-java-format = "1.35.0"
 hadolint = "2.14.0"
 ktlint = "1.8.0"
 lychee = "0.24.2"
+# @yarnpkg/libzip 3.2.2 is npm-signed and matches Yarn's release commit, but
+# was published without provenance; mise's no-downgrade policy otherwise rejects Renovate.
 "npm:renovate" = { version = "43.265.4", trust_policy_excludes = ["@yarnpkg/libzip@3.2.2"] }
 ruff = "0.15.22"
 rumdl = "0.2.34"

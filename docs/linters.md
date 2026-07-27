@@ -33,10 +33,11 @@ page with its behavior, configuration, and examples.
 
 ### Tooling / CI
 
-| Name           | Check                                                                 |
-| -------------- | --------------------------------------------------------------------- |
-| Dockerfile     | [`hadolint`](linters/hadolint.md)                                     |
-| GitHub Actions | [`actionlint`](linters/actionlint.md) / [`zizmor`](linters/zizmor.md) |
+| Name                 | Check                                                                 |
+| -------------------- | --------------------------------------------------------------------- |
+| Dockerfile           | [`hadolint`](linters/hadolint.md)                                     |
+| GitHub Actions       | [`actionlint`](linters/actionlint.md) / [`zizmor`](linters/zizmor.md) |
+| Kubernetes manifests | [`kube-linter`](linters/kube-linter.md)                               |
 
 ### General
 

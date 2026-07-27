@@ -55,6 +55,13 @@
   ],
   packageRules: [
     {
+      description: "Prefer Flint's checksum-aware mise manager over Renovate's native uses-with manager",
+      matchManagers: ["github-actions"],
+      matchDepTypes: ["uses-with"],
+      matchPackageNames: ["jdx/mise"],
+      enabled: false,
+    },
+    {
       matchDepNames: [
         "actionlint",
         "aqua:jonwiggins/xmloxide",

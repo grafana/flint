@@ -68,6 +68,7 @@
         "aqua:owenlamont/ryl",
         "biome",
         "checkstyle",
+        "dotenv-linter",
         "editorconfig-checker",
         "golangci-lint",
         "google-java-format",

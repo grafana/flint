@@ -24,6 +24,10 @@
       "packageName": "checkstyle/checkstyle",
       "datasource": "github-releases"
     },
+    "dotenv-linter": {
+      "packageName": "dotenv-linter/dotenv-linter",
+      "datasource": "github-releases"
+    },
     "editorconfig-checker": {
       "packageName": "editorconfig-checker/editorconfig-checker",
       "datasource": "github-releases"
@@ -118,6 +122,7 @@
         "aqua:owenlamont/ryl",
         "biome",
         "checkstyle",
+        "dotenv-linter",
         "dotnet",
         "editorconfig-checker",
         "go",

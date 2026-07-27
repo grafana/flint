@@ -53,7 +53,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup mise
-        uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
+        uses: jdx/mise-action@f10502fc09dadecfefb962fff68ce77213930204 # v4.2.2
         with:
           version: v2026.7.14
           sha256: fc96308f4fa085d7359892ac6351ededb35ecfabf1ddc34f5757bc755a2af8a6

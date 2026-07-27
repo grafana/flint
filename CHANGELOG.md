@@ -1,5 +1,58 @@
 # Changelog
 
+## [0.22.10](https://github.com/grafana/flint/compare/v0.22.9...v0.22.10) - 2026-07-27
+
+### Added
+
+- add safe dotenv linting ([#436](https://github.com/grafana/flint/pull/436))
+- add native Java formatting and regex replacements ([#407](https://github.com/grafana/flint/pull/407))
+- add scoped Kubernetes manifest linting ([#437](https://github.com/grafana/flint/pull/437))
+- add standalone Checkstyle linting ([#435](https://github.com/grafana/flint/pull/435))
+- improve Flint init and setup migrations ([#428](https://github.com/grafana/flint/pull/428))
+- define registry and execution contracts ([#427](https://github.com/grafana/flint/pull/427))
+
+### Fixed
+
+- *(renovate)* avoid overlapping mise managers ([#446](https://github.com/grafana/flint/pull/446))
+
+### Other
+
+- *(deps)* update dependency jdx/mise-action to v4.2.2 ([#448](https://github.com/grafana/flint/pull/448))
+- make Windows aube installs cacheable ([#447](https://github.com/grafana/flint/pull/447))
+- *(deps)* update mise to v2026.7.12 ([#444](https://github.com/grafana/flint/pull/444))
+- *(deps)* update linters ([#443](https://github.com/grafana/flint/pull/443))
+- move linter reference to dedicated pages ([#440](https://github.com/grafana/flint/pull/440))
+- *(deps)* lock file maintenance ([#445](https://github.com/grafana/flint/pull/445))
+- *(deps)* update taiki-e/install-action action to v2.85.0 ([#442](https://github.com/grafana/flint/pull/442))
+- *(deps)* update taiki-e/install-action action to v2.84.1 ([#441](https://github.com/grafana/flint/pull/441))
+- require silent happy paths for checks ([#439](https://github.com/grafana/flint/pull/439))
+- *(deps)* update grafana/shared-workflows/lint-pr-title action to v1.2.4 ([#438](https://github.com/grafana/flint/pull/438))
+- add Linux musl release artifacts ([#421](https://github.com/grafana/flint/pull/421))
+- validate curated mise registry backends ([#429](https://github.com/grafana/flint/pull/429))
+- *(deps)* update rust crate tokio to v1.53.1 ([#434](https://github.com/grafana/flint/pull/434))
+- *(deps)* update taiki-e/install-action action to v2.84.0 ([#433](https://github.com/grafana/flint/pull/433))
+- *(deps)* update rust crate clap to v4.6.3 ([#432](https://github.com/grafana/flint/pull/432))
+- *(deps)* update rust crate serde_json to v1.0.151 ([#431](https://github.com/grafana/flint/pull/431))
+- record Flint v2 architecture decisions ([#426](https://github.com/grafana/flint/pull/426))
+- *(deps)* update taiki-e/install-action action to v2.83.4 ([#423](https://github.com/grafana/flint/pull/423))
+- *(deps)* update actions/checkout digest to 3d3c42e ([#422](https://github.com/grafana/flint/pull/422))
+- *(deps)* update rust crate regex to v1.13.1 ([#412](https://github.com/grafana/flint/pull/412))
+- document semantic PR title guidance ([#420](https://github.com/grafana/flint/pull/420))
+- *(deps)* update linters ([#418](https://github.com/grafana/flint/pull/418))
+- *(deps)* update dependency mise to v2026.7.7 ([#417](https://github.com/grafana/flint/pull/417))
+- *(deps)* lock file maintenance ([#419](https://github.com/grafana/flint/pull/419))
+- *(deps)* update taiki-e/install-action action to v2.83.3 ([#415](https://github.com/grafana/flint/pull/415))
+- *(deps)* update rust crate tokio to v1.52.4 ([#414](https://github.com/grafana/flint/pull/414))
+- *(deps)* update dependency jdx/mise-action to v4.2.1 ([#416](https://github.com/grafana/flint/pull/416))
+- *(deps)* update dependency rust to v1.97.1 ([#413](https://github.com/grafana/flint/pull/413))
+- *(deps)* update rust crate clap to v4.6.2 ([#411](https://github.com/grafana/flint/pull/411))
+- *(deps)* update rust crate globset to v0.4.19 ([#410](https://github.com/grafana/flint/pull/410))
+- *(deps)* update rust crate toml_edit to v0.25.13 ([#409](https://github.com/grafana/flint/pull/409))
+- *(deps)* update rust crate toml to v1.1.3 ([#408](https://github.com/grafana/flint/pull/408))
+- document signed commit requirement ([#406](https://github.com/grafana/flint/pull/406))
+- batch rumdl file checks ([#404](https://github.com/grafana/flint/pull/404))
+- *(deps)* update taiki-e/install-action action to v2.83.2 ([#405](https://github.com/grafana/flint/pull/405))
+
 ## [0.22.9](https://github.com/grafana/flint/compare/v0.22.8...v0.22.9) - 2026-07-14
 
 ### Fixed

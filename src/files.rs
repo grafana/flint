@@ -59,14 +59,19 @@ pub fn changed(
 }
 
 fn build_exclude_set(cfg: &Config) -> GlobSet {
+    let patterns: Vec<&str> = cfg.settings.exclude.iter().map(String::as_str).collect();
+    build_glob_set(&patterns)
+}
+
+fn build_glob_set(patterns: &[&str]) -> GlobSet {
     let mut builder = GlobSetBuilder::new();
-    for pattern in &cfg.settings.exclude {
+    for pattern in patterns {
         match GlobBuilder::new(pattern).literal_separator(true).build() {
             Ok(glob) => {
                 builder.add(glob);
             }
-            Err(e) => {
-                eprintln!("flint: invalid exclude pattern {pattern:?}: {e}");
+            Err(error) => {
+                eprintln!("flint: invalid glob pattern {pattern:?}: {error}");
             }
         }
     }
@@ -258,6 +263,8 @@ pub fn match_files<'a>(
     exclude_patterns: &[&str],
     project_root: &Path,
 ) -> Vec<&'a PathBuf> {
+    let patterns = build_glob_set(patterns);
+    let exclude_patterns = build_glob_set(exclude_patterns);
     files
         .iter()
         .filter(|p| {
@@ -267,40 +274,13 @@ pub fn match_files<'a>(
                 .file_name()
                 .map(|n| n.to_string_lossy())
                 .unwrap_or_default();
-            let included = patterns.iter().any(|pat| {
-                if *pat == "*" {
-                    return true;
-                }
-                glob_match(pat, file_name.as_ref()) || glob_match(pat, rel_str.as_ref())
-            });
-            let excluded = exclude_patterns.iter().any(|pat| {
-                glob_match(pat, file_name.as_ref()) || glob_match(pat, rel_str.as_ref())
-            });
+            let included =
+                patterns.is_match(file_name.as_ref()) || patterns.is_match(rel_str.as_ref());
+            let excluded = exclude_patterns.is_match(file_name.as_ref())
+                || exclude_patterns.is_match(rel_str.as_ref());
             included && !excluded
         })
         .collect()
-}
-
-fn glob_match(pattern: &str, name: &str) -> bool {
-    // Simple glob: splits on `*` and checks that each segment appears in order.
-    // Handles `*.ext`, `prefix*`, `dir/*.yml`, etc.
-    let parts: Vec<&str> = pattern.splitn(2, '*').collect();
-    match parts.as_slice() {
-        [only] => name == *only || name.ends_with(&format!("/{only}")),
-        [prefix, suffix] => {
-            let n = name;
-            // The prefix must match the start of the name (or the part after the last slash).
-            let anchor_start = prefix.is_empty() || n.starts_with(prefix) || {
-                // Allow matching the basename portion for patterns like `*.sh`.
-                n.contains('/') && {
-                    let after_slash = n.rfind('/').map(|i| &n[i + 1..]).unwrap_or(n);
-                    prefix.is_empty() || after_slash.starts_with(prefix)
-                }
-            };
-            anchor_start && n.ends_with(suffix)
-        }
-        _ => false,
-    }
 }
 
 #[cfg(test)]
@@ -401,6 +381,19 @@ mod tests {
             filter_names(tmp.path(), &GlobSetBuilder::new().build().unwrap(), names).unwrap();
 
         assert_eq!(files, vec![tmp.path().join("tracked.sh")]);
+    }
+
+    #[test]
+    fn match_files_uses_settings_glob_syntax_for_check_excludes() {
+        let tmp = tempfile::tempdir().unwrap();
+        let files = vec![
+            tmp.path().join("src/kept/Foo.java"),
+            tmp.path().join("src/excluded/nested/Bar.java"),
+        ];
+
+        let matched = match_files(&files, &["*.java"], &["src/excluded/**"], tmp.path());
+
+        assert_eq!(matched, vec![&files[0]]);
     }
 
     /// Regression test for os error 206 (ERROR_FILENAME_EXCED_RANGE) on Windows: the previous

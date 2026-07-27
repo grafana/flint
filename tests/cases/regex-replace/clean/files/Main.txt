@@ -1,0 +1,2 @@
+use static foo.bar;
+value = bar(value);

@@ -42,6 +42,10 @@ pub struct ChecksConfig {
     pub renovate_deps: RenovateDepsConfig,
     #[serde(rename = "license-header", alias = "license_header")]
     pub license_header: LicenseHeaderConfig,
+    #[serde(rename = "google-java-format", alias = "google_java_format")]
+    pub google_java_format: GoogleJavaFormatConfig,
+    #[serde(rename = "regex-replace", alias = "regex_replace")]
+    pub regex_replace: RegexReplaceConfig,
 }
 
 #[derive(Debug, Default, Deserialize, Clone)]
@@ -66,6 +70,9 @@ pub struct LicenseHeaderConfig {
     pub text: String,
     /// Glob patterns for files to check (e.g. `["*.java", "*.kt"]`).
     pub patterns: Vec<String>,
+    /// Glob patterns excluded after `patterns` are matched. Uses the same glob
+    /// syntax as `settings.exclude`.
+    pub exclude: Vec<String>,
     /// How many lines from the top of each file to search. Default: 5.
     pub lines_to_check: usize,
 }
@@ -75,9 +82,145 @@ impl Default for LicenseHeaderConfig {
         Self {
             text: String::new(),
             patterns: vec![],
+            exclude: vec![],
             lines_to_check: 5,
         }
     }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(default)]
+pub struct GoogleJavaFormatConfig {
+    /// Restrict formatting to paths matching these globs. An empty list uses the
+    /// check's registered patterns.
+    pub patterns: Vec<String>,
+    /// Glob patterns excluded after `patterns` are matched. Uses the same glob
+    /// syntax as `settings.exclude`.
+    pub exclude: Vec<String>,
+    /// Keep the behavior used by Spotless and google-java-format 1.35, which
+    /// does not reflow long strings unless explicitly requested.
+    pub skip_reflowing_long_strings: bool,
+    pub skip_sorting_imports: bool,
+    pub skip_removing_unused_imports: bool,
+    pub skip_javadoc_formatting: bool,
+    pub aosp: bool,
+    /// Comment marker pairs whose regions should be restored after formatting.
+    /// This is useful for repositories using formatter-off directives that GJF
+    /// itself does not understand.
+    pub off_on_markers: Vec<OffOnMarkerConfig>,
+}
+
+impl Default for GoogleJavaFormatConfig {
+    fn default() -> Self {
+        Self {
+            patterns: vec![],
+            exclude: vec![],
+            skip_reflowing_long_strings: true,
+            skip_sorting_imports: false,
+            skip_removing_unused_imports: false,
+            skip_javadoc_formatting: false,
+            aosp: false,
+            off_on_markers: vec![],
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct OffOnMarkerConfig {
+    pub off: String,
+    pub on: String,
+}
+
+#[derive(Debug, Default, Deserialize, Clone)]
+#[serde(default)]
+pub struct RegexReplaceConfig {
+    /// Restrict rewriting to paths matching these globs. An empty list uses
+    /// all files in the Flint file list.
+    pub patterns: Vec<String>,
+    /// Glob patterns excluded after `patterns` are matched. Uses the same glob
+    /// syntax as `settings.exclude`.
+    pub exclude: Vec<String>,
+    /// Ordered rule sets. Each set has its own scope and defaults.
+    pub sets: Vec<RegexReplaceSetConfig>,
+}
+
+#[derive(Debug, Default, Deserialize, Clone)]
+#[serde(default)]
+pub struct RegexReplaceSetConfig {
+    /// Human-readable name used in diagnostics and documentation.
+    pub name: String,
+    /// Additional file scope for this set. Empty means all files selected by
+    /// the parent check.
+    pub patterns: Vec<String>,
+    /// Additional exclusions for this set, using the same glob syntax as
+    /// `settings.exclude`.
+    pub exclude: Vec<String>,
+    /// Defaults inherited by rules in this set. A rule can override them.
+    pub replacement: Option<String>,
+    /// Optional line regexes controlling where this set's `add_lines` are
+    /// inserted.
+    pub add_lines_before_pattern: Option<String>,
+    pub add_lines_fallback_after_pattern: Option<String>,
+    /// Ignore source lines matching this regex before applying this set.
+    pub skip_line_pattern: Option<String>,
+    /// Configured regions to ignore while applying this set. This is generic
+    /// region handling; it does not assume a particular comment syntax.
+    pub ignore_regions: Vec<RegexReplaceIgnoreRegionConfig>,
+    pub rules: Vec<RegexReplaceRuleConfig>,
+    /// Rules that derive a replacement rule from a line matched by
+    /// `source_pattern`.
+    pub derived_rules: Vec<DerivedRegexReplaceRuleConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct RegexReplaceIgnoreRegionConfig {
+    /// Regex matching the line where an ignored region starts.
+    pub start_pattern: String,
+    /// Regex matching the line where an ignored region ends.
+    pub end_pattern: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct RegexReplaceRuleConfig {
+    /// Regex matching text to replace. Capture groups may be used by
+    /// `replacement` and `add_lines`.
+    pub pattern: String,
+    /// Replacement text passed to regex capture expansion. When omitted, the
+    /// set's replacement default is used, then `$0`.
+    #[serde(default)]
+    pub replacement: Option<String>,
+    /// Lines to add when this rule matches, also supporting regex capture
+    /// expansion.
+    #[serde(default)]
+    pub add_lines: Vec<String>,
+    /// Only apply this rule when the file contains a match for this regex.
+    #[serde(default)]
+    pub content_pattern: Option<String>,
+    #[serde(default)]
+    pub line_exclude_pattern: Option<String>,
+    #[serde(default)]
+    pub file_pattern: Option<String>,
+    #[serde(default)]
+    pub content_exclude_pattern: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct DerivedRegexReplaceRuleConfig {
+    /// Regex matched against source lines. Named captures can be referenced as
+    /// `{name}` in the other fields.
+    pub source_pattern: String,
+    /// Regex for replacement text. `{name}` placeholders are replaced with
+    /// escaped source captures before this regex is compiled.
+    pub pattern: String,
+    /// Overrides the set replacement default; otherwise `$0` is used.
+    #[serde(default)]
+    pub replacement: Option<String>,
+    /// Lines to add. `{name}` source placeholders and `$1`, `$2`, ... match
+    /// captures may be used.
+    #[serde(default)]
+    pub add_lines: Vec<String>,
+    #[serde(default)]
+    pub source_exclude_pattern: Option<String>,
 }
 
 /// Builds env-var prefix → figment key-path mappings for every check in the registry.

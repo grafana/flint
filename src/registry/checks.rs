@@ -2,7 +2,7 @@ use super::types::{
     Check, ConfigFile, EditorconfigDirectiveStyle, OverviewRole, OverviewSection, WorkflowSetup,
 };
 use crate::linters::{
-    biome, flint_setup, license_header, lychee, renovate_deps,
+    biome, flint_setup, google_java_format, license_header, lychee, regex_replace, renovate_deps,
     renovate_deps::RENOVATE_CONFIG_PATTERNS, rumdl, rustfmt, taplo, typos, yamllint,
 };
 const TOOL_RUMDL: &[&str] = &["tool", "rumdl"];
@@ -568,32 +568,35 @@ fn check_gofmt() -> Check {
 }
 
 fn check_google_java_format() -> Check {
-    Check::files(
-        "google-java-format",
-        "google-java-format --dry-run --set-exit-if-changed {FILES}",
-        &["*.java"],
-    )
-    .fix("google-java-format -i {FILES}")
-    .mise_tool("google-java-format")
-    .formatter()
-    .editorconfig_line_length_off(
-        &["*.java"],
-        "Java line length is handled by google-java-format",
-        Some(EditorconfigDirectiveStyle::Slash),
-    )
-    .migrate_tool_keys(&[
-        "ubi:google/google-java-format",
-        "github:google/google-java-format",
-    ])
-    .project_url(GOOGLE_JAVA_FORMAT_URL)
-    .overview(
-        OverviewSection::Languages,
-        "Java",
-        OverviewRole::Formatter,
-        None,
-    )
-    .desc("Format Java code")
-    .lang()
+    Check::native(&google_java_format::CHECK_TYPE)
+        .patterns(&["*.java"])
+        .mise_tool("google-java-format")
+        .formatter()
+        .editorconfig_line_length_off(
+            &["*.java"],
+            "Java line length is handled by google-java-format",
+            Some(EditorconfigDirectiveStyle::Slash),
+        )
+        .migrate_tool_keys(&[
+            "ubi:google/google-java-format",
+            "github:google/google-java-format",
+        ])
+        .project_url(GOOGLE_JAVA_FORMAT_URL)
+        .overview(
+            OverviewSection::Languages,
+            "Java",
+            OverviewRole::Formatter,
+            None,
+        )
+        .desc("Format Java code")
+        .lang()
+}
+
+fn check_regex_replace() -> Check {
+    Check::native(&regex_replace::CHECK_TYPE)
+        .activate_unconditionally()
+        .status_hook(regex_replace::status)
+        .desc("Apply configured regular-expression replacements to source files")
 }
 
 fn check_ktlint() -> Check {
@@ -722,6 +725,7 @@ pub fn builtin() -> Vec<Check> {
         check_cargo_clippy(),
         check_cargo_fmt(),
         check_gofmt(),
+        check_regex_replace(),
         check_google_java_format(),
         check_ktlint(),
         check_dotnet_format(),

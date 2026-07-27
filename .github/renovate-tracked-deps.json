@@ -16,6 +16,10 @@
       "packageName": "biomejs/biome",
       "datasource": "github-tags"
     },
+    "checkstyle": {
+      "packageName": "checkstyle/checkstyle",
+      "datasource": "github-releases"
+    },
     "editorconfig-checker": {
       "packageName": "editorconfig-checker/editorconfig-checker",
       "datasource": "github-releases"
@@ -31,10 +35,6 @@
     "hadolint": {
       "packageName": "hadolint/hadolint",
       "datasource": "github-tags"
-    },
-    "http:checkstyle": {
-      "packageName": "checkstyle/checkstyle",
-      "datasource": "github-releases"
     },
     "ktlint": {
       "packageName": "pinterest/ktlint",
@@ -113,13 +113,13 @@
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",
+        "checkstyle",
         "dotnet",
         "editorconfig-checker",
         "go",
         "golangci-lint",
         "google-java-format",
         "hadolint",
-        "http:checkstyle",
         "ktlint",
         "lychee",
         "node",

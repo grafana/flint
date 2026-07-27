@@ -1,2 +1,2 @@
 [tools]
-"http:checkstyle" = { version = "13.8.0", url = "https://github.com/checkstyle/checkstyle/releases/download/checkstyle-{{ version }}/checkstyle-{{ version }}-all.jar", bin = "checkstyle" }
+checkstyle = "13.8.0"

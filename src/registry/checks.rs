@@ -55,7 +55,6 @@ const XMLLINT_URL: &str = "https://github.com/jonwiggins/xmloxide";
 const YAMLLINT_CONFIG_URL: &str = "https://yamllint.readthedocs.io/en/stable/configuration.html";
 const RYL_URL: &str = "https://github.com/owenlamont/ryl";
 
-const CHECKSTYLE_TOOL_KEY: &str = "http:checkstyle";
 const CHECKSTYLE_BASELINE_TRIGGERS: &[ConfigFile] =
     &[ConfigFile::project("checkstyle-suppressions.xml")];
 
@@ -609,7 +608,6 @@ fn check_checkstyle() -> Check {
         &["*.java"],
     )
     .java_jar()
-    .mise_tool(CHECKSTYLE_TOOL_KEY)
     .baseline_config(ConfigFile::project("checkstyle.xml"))
     .baseline_triggers(CHECKSTYLE_BASELINE_TRIGGERS)
     .failure_output_patterns(&["[WARN]", "[ERROR]"])

@@ -20,7 +20,7 @@ is report-only; use a formatter such as
 
 Flint runs the standalone Checkstyle CLI against selected Java files. A Java
 runtime must be available on `PATH` because Checkstyle is distributed as a JAR.
-Flint resolves that JAR from the `http:checkstyle` entry in `mise.toml` and
+Flint resolves that JAR from the direct `checkstyle` entry in `mise.toml` and
 invokes it with `java -jar` on every platform.
 
 The repository must provide `checkstyle.xml` at its root. A root-level

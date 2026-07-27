@@ -65,6 +65,7 @@
         "google-java-format",
         "hadolint",
         "ktlint",
+        "kube-linter",
         "lychee",
         "npm:renovate",
         "ruff",

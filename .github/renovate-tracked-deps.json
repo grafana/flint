@@ -12,6 +12,10 @@
       "packageName": "owenlamont/ryl",
       "datasource": "github-tags"
     },
+    "kube-linter": {
+      "packageName": "stackrox/kube-linter",
+      "datasource": "github-tags"
+    },
     "biome": {
       "packageName": "biomejs/biome",
       "datasource": "github-tags"
@@ -116,6 +120,7 @@
         "google-java-format",
         "hadolint",
         "ktlint",
+        "kube-linter",
         "lychee",
         "node",
         "npm:renovate",

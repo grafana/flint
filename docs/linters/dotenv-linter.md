@@ -17,7 +17,7 @@
 printing their values.
 
 > [!WARNING]
-> Do not commit secret-bearing `.env` files.
+> Do not commit `.env` files containing secrets to git.
 
 Flint checks only explicit `.env`-style files: `.env`, `.env.*`, and files
 ending in `.env`. It passes those file paths rather than a directory, so

@@ -3,7 +3,17 @@ args = "run --full ruff-format"
 exit = 1
 stderr = '''
 [ruff-format]
-Would reformat: main.py
+unformatted: File would be reformatted
+ --> main.py:1:1
+  |
+  - x=1
+  - y =  2
+  - z=x+y
+1 + x = 1
+2 + y = 2
+3 + z = x + y
+  |
+
 1 file would be reformatted
 
 flint: 1 check failed (ruff-format)

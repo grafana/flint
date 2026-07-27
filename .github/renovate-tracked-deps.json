@@ -16,6 +16,10 @@
       "packageName": "biomejs/biome",
       "datasource": "github-tags"
     },
+    "checkstyle": {
+      "packageName": "checkstyle/checkstyle",
+      "datasource": "github-releases"
+    },
     "dotenv-linter": {
       "packageName": "dotenv-linter/dotenv-linter",
       "datasource": "github-releases"
@@ -113,6 +117,7 @@
         "aqua:jonwiggins/xmloxide",
         "aqua:owenlamont/ryl",
         "biome",
+        "checkstyle",
         "dotenv-linter",
         "dotnet",
         "editorconfig-checker",

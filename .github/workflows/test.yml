@@ -54,6 +54,9 @@ jobs:
         with:
           version: ${{ matrix.mise_version }}
           sha256: ${{ matrix.mise_sha256 }}
+          # Aube-backed npm installs use Windows links that do not survive
+          # mise-action's directory-only cache with all dependencies intact.
+          cache: ${{ runner.os != 'Windows' }}
           cache_key_prefix: mise-v2
 
       - name: Install mise tools

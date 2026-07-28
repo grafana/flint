@@ -23,6 +23,7 @@ jobs:
       attestations: write
     env:
       TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      # Artifact releases pair a focused tool allowlist with cache: false.
       MISE_ENABLE_TOOLS: rust
 
     strategy:

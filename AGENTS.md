@@ -79,6 +79,17 @@ Run tests with `cargo test`. Tests spin up temporary git
 repos and run the real `flint` binary — they are
 integration tests, not unit tests, so they can be slow.
 
+For focused GitHub Actions jobs, set job-level
+`MISE_ENABLE_TOOLS` to the complete mise tool allowlist.
+Artifact release jobs must set `cache: false`. For other
+jobs that keep mise-action caching enabled, extend its cache
+key with `-{{env.MISE_ENABLE_TOOLS}}`, because the default
+key does not include this setting:
+
+```yaml
+cache_key: "{{default}}-{{env.MISE_ENABLE_TOOLS}}"
+```
+
 The `cases` test runs all fixture cases under `tests/cases/`
 in parallel by top-level directory (linter group). Two env
 vars control its behaviour:

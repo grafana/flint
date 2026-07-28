@@ -23,6 +23,7 @@ jobs:
       attestations: write
     env:
       TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      # Keep artifact releases isolated from unrelated mise tools and caches.
       MISE_ENABLE_TOOLS: rust
 
     strategy:

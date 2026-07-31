@@ -1,6 +1,6 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  extends: ["config:recommended", "customManagers:dockerfileVersions", "customManagers:githubActionsVersions"],
+  extends: ["config:recommended", "customManagers:dockerfileVersions", "customManagers:githubActionsVersions", "helpers:pinGitHubActionDigestsToSemver"],
   branchPrefix: "grafanarenovatebot/",
   dependencyDashboard: true,
   platformCommit: "enabled",

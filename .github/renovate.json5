@@ -8,6 +8,7 @@
   ignorePaths: ["tests/"],
   ignorePresets: [":ignoreModulesAndTests"],
   ignoreUnstable: true,
+  schedule: ["* 5-21 * * MON-FRI"],
   vulnerabilityAlerts: {
     enabled: true,
     labels: ["automerge-security-update"],

@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.22.11](https://github.com/grafana/flint/compare/v0.22.10...v0.22.11) - 2026-08-03
+
+### Other
+
+- *(deps)* lock file maintenance ([#464](https://github.com/grafana/flint/pull/464))
+- *(deps)* update taiki-e/install-action action to v2.85.4 ([#460](https://github.com/grafana/flint/pull/460))
+- *(deps)* update rust crate toml to v1.1.4 ([#459](https://github.com/grafana/flint/pull/459))
+- *(deps)* update taiki-e/install-action action to v2.85.3 ([#458](https://github.com/grafana/flint/pull/458))
+- *(deps)* update actions/attest-build-provenance action to v4.1.1 ([#457](https://github.com/grafana/flint/pull/457))
+- update renovate config ([#456](https://github.com/grafana/flint/pull/456))
+- *(deps)* update node.js to v24.18.1 ([#455](https://github.com/grafana/flint/pull/455))
+- *(deps)* update taiki-e/install-action action to v2.85.2 ([#454](https://github.com/grafana/flint/pull/454))
+- explain release mise isolation ([#453](https://github.com/grafana/flint/pull/453))
+- limit release builds to Rust toolchain ([#450](https://github.com/grafana/flint/pull/450))
+- *(deps)* update taiki-e/install-action action to v2.85.1 ([#452](https://github.com/grafana/flint/pull/452))
+- *(deps)* update dependency jdx/mise-action to v4.2.3 ([#451](https://github.com/grafana/flint/pull/451))
+
 ## [0.22.10](https://github.com/grafana/flint/compare/v0.22.9...v0.22.10) - 2026-07-27
 
 ### Added

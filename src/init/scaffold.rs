@@ -24,7 +24,7 @@ pub(super) fn generate_lint_workflow(
         ""
     };
     let rust_steps = if needs_rust_components {
-        "\n      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1\n\n      - name: Install Rust lint components\n        run: rustup component add clippy rustfmt\n"
+        "\n      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2\n\n      - name: Install Rust lint components\n        run: rustup component add clippy rustfmt\n"
     } else {
         ""
     };

@@ -27,6 +27,6 @@ jobs:
           sha256: 9a6c2a8b6fe77c98f1d210b4b3cbd2a0cf31886ad1baf10698757a3234c678c1
           cache_key: "{{default}}-{{env.MISE_ENABLE_TOOLS}}"
       - name: Restore Rust cache
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Validate curated tool backends
         run: mise run validate-mise-registry

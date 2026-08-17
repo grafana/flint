@@ -102,9 +102,9 @@ checksum = "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da"
 
 [[package]]
 name = "bstr"
-version = "1.13.0"
+version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f7dc094d718f2e1c1559ad110e27eeaae14a5465d3d56dd6dbd793079fbd530"
+checksum = "6bb31b46c14244e20ee9984b11bf5c992b91fb6939fea616e3512c8baecdbe5f"
 dependencies = [
  "memchr",
  "serde_core",
@@ -332,9 +332,9 @@ dependencies = [
 
 [[package]]
 name = "granit-parser"
-version = "0.0.1"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e354bf0eb3279a16e8f92fc1ba6ddd4420953fc064140b010844d21874b58113"
+checksum = "4ccd1be9ebf2bd5520dbfcfb72b70ef492f654061299a097056f3e73410e38ec"
 dependencies = [
  "arraydeque",
  "smallvec",
@@ -686,9 +686,9 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml_bw"
-version = "2.5.6"
+version = "2.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9559c696727e20fa0f661a1db638c7ae1be73419de8e1aed2642b796096ab53"
+checksum = "659d74d982f3ee009c27f34a1fc84d84828095d58ea210ce31705833188c8e27"
 dependencies = [
  "base64",
  "granit-parser",

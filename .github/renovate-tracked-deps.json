@@ -22,7 +22,7 @@
     },
     "checkstyle": {
       "packageName": "checkstyle/checkstyle",
-      "datasource": "github-releases"
+      "datasource": "github-tags"
     },
     "dotenv-linter": {
       "packageName": "dotenv-linter/dotenv-linter",

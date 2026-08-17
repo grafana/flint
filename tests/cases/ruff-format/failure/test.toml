@@ -4,7 +4,7 @@ exit = 1
 stderr = '''
 [ruff-format]
 unformatted: File would be reformatted
- --> main.py:1:1
+ --> main.py:1:2
   |
   - x=1
   - y =  2

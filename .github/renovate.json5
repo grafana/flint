@@ -19,15 +19,6 @@
   customManagers: [
     {
       customType: "regex",
-      description: "Update mise version in GitHub Actions workflows",
-      managerFilePatterns: ["/(^|/)(workflow-templates|\\.(?:github|gitea|forgejo)/(?:workflows|actions))/.+\\.ya?ml$/", "/(^|/)action\\.ya?ml$/"],
-      datasourceTemplate: "github-release-attachments",
-      packageNameTemplate: "jdx/mise",
-      depNameTemplate: "mise",
-      matchStrings: ["jdx/mise-action.*\\n\\s*with:\\s*\\n\\s*version: [\"']?(?<currentValue>v[.\\d]+)[\"']?\\s*\\n\\s*sha256:\\s*(?:(?:[>|][-+]?)\\s*\\n\\s*)?[\"']?(?<currentDigest>[a-f0-9]{64})[\"']?"],
-    },
-    {
-      customType: "regex",
       description: "Update GitHub Action SHA pins embedded in the generated workflow template (src/init/scaffold.rs)",
       managerFilePatterns: ["/^src/init/scaffold\\.rs$/"],
       matchStrings: ["uses: (?<depName>[^@\\\\]+)@(?<currentDigest>[a-f0-9]{40})\\s*#\\s*(?<currentValue>v[^\\s'\"\\\\]+)"],
@@ -55,13 +46,6 @@
     },
   ],
   packageRules: [
-    {
-      description: "Prefer Flint's checksum-aware mise manager over Renovate's native uses-with manager",
-      matchManagers: ["github-actions"],
-      matchDepTypes: ["uses-with"],
-      matchPackageNames: ["jdx/mise"],
-      enabled: false,
-    },
     {
       matchDepNames: [
         "actionlint",

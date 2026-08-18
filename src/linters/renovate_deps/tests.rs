@@ -1295,9 +1295,15 @@ fn relevant_when_new_file_matches_inline_custom_manager_pattern() {
 fn relevant_when_extends_is_a_single_string() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join(".github")).unwrap();
+    std::fs::create_dir_all(dir.path().join("shared")).unwrap();
     std::fs::write(
         dir.path().join(".github/renovate.json5"),
-        r#"{ extends: "github>grafana/flint#v1.2.3" }"#,
+        r#"{ extends: "local>shared/renovate" }"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("shared/renovate.json5"),
+        r#"{ customManagers: [{ managerFilePatterns: ["**/*.yml"] }] }"#,
     )
     .unwrap();
     write_snapshot(
@@ -1323,7 +1329,7 @@ fn relevant_when_extends_is_a_single_string() {
 }
 
 #[test]
-fn relevant_when_new_file_matches_bundled_flint_preset_pattern() {
+fn not_relevant_when_bundled_flint_preset_has_no_custom_manager_pattern() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join(".github")).unwrap();
     std::fs::write(
@@ -1340,8 +1346,7 @@ fn relevant_when_new_file_matches_bundled_flint_preset_pattern() {
     )
     .unwrap();
 
-    // default.json's mise-in-workflows custom manager should match this.
-    assert!(is_relevant(
+    assert!(!is_relevant(
         &file_list(
             &[dir
                 .path()

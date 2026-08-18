@@ -1,8 +1,6 @@
 use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 
-use regex::Regex;
-
 use super::*;
 
 #[test]
@@ -579,102 +577,6 @@ fn repo_renovate_config_stays_aligned_with_shared_preset_contract() {
             "biome extractVersion override drifted between default.json and .github/renovate.json5"
         );
     }
-
-    {
-        let description =
-            "Prefer Flint's checksum-aware mise manager over Renovate's native uses-with manager";
-        let default_rule = package_rule_by_description(&default_parsed, description)
-            .unwrap_or_else(|| panic!("default.json missing package rule {description:?}"));
-        let repo_rule =
-            package_rule_by_description(&repo_parsed, description).unwrap_or_else(|| {
-                panic!(".github/renovate.json5 missing package rule {description:?}")
-            });
-        assert_eq!(
-            default_rule, repo_rule,
-            "mise uses-with fallback rule drifted between default.json and .github/renovate.json5"
-        );
-        assert_eq!(
-            default_rule["enabled"].as_bool(),
-            Some(false),
-            "mise uses-with fallback rule must disable Renovate's overlapping native manager"
-        );
-    }
-
-    {
-        let description = "Update mise version in GitHub Actions workflows";
-        let default_manager = custom_manager_by_description(&default_parsed, description)
-            .unwrap_or_else(|| panic!("default.json missing custom manager {description:?}"));
-        let repo_manager =
-            custom_manager_by_description(&repo_parsed, description).unwrap_or_else(|| {
-                panic!(".github/renovate.json5 missing custom manager {description:?}")
-            });
-        assert_eq!(
-            default_manager, repo_manager,
-            "custom manager {description:?} in .github/renovate.json5 drifted from default.json"
-        );
-    }
-}
-
-#[test]
-fn mise_action_custom_manager_matches_plain_and_block_scalar_sha256() {
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let default_json_path = manifest_dir.join("default.json");
-    let default_json =
-        std::fs::read_to_string(&default_json_path).expect("default.json must be readable");
-    let parsed: serde_json::Value =
-        serde_json::from_str(&default_json).expect("default.json must be valid JSON");
-
-    let description = "Update mise version in GitHub Actions workflows";
-    let manager = custom_manager_by_description(&parsed, description)
-        .unwrap_or_else(|| panic!("default.json missing custom manager {description:?}"));
-    let pattern = manager["matchStrings"][0]
-        .as_str()
-        .expect("custom manager match string must be a string");
-    let regex = Regex::new(pattern).expect("custom manager regex must compile");
-
-    for (name, sample) in [
-        (
-            "plain scalar",
-            r#"
-      - name: Setup mise
-        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
-        with:
-          version: v2026.4.28
-          sha256: 9655492db554e8f70a69830f54307ac0f4681d6c42f9844e862528b7853d09d1
-"#,
-        ),
-        (
-            "block scalar",
-            r#"
-      - name: Setup mise
-        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
-        with:
-          version: v2026.4.28
-          sha256: >-
-            c55befc52e5694f388b927ef304362ca7b9e919d97d43c342fca57f2eccea255
-"#,
-        ),
-    ] {
-        let captures = regex
-            .captures(sample)
-            .unwrap_or_else(|| panic!("regex must match {name} mise-action YAML"));
-        assert_eq!(
-            captures.name("currentValue").map(|value| value.as_str()),
-            Some("v2026.4.28"),
-            "regex must capture the mise version for {name}"
-        );
-        assert_eq!(
-            captures.name("currentDigest").map(|value| value.as_str()),
-            Some(match name {
-                "plain scalar" =>
-                    "9655492db554e8f70a69830f54307ac0f4681d6c42f9844e862528b7853d09d1",
-                "block scalar" =>
-                    "c55befc52e5694f388b927ef304362ca7b9e919d97d43c342fca57f2eccea255",
-                _ => unreachable!("unexpected sample"),
-            }),
-            "regex must capture the mise sha256 digest for {name}"
-        );
-    }
 }
 
 #[test]
@@ -827,16 +729,6 @@ fn package_rule_by_description<'a>(
         .into_iter()
         .flatten()
         .find(|rule| rule["description"].as_str() == Some(description))
-}
-
-fn custom_manager_by_description<'a>(
-    parsed: &'a serde_json::Value,
-    description: &str,
-) -> Option<&'a serde_json::Value> {
-    parsed["customManagers"]
-        .as_array()?
-        .iter()
-        .find(|manager| manager["description"].as_str() == Some(description))
 }
 
 fn package_names(rule: &serde_json::Value) -> Vec<&str> {

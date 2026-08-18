@@ -90,21 +90,6 @@
     }
   },
   "files": {
-    ".github/workflows/lint.yml": {
-      "regex": [
-        "mise"
-      ]
-    },
-    ".github/workflows/mise-registry.yml": {
-      "regex": [
-        "mise"
-      ]
-    },
-    ".github/workflows/release-plz.yml": {
-      "regex": [
-        "mise"
-      ]
-    },
     ".github/workflows/release.yml": {
       "regex": [
         "mise"

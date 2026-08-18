@@ -557,6 +557,8 @@ pub struct Check {
     /// Extra generated workflow setup needed when this check is selected by `flint init`.
     pub workflow_setup: Option<WorkflowSetup>,
     pub fix_behavior: FixBehavior,
+    /// Run this check before other checks in the same fix pass (runner invocation).
+    pub fix_first: bool,
     /// Fixers that must complete before this check runs in fix mode.
     pub fix_after: Vec<&'static str>,
     pub kind: CheckKind,
@@ -718,6 +720,7 @@ impl Check {
             java_jar: None,
             workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
+            fix_first: false,
             fix_after: vec![],
             desc: "",
             project_url: None,
@@ -765,6 +768,7 @@ impl Check {
             java_jar: None,
             workflow_setup: None,
             fix_behavior: FixBehavior::Definitive,
+            fix_first: false,
             fix_after: vec![],
             kind: CheckKind::Native(NativeCheckRef::new(native)),
             desc: "",
@@ -859,6 +863,12 @@ impl Check {
     /// Run this fixer after the named fixer when both are active.
     pub fn fix_after(mut self, check: &'static str) -> Self {
         self.fix_after.push(check);
+        self
+    }
+
+    /// Run this check before all other checks in fix mode.
+    pub fn fix_first(mut self) -> Self {
+        self.fix_first = true;
         self
     }
 

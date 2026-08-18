@@ -133,6 +133,16 @@ fn registry_entries_have_complete_metadata() {
 }
 
 #[test]
+fn regex_replace_fixes_before_all_other_checks() {
+    let check = builtin()
+        .into_iter()
+        .find(|check| check.name == "regex-replace")
+        .unwrap();
+
+    assert!(check.fix_first);
+}
+
+#[test]
 fn fixer_dependencies_are_valid_and_acyclic() {
     let registry = builtin();
     let fixers: Vec<&Check> = registry.iter().filter(|check| check.has_fix()).collect();
@@ -318,7 +328,7 @@ fn names_prefer_binary_or_native_command() {
 }
 
 #[test]
-fn test_case_groups_match_registered_checks() {
+fn case_directories_match_registry() {
     let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/cases");
     let mut allowed: BTreeSet<String> = builtin()
         .into_iter()

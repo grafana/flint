@@ -227,6 +227,7 @@ pub async fn run(
 
 fn order_checks_for_fix<'a>(checks: &[&'a Check]) -> Result<Vec<&'a Check>> {
     let mut remaining = checks.to_vec();
+    remaining.sort_by_key(|check| !check.fix_first);
     let mut ordered = Vec::with_capacity(remaining.len());
 
     while !remaining.is_empty() {
@@ -954,6 +955,7 @@ mod tests {
             java_jar: None,
             workflow_setup: None,
             fix_behavior: crate::registry::FixBehavior::Definitive,
+            fix_first: false,
             fix_after: vec![],
             kind: CheckKind::Template {
                 check_cmd: "run-it",
@@ -1005,6 +1007,21 @@ mod tests {
         assert_eq!(
             ordered.iter().map(|check| check.name).collect::<Vec<_>>(),
             ["first", "second"]
+        );
+    }
+
+    #[test]
+    fn fix_order_runs_fix_first_checks_before_all_others() {
+        let mut regular = project_check(&[]);
+        regular.name = "regular";
+        let mut first = project_check(&[]);
+        first.name = "first";
+        first.fix_first = true;
+
+        let ordered = order_checks_for_fix(&[&regular, &first]).unwrap();
+        assert_eq!(
+            ordered.iter().map(|check| check.name).collect::<Vec<_>>(),
+            ["first", "regular"]
         );
     }
 

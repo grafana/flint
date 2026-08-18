@@ -133,6 +133,16 @@ fn registry_entries_have_complete_metadata() {
 }
 
 #[test]
+fn google_java_format_fixes_after_regex_replace() {
+    let check = builtin()
+        .into_iter()
+        .find(|check| check.name == "google-java-format")
+        .unwrap();
+
+    assert_eq!(check.fix_after, vec!["regex-replace"]);
+}
+
+#[test]
 fn fixer_dependencies_are_valid_and_acyclic() {
     let registry = builtin();
     let fixers: Vec<&Check> = registry.iter().filter(|check| check.has_fix()).collect();

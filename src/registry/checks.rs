@@ -626,6 +626,7 @@ fn check_gofmt() -> Check {
 fn check_google_java_format() -> Check {
     Check::native(&google_java_format::CHECK_TYPE)
         .patterns(&["*.java"])
+        .fix_after("regex-replace")
         .mise_tool("google-java-format")
         .formatter()
         .editorconfig_line_length_off(

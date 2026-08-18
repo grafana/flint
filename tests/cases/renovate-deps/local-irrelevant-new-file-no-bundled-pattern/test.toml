@@ -1,0 +1,12 @@
+[expected]
+args = "run"
+exit = 0
+
+[env]
+GITHUB_TOKEN = "token"
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+exit 99
+'''

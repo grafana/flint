@@ -557,7 +557,7 @@ pub struct Check {
     /// Extra generated workflow setup needed when this check is selected by `flint init`.
     pub workflow_setup: Option<WorkflowSetup>,
     pub fix_behavior: FixBehavior,
-    /// Run this check before all others in fix mode.
+    /// Run this check before other checks in the same fix pass (runner invocation).
     pub fix_first: bool,
     /// Fixers that must complete before this check runs in fix mode.
     pub fix_after: Vec<&'static str>,

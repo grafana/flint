@@ -328,7 +328,7 @@ fn names_prefer_binary_or_native_command() {
 }
 
 #[test]
-fn test_case_groups_match_registered_checks() {
+fn case_directories_match_registry() {
     let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/cases");
     let mut allowed: BTreeSet<String> = builtin()
         .into_iter()

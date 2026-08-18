@@ -626,7 +626,6 @@ fn check_gofmt() -> Check {
 fn check_google_java_format() -> Check {
     Check::native(&google_java_format::CHECK_TYPE)
         .patterns(&["*.java"])
-        .fix_after("regex-replace")
         .mise_tool("google-java-format")
         .formatter()
         .editorconfig_line_length_off(
@@ -651,6 +650,7 @@ fn check_google_java_format() -> Check {
 
 fn check_regex_replace() -> Check {
     Check::native(&regex_replace::CHECK_TYPE)
+        .fix_first()
         .activate_unconditionally()
         .status_hook(regex_replace::status)
         .desc("Apply configured regular-expression replacements to source files")

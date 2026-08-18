@@ -133,13 +133,13 @@ fn registry_entries_have_complete_metadata() {
 }
 
 #[test]
-fn google_java_format_fixes_after_regex_replace() {
+fn regex_replace_fixes_before_all_other_checks() {
     let check = builtin()
         .into_iter()
-        .find(|check| check.name == "google-java-format")
+        .find(|check| check.name == "regex-replace")
         .unwrap();
 
-    assert_eq!(check.fix_after, vec!["regex-replace"]);
+    assert!(check.fix_first);
 }
 
 #[test]

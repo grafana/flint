@@ -163,6 +163,8 @@ It stores only the stable metadata Flint needs for these checks:
 
 - `files`: extracted dependency names by file and manager
 - `meta`: stable package metadata used for rule-coverage validation
+- `actionMeta`: stable identity and ref-shape metadata for reusable GitHub
+  Actions, keyed by the complete `package/path` target
 
 Lookup-only fields such as `currentVersion`, `currentValue`, and
 `extractVersion` are used transiently during validation and autofix, but are
@@ -180,6 +182,16 @@ flint run --fix renovate-deps
 Verification (plain `flint run`) uses Renovate's cheap `--dry-run=extract`
 plus the committed snapshot's metadata. `--fix` regenerates via
 `--dry-run=lookup` so meta is authoritative.
+
+For monorepo GitHub Actions, `actionMeta` keeps the action path separate from
+the shared package name. Semver-like refs record their optional compatibility
+prefix (for example, `create-github-app-token/v0.2.2` records compatibility
+`create-github-app-token`, while `v0.2.2` records no prefix), and branch refs
+record the ref (for example, `main`). Comparing these shapes catches a
+namespace change without changing the snapshot for ordinary version bumps in
+the same namespace. Lookup remains responsible for transient ref-to-commit
+and digest checks; the stable snapshot does not contain a digest that would
+change on every update.
 
 When Flint can infer a better `extractVersion` directly from Renovate's
 resolved `currentVersion` and `currentValue`, `--fix` also appends a targeted

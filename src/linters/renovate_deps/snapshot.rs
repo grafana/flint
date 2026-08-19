@@ -18,6 +18,26 @@ pub(crate) type DepFiles = BTreeMap<String, BTreeMap<String, Vec<String>>>;
 pub(crate) struct Snapshot {
     pub(crate) meta: BTreeMap<String, DepMeta>,
     pub(crate) files: DepFiles,
+    /// Stable identity and ref-shape metadata for reusable GitHub Actions.
+    ///
+    /// This is deliberately separate from `meta`: Renovate uses the same
+    /// package name for every path in a monorepo, while each action path may
+    /// have its own tag namespace (or be a branch-pinned workflow).
+    #[serde(rename = "actionMeta")]
+    pub(crate) action_meta: BTreeMap<String, ActionMeta>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub(crate) struct ActionMeta {
+    #[serde(rename = "packageName")]
+    pub(crate) package_name: String,
+    #[serde(rename = "refKind")]
+    pub(crate) ref_kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) compatibility: Option<String>,
+    #[serde(rename = "ref", skip_serializing_if = "Option::is_none")]
+    pub(crate) ref_: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,6 +99,7 @@ pub(crate) fn read_snapshot(contents: &str) -> anyhow::Result<Snapshot> {
         Snapshot {
             meta: BTreeMap::new(),
             files: serde_json::from_value(parsed)?,
+            action_meta: BTreeMap::new(),
         }
     };
     snapshot.normalize();
@@ -124,6 +145,7 @@ pub(crate) fn extract_deps(
 
     let mut deps_by_file: BTreeMap<String, BTreeMap<String, BTreeSet<String>>> = BTreeMap::new();
     let mut meta_by_dep: BTreeMap<String, DepMetaAccumulator> = BTreeMap::new();
+    let mut action_meta = BTreeMap::new();
 
     if let Some(obj) = config.as_object() {
         for (manager, manager_files) in obj {
@@ -173,6 +195,19 @@ pub(crate) fn extract_deps(
                             .and_then(|v| v.as_str())
                             .map(ToOwned::to_owned),
                     };
+                    if manager == "github-actions"
+                        && let Some(next_action) = action_meta_from_dep(dep)?
+                        && let Some(previous) =
+                            action_meta.insert(next_action.0.clone(), next_action.1.clone())
+                        && previous != next_action.1
+                    {
+                        anyhow::bail!(
+                            "GitHub Action {} has conflicting stable metadata: {:?} vs {:?}",
+                            next_action.0,
+                            previous,
+                            next_action.1
+                        );
+                    }
                     meta_by_dep
                         .entry(dep_name.to_string())
                         .or_default()
@@ -205,10 +240,148 @@ pub(crate) fn extract_deps(
         .map(|(dep_name, meta)| (dep_name, meta.finish()))
         .collect();
 
-    Ok(Snapshot { meta, files })
+    Ok(Snapshot {
+        meta,
+        files,
+        action_meta,
+    })
 }
 
-fn canonical_manager_name(manager: &str) -> &str {
+/// Extract stable metadata for a reusable action from Renovate's dependency
+/// record. The github-actions manager keeps the action sub-path in
+/// `replaceString`, while `depName` remains the repository name. Tracking the
+/// complete target prevents paths in a monorepo from collapsing together.
+fn action_meta_from_dep(dep: &serde_json::Value) -> anyhow::Result<Option<(String, ActionMeta)>> {
+    let package_name = dep
+        .get("packageName")
+        .and_then(|v| v.as_str())
+        .or_else(|| dep.get("depName").and_then(|v| v.as_str()));
+    let Some(package_name) = package_name else {
+        return Ok(None);
+    };
+    let Some(replace_string) = dep.get("replaceString").and_then(|v| v.as_str()) else {
+        return Ok(None);
+    };
+
+    // replaceString is the source fragment, e.g.
+    // `grafana/shared-workflows/actions/create-github-app-token@<sha> # ...`.
+    let target = replace_string
+        .split('@')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .trim_matches(['"', '\'']);
+    let path = target
+        .strip_prefix(&format!("{package_name}/"))
+        .unwrap_or_else(|| if target == package_name { "" } else { target });
+    if path == target && target != package_name {
+        // The source fragment is not the package Renovate extracted (for
+        // example a registry alias); do not invent an action identity.
+        return Ok(None);
+    }
+
+    let current_ref = dep
+        .get("currentValue")
+        .and_then(|v| v.as_str())
+        .or_else(|| {
+            replace_string
+                .split('@')
+                .nth(1)
+                .and_then(|value| value.split_whitespace().next())
+        })
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let Some(current_ref) = current_ref else {
+        return Ok(None);
+    };
+    // A full SHA without a Renovate tag/comment gives us no stable namespace
+    // to validate. Lookup still validates the digest itself.
+    if is_sha(current_ref) {
+        return Ok(None);
+    }
+
+    let target_key = if path.is_empty() {
+        package_name.to_string()
+    } else {
+        format!("{package_name}/{path}")
+    };
+
+    // Do not infer a namespace from the action path: repositories are free to
+    // use repo-level tags (v1), component tags (foo/v1), or branch refs for
+    // nested actions. The extracted ref itself is the source of truth for the
+    // stable shape. A subsequent change from foo/v1 to v1 is caught because
+    // `compatibility` changes from Some("foo") to None.
+    if let Some(compatibility) = version_tag_compatibility(current_ref) {
+        return Ok(Some((
+            target_key,
+            ActionMeta {
+                package_name: package_name.to_string(),
+                ref_kind: "version-tag".to_string(),
+                compatibility,
+                ref_: None,
+            },
+        )));
+    }
+
+    Ok(Some((
+        target_key,
+        ActionMeta {
+            package_name: package_name.to_string(),
+            ref_kind: "branch".to_string(),
+            compatibility: None,
+            ref_: Some(current_ref.to_string()),
+        },
+    )))
+}
+
+fn is_sha(value: &str) -> bool {
+    value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+/// Returns the optional compatibility prefix for a semver-like action ref.
+/// For `v1.2.3` this is `None`; for `component/v1.2.3` or
+/// `component-v1.2.3` it is `Some("component")`.
+pub(crate) fn version_tag_compatibility(value: &str) -> Option<Option<String>> {
+    let value = value
+        .strip_prefix(|c| c == 'v' || c == 'V')
+        .unwrap_or(value);
+    if is_numeric_version(value) {
+        return Some(None);
+    }
+
+    // Tags with a namespace are separated from their semver suffix by a
+    // slash or hyphen. Try every separator so prerelease hyphens are not
+    // mistaken for the namespace delimiter.
+    for (separator, _) in value
+        .char_indices()
+        .filter(|(_, character)| *character == '/' || *character == '-')
+    {
+        let (prefix, suffix) = value.split_at(separator);
+        let suffix = suffix.get(1..).unwrap_or_default();
+        let suffix = suffix
+            .strip_prefix(|c| c == 'v' || c == 'V')
+            .unwrap_or(suffix);
+        if !prefix.is_empty() && is_numeric_version(suffix) {
+            return Some(Some(prefix.to_string()));
+        }
+    }
+    None
+}
+
+fn is_numeric_version(value: &str) -> bool {
+    let core_end = value.find(['-', '+']).unwrap_or(value.len());
+    let core = &value[..core_end];
+    let suffix = &value[core_end..];
+    let parts: Vec<_> = core.split('.').collect();
+    (1..=3).contains(&parts.len())
+        && !core.is_empty()
+        && (suffix.is_empty() || suffix.len() > 1)
+        && parts
+            .iter()
+            .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
+}
+
+pub(crate) fn canonical_manager_name(manager: &str) -> &str {
     match manager {
         "renovate-config-presets" => "renovate-config",
         _ => manager,

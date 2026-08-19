@@ -119,18 +119,17 @@ fn changed_files_uses_changed_file_semantics_and_is_deterministic() {
     git(root, &["switch", "-q", "-c", "feature"]);
 
     std::fs::write(root.join("committed.txt"), "committed\n").unwrap();
+    // Windows does not allow control characters (including newlines) in file
+    // names. Keep this case on platforms where the filesystem supports it so
+    // the NUL-delimited output remains covered there; the space-containing
+    // filename below still exercises safe machine-readable output on Windows.
+    #[cfg(not(windows))]
     std::fs::write(root.join("line\nbreak.txt"), "newline\n").unwrap();
     std::fs::write(root.join("space name.txt"), "space\n").unwrap();
-    git(
-        root,
-        &[
-            "add",
-            "--",
-            "committed.txt",
-            "line\nbreak.txt",
-            "space name.txt",
-        ],
-    );
+    let mut committed_paths = vec!["add", "--", "committed.txt", "space name.txt"];
+    #[cfg(not(windows))]
+    committed_paths.push("line\nbreak.txt");
+    git(root, &committed_paths);
     git(root, &["commit", "-q", "-m", "committed changes"]);
 
     std::fs::write(root.join("staged.txt"), "staged\n").unwrap();
@@ -145,13 +144,14 @@ fn changed_files_uses_changed_file_semantics_and_is_deterministic() {
     assert!(out.status.success(), "{:?}", combined_output(&out));
     assert!(out.stderr.is_empty(), "unexpected stderr: {:?}", out.stderr);
 
-    let mut expected = [
+    let mut expected = vec![
         "committed.txt",
-        "line\nbreak.txt",
         "space name.txt",
         "staged.txt",
         "unstaged.txt",
     ];
+    #[cfg(not(windows))]
+    expected.push("line\nbreak.txt");
     expected.sort_unstable();
     let expected = expected.join("\0") + "\0";
     assert_eq!(out.stdout, expected.as_bytes());
@@ -162,13 +162,14 @@ fn changed_files_uses_changed_file_semantics_and_is_deterministic() {
         "{:?}",
         combined_output(&line_output)
     );
-    let mut expected_lines = [
+    let mut expected_lines = vec![
         "committed.txt",
-        "line\nbreak.txt",
         "space name.txt",
         "staged.txt",
         "unstaged.txt",
     ];
+    #[cfg(not(windows))]
+    expected_lines.push("line\nbreak.txt");
     expected_lines.sort_unstable();
     let expected_lines = expected_lines.join("\n") + "\n";
     assert_eq!(line_output.stdout, expected_lines.as_bytes());
@@ -224,6 +225,7 @@ fn changed_files_uses_changed_file_semantics_and_is_deterministic() {
         .collect::<Vec<_>>();
     assert!(full_paths.windows(2).all(|pair| pair[0] < pair[1]));
     assert!(full_paths.iter().any(|path| *path == b"committed.txt"));
+    #[cfg(not(windows))]
     assert!(full_paths.iter().any(|path| *path == b"line\nbreak.txt"));
     assert!(full_paths.iter().any(|path| *path == b"space name.txt"));
     assert!(!full_paths.iter().any(|path| *path == b"generated.txt"));

@@ -133,7 +133,7 @@ pub fn all(project_root: &Path, cfg: &Config) -> Result<FileList> {
 
 fn all_files(project_root: &Path, exclude: &GlobSet) -> Result<FileList> {
     let out = Command::new("git")
-        .args(["ls-files"])
+        .args(["ls-files", "-z"])
         .current_dir(project_root)
         .output()
         .context("git ls-files")?;
@@ -143,10 +143,7 @@ fn all_files(project_root: &Path, exclude: &GlobSet) -> Result<FileList> {
         anyhow::bail!("git ls-files failed ({}): {}", out.status, stderr.trim());
     }
 
-    let names: BTreeSet<String> = String::from_utf8_lossy(&out.stdout)
-        .lines()
-        .map(str::to_string)
-        .collect();
+    let names = parse_nul_names(&out.stdout);
 
     Ok(FileList {
         files: filter_names(project_root, exclude, names)?,
@@ -157,7 +154,7 @@ fn all_files(project_root: &Path, exclude: &GlobSet) -> Result<FileList> {
 }
 
 fn git_diff_names(project_root: &Path, extra_args: &[&str]) -> Result<Vec<String>> {
-    let mut args = vec!["diff", "--name-only"];
+    let mut args = vec!["diff", "--name-only", "-z"];
     args.extend_from_slice(extra_args);
     let out = Command::new("git")
         .args(&args)
@@ -174,10 +171,16 @@ fn git_diff_names(project_root: &Path, extra_args: &[&str]) -> Result<Vec<String
         );
     }
 
-    Ok(String::from_utf8_lossy(&out.stdout)
-        .lines()
-        .map(str::to_string)
-        .collect())
+    Ok(parse_nul_names(&out.stdout).into_iter().collect())
+}
+
+fn parse_nul_names(bytes: &[u8]) -> BTreeSet<String> {
+    bytes
+        .split(|byte| *byte == 0)
+        .filter(|name| !name.is_empty())
+        .map(String::from_utf8_lossy)
+        .map(std::borrow::Cow::into_owned)
+        .collect()
 }
 
 fn filter_names(

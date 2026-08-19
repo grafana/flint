@@ -60,6 +60,203 @@ fn git_repo() -> TempDir {
     dir
 }
 
+fn git(repo: &Path, args: &[&str]) {
+    let out = Command::new("git")
+        .args(args)
+        .current_dir(repo)
+        .output()
+        .expect("failed to spawn git");
+    assert!(
+        out.status.success(),
+        "git {} failed: {}",
+        args.join(" "),
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+fn git_stdout(repo: &Path, args: &[&str]) -> String {
+    let out = Command::new("git")
+        .args(args)
+        .current_dir(repo)
+        .output()
+        .expect("failed to spawn git");
+    assert!(
+        out.status.success(),
+        "git {} failed: {}",
+        args.join(" "),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8(out.stdout).expect("git output should be UTF-8")
+}
+
+#[test]
+fn changed_files_uses_changed_file_semantics_and_is_deterministic() {
+    let repo = git_repo();
+    let root = repo.path();
+
+    std::fs::create_dir_all(root.join("excluded")).unwrap();
+    std::fs::write(
+        root.join(".gitattributes"),
+        "generated.txt linguist-generated\n",
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("flint.toml"),
+        "[settings]\nexclude = [\"excluded/**\"]\n",
+    )
+    .unwrap();
+    for name in [
+        "staged.txt",
+        "unstaged.txt",
+        "deleted.txt",
+        "generated.txt",
+        "excluded/ignored.txt",
+    ] {
+        std::fs::write(root.join(name), "base\n").unwrap();
+    }
+    git(root, &["add", "--all"]);
+    git(root, &["commit", "-q", "-m", "base"]);
+    git(root, &["switch", "-q", "-c", "feature"]);
+
+    std::fs::write(root.join("committed.txt"), "committed\n").unwrap();
+    std::fs::write(root.join("line\nbreak.txt"), "newline\n").unwrap();
+    std::fs::write(root.join("space name.txt"), "space\n").unwrap();
+    git(
+        root,
+        &[
+            "add",
+            "--",
+            "committed.txt",
+            "line\nbreak.txt",
+            "space name.txt",
+        ],
+    );
+    git(root, &["commit", "-q", "-m", "committed changes"]);
+
+    std::fs::write(root.join("staged.txt"), "staged\n").unwrap();
+    git(root, &["add", "--", "staged.txt"]);
+    std::fs::write(root.join("unstaged.txt"), "unstaged\n").unwrap();
+    git(root, &["rm", "-q", "--", "deleted.txt"]);
+    std::fs::write(root.join("generated.txt"), "generated changed\n").unwrap();
+    std::fs::write(root.join("excluded/ignored.txt"), "excluded changed\n").unwrap();
+    std::fs::write(root.join("untracked.txt"), "not staged\n").unwrap();
+
+    let out = flint_with_env(&["changed-files", "--null"], root, &[]);
+    assert!(out.status.success(), "{:?}", combined_output(&out));
+    assert!(out.stderr.is_empty(), "unexpected stderr: {:?}", out.stderr);
+
+    let mut expected = [
+        "committed.txt",
+        "line\nbreak.txt",
+        "space name.txt",
+        "staged.txt",
+        "unstaged.txt",
+    ];
+    expected.sort_unstable();
+    let expected = expected.join("\0") + "\0";
+    assert_eq!(out.stdout, expected.as_bytes());
+
+    let line_output = flint_with_env(&["changed-files"], root, &[]);
+    assert!(
+        line_output.status.success(),
+        "{:?}",
+        combined_output(&line_output)
+    );
+    let mut expected_lines = [
+        "committed.txt",
+        "line\nbreak.txt",
+        "space name.txt",
+        "staged.txt",
+        "unstaged.txt",
+    ];
+    expected_lines.sort_unstable();
+    let expected_lines = expected_lines.join("\n") + "\n";
+    assert_eq!(line_output.stdout, expected_lines.as_bytes());
+
+    let base = git_stdout(root, &["rev-parse", "main"]);
+    let args = ["changed-files", "--null", "--new-from-rev", base.trim()];
+    let from_rev = flint_with_env(&args, root, &[]);
+    assert!(
+        from_rev.status.success(),
+        "{:?}",
+        combined_output(&from_rev)
+    );
+    assert_eq!(from_rev.stdout, out.stdout);
+
+    let env_options = flint_with_env(
+        &["changed-files", "--null"],
+        root,
+        &[
+            ("FLINT_NEW_FROM_REV", base.trim()),
+            ("FLINT_TO_REF", "HEAD"),
+        ],
+    );
+    assert!(
+        env_options.status.success(),
+        "{:?}",
+        combined_output(&env_options)
+    );
+    assert_eq!(env_options.stdout, out.stdout);
+
+    let to_main = flint_with_env(&["changed-files", "--null", "--to-ref", "main"], root, &[]);
+    assert!(to_main.status.success(), "{:?}", combined_output(&to_main));
+    assert_eq!(to_main.stdout, b"staged.txt\0unstaged.txt\0");
+
+    let full = flint_with_env(&["changed-files", "--full", "--null"], root, &[]);
+    assert!(full.status.success(), "{:?}", combined_output(&full));
+    let full_again = flint_with_env(&["changed-files", "--full", "--null"], root, &[]);
+    assert_eq!(full.stdout, full_again.stdout);
+    let fallback = flint_with_env(
+        &["changed-files", "--null", "--new-from-rev", "missing-ref"],
+        root,
+        &[],
+    );
+    assert!(
+        fallback.status.success(),
+        "{:?}",
+        combined_output(&fallback)
+    );
+    assert_eq!(fallback.stdout, full.stdout);
+    let full_paths = full
+        .stdout
+        .split(|byte| *byte == 0)
+        .filter(|path| !path.is_empty())
+        .collect::<Vec<_>>();
+    assert!(full_paths.windows(2).all(|pair| pair[0] < pair[1]));
+    assert!(full_paths.iter().any(|path| *path == b"committed.txt"));
+    assert!(full_paths.iter().any(|path| *path == b"line\nbreak.txt"));
+    assert!(full_paths.iter().any(|path| *path == b"space name.txt"));
+    assert!(!full_paths.iter().any(|path| *path == b"generated.txt"));
+    assert!(
+        !full_paths
+            .iter()
+            .any(|path| *path == b"excluded/ignored.txt")
+    );
+    assert!(!full_paths.iter().any(|path| *path == b"deleted.txt"));
+    assert!(!full_paths.iter().any(|path| *path == b"untracked.txt"));
+}
+
+#[test]
+fn changed_files_empty_output_is_clean_and_excludes_untracked_files() {
+    let repo = git_repo();
+    let root = repo.path();
+    std::fs::write(root.join("tracked.txt"), "tracked\n").unwrap();
+    git(root, &["add", "--", "tracked.txt"]);
+    git(root, &["commit", "-q", "-m", "base"]);
+    git(root, &["switch", "-q", "-c", "feature"]);
+    std::fs::write(root.join("untracked.txt"), "untracked\n").unwrap();
+
+    for args in [
+        ["changed-files"].as_slice(),
+        ["changed-files", "--null"].as_slice(),
+    ] {
+        let out = flint_with_env(args, root, &[]);
+        assert!(out.status.success(), "{:?}", combined_output(&out));
+        assert!(out.stdout.is_empty(), "unexpected stdout: {:?}", out.stdout);
+        assert!(out.stderr.is_empty(), "unexpected stderr: {:?}", out.stderr);
+    }
+}
+
 /// Runs all fixture cases under tests/cases/.
 /// Each case is a directory containing:
 ///   files/     — files to copy into the repo and stage

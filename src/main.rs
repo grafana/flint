@@ -11,11 +11,12 @@ mod registry;
 mod runner;
 mod setup;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use registry::{CheckKind, FixBehavior, LinterConfig, Scope};
 use runner::{CheckResult, RunContext as RunnerRunContext, RunOptions};
 use std::collections::{HashMap, HashSet};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
@@ -30,6 +31,8 @@ struct Cli {
 enum SubCommand {
     /// Lint the code.
     Run(RunArgs),
+    /// Print the repository files selected by Flint's changed-file discovery.
+    ChangedFiles(ChangedFilesArgs),
     /// List available linters and their status.
     Linters(LintersArgs),
     /// Set up linters in mise.toml for this project.
@@ -121,6 +124,26 @@ struct RunArgs {
     linters: Vec<String>,
 }
 
+#[derive(Args, Debug)]
+struct ChangedFilesArgs {
+    /// Print all eligible tracked files instead of only changed files.
+    #[arg(long)]
+    full: bool,
+
+    /// Select changes after git revision REV (default: merge base with base branch).
+    #[arg(long, value_name = "REV", env = "FLINT_NEW_FROM_REV")]
+    new_from_rev: Option<String>,
+
+    /// Compare changed files to this ref (default: HEAD).
+    #[arg(long, value_name = "REF", env = "FLINT_TO_REF")]
+    to_ref: Option<String>,
+
+    /// Separate paths with NUL bytes instead of newlines.
+    /// Use this when paths may contain whitespace or newlines.
+    #[arg(long)]
+    null: bool,
+}
+
 impl From<&RunArgs> for FixSummaryOptions {
     fn from(args: &RunArgs) -> Self {
         Self {
@@ -171,6 +194,17 @@ async fn main() -> Result<()> {
                 print_linters(&registry, &mise_tools, &cfg);
             }
         }
+        SubCommand::ChangedFiles(args) => {
+            let cfg = config::load(&config_dir)?;
+            let file_list = files::changed(
+                &project_root,
+                &cfg,
+                args.full,
+                args.new_from_rev.as_deref(),
+                args.to_ref.as_deref(),
+            )?;
+            print_changed_files(&project_root, &file_list.files, args.null)?;
+        }
         SubCommand::Init(args) => {
             if args.only.is_empty() {
                 init::run(
@@ -198,6 +232,46 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn print_changed_files(project_root: &Path, files: &[PathBuf], nul: bool) -> Result<()> {
+    let stdout = std::io::stdout();
+    let mut stdout = stdout.lock();
+    write_changed_files(&mut stdout, project_root, files, nul)
+}
+
+fn write_changed_files<W: Write>(
+    stdout: &mut W,
+    project_root: &Path,
+    files: &[PathBuf],
+    nul: bool,
+) -> Result<()> {
+    let separator = if nul { "\0" } else { "\n" };
+    for path in files {
+        let relative = path
+            .strip_prefix(project_root)
+            .with_context(|| format!("file is outside project root: {}", path.display()))?;
+        let relative = relative
+            .to_string_lossy()
+            .replace(std::path::MAIN_SEPARATOR, "/");
+        if let Err(error) = stdout.write_all(relative.as_bytes()) {
+            if error.kind() == std::io::ErrorKind::BrokenPipe {
+                return Ok(());
+            }
+            return Err(error.into());
+        }
+        if let Err(error) = stdout.write_all(separator.as_bytes()) {
+            if error.kind() == std::io::ErrorKind::BrokenPipe {
+                return Ok(());
+            }
+            return Err(error.into());
+        }
+    }
+    match stdout.flush() {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
+        Err(error) => Err(error.into()),
+    }
 }
 
 async fn run(
@@ -1279,9 +1353,11 @@ fn display_binary(check: &registry::Check) -> &'static str {
 mod tests {
     use super::{
         RunArgs, display_binary, linter_status, render_linters_table, unsupported_config,
-        use_filtered_run_policy,
+        use_filtered_run_policy, write_changed_files,
     };
     use crate::{config, registry};
+    use std::io;
+    use std::io::Write;
     use std::path::Path;
 
     fn run_args() -> RunArgs {
@@ -1296,6 +1372,26 @@ mod tests {
             time: false,
             linters: Vec::new(),
         }
+    }
+
+    #[test]
+    fn changed_files_treats_broken_pipe_as_success() {
+        struct ClosedPipe;
+
+        impl Write for ClosedPipe {
+            fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
+                Err(io::Error::new(io::ErrorKind::BrokenPipe, "closed"))
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let root = Path::new("/tmp/project");
+        let files = [root.join("file.txt")];
+        let mut stdout = ClosedPipe;
+        assert!(write_changed_files(&mut stdout, root, &files, false).is_ok());
     }
 
     fn mise_tools_from(content: &str) -> std::collections::HashMap<String, String> {

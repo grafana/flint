@@ -1,0 +1,10 @@
+name: CI
+
+on:
+  push:
+
+jobs:
+  sign:
+    uses: grafana/shared-workflows/.github/workflows/sign-and-attest.yml@0123456789012345678901234567890123456789 # main
+    steps:
+      - uses: grafana/shared-workflows/actions/create-github-app-token@0123456789012345678901234567890123456789 # create-github-app-token/v0.2.2

@@ -392,6 +392,22 @@ fn action_metadata_accepts_bare_version_for_nested_action() {
 }
 
 #[test]
+fn action_metadata_uses_ref_comment_without_current_value() {
+    let log = log_current(
+        r#"{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[
+          {"depName":"grafana/shared-workflows","packageName":"grafana/shared-workflows","depType":"action","replaceString":"grafana/shared-workflows/actions/create-github-app-token@ae92934a14a48b94494dbc06d74a81d47fe08a40 # create-github-app-token/v0.2.2"}
+        ]}]}"#,
+    );
+    let result = extract_deps(&log, &[]).unwrap();
+    let meta = &result.action_meta["grafana/shared-workflows/actions/create-github-app-token"];
+    assert_eq!(meta.ref_kind, "version-tag");
+    assert_eq!(
+        meta.compatibility.as_deref(),
+        Some("create-github-app-token")
+    );
+}
+
+#[test]
 fn action_metadata_accepts_bare_version_for_top_level_action() {
     let log = log_current(
         r#"{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[

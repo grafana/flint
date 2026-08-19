@@ -285,6 +285,12 @@ fn action_meta_from_dep(dep: &serde_json::Value) -> anyhow::Result<Option<(Strin
         .and_then(|v| v.as_str())
         .or_else(|| {
             replace_string
+                .split_once('#')
+                .map(|(_, comment)| comment.trim())
+                .filter(|value| !value.is_empty())
+        })
+        .or_else(|| {
+            replace_string
                 .split('@')
                 .nth(1)
                 .and_then(|value| value.split_whitespace().next())
@@ -381,7 +387,7 @@ fn is_numeric_version(value: &str) -> bool {
             .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
 }
 
-pub(crate) fn canonical_manager_name(manager: &str) -> &str {
+pub(super) fn canonical_manager_name(manager: &str) -> &str {
     match manager {
         "renovate-config-presets" => "renovate-config",
         _ => manager,

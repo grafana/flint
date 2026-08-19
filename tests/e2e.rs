@@ -184,6 +184,18 @@ fn changed_files_uses_changed_file_semantics_and_is_deterministic() {
     );
     assert_eq!(from_rev.stdout, out.stdout);
 
+    let cli_precedence = flint_with_env(
+        &["changed-files", "--null", "--new-from-rev", base.trim()],
+        root,
+        &[("FLINT_NEW_FROM_REV", "missing-ref")],
+    );
+    assert!(
+        cli_precedence.status.success(),
+        "{:?}",
+        combined_output(&cli_precedence)
+    );
+    assert_eq!(cli_precedence.stdout, out.stdout);
+
     let env_options = flint_with_env(
         &["changed-files", "--null"],
         root,
@@ -236,6 +248,52 @@ fn changed_files_uses_changed_file_semantics_and_is_deterministic() {
     );
     assert!(!full_paths.iter().any(|path| *path == b"deleted.txt"));
     assert!(!full_paths.iter().any(|path| *path == b"untracked.txt"));
+
+    let filtered = flint_with_env(
+        &[
+            "changed-files",
+            "--full",
+            "--null",
+            "--include",
+            "*.txt",
+            "--include",
+            "README.md",
+            "--exclude",
+            "space*",
+        ],
+        root,
+        &[],
+    );
+    assert!(
+        filtered.status.success(),
+        "{:?}",
+        combined_output(&filtered)
+    );
+    let filtered_paths = filtered
+        .stdout
+        .split(|byte| *byte == 0)
+        .filter(|path| !path.is_empty())
+        .collect::<Vec<_>>();
+    assert!(filtered_paths.iter().any(|path| *path == b"committed.txt"));
+    assert!(!filtered_paths.iter().any(|path| *path == b"space name.txt"));
+    assert!(!filtered_paths.iter().any(|path| *path == b"README.md"));
+    assert!(!filtered_paths.iter().any(|path| *path == b"generated.txt"));
+
+    let no_match = flint_with_env(
+        &["changed-files", "--include", "does-not-exist/**", "--null"],
+        root,
+        &[],
+    );
+    assert!(
+        no_match.status.success(),
+        "{:?}",
+        combined_output(&no_match)
+    );
+    assert!(no_match.stdout.is_empty());
+
+    let invalid = flint_with_env(&["changed-files", "--include", "[", "--null"], root, &[]);
+    assert!(!invalid.status.success());
+    assert!(combined_output(&invalid).contains("invalid --include glob pattern"));
 }
 
 #[test]

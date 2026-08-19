@@ -46,13 +46,15 @@ Deleted files, generated files marked with
 `flint.toml` are omitted. Output is deterministic and contains only existing
 eligible files.
 
-Use `--full` to list every eligible tracked file. `--new-from-rev REV` and
-`--to-ref REF` provide the same revision controls as `flint run`:
+Use `--full` to select every eligible tracked file; untracked files remain
+excluded. `--new-from-rev REV` and `--to-ref REF` provide the same revision
+controls as `flint run`:
 
 ```bash
 flint changed-files
 flint changed-files --full
 flint changed-files --new-from-rev origin/main --to-ref HEAD
+flint changed-files --include '*.scala' --include '*.groovy' --exclude 'src/generated/**'
 ```
 
 See the dedicated [changed-file discovery guide](changed-files.md) for exact
@@ -65,10 +67,13 @@ See the [NUL-aware examples](changed-files.md#output-formats), including an
 empty-output-safe Python invocation. Flint currently represents Git paths as
 UTF-8 strings, so `--null` does not preserve arbitrary non-UTF-8 bytes.
 
-The command is intentionally generic: callers can filter the returned paths
-for the files owned by a particular formatter or other tool. This lets a
-repository's orchestration task and hooks share Flint's file-discovery
-semantics without putting tool-specific policy in Flint.
+`--include GLOB` and `--exclude GLOB` may be repeated to filter the eligible
+paths. Includes are ORed, exclusions are applied afterward and take precedence,
+and patterns match either repository-relative paths or basenames (so
+`*.scala` matches Scala files anywhere). Invalid patterns are reported as
+command errors. The options are generic rather than formatter-specific, so a
+repository can use the same command for Spotless, Flint, or another tool while
+keeping ownership policy in its orchestration task.
 
 ## `flint run` flags
 

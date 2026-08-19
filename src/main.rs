@@ -126,9 +126,17 @@ struct RunArgs {
 
 #[derive(Args, Debug)]
 struct ChangedFilesArgs {
-    /// Print all eligible tracked files instead of only changed files.
+    /// Select all eligible tracked files instead of only changed files.
     #[arg(long)]
     full: bool,
+
+    /// Include paths matching GLOB. May be repeated; patterns are combined with OR.
+    #[arg(long, value_name = "GLOB", action = clap::ArgAction::Append)]
+    include: Vec<String>,
+
+    /// Exclude paths matching GLOB. May be repeated; exclusions take precedence over includes.
+    #[arg(long, value_name = "GLOB", action = clap::ArgAction::Append)]
+    exclude: Vec<String>,
 
     /// Select changes after git revision REV (default: merge base with base branch).
     #[arg(long, value_name = "REV", env = "FLINT_NEW_FROM_REV")]
@@ -203,6 +211,8 @@ async fn main() -> Result<()> {
                 args.new_from_rev.as_deref(),
                 args.to_ref.as_deref(),
             )?;
+            let file_list =
+                files::apply_filters(&project_root, file_list, &args.include, &args.exclude)?;
             print_changed_files(&project_root, &file_list.files, args.null)?;
         }
         SubCommand::Init(args) => {

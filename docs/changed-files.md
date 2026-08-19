@@ -18,8 +18,8 @@ Without `--full`, Flint selects the union of:
 - unstaged worktree changes; and
 - staged index changes.
 
-Untracked files are not included until they are staged. `--full` lists tracked
-files only.
+Untracked files are not included until they are staged. `--full` selects all
+eligible tracked files; it does not include untracked files.
 
 `--new-from-rev REV` replaces the configured base branch when resolving the
 merge base. `--to-ref REF` replaces `HEAD` as the end of the committed range.
@@ -27,13 +27,13 @@ These options have the same meaning as their `flint run` counterparts. If a
 merge base cannot be resolved, Flint falls back to full tracked-file
 selection, as it does for a lint run.
 
-The revision options also accept `FLINT_NEW_FROM_REV` and `FLINT_TO_REF`, which
-is useful when a shared task forwards the same revision context to both
-`flint run` and `flint changed-files`. Explicit command-line options take
-precedence over environment variables.
+The revision options also accept values from the `FLINT_NEW_FROM_REV` and
+`FLINT_TO_REF` environment variables. This is useful when a shared task
+forwards the same revision context to both `flint run` and `flint changed-files`.
+An explicitly supplied command-line option takes precedence over its
+environment variable.
 
-`--full` explicitly selects all tracked files. In either mode, Flint excludes
-paths that:
+In either mode, Flint first excludes paths that:
 
 - do not exist in the worktree, including deleted files;
 - are marked `linguist-generated` in `.gitattributes`;
@@ -45,6 +45,28 @@ printed without diagnostic output on stdout. Errors are reported on stderr.
 Flint currently represents Git paths as UTF-8 strings. A path containing
 invalid UTF-8 bytes is lossily converted; `--null` makes separators safe for
 whitespace and newlines, but does not preserve arbitrary non-UTF-8 bytes.
+
+## Filtering
+
+Use `--include GLOB` and `--exclude GLOB` to select a subset of Flint's
+already-eligible paths. Each option may be repeated. Includes are combined with
+OR; exclusions are applied afterward and always win. With no includes, all
+eligible paths are candidates. An include cannot re-include a generated,
+built-in, configured-excluded, deleted, or untracked path.
+
+Patterns match either a repository-relative path or its basename, so `*.scala`
+matches Scala files in any directory while `src/**/*.scala` restricts the
+selection to `src`. For example, a formatter task can select Scala and Groovy
+files while retaining Flint's change semantics:
+
+```bash
+flint changed-files --null \
+  --include '*.scala' --include '*.groovy' \
+  --exclude 'src/generated/**'
+```
+
+Filtering is generic rather than formatter-specific. A caller still decides
+which patterns belong to Spotless, Flint, or another tool.
 
 ## Output formats
 
@@ -77,15 +99,6 @@ paths = subprocess.check_output(["flint", "changed-files", "--null"])
 payload = paths.rstrip(b"\0")
 files = payload.split(b"\0") if payload else []
 ```
-
-## Tool-specific filtering
-
-Flint deliberately does not provide formatter-specific flags. Callers should
-filter this generic list according to their own ownership rules—for example,
-selecting only Scala and Groovy files before invoking Spotless. Keeping that
-policy outside Flint allows the same command to serve different repositories,
-formatters, hooks, and orchestration tasks while preserving one canonical
-definition of changed files.
 
 See the [CLI reference](cli.md#flint-changed-files) for the complete command
 overview.

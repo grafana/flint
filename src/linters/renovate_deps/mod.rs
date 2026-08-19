@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
+use self::action_validation::validate_lookup_action_warnings;
 use self::install_patch::configure_extract_workaround_env;
 use self::manager_patterns::changed_matches_manager_file_patterns;
 use self::mise_normalize::patch_semver_equivalent_mise_values;
@@ -21,6 +22,7 @@ use crate::registry::{
     NativeRunContext, NativeRunFuture, PreparedNativeCheck,
 };
 
+mod action_validation;
 mod install_patch;
 mod manager_patterns;
 mod mise_normalize;
@@ -663,6 +665,9 @@ async fn generate_snapshot(
     let mut generated = Snapshot::default();
     for attempt in 1..=3u32 {
         let log_bytes = run_renovate(project_root, config_path, dry_run).await?;
+        if dry_run == "lookup" {
+            validate_lookup_action_warnings(&log_bytes, exclude_managers)?;
+        }
         generated = extract_deps(&log_bytes, exclude_managers)?;
         if !generated.is_empty() || attempt == 3 {
             break;

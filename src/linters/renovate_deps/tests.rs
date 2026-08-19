@@ -4,9 +4,9 @@ use super::rules::{
     ComparablePackageRule, ExtractVersionMismatch, RuleMatcher, equivalent_version_shapes,
     incomplete_meta_for_rules, relevant_dep_names, validate_extract_version_consistency,
 };
-use super::snapshot::{DepFiles, DepMeta};
+use super::snapshot::{ActionMeta, DepFiles, DepMeta, version_tag_compatibility};
 use super::*;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 type FileManagers<'a> = [(&'a str, &'a [(&'a str, &'a [&'a str])])];
 
@@ -15,6 +15,7 @@ fn log(config_json: &str) -> Vec<u8> {
 }
 
 fn log_current(config_json: &str) -> Vec<u8> {
+    let config_json = config_json.lines().map(str::trim).collect::<String>();
     format!(r#"{{"msg":"packageFiles with updates","config":{config_json}}}"#).into_bytes()
 }
 
@@ -53,6 +54,7 @@ fn snapshot(meta: &[(&str, Option<&str>, Option<&str>)], files: &FileManagers<'_
                 )
             })
             .collect(),
+        action_meta: BTreeMap::new(),
         files: dep_files(files),
     }
 }
@@ -348,6 +350,172 @@ fn extracts_extended_dep_metadata_from_lookup_logs() {
 }
 
 #[test]
+fn extracts_action_metadata_per_monorepo_target() {
+    let log = log_current(
+        r#"{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[
+          {"depName":"grafana/shared-workflows","packageName":"grafana/shared-workflows","depType":"action","currentValue":"create-github-app-token/v0.2.2","replaceString":"grafana/shared-workflows/actions/create-github-app-token@ae92934a14a48b94494dbc06d74a81d47fe08a40 # create-github-app-token/v0.2.2"},
+          {"depName":"grafana/shared-workflows","packageName":"grafana/shared-workflows","depType":"action","currentValue":"main","replaceString":"grafana/shared-workflows/.github/workflows/sign-and-attest.yml@abc1234567890123456789012345678901234567 # main"}
+        ]}]}"#,
+    );
+    let result = extract_deps(&log, &[]).unwrap();
+
+    assert_eq!(result.action_meta.len(), 2);
+    assert_eq!(
+        result.action_meta["grafana/shared-workflows/actions/create-github-app-token"],
+        ActionMeta {
+            package_name: "grafana/shared-workflows".to_string(),
+            ref_kind: "version-tag".to_string(),
+            compatibility: Some("create-github-app-token".to_string()),
+            ref_: None,
+        }
+    );
+    assert_eq!(
+        result.action_meta["grafana/shared-workflows/.github/workflows/sign-and-attest.yml"]
+            .ref_
+            .as_deref(),
+        Some("main")
+    );
+}
+
+#[test]
+fn action_metadata_accepts_bare_version_for_nested_action() {
+    let log = log_current(
+        r#"{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[
+          {"depName":"example/repo","packageName":"example/repo","depType":"action","currentValue":"v0.2.2","replaceString":"example/repo/actions/nested/action@ae92934a14a48b94494dbc06d74a81d47fe08a40 # v0.2.2"}
+        ]}]}"#,
+    );
+    assert!(
+        extract_deps(&log, &[]).unwrap().action_meta["example/repo/actions/nested/action"]
+            .compatibility
+            .is_none()
+    );
+}
+
+#[test]
+fn action_metadata_uses_ref_comment_without_current_value() {
+    let log = log_current(
+        r#"{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[
+          {"depName":"grafana/shared-workflows","packageName":"grafana/shared-workflows","depType":"action","replaceString":"grafana/shared-workflows/actions/create-github-app-token@ae92934a14a48b94494dbc06d74a81d47fe08a40 # create-github-app-token/v0.2.2"}
+        ]}]}"#,
+    );
+    let result = extract_deps(&log, &[]).unwrap();
+    let meta = &result.action_meta["grafana/shared-workflows/actions/create-github-app-token"];
+    assert_eq!(meta.ref_kind, "version-tag");
+    assert_eq!(
+        meta.compatibility.as_deref(),
+        Some("create-github-app-token")
+    );
+}
+
+#[test]
+fn action_metadata_accepts_bare_version_for_top_level_action() {
+    let log = log_current(
+        r#"{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[
+          {"depName":"actions/checkout","packageName":"actions/checkout","depType":"action","currentValue":"v4.2.2","replaceString":"actions/checkout@abc1234567890123456789012345678901234567 # v4.2.2"}
+        ]}]}"#,
+    );
+    let result = extract_deps(&log, &[]).unwrap();
+    let meta = &result.action_meta["actions/checkout"];
+    assert_eq!(meta.ref_kind, "version-tag");
+    assert!(meta.compatibility.is_none());
+}
+
+#[test]
+fn action_ref_classification_supports_major_and_prerelease_tags() {
+    assert_eq!(version_tag_compatibility("v4"), Some(None));
+    assert_eq!(
+        version_tag_compatibility("component/v1"),
+        Some(Some("component".into()))
+    );
+    assert_eq!(version_tag_compatibility("v1.2.3-rc.1+build.7"), Some(None));
+    assert_eq!(
+        version_tag_compatibility("component/v1.2.3-rc.1+build.7"),
+        Some(Some("component".into()))
+    );
+    assert_eq!(
+        version_tag_compatibility("component-v1.2.3-rc.1+build.7"),
+        Some(Some("component".into()))
+    );
+}
+
+#[test]
+fn action_metadata_accepts_branch_refs_for_nested_actions() {
+    let log = log_current(
+        r#"{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[
+          {"depName":"example/repo","packageName":"example/repo","depType":"action","currentValue":"main","replaceString":"example/repo/actions/nested/action@abc1234567890123456789012345678901234567 # main"}
+        ]}]}"#,
+    );
+    let result = extract_deps(&log, &[]).unwrap();
+    let meta = &result.action_meta["example/repo/actions/nested/action"];
+    assert_eq!(meta.ref_kind, "branch");
+    assert_eq!(meta.ref_.as_deref(), Some("main"));
+}
+
+#[test]
+fn lookup_deterministic_digest_warning_is_invalid() {
+    let log = log_current(
+        r#"{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[{"depName":"grafana/shared-workflows","warnings":[{"message":"Could not determine new digest for update (github-digest package grafana/shared-workflows)"}]}]}]}"#,
+    );
+    let err = validate_lookup_action_warnings(&log, &[]).unwrap_err();
+    assert!(err.to_string().contains("invalid GitHub Action ref"));
+
+    assert!(
+        validate_lookup_action_warnings(b"Could not determine new digest for update\n", &[])
+            .is_ok()
+    );
+}
+
+#[test]
+fn lookup_no_result_warning_is_inconclusive() {
+    let log = log_current(
+        r#"{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[{"depName":"grafana/shared-workflows","warnings":[{"message":"Failed to look up github-tags package grafana/shared-workflows: no-result"}]}]}],"docker":[{"packageFile":"Dockerfile","deps":[{"depName":"grafana/shared-workflows","warnings":[{"message":"Could not determine new digest for update (docker package grafana/shared-workflows)"}]}]}]}"#,
+    );
+    assert!(validate_lookup_action_warnings(&log, &[]).is_ok());
+}
+
+#[test]
+fn lookup_action_warning_respects_manager_exclusion() {
+    let log = log_current(
+        r#"{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[{"depName":"grafana/shared-workflows","warnings":[{"message":"Could not determine new digest for update (github-digest package grafana/shared-workflows)"}]}]}]}"#,
+    );
+    let exclusions = vec!["github-actions".to_string()];
+    assert!(validate_lookup_action_warnings(&log, &exclusions).is_ok());
+}
+
+#[test]
+fn action_metadata_conflicts_are_rejected_for_same_target() {
+    let log = log_current(
+        r#"{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[
+          {"depName":"example/repo","packageName":"example/repo","depType":"action","currentValue":"v1.2.3","replaceString":"example/repo/actions/nested/action@abc1234567890123456789012345678901234567 # v1.2.3"},
+          {"depName":"example/repo","packageName":"example/repo","depType":"action","currentValue":"main","replaceString":"example/repo/actions/nested/action@abc1234567890123456789012345678901234567 # main"}
+        ]}]}"#,
+    );
+    let err = extract_deps(&log, &[]).unwrap_err();
+    assert!(err.to_string().contains("conflicting stable metadata"));
+}
+
+#[test]
+fn action_metadata_respects_manager_exclusions() {
+    let log = log_current(
+        r#"{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[
+          {"depName":"grafana/shared-workflows","packageName":"grafana/shared-workflows","depType":"action","currentValue":"main","replaceString":"grafana/shared-workflows/.github/workflows/sign-and-attest.yml@abc1234567890123456789012345678901234567 # main"}
+        ]}]}"#,
+    );
+    let result = extract_deps(&log, &["github-actions".to_string()]).unwrap();
+    assert!(result.action_meta.is_empty());
+    assert!(result.files.is_empty());
+}
+
+#[test]
+fn reads_snapshot_without_action_metadata() {
+    let snapshot = read_snapshot(
+        r#"{"meta":{},"files":{"workflow.yml":{"github-actions":["actions/checkout"]}}}"#,
+    )
+    .unwrap();
+    assert!(snapshot.action_meta.is_empty());
+}
+
+#[test]
 fn extracts_legacy_manager_names_using_canonical_snapshot_keys() {
     let log = log(
         r#"{"renovate-config-presets":[{"packageFile":".github/renovate.json5","deps":[{"depName":"grafana/flint"}]}]}"#,
@@ -489,6 +657,7 @@ fn write_snapshot_serializes_canonical_dep_order() {
     let path = dir.path().join("out.json");
     let deps = Snapshot {
         meta: BTreeMap::new(),
+        action_meta: BTreeMap::new(),
         files: dep_files(&[("package.json", &[("npm", &["zebra", "alpha", "moose"])])]),
     };
 
@@ -629,6 +798,7 @@ fn validate_extract_version_consistency_accepts_matching_extraction() {
         )]
         .into_iter()
         .collect(),
+        action_meta: BTreeMap::new(),
         files: dep_files(&[("mise.toml", &[("mise", &["actionlint"])])]),
     };
 
@@ -650,6 +820,7 @@ fn validate_extract_version_consistency_accepts_normalized_current_version() {
         )]
         .into_iter()
         .collect(),
+        action_meta: BTreeMap::new(),
         files: dep_files(&[("mise.toml", &[("mise", &["actionlint"])])]),
     };
 
@@ -671,6 +842,7 @@ fn validate_extract_version_consistency_accepts_normalized_prefixed_current_valu
         )]
         .into_iter()
         .collect(),
+        action_meta: BTreeMap::new(),
         files: dep_files(&[("mise.toml", &[("mise", &["shellcheck"])])]),
     };
 
@@ -692,6 +864,7 @@ fn validate_extract_version_consistency_flags_mismatch() {
         )]
         .into_iter()
         .collect(),
+        action_meta: BTreeMap::new(),
         files: dep_files(&[("mise.toml", &[("mise", &["biome"])])]),
     };
 
@@ -719,6 +892,7 @@ fn validate_extract_version_consistency_flags_no_match() {
         )]
         .into_iter()
         .collect(),
+        action_meta: BTreeMap::new(),
         files: dep_files(&[("mise.toml", &[("mise", &["biome"])])]),
     };
 
@@ -755,6 +929,7 @@ fn patch_semver_equivalent_mise_values_rewrites_to_preferred_shape() {
         )]
         .into_iter()
         .collect(),
+        action_meta: BTreeMap::new(),
         files: dep_files(&[("mise.toml", &[("mise", &["protoc"])])]),
     };
     let mismatches = extract_version_mismatches(&snap).unwrap();

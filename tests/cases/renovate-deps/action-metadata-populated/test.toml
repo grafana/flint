@@ -1,0 +1,43 @@
+[expected]
+args = "run --full --fix renovate-deps"
+exit = 1
+stderr = '''
+flint: fixed: renovate-deps — commit before pushing
+'''
+
+[env]
+GITHUB_TOKEN = "token"
+
+[expected.files]
+".github/renovate-tracked-deps.json" = '''
+{
+  "meta": {},
+  "files": {
+    ".github/workflows/ci.yml": {
+      "github-actions": [
+        "grafana/shared-workflows"
+      ]
+    }
+  },
+  "actionMeta": {
+    "grafana/shared-workflows/.github/workflows/sign-and-attest.yml": {
+      "packageName": "grafana/shared-workflows",
+      "refKind": "branch",
+      "ref": "main"
+    },
+    "grafana/shared-workflows/actions/create-github-app-token": {
+      "packageName": "grafana/shared-workflows",
+      "refKind": "version-tag",
+      "compatibility": "create-github-app-token"
+    }
+  }
+}
+'''
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+set -eu
+
+printf '%s\n' '{"msg":"Extracted dependencies","packageFiles":{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[{"depName":"grafana/shared-workflows","packageName":"grafana/shared-workflows","depType":"action","currentValue":"main","replaceString":"grafana/shared-workflows/.github/workflows/sign-and-attest.yml@0123456789012345678901234567890123456789 # main"},{"depName":"grafana/shared-workflows","packageName":"grafana/shared-workflows","depType":"action","currentValue":"create-github-app-token/v0.2.2","replaceString":"grafana/shared-workflows/actions/create-github-app-token@0123456789012345678901234567890123456789 # create-github-app-token/v0.2.2"}]}]}}'
+'''

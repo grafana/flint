@@ -34,7 +34,8 @@ lookup
         "Swatinem/rust-cache"
       ]
     }
-  }
+  },
+  "actionMeta": {}
 }
 """
 

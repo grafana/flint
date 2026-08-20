@@ -2,6 +2,7 @@
 
 ```text
 flint run [OPTIONS] [LINTERS...]
+flint changed-files [OPTIONS]
 flint init [OPTIONS]
 flint hook install
 flint linters
@@ -33,6 +34,44 @@ echo $1
 ...
 flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
 ```
+
+## `flint changed-files`
+
+`flint changed-files` prints the repository-relative files selected by Flint's
+Git-aware file discovery, without running any linters. It uses the same
+changed-file semantics as `flint run`: committed changes since the merge base,
+plus staged and unstaged changes. Untracked files are excluded until staged.
+Deleted files, generated files marked with
+`linguist-generated`, Flint-managed files, and paths excluded by
+`flint.toml` are omitted. Output is deterministic and contains only existing
+eligible files.
+
+Use `--full` to select every eligible tracked file; untracked files remain
+excluded. `--new-from-rev REV` and `--to-ref REF` provide the same revision
+controls as `flint run`:
+
+```bash
+flint changed-files
+flint changed-files --full
+flint changed-files --new-from-rev origin/main --to-ref HEAD
+flint changed-files --include '*.scala' --include '*.groovy' --exclude 'src/generated/**'
+```
+
+See the dedicated [changed-file discovery guide](changed-files.md) for exact
+selection semantics and integration examples.
+
+Paths are separated by newlines by default. Use `--null` for machine-readable
+output when paths may contain whitespace or newlines. See the [NUL-aware examples](changed-files.md#output-formats), including an
+empty-output-safe Python invocation. Flint currently represents Git paths as
+UTF-8 strings, so `--null` does not preserve arbitrary non-UTF-8 bytes.
+
+`--include GLOB` and `--exclude GLOB` may be repeated to filter the eligible
+paths. Includes are ORed, exclusions are applied afterward and take precedence,
+and patterns match either repository-relative paths or basenames (so
+`*.scala` matches Scala files anywhere). Invalid patterns are reported as
+command errors. The options are generic rather than formatter-specific, so a
+repository can use the same command for Spotless, Flint, or another tool while
+keeping ownership policy in its orchestration task.
 
 ## `flint run` flags
 

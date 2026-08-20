@@ -12,6 +12,7 @@
 
 <p align="center">
   <a href="docs/cli.md">CLI reference</a> ·
+  <a href="docs/changed-files.md">Changed-file discovery</a> ·
   <a href="docs/check-model.md">How checks work</a> ·
   <a href="docs/linters.md">Linters</a> ·
   <a href="docs/why.md">Why flint?</a> ·
@@ -129,6 +130,9 @@ every matching tracked file. Flint also skips files marked
 so GitHub and other tools can reuse the same metadata.
 
 For more commands and flags, see the [CLI reference](docs/cli.md).
+To reuse Flint's Git-aware file selection from another formatter or repository
+task, see [changed-file discovery](docs/changed-files.md) and run
+`flint changed-files`.
 
 > [!NOTE]
 > In rare cases (currently only `renovate-deps`) a failure may show up

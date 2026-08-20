@@ -131,9 +131,65 @@ pub fn all(project_root: &Path, cfg: &Config) -> Result<FileList> {
     all_files(project_root, &exclude)
 }
 
+/// Apply caller-owned path filters to an already eligible file list.
+///
+/// Flint owns discovery and its built-in/configured exclusions. These filters
+/// are deliberately applied afterward so an include cannot re-include a path
+/// that discovery excluded (for example a generated file). An include matches
+/// either the repository-relative path or its basename, like check patterns.
+pub fn apply_filters(
+    project_root: &Path,
+    mut file_list: FileList,
+    includes: &[String],
+    excludes: &[String],
+) -> Result<FileList> {
+    let include_set = build_cli_glob_set(includes, "--include")?;
+    let exclude_set = build_cli_glob_set(excludes, "--exclude")?;
+
+    file_list.files.retain(|path| {
+        let (relative, basename) = relative_and_basename(project_root, path);
+        let included = includes.is_empty()
+            || include_set.is_match(&relative)
+            || include_set.is_match(&basename);
+        let excluded = exclude_set.is_match(&relative) || exclude_set.is_match(&basename);
+        included && !excluded
+    });
+
+    Ok(file_list)
+}
+
+fn build_cli_glob_set(patterns: &[String], option: &str) -> Result<GlobSet> {
+    let patterns: Vec<&str> = patterns.iter().map(String::as_str).collect();
+    let mut builder = GlobSetBuilder::new();
+    for pattern in patterns {
+        let glob = GlobBuilder::new(pattern)
+            .literal_separator(true)
+            .build()
+            .map_err(|error| {
+                anyhow::anyhow!("invalid {option} glob pattern {pattern:?}: {error}")
+            })?;
+        builder.add(glob);
+    }
+    builder
+        .build()
+        .map_err(|error| anyhow::anyhow!("invalid {option} glob patterns: {error}"))
+}
+
+fn relative_and_basename(project_root: &Path, path: &Path) -> (String, String) {
+    let relative = path.strip_prefix(project_root).unwrap_or(path);
+    let relative = relative
+        .to_string_lossy()
+        .replace(std::path::MAIN_SEPARATOR, "/");
+    let basename = path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    (relative, basename)
+}
+
 fn all_files(project_root: &Path, exclude: &GlobSet) -> Result<FileList> {
     let out = Command::new("git")
-        .args(["ls-files"])
+        .args(["ls-files", "-z"])
         .current_dir(project_root)
         .output()
         .context("git ls-files")?;
@@ -143,10 +199,7 @@ fn all_files(project_root: &Path, exclude: &GlobSet) -> Result<FileList> {
         anyhow::bail!("git ls-files failed ({}): {}", out.status, stderr.trim());
     }
 
-    let names: BTreeSet<String> = String::from_utf8_lossy(&out.stdout)
-        .lines()
-        .map(str::to_string)
-        .collect();
+    let names = parse_nul_names(&out.stdout);
 
     Ok(FileList {
         files: filter_names(project_root, exclude, names)?,
@@ -157,7 +210,7 @@ fn all_files(project_root: &Path, exclude: &GlobSet) -> Result<FileList> {
 }
 
 fn git_diff_names(project_root: &Path, extra_args: &[&str]) -> Result<Vec<String>> {
-    let mut args = vec!["diff", "--name-only"];
+    let mut args = vec!["diff", "--name-only", "-z"];
     args.extend_from_slice(extra_args);
     let out = Command::new("git")
         .args(&args)
@@ -174,10 +227,16 @@ fn git_diff_names(project_root: &Path, extra_args: &[&str]) -> Result<Vec<String
         );
     }
 
-    Ok(String::from_utf8_lossy(&out.stdout)
-        .lines()
-        .map(str::to_string)
-        .collect())
+    Ok(parse_nul_names(&out.stdout).into_iter().collect())
+}
+
+fn parse_nul_names(bytes: &[u8]) -> BTreeSet<String> {
+    bytes
+        .split(|byte| *byte == 0)
+        .filter(|name| !name.is_empty())
+        .map(String::from_utf8_lossy)
+        .map(std::borrow::Cow::into_owned)
+        .collect()
 }
 
 fn filter_names(
@@ -268,16 +327,10 @@ pub fn match_files<'a>(
     files
         .iter()
         .filter(|p| {
-            let rel = p.strip_prefix(project_root).unwrap_or(p);
-            let rel_str = rel.to_string_lossy();
-            let file_name = p
-                .file_name()
-                .map(|n| n.to_string_lossy())
-                .unwrap_or_default();
-            let included =
-                patterns.is_match(file_name.as_ref()) || patterns.is_match(rel_str.as_ref());
-            let excluded = exclude_patterns.is_match(file_name.as_ref())
-                || exclude_patterns.is_match(rel_str.as_ref());
+            let (rel_str, file_name) = relative_and_basename(project_root, p);
+            let included = patterns.is_match(&file_name) || patterns.is_match(&rel_str);
+            let excluded =
+                exclude_patterns.is_match(&file_name) || exclude_patterns.is_match(&rel_str);
             included && !excluded
         })
         .collect()
@@ -394,6 +447,46 @@ mod tests {
         let matched = match_files(&files, &["*.java"], &["src/excluded/**"], tmp.path());
 
         assert_eq!(matched, vec![&files[0]]);
+    }
+
+    #[test]
+    fn apply_filters_matches_basenames_and_paths_and_excludes_win() {
+        let root = Path::new("/repo");
+        let list = FileList {
+            files: vec![
+                root.join("src/Foo.scala"),
+                root.join("src/Foo.groovy"),
+                root.join("test/Foo.scala"),
+                root.join("README.md"),
+            ],
+            changed_paths: vec![],
+            merge_base: None,
+            full: true,
+        };
+
+        let filtered = apply_filters(
+            root,
+            list,
+            &["*.scala".to_string(), "README.md".to_string()],
+            &["test/**".to_string(), "README.md".to_string()],
+        )
+        .unwrap();
+
+        assert_eq!(filtered.files, vec![root.join("src/Foo.scala")]);
+    }
+
+    #[test]
+    fn apply_filters_rejects_invalid_cli_globs() {
+        let root = Path::new("/repo");
+        let list = FileList {
+            files: vec![root.join("file.txt")],
+            changed_paths: vec![],
+            merge_base: None,
+            full: true,
+        };
+
+        let error = apply_filters(root, list, &["[".to_string()], &[]).unwrap_err();
+        assert!(error.to_string().contains("invalid --include glob pattern"));
     }
 
     /// Regression test for os error 206 (ERROR_FILENAME_EXCED_RANGE) on Windows: the previous

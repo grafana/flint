@@ -300,6 +300,21 @@ fn filters_skip_reasons() {
 }
 
 #[test]
+fn github_action_invalid_value_is_kept() {
+    // Lookup marks GitHub Actions whose ref comes from an expression as
+    // invalid-value, while extract mode keeps the same dependency. Keeping it
+    // in both snapshots makes fix followed by verification idempotent.
+    let log = log(
+        r#"{"github-actions":[{"packageFile":".github/workflows/release.yml","deps":[{"depName":"sigstore/cosign","currentValue":"${{ env.COSIGN_VERSION }}","skipReason":"invalid-value"}]}]}"#,
+    );
+    let result = extract_deps(&log, &[]).unwrap();
+    assert_eq!(
+        result.files[".github/workflows/release.yml"]["github-actions"],
+        vec!["sigstore/cosign"]
+    );
+}
+
+#[test]
 fn invalid_version_is_kept() {
     // Lookup-time versioning failures (e.g. java-jdk `temurin-*` currentVersion
     // rejected by workarounds:javaLTSVersions regex) must not drop the dep.

@@ -3,12 +3,6 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 
 const PACKAGE_FILES_MSGS: &[&str] = &["Extracted dependencies", "packageFiles with updates"];
-// `invalid-version` is intentionally NOT filtered: it is set at lookup time when
-// Renovate's versioning rejects the resolved `currentVersion` (e.g. mise.lock
-// forwarding `temurin-*` as currentVersion for java-jdk). The dep is still
-// declared in the config and must remain tracked; filtering it here caused
-// `--fix` (lookup) to silently drop deps that verify (extract) keeps.
-const SKIP_REASONS: &[&str] = &["contains-variable", "invalid-value"];
 
 /// `{file_path: {manager: [dep_name, ...]}}` — all collections sorted.
 pub(crate) type DepFiles = BTreeMap<String, BTreeMap<String, Vec<String>>>;
@@ -167,7 +161,7 @@ pub(crate) fn extract_deps(
                 };
                 for dep in deps {
                     let skip_reason = dep.get("skipReason").and_then(|v| v.as_str());
-                    if SKIP_REASONS.contains(&skip_reason.unwrap_or("")) {
+                    if should_skip_dep(manager, skip_reason) {
                         continue;
                     }
                     let Some(dep_name) = dep.get("depName").and_then(|v| v.as_str()) else {
@@ -245,6 +239,19 @@ pub(crate) fn extract_deps(
         files,
         action_meta,
     })
+}
+
+fn should_skip_dep(manager: &str, skip_reason: Option<&str>) -> bool {
+    match skip_reason {
+        Some("contains-variable") => true,
+        // For GitHub Actions, lookup mode marks expression-based refs as
+        // invalid-value while extract mode keeps the dependency. It is still
+        // declared and must remain in both snapshots so fix is idempotent.
+        Some("invalid-value") => manager != "github-actions",
+        // invalid-version is likewise lookup-only and never removes a
+        // declared dependency from the stable snapshot.
+        _ => false,
+    }
 }
 
 /// Extract stable metadata for a reusable action from Renovate's dependency

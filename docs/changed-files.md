@@ -46,6 +46,11 @@ Flint currently represents Git paths as UTF-8 strings. A path containing
 invalid UTF-8 bytes is lossily converted; `--null` makes separators safe for
 whitespace and newlines, but does not preserve arbitrary non-UTF-8 bytes.
 
+Flint computes the complete deterministic set before emitting it, then writes
+the output incrementally. For large or unusual path sets, consume `--null`
+directly as a stream rather than using shell command substitution. Pagination
+is intentionally not provided: the command emits one complete snapshot.
+
 ## Filtering
 
 Use `--include GLOB` and `--exclude GLOB` to select a subset of Flint's
@@ -89,6 +94,13 @@ if files:
     raise SystemExit(subprocess.run(["some-formatter", *files]).returncode)
 '
 ```
+
+On Unix, `xargs -0` can batch paths for tools that accept file arguments, but
+its batching options and availability vary across platforms. Cross-platform
+callers should parse the NUL stream incrementally and choose their own
+argument-size limit. If a caller only needs to know whether any matching path
+exists, it can stop after the first relevant record instead of collecting the
+whole list.
 
 Use a NUL-aware reader in other languages, for example Python:
 

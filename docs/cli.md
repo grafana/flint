@@ -61,9 +61,7 @@ See the dedicated [changed-file discovery guide](changed-files.md) for exact
 selection semantics and integration examples.
 
 Paths are separated by newlines by default. Use `--null` for machine-readable
-output when paths may contain whitespace or newlines:
-
-See the [NUL-aware examples](changed-files.md#output-formats), including an
+output when paths may contain whitespace or newlines. See the [NUL-aware examples](changed-files.md#output-formats), including an
 empty-output-safe Python invocation. Flint currently represents Git paths as
 UTF-8 strings, so `--null` does not preserve arbitrary non-UTF-8 bytes.
 

@@ -987,8 +987,13 @@ struct FlintTomlChange {
 
 impl FlintTomlChange {
     fn check_changed(&self, name: &str) -> bool {
-        toml_section(&self.current, &["checks", name])
-            != toml_section(&self.previous, &["checks", name])
+        self.check_config(&self.current, name) != self.check_config(&self.previous, name)
+    }
+
+    fn check_config<'a>(&self, value: &'a toml::Value, name: &str) -> Option<&'a toml::Value> {
+        let underscore_alias = name.replace('-', "_");
+        toml_section(value, &["checks", name])
+            .or_else(|| toml_section(value, &["checks", &underscore_alias]))
     }
 }
 
@@ -1376,8 +1381,8 @@ fn display_binary(check: &registry::Check) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        RunArgs, display_binary, linter_status, render_linters_table, unsupported_config,
-        use_filtered_run_policy, write_changed_files,
+        FlintTomlChange, RunArgs, display_binary, linter_status, render_linters_table,
+        unsupported_config, use_filtered_run_policy, write_changed_files,
     };
     use crate::{config, registry};
     use std::io;
@@ -1416,6 +1421,24 @@ mod tests {
         let files = [root.join("file.txt")];
         let mut stdout = ClosedPipe;
         assert!(write_changed_files(&mut stdout, root, &files, false).is_ok());
+    }
+
+    #[test]
+    fn flint_toml_check_changes_accept_underscore_aliases() {
+        let unchanged_alias = FlintTomlChange {
+            current: toml::from_str("[checks.renovate_deps]\nexclude_managers = []\n").unwrap(),
+            previous: toml::from_str("[checks.renovate-deps]\nexclude_managers = []\n").unwrap(),
+            settings_changed: false,
+        };
+        assert!(!unchanged_alias.check_changed("renovate-deps"));
+
+        let changed_alias = FlintTomlChange {
+            current: toml::from_str("[checks.renovate_deps]\nexclude_managers = [\"npm\"]\n")
+                .unwrap(),
+            previous: toml::from_str("[checks.renovate_deps]\nexclude_managers = []\n").unwrap(),
+            settings_changed: false,
+        };
+        assert!(changed_alias.check_changed("renovate-deps"));
     }
 
     fn mise_tools_from(content: &str) -> std::collections::HashMap<String, String> {

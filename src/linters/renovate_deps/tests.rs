@@ -749,6 +749,7 @@ fn incomplete_meta_for_rules_passes_when_meta_is_complete() {
     let rules = vec![ComparablePackageRule {
         label: "group \"linters\"".to_string(),
         matcher: RuleMatcher::DepNames(BTreeSet::from(["actionlint".to_string()])),
+        has_extract_version: false,
     }];
     assert!(incomplete_meta_for_rules(&snap, &rules).is_none());
 }
@@ -767,6 +768,7 @@ fn version_validation_uses_lookup_for_new_rule_relevant_dependency() {
     let rules = vec![ComparablePackageRule {
         label: "group \"linters\"".to_string(),
         matcher: RuleMatcher::DepNames(BTreeSet::from(["checkstyle".to_string()])),
+        has_extract_version: false,
     }];
 
     assert!(version_validation_needs_lookup(
@@ -779,7 +781,9 @@ fn version_validation_uses_lookup_for_new_rule_relevant_dependency() {
 
 #[test]
 fn bundled_preset_exposes_dependencies_with_extract_version_overrides() {
+    let dir = tempfile::tempdir().unwrap();
     let deps = bundled_extract_version_dep_names(
+        dir.path(),
         r#"{ extends: ["config:recommended", "github>grafana/flint#v1.2.3"] }"#,
     );
 
@@ -787,7 +791,25 @@ fn bundled_preset_exposes_dependencies_with_extract_version_overrides() {
         deps,
         HashSet::from(["biome".to_string(), "checkstyle".to_string()])
     );
-    assert!(bundled_extract_version_dep_names("{}").is_empty());
+    assert!(bundled_extract_version_dep_names(dir.path(), "{}").is_empty());
+}
+
+#[test]
+fn bundled_preset_is_resolved_through_local_preset() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("renovate-preset.json5"),
+        r#"{ extends: ["github>grafana/flint"] }"#,
+    )
+    .unwrap();
+
+    let deps =
+        bundled_extract_version_dep_names(dir.path(), r#"{ extends: ["local>renovate-preset"] }"#);
+
+    assert_eq!(
+        deps,
+        HashSet::from(["biome".to_string(), "checkstyle".to_string()])
+    );
 }
 
 #[test]
@@ -811,6 +833,7 @@ fn version_validation_uses_lookup_when_dependency_identity_changes() {
     let rules = vec![ComparablePackageRule {
         label: "group \"linters\"".to_string(),
         matcher: RuleMatcher::DepNames(BTreeSet::from(["checkstyle".to_string()])),
+        has_extract_version: false,
     }];
 
     assert!(version_validation_needs_lookup(
@@ -835,9 +858,52 @@ fn version_validation_keeps_extract_for_stable_dependency_identity() {
     let rules = vec![ComparablePackageRule {
         label: "group \"linters\"".to_string(),
         matcher: RuleMatcher::DepNames(BTreeSet::from(["checkstyle".to_string()])),
+        has_extract_version: false,
     }];
 
     assert!(!version_validation_needs_lookup(
+        &generated,
+        Some(&committed),
+        &rules,
+        &HashSet::new()
+    ));
+}
+
+#[test]
+fn version_validation_uses_lookup_for_new_package_name_rule_candidate() {
+    let generated = snapshot(&[], &[("mise.toml", &[("mise", &["actionlint"])])]);
+    let rules = vec![ComparablePackageRule {
+        label: "group \"linters\"".to_string(),
+        matcher: RuleMatcher::PackageNames(BTreeSet::from(["rhysd/actionlint".to_string()])),
+        has_extract_version: false,
+    }];
+
+    assert!(version_validation_needs_lookup(
+        &generated,
+        Some(&Snapshot::default()),
+        &rules,
+        &HashSet::new()
+    ));
+}
+
+#[test]
+fn version_validation_uses_lookup_for_incomplete_extract_version_rule_metadata() {
+    let generated = snapshot(
+        &[(
+            "checkstyle",
+            Some("checkstyle/checkstyle"),
+            Some("github-releases"),
+        )],
+        &[("mise.toml", &[("mise", &["checkstyle"])])],
+    );
+    let committed = generated.clone();
+    let rules = vec![ComparablePackageRule {
+        label: "extract checkstyle version".to_string(),
+        matcher: RuleMatcher::DepNames(BTreeSet::from(["checkstyle".to_string()])),
+        has_extract_version: true,
+    }];
+
+    assert!(version_validation_needs_lookup(
         &generated,
         Some(&committed),
         &rules,
@@ -856,6 +922,7 @@ fn incomplete_meta_for_rules_dep_name_rule_tolerates_missing_datasource() {
     let rules = vec![ComparablePackageRule {
         label: "group \"linters\"".to_string(),
         matcher: RuleMatcher::DepNames(BTreeSet::from(["biome".to_string()])),
+        has_extract_version: false,
     }];
     assert!(incomplete_meta_for_rules(&snap, &rules).is_none());
 }
@@ -869,6 +936,7 @@ fn incomplete_meta_for_rules_dep_name_rule_flags_missing_packagename() {
     let rules = vec![ComparablePackageRule {
         label: "group \"linters\"".to_string(),
         matcher: RuleMatcher::DepNames(BTreeSet::from(["actionlint".to_string()])),
+        has_extract_version: false,
     }];
     let reason = incomplete_meta_for_rules(&snap, &rules).unwrap();
     assert!(reason.contains("actionlint"));
@@ -884,6 +952,7 @@ fn incomplete_meta_for_rules_package_name_rule_requires_datasource() {
     let rules = vec![ComparablePackageRule {
         label: "group \"mise\"".to_string(),
         matcher: RuleMatcher::PackageNames(BTreeSet::from(["jdx/mise".to_string()])),
+        has_extract_version: false,
     }];
     let reason = incomplete_meta_for_rules(&snap, &rules).unwrap();
     assert!(reason.contains("mise"));
@@ -1140,6 +1209,32 @@ fn add_to_package_rules_reuses_existing_trailing_comma() {
 }
 
 #[test]
+fn add_to_package_rules_puts_comma_before_trailing_line_comment() {
+    let content = r#"{
+  packageRules: [
+    {
+      matchDepNames: ["renovate"]
+    } // keep this comment
+  ],
+}
+"#;
+    let rule = serde_json::json!({
+        "description": "Flint autofix",
+        "matchDepNames": ["checkstyle"],
+        "extractVersion": "^checkstyle-(?<version>.+)$",
+    });
+
+    let updated = add_to_package_rules(content, &[rule]).unwrap();
+
+    assert!(
+        updated.contains("}, // keep this comment"),
+        "updated config: {updated}"
+    );
+    let parsed: serde_json::Value = json5::from_str(&updated).unwrap();
+    assert_eq!(parsed["packageRules"].as_array().unwrap().len(), 2);
+}
+
+#[test]
 fn validate_rule_coverage_flags_split_dep_names_for_same_package() {
     let dir = tempfile::tempdir().unwrap();
     let config_path = dir.path().join("renovate.json5");
@@ -1331,6 +1426,7 @@ fn trim_snapshot_meta_keeps_only_rule_relevant_deps() {
     let rules = vec![ComparablePackageRule {
         label: "group \"linters\"".to_string(),
         matcher: RuleMatcher::DepNames(BTreeSet::from(["actionlint".to_string()])),
+        has_extract_version: false,
     }];
 
     let relevant = relevant_dep_names(&snapshot, &rules);

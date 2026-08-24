@@ -305,7 +305,7 @@ fn generated_paths(project_root: &Path, names: &BTreeSet<String>) -> Result<Hash
 
     let mut generated = HashSet::new();
     let fields: Vec<&[u8]> = out.stdout.split(|byte| *byte == 0).collect();
-    for chunk in fields.chunks_exact(3) {
+    for chunk in fields.as_chunks::<3>().0 {
         let path = String::from_utf8_lossy(chunk[0]);
         let info = String::from_utf8_lossy(chunk[2]);
         if matches!(info.as_ref(), "set" | "true") {

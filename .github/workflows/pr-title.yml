@@ -5,11 +5,13 @@ on:
     types:
       - opened
       - edited
+      - synchronize
+      - reopened
 permissions:
   pull-requests: read
 
 jobs:
-  lint:
+  pr-title:
     runs-on: ubuntu-latest
     steps:
       - uses: grafana/shared-workflows/actions/lint-pr-title@70c40e5b6522c854a55334124545261cae3d4c73 # lint-pr-title/v1.2.4

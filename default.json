@@ -38,6 +38,11 @@
       "extractVersion": "^@biomejs/biome@(?<version>.+)$"
     },
     {
+      "description": "Align Checkstyle's aqua tag format with Renovate extractVersion matching",
+      "matchDepNames": ["checkstyle"],
+      "extractVersion": "^checkstyle\\-(?<version>.+)$"
+    },
+    {
       "matchPackageNames": ["jdx/mise"],
       "groupName": "mise",
       "description": "Only update mise once a week",

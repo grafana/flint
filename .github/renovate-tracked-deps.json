@@ -12,10 +12,6 @@
       "packageName": "owenlamont/ryl",
       "datasource": "github-tags"
     },
-    "kube-linter": {
-      "packageName": "stackrox/kube-linter",
-      "datasource": "github-tags"
-    },
     "biome": {
       "packageName": "biomejs/biome",
       "datasource": "github-tags"
@@ -44,9 +40,17 @@
       "packageName": "hadolint/hadolint",
       "datasource": "github-tags"
     },
+    "jdx/mise": {
+      "packageName": "jdx/mise",
+      "datasource": "github-release-attachments"
+    },
     "ktlint": {
       "packageName": "pinterest/ktlint",
       "datasource": "github-releases"
+    },
+    "kube-linter": {
+      "packageName": "stackrox/kube-linter",
+      "datasource": "github-tags"
     },
     "lychee": {
       "packageName": "lycheeverse/lychee",
@@ -90,12 +94,58 @@
     }
   },
   "files": {
+    ".github/workflows/lint.yml": {
+      "github-actions": [
+        "Swatinem/rust-cache",
+        "actions/checkout",
+        "jdx/mise",
+        "jdx/mise-action",
+        "ubuntu"
+      ]
+    },
+    ".github/workflows/mise-registry.yml": {
+      "github-actions": [
+        "Swatinem/rust-cache",
+        "actions/checkout",
+        "jdx/mise",
+        "jdx/mise-action",
+        "ubuntu"
+      ]
+    },
+    ".github/workflows/pr-title.yml": {
+      "github-actions": [
+        "grafana/shared-workflows",
+        "ubuntu"
+      ]
+    },
+    ".github/workflows/release-plz.yml": {
+      "github-actions": [
+        "actions/checkout",
+        "jdx/mise",
+        "jdx/mise-action",
+        "ubuntu"
+      ]
+    },
     ".github/workflows/release.yml": {
+      "github-actions": [
+        "actions/attest-build-provenance",
+        "actions/checkout",
+        "jdx/mise",
+        "jdx/mise-action",
+        "taiki-e/install-action",
+        "ubuntu"
+      ],
       "regex": [
         "mise"
       ]
     },
     ".github/workflows/test.yml": {
+      "github-actions": [
+        "Swatinem/rust-cache",
+        "actions/checkout",
+        "jdx/mise",
+        "jdx/mise-action"
+      ],
       "regex": [
         "mise"
       ]
@@ -137,6 +187,33 @@
         "jdx/mise-action",
         "mise"
       ]
+    }
+  },
+  "actionMeta": {
+    "Swatinem/rust-cache": {
+      "packageName": "Swatinem/rust-cache",
+      "refKind": "version-tag"
+    },
+    "actions/attest-build-provenance": {
+      "packageName": "actions/attest-build-provenance",
+      "refKind": "version-tag"
+    },
+    "actions/checkout": {
+      "packageName": "actions/checkout",
+      "refKind": "version-tag"
+    },
+    "grafana/shared-workflows/actions/lint-pr-title": {
+      "packageName": "grafana/shared-workflows",
+      "refKind": "version-tag",
+      "compatibility": "lint-pr-title"
+    },
+    "jdx/mise-action": {
+      "packageName": "jdx/mise-action",
+      "refKind": "version-tag"
+    },
+    "taiki-e/install-action": {
+      "packageName": "taiki-e/install-action",
+      "refKind": "version-tag"
     }
   }
 }

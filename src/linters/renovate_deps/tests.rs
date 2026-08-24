@@ -754,6 +754,98 @@ fn incomplete_meta_for_rules_passes_when_meta_is_complete() {
 }
 
 #[test]
+fn version_validation_uses_lookup_for_new_rule_relevant_dependency() {
+    let generated = snapshot(
+        &[(
+            "checkstyle",
+            Some("checkstyle/checkstyle"),
+            Some("github-tags"),
+        )],
+        &[("mise.toml", &[("mise", &["checkstyle"])])],
+    );
+    let committed = Snapshot::default();
+    let rules = vec![ComparablePackageRule {
+        label: "group \"linters\"".to_string(),
+        matcher: RuleMatcher::DepNames(BTreeSet::from(["checkstyle".to_string()])),
+    }];
+
+    assert!(version_validation_needs_lookup(
+        &generated,
+        Some(&committed),
+        &rules,
+        &HashSet::new()
+    ));
+}
+
+#[test]
+fn bundled_preset_exposes_dependencies_with_extract_version_overrides() {
+    let deps = bundled_extract_version_dep_names(
+        r#"{ extends: ["config:recommended", "github>grafana/flint#v1.2.3"] }"#,
+    );
+
+    assert_eq!(
+        deps,
+        HashSet::from(["biome".to_string(), "checkstyle".to_string()])
+    );
+    assert!(bundled_extract_version_dep_names("{}").is_empty());
+}
+
+#[test]
+fn version_validation_uses_lookup_when_dependency_identity_changes() {
+    let generated = snapshot(
+        &[(
+            "checkstyle",
+            Some("checkstyle/checkstyle"),
+            Some("github-tags"),
+        )],
+        &[("mise.toml", &[("mise", &["checkstyle"])])],
+    );
+    let committed = snapshot(
+        &[(
+            "checkstyle",
+            Some("checkstyle/checkstyle"),
+            Some("github-releases"),
+        )],
+        &[("mise.toml", &[("mise", &["checkstyle"])])],
+    );
+    let rules = vec![ComparablePackageRule {
+        label: "group \"linters\"".to_string(),
+        matcher: RuleMatcher::DepNames(BTreeSet::from(["checkstyle".to_string()])),
+    }];
+
+    assert!(version_validation_needs_lookup(
+        &generated,
+        Some(&committed),
+        &rules,
+        &HashSet::new()
+    ));
+}
+
+#[test]
+fn version_validation_keeps_extract_for_stable_dependency_identity() {
+    let generated = snapshot(
+        &[(
+            "checkstyle",
+            Some("checkstyle/checkstyle"),
+            Some("github-tags"),
+        )],
+        &[("mise.toml", &[("mise", &["checkstyle"])])],
+    );
+    let committed = generated.clone();
+    let rules = vec![ComparablePackageRule {
+        label: "group \"linters\"".to_string(),
+        matcher: RuleMatcher::DepNames(BTreeSet::from(["checkstyle".to_string()])),
+    }];
+
+    assert!(!version_validation_needs_lookup(
+        &generated,
+        Some(&committed),
+        &rules,
+        &HashSet::new()
+    ));
+}
+
+#[test]
 fn incomplete_meta_for_rules_dep_name_rule_tolerates_missing_datasource() {
     // matchDepNames doesn't need datasource — Renovate doesn't always surface
     // one for bare-key mise tools (e.g. biome) and grouping isn't affected.
@@ -1022,6 +1114,29 @@ fn patch_extract_version_overrides_preserves_json5_formatting() {
     let rules = parsed["packageRules"].as_array().unwrap();
     assert_eq!(rules.len(), 1);
     assert_eq!(rules[0]["matchDepNames"][0], "biome");
+}
+
+#[test]
+fn add_to_package_rules_reuses_existing_trailing_comma() {
+    let content = r#"{
+  packageRules: [
+    {
+      matchDepNames: ["renovate"],
+    },
+  ],
+}
+"#;
+    let rule = serde_json::json!({
+        "description": "Flint autofix",
+        "matchDepNames": ["checkstyle"],
+        "extractVersion": "^checkstyle-(?<version>.+)$",
+    });
+
+    let updated = add_to_package_rules(content, &[rule]).unwrap();
+
+    assert!(!updated.contains("},,"), "updated config: {updated}");
+    let parsed: serde_json::Value = json5::from_str(&updated).unwrap();
+    assert_eq!(parsed["packageRules"].as_array().unwrap().len(), 2);
 }
 
 #[test]
@@ -1676,7 +1791,16 @@ fn extract_failure_snippet_handles_missing_msg() {
 {\"level\":60,\"msg\":\"\",\"err\":{\"message\":\"fatal\"}}\n\
 {\"level\":40,\"msg\":\"warn only\"}\n";
     let snippet = extract_failure_snippet(log);
-    assert_eq!(snippet, "level=50 boom\nlevel=60 fatal\nlevel=40 warn only");
+    assert_eq!(snippet, "level=60 fatal");
+}
+
+#[test]
+fn extract_failure_snippet_omits_startup_warning_when_fatal_error_exists() {
+    let log = "\
+{\"level\":40,\"msg\":\"RE2 not usable, falling back to RegExp\"}\n\
+{\"level\":60,\"msg\":\"Could not parse config file\"}\n";
+    let snippet = extract_failure_snippet(log);
+    assert_eq!(snippet, "level=60 Could not parse config file");
 }
 
 #[test]

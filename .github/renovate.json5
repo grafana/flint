@@ -87,5 +87,12 @@
       description: "Only update mise once a week",
       schedule: ["before 4am on Monday"],
     },
+    {
+      "description": "Align Checkstyle's aqua tag format with Renovate extractVersion matching",
+      "extractVersion": "^checkstyle\\-(?<version>.+)$",
+      "matchDepNames": [
+        "checkstyle"
+      ]
+    }
   ],
 }

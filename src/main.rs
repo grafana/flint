@@ -318,7 +318,6 @@ async fn run(
         args.new_from_rev.as_deref(),
         args.to_ref.as_deref(),
     )?;
-
     // Discover which checks are declared in the consuming repo's mise.toml.
     // Outside CI, plain `flint run` relevance-gates checks that declare an
     // `adaptive_relevance` hook. Explicit linter names and `--full` bypass the
@@ -341,29 +340,35 @@ async fn run(
             std::process::exit(1);
         }
     }
-    let active: Vec<&registry::Check> = {
-        let mut out = vec![];
-        let relevance_ctx = AdaptiveRunContext {
-            file_list: &file_list,
-            project_root,
-        };
-        for c in checks {
-            if registry::check_active(c, &mise_tools) {
-                let include = !use_filtered_policy
-                    || c.adaptive_relevance.is_none_or(|hook| hook(&relevance_ctx));
-                if include {
-                    out.push(c);
-                }
-            } else if explicit {
-                eprintln!(
-                    "flint: linter {name} is not active (binary not installed or not declared in mise.toml)",
-                    name = c.name
-                );
-                std::process::exit(1);
-            }
+    let mut eligible = vec![];
+    for c in checks {
+        if registry::check_active(c, &mise_tools) {
+            eligible.push(c);
+        } else if explicit {
+            eprintln!(
+                "flint: linter {name} is not active (binary not installed or not declared in mise.toml)",
+                name = c.name
+            );
+            std::process::exit(1);
         }
-        out
+    }
+
+    // Baseline triggers must bypass adaptive local relevance. In particular, a
+    // check-specific flint.toml change can be the only relevant changed file.
+    let baseline_candidates =
+        baseline_check_names(&eligible, &file_list, project_root, config_dir, &mise_tools);
+    let relevance_ctx = AdaptiveRunContext {
+        file_list: &file_list,
+        project_root,
     };
+    let active: Vec<&registry::Check> = eligible
+        .into_iter()
+        .filter(|c| {
+            !use_filtered_policy
+                || baseline_candidates.contains(c.name)
+                || c.adaptive_relevance.is_none_or(|hook| hook(&relevance_ctx))
+        })
+        .collect();
 
     let mut setup_check_result = None;
     let mut setup_fix_outcome = None;
@@ -923,19 +928,28 @@ fn baseline_check_names(
     active
         .iter()
         .filter(|check| {
-            !registry::check_active(check, &previous_tools)
-                || registry::tool_version_changed(check, &previous_tools, current_tools)
-                || registry::runtime_version_changed(check, &previous_tools, current_tools)
-                || flint_toml.as_ref().is_some_and(|change| {
-                    change.settings_changed
-                        || (check.kind.is_native() && change.check_changed(check.name))
-                })
-                || check.baseline_config.as_ref().is_some_and(|config| {
-                    changed.contains(&config_file_rel_path(project_root, config_dir, config))
-                })
-                || check.baseline_triggers.iter().any(|config| {
-                    changed.contains(&config_file_rel_path(project_root, config_dir, config))
-                })
+            let newly_active = !registry::check_active(check, &previous_tools);
+            let tool_version_changed =
+                registry::tool_version_changed(check, &previous_tools, current_tools);
+            let runtime_version_changed =
+                registry::runtime_version_changed(check, &previous_tools, current_tools);
+            let flint_toml_requires_baseline = flint_toml.as_ref().is_some_and(|change| {
+                change.settings_changed
+                    || (check.kind.is_native() && change.check_changed(check.name))
+            });
+            let baseline_config_changed = check.baseline_config.as_ref().is_some_and(|config| {
+                changed.contains(&config_file_rel_path(project_root, config_dir, config))
+            });
+            let baseline_trigger_changed = check.baseline_triggers.iter().any(|config| {
+                changed.contains(&config_file_rel_path(project_root, config_dir, config))
+            });
+
+            newly_active
+                || tool_version_changed
+                || runtime_version_changed
+                || flint_toml_requires_baseline
+                || baseline_config_changed
+                || baseline_trigger_changed
         })
         .map(|check| check.name.to_string())
         .collect()

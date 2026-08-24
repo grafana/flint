@@ -560,23 +560,11 @@ fn repo_renovate_config_stays_aligned_with_shared_preset_contract() {
         );
     }
 
-    {
-        let description = "Align biome's aqua tag format with Renovate extractVersion matching";
-        let default_rule = package_rule_by_description(&default_parsed, description)
-            .unwrap_or_else(|| panic!("default.json missing package rule {description:?}"));
-        let repo_rule =
-            package_rule_by_description(&repo_parsed, description).unwrap_or_else(|| {
-                panic!(".github/renovate.json5 missing package rule {description:?}")
-            });
-        assert_eq!(
-            default_rule["matchDepNames"], repo_rule["matchDepNames"],
-            "biome extractVersion override matchDepNames drifted between default.json and .github/renovate.json5"
-        );
-        assert_eq!(
-            default_rule["extractVersion"], repo_rule["extractVersion"],
-            "biome extractVersion override drifted between default.json and .github/renovate.json5"
-        );
-    }
+    assert_eq!(
+        extract_version_rules(&default_parsed),
+        extract_version_rules(&repo_parsed),
+        "extractVersion overrides drifted between default.json and .github/renovate.json5"
+    );
 }
 
 #[test]
@@ -720,15 +708,20 @@ fn package_rule_by_group_name<'a>(
         .find(|rule| rule["groupName"].as_str() == Some(group_name))
 }
 
-fn package_rule_by_description<'a>(
-    parsed: &'a serde_json::Value,
-    description: &str,
-) -> Option<&'a serde_json::Value> {
-    parsed["packageRules"]
+fn extract_version_rules(parsed: &serde_json::Value) -> Vec<serde_json::Value> {
+    let mut rules: Vec<_> = parsed["packageRules"]
         .as_array()
         .into_iter()
         .flatten()
-        .find(|rule| rule["description"].as_str() == Some(description))
+        .filter(|rule| !rule["extractVersion"].is_null())
+        .cloned()
+        .collect();
+    rules.sort_by(|left, right| {
+        left["description"]
+            .as_str()
+            .cmp(&right["description"].as_str())
+    });
+    rules
 }
 
 fn package_names(rule: &serde_json::Value) -> Vec<&str> {

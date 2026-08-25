@@ -845,8 +845,16 @@ fn mise_fix_command(project_root: &Path) -> Option<String> {
             .as_table_like()
             .and_then(|task| task.get("run"))
             .and_then(toml_edit::Item::as_str);
-        (run == Some("flint run --fix")).then(|| format!("mise run {name}"))
+        (run == Some("flint run --fix") && is_safe_mise_task_name(name))
+            .then(|| format!("mise run {name}"))
     })
+}
+
+fn is_safe_mise_task_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b':' | b'_' | b'-'))
 }
 
 #[cfg(test)]
@@ -862,6 +870,17 @@ mod fix_command_tests {
         )
         .unwrap();
         assert_eq!(fix_command(root.path()), "mise run lint:fix");
+    }
+
+    #[test]
+    fn falls_back_for_unsafe_mise_fix_task_name() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(
+            root.path().join("mise.toml"),
+            "[tasks.\"lint fix\"]\nrun = \"flint run --fix\"\n",
+        )
+        .unwrap();
+        assert_eq!(fix_command(root.path()), "flint run --fix");
     }
 }
 

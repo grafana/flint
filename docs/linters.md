@@ -55,6 +55,11 @@ page with its behavior, configuration, and examples.
 
 ## Scopes
 
+Flint owns file selection: file and files checks receive only eligible tracked
+paths selected by Flint, including in `--full` mode. Some checks necessarily
+deviate because they need project context or perform their own discovery; see
+[the file-selection contract and authoritative exception list](check-model.md#file-selection-contract).
+
 ### Scope: file
 
 Invoked once per matched file.
@@ -69,18 +74,14 @@ every eligible tracked file.
 
 Invoked once with no file args; for checks with patterns set, skipped entirely
 if no matching files changed, but runs on the whole project when it does run.
-The template checks using this scope are explicit exceptions to Flint's
-file-selection contract: `cargo-fmt`, `cargo-clippy`, and `golangci-lint` need
-project/package context. `golangci-lint` uses `--new-from-rev` to scope reported
-findings to changed code, but may still inspect the project. Native
-project-wide exceptions are described below.
+Project-scoped checks are explicit exceptions to Flint's file-selection
+contract; see the authoritative exception list in
+[How Flint runs checks](check-model.md#file-selection-contract).
 
 ### Scope: native
 
 Implemented in-process rather than via a command template. Native checks declare
-whether they honor Flint's selected paths. Most do; `kube-linter`,
-`renovate-deps`, and `flint-setup` are explicit project-wide exceptions.
-Kube-linter recursively selects configured manifests; renovate-deps examines
-fixed dependency metadata paths; and flint-setup checks its fixed setup files.
+whether they honor Flint's selected paths. Most do; the explicit exceptions are
+listed in [How Flint runs checks](check-model.md#file-selection-contract).
 See [How Flint runs checks](check-model.md) for the higher-level model and when
 to choose native vs template checks.

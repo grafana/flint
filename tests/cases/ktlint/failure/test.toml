@@ -9,5 +9,5 @@ Summary error count (descending) by rule:
   standard:indent: 1
 
 flint: 1 check failed (ktlint)
-💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+💡 Try `mise run lint:fix` to auto-fix lint issues, then re-run `flint run` to verify.
 '''

@@ -75,10 +75,13 @@ Template checks declare:
   - **project**: one invocation with no file arguments
 
 Flint owns file selection: file and files checks receive only eligible tracked
-paths selected by Flint, including in `--full` mode. Project-scoped checks are
-explicit exceptions because some upstream CLIs require package-wide context.
-The current exceptions are `cargo-fmt`, `cargo-clippy`, and `golangci-lint`;
-they may inspect files beyond Flint's selected list when activated.
+paths selected by Flint, including in `--full` mode. Checks that cannot obey this
+contract are explicit exceptions and may inspect files beyond Flint's selected
+list. The current exceptions are `cargo-fmt`, `cargo-clippy`, `flint-setup`,
+`golangci-lint`, `kube-linter`, and `renovate-deps`. Cargo and golangci-lint
+need package context; kube-linter recursively selects configured manifests;
+renovate-deps examines fixed dependency metadata paths; and flint-setup checks
+its fixed setup files (`mise.toml` and `flint.toml`).
 
 This is the simplest model when a tool is already a good CLI and Flint mainly
 needs to handle:

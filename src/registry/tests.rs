@@ -286,7 +286,14 @@ fn ktlint_full_runs_keep_file_list_filtering() {
 fn project_wide_checks_are_explicit_file_selection_exceptions() {
     use crate::registry::FileSelection;
 
-    let expected = ["cargo-clippy", "cargo-fmt", "golangci-lint"];
+    let expected = [
+        "cargo-clippy",
+        "cargo-fmt",
+        "flint-setup",
+        "golangci-lint",
+        "kube-linter",
+        "renovate-deps",
+    ];
     let mut exceptions: Vec<&str> = builtin()
         .iter()
         .filter(|check| check.file_selection == FileSelection::ProjectWide)
@@ -296,9 +303,15 @@ fn project_wide_checks_are_explicit_file_selection_exceptions() {
     assert_eq!(exceptions, expected);
 
     for check in builtin() {
-        if let CheckKind::Template { full_cmd, .. } = check.kind {
+        if let CheckKind::Template {
+            full_cmd,
+            full_fix_cmd,
+            ..
+        } = check.kind
+        {
             assert!(
-                full_cmd.is_empty() || check.file_selection == FileSelection::ProjectWide,
+                (full_cmd.is_empty() && full_fix_cmd.is_empty())
+                    || check.file_selection == FileSelection::ProjectWide,
                 "{} has an unscoped full command without declaring a project-wide exception",
                 check.name
             );

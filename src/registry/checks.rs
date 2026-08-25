@@ -625,6 +625,7 @@ fn check_gofmt() -> Check {
 
 fn check_google_java_format() -> Check {
     Check::native(&google_java_format::CHECK_TYPE)
+        .flint_file_selection()
         .patterns(&["*.java"])
         .mise_tool("google-java-format")
         .formatter()
@@ -650,6 +651,7 @@ fn check_google_java_format() -> Check {
 
 fn check_regex_replace() -> Check {
     Check::native(&regex_replace::CHECK_TYPE)
+        .flint_file_selection()
         .fix_first()
         .activate_unconditionally()
         .status_hook(regex_replace::status)
@@ -725,6 +727,7 @@ fn check_dotnet_format() -> Check {
 
 fn check_lychee() -> Check {
     Check::native(&lychee::CHECK_TYPE)
+        .flint_file_selection()
         .project_url(LYCHEE_URL)
         .overview(
             OverviewSection::General,
@@ -753,6 +756,7 @@ fn check_renovate_deps() -> Check {
 
 fn check_license_header() -> Check {
     Check::native(&license_header::CHECK_TYPE)
+        .flint_file_selection()
         .activate_unconditionally()
         .status_hook(license_header::status)
         .overview(

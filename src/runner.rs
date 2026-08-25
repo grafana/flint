@@ -981,6 +981,7 @@ mod tests {
                 full_fix_cmd: "",
                 scope: Scope::Files,
             },
+            file_selection: crate::registry::FileSelection::Flint,
             ..project_check(patterns)
         }
     }

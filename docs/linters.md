@@ -61,21 +61,26 @@ Invoked once per matched file.
 
 ### Scope: files
 
-Invoked once with all Flint-selected files as args. This includes every
-eligible tracked file in `--full` mode.
+Invoked in one or more batches with Flint-selected files as args. Batches are
+used when the rendered command would be large. In `--full` mode, this includes
+every eligible tracked file.
 
 ### Scope: project
 
 Invoked once with no file args; for checks with patterns set, skipped entirely
 if no matching files changed, but runs on the whole project when it does run.
-These are explicit exceptions to Flint's file-selection contract: `cargo-fmt`,
-`cargo-clippy`, and `golangci-lint` need project/package context that their CLIs
-cannot constrain to a path list. `golangci-lint` uses `--new-from-rev` to scope
-reported findings to changed code, but may still inspect the project.
+The template checks using this scope are explicit exceptions to Flint's
+file-selection contract: `cargo-fmt`, `cargo-clippy`, and `golangci-lint` need
+project/package context. `golangci-lint` uses `--new-from-rev` to scope reported
+findings to changed code, but may still inspect the project. Native
+project-wide exceptions are described below.
 
 ### Scope: native
 
-Implemented in-process rather than via a command template. These checks may run
-without file arguments or use custom orchestration logic. See
-[How Flint runs checks](check-model.md) for the higher-level model and when to
-choose native vs template checks.
+Implemented in-process rather than via a command template. Native checks declare
+whether they honor Flint's selected paths. Most do; `kube-linter`,
+`renovate-deps`, and `flint-setup` are explicit project-wide exceptions.
+Kube-linter recursively selects configured manifests; renovate-deps examines
+fixed dependency metadata paths; and flint-setup checks its fixed setup files.
+See [How Flint runs checks](check-model.md) for the higher-level model and when
+to choose native vs template checks.

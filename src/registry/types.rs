@@ -759,7 +759,7 @@ impl Check {
             mise_tool_name: None,
             version_range: None,
             patterns: &[],
-            file_selection: FileSelection::Flint,
+            file_selection: FileSelection::ProjectWide,
             excludes_if_active: &[],
             linter_config: None,
             env: &[],
@@ -796,6 +796,14 @@ impl Check {
     }
 
     // --- Modifiers ---
+
+    /// Declare that native preparation constrains execution to Flint's selected paths.
+    /// Native checks default to `ProjectWide` because their implementations may discover
+    /// files independently; opt in only when the implementation demonstrably uses the list.
+    pub fn flint_file_selection(mut self) -> Self {
+        self.file_selection = FileSelection::Flint;
+        self
+    }
 
     /// Override `bin_name` when the binary name differs from the check name
     /// (e.g. `ruff-format` invokes `ruff`).

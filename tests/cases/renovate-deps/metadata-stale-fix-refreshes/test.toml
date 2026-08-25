@@ -13,8 +13,9 @@ GITHUB_TOKEN = "token"
 ".reno-modes" = """
 extract
 lookup
+lookup
 """
-".reno-count" = "2\n"
+".reno-count" = "3\n"
 "renovate-tracked-deps.json" = """
 {
   "meta": {

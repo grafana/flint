@@ -10,7 +10,7 @@ stderr_contains = [
 GITHUB_TOKEN = "token"
 
 [expected.files]
-".reno-mode" = "extract\n"
+".reno-mode" = "lookup\n"
 
 [fake_bins]
 renovate = '''

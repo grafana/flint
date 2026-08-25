@@ -1,0 +1,22 @@
+[expected]
+args = "run"
+exit = 1
+stderr = """
+[renovate-deps]
+flint: renovate-deps: renovate exited with status 1: level=60 Could not parse config file
+
+flint: 1 check failed (renovate-deps)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+"""
+
+[env]
+GITHUB_TOKEN = "token"
+FLINT_CONFIG_DIR = ".github/config"
+
+[fake_bins]
+renovate = '''
+#!/bin/sh
+printf '%s\n' '{"level":40,"msg":"RE2 not usable, falling back to RegExp"}' >&2
+printf '%s\n' '{"level":60,"msg":"Could not parse config file"}' >&2
+exit 1
+'''

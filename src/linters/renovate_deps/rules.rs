@@ -30,6 +30,7 @@ pub(crate) enum RuleMatcher {
 pub(crate) struct ComparablePackageRule {
     pub(crate) label: String,
     pub(crate) matcher: RuleMatcher,
+    pub(crate) has_extract_version: bool,
 }
 
 #[derive(Debug)]
@@ -469,7 +470,7 @@ fn extracted_dep_names(snapshot: &Snapshot) -> BTreeSet<String> {
         .collect()
 }
 
-fn package_name_rule_dep_candidates(
+pub(crate) fn package_name_rule_dep_candidates(
     snapshot: &Snapshot,
     package_names: &BTreeSet<String>,
 ) -> BTreeSet<String> {
@@ -552,7 +553,13 @@ fn comparable_package_rule(
     };
 
     Ok(Some(ComparableRuleOutcome::Comparable(
-        ComparablePackageRule { label, matcher },
+        ComparablePackageRule {
+            label,
+            matcher,
+            has_extract_version: rule
+                .get("extractVersion")
+                .is_some_and(|value| !value.is_null()),
+        },
     )))
 }
 

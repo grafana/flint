@@ -26,6 +26,48 @@ use regex::Regex;
 const FLINT_DEFAULT_PRESET: &str = include_str!("../../../default.json");
 const FLINT_PRESET_EXTEND_PREFIX: &str = "github>grafana/flint";
 
+pub(crate) fn bundled_extract_version_dep_names(
+    project_root: &Path,
+    config_content: &str,
+) -> HashSet<String> {
+    let mut visited = HashSet::new();
+    if !extends_flint_preset(project_root, config_content, &mut visited) {
+        return HashSet::new();
+    }
+
+    serde_json::from_str::<serde_json::Value>(FLINT_DEFAULT_PRESET)
+        .ok()
+        .and_then(|preset| preset["packageRules"].as_array().cloned())
+        .into_iter()
+        .flatten()
+        .filter(|rule| !rule["extractVersion"].is_null())
+        .flat_map(|rule| {
+            rule["matchDepNames"]
+                .as_array()
+                .cloned()
+                .into_iter()
+                .flatten()
+        })
+        .filter_map(|dep_name| dep_name.as_str().map(ToOwned::to_owned))
+        .collect()
+}
+
+fn extends_flint_preset(
+    project_root: &Path,
+    config_content: &str,
+    visited: &mut HashSet<String>,
+) -> bool {
+    let Ok(config) = json5::from_str::<serde_json::Value>(config_content) else {
+        return false;
+    };
+
+    extends_entries(&config).into_iter().any(|entry| {
+        is_flint_preset_extend(entry)
+            || resolve_extend(project_root, entry, visited)
+                .is_some_and(|resolved| extends_flint_preset(project_root, &resolved, visited))
+    })
+}
+
 /// Returns true if any `changed` path matches a `managerFilePatterns` entry
 /// declared by `config_content` (or one of its resolvable `extends`).
 pub(crate) fn changed_matches_manager_file_patterns(

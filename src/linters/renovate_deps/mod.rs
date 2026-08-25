@@ -5,12 +5,14 @@ use std::process::Stdio;
 
 use self::action_validation::validate_lookup_action_warnings;
 use self::install_patch::configure_extract_workaround_env;
-use self::manager_patterns::changed_matches_manager_file_patterns;
+use self::manager_patterns::{
+    bundled_extract_version_dep_names, changed_matches_manager_file_patterns,
+};
 use self::mise_normalize::patch_semver_equivalent_mise_values;
 use self::rules::{
     ExtractVersionMismatch, comparable_package_rules_for_config, extract_version_mismatches,
-    incomplete_meta_for_rules, trim_snapshot_meta, validate_extract_version_consistency,
-    validate_rule_coverage,
+    incomplete_meta_for_rules, package_name_rule_dep_candidates, relevant_dep_names,
+    trim_snapshot_meta, validate_extract_version_consistency, validate_rule_coverage,
 };
 use self::snapshot::{Snapshot, extract_deps, read_snapshot, unified_diff, write_snapshot};
 use crate::config::RenovateDepsConfig;
@@ -381,23 +383,27 @@ fn add_to_package_rules(content: &str, rules: &[serde_json::Value]) -> anyhow::R
         let inside = &content[inside_start..close_pos];
 
         if inside.contains('\n') {
-            let insert_pos = inside
-                .char_indices()
-                .rfind(|(_, ch)| !ch.is_whitespace())
-                .map(|(idx, _)| inside_start + idx + 1)
-                .unwrap_or(inside_start);
+            let insert_pos = inside_start + inside.trim_end().len();
             let indent = inside
                 .lines()
                 .find(|line| !line.trim().is_empty())
                 .map(|line| " ".repeat(line.len() - line.trim_start().len()))
                 .unwrap_or_else(|| "    ".to_string());
             let rendered = render_package_rules(rules, &indent)?;
-            let separator = if inside.trim().is_empty() { "" } else { "," };
+            let last_code_token = last_json5_code_token(inside);
+            let code_end = last_code_token
+                .map(|(end, _)| inside_start + end)
+                .unwrap_or(inside_start);
+            let separator = match last_code_token {
+                None | Some((_, ',')) => "",
+                Some(_) => ",",
+            };
 
             return Ok(format!(
-                "{}{}\n{}{}{}",
-                &content[..insert_pos],
+                "{}{}{}\n{}{}{}",
+                &content[..code_end],
                 separator,
+                &content[code_end..insert_pos],
                 rendered,
                 &content[insert_pos..close_pos],
                 &content[close_pos..]
@@ -409,7 +415,7 @@ fn add_to_package_rules(content: &str, rules: &[serde_json::Value]) -> anyhow::R
             .map(serde_json::to_string)
             .collect::<Result<Vec<_>, _>>()?
             .join(", ");
-        let separator = if inside.trim().is_empty() { "" } else { ", " };
+        let separator = separator_before_append(inside, ", ", " ");
         Ok(format!(
             "{}{}{}{}",
             &content[..close_pos],
@@ -434,6 +440,78 @@ fn add_to_package_rules(content: &str, rules: &[serde_json::Value]) -> anyhow::R
                 before, rendered, after
             ))
         }
+    }
+}
+
+fn has_trailing_comma(value: &str) -> bool {
+    value.trim_end().ends_with(',')
+}
+
+fn last_json5_code_token(value: &str) -> Option<(usize, char)> {
+    let mut chars = value.char_indices().peekable();
+    let mut last = None;
+
+    while let Some((idx, ch)) = chars.next() {
+        if ch == '/' {
+            match chars.peek().map(|(_, next)| *next) {
+                Some('/') => {
+                    chars.next();
+                    for (_, comment_ch) in chars.by_ref() {
+                        if comment_ch == '\n' {
+                            break;
+                        }
+                    }
+                    continue;
+                }
+                Some('*') => {
+                    chars.next();
+                    let mut previous = '\0';
+                    for (_, comment_ch) in chars.by_ref() {
+                        if previous == '*' && comment_ch == '/' {
+                            break;
+                        }
+                        previous = comment_ch;
+                    }
+                    continue;
+                }
+                _ => {}
+            }
+        }
+
+        if matches!(ch, '"' | '\'') {
+            let quote = ch;
+            let mut escaped = false;
+            let mut end = idx + ch.len_utf8();
+            for (string_idx, string_ch) in chars.by_ref() {
+                end = string_idx + string_ch.len_utf8();
+                if escaped {
+                    escaped = false;
+                } else if string_ch == '\\' {
+                    escaped = true;
+                } else if string_ch == quote {
+                    break;
+                }
+            }
+            last = Some((end, quote));
+        } else if !ch.is_whitespace() {
+            last = Some((idx + ch.len_utf8(), ch));
+        }
+    }
+
+    last
+}
+
+fn separator_before_append<'a>(
+    value: &str,
+    missing_comma_separator: &'a str,
+    existing_comma_separator: &'a str,
+) -> &'a str {
+    if value.trim().is_empty() {
+        ""
+    } else if has_trailing_comma(value) {
+        existing_comma_separator
+    } else {
+        missing_comma_separator
     }
 }
 
@@ -535,6 +613,10 @@ async fn run_inner(
     project_root: &Path,
 ) -> anyhow::Result<LinterOutput> {
     let config_path = resolve_renovate_config_path(project_root)?;
+    let config_content = std::fs::read_to_string(&config_path)
+        .with_context(|| format!("failed to read {}", config_path.display()))?;
+    let preset_extract_version_deps =
+        bundled_extract_version_dep_names(project_root, &config_content);
     let mut parsed_rules = comparable_package_rules_for_config(&config_path)?;
     let committed_path = committed_path_for_config(&config_path);
     let committed_display = display_path(project_root, &committed_path);
@@ -544,10 +626,10 @@ async fn run_inner(
         None
     };
 
-    // Verification path uses cheap extract + committed meta. Fix mode
-    // unconditionally regenerates via lookup so the written snapshot carries
-    // authoritative packageName/datasource metadata for every dep — extract
-    // alone leaves gaps (e.g. bare-key mise tools resolved through aqua).
+    // Verification starts with cheap extract + committed meta, but falls back
+    // to lookup when a rule-relevant dependency is new, changes identity, or
+    // has incomplete version context. Fix mode always uses lookup so the
+    // written snapshot carries authoritative metadata for every dependency.
     let dry_run = if fix { "lookup" } else { "extract" };
     if verbose && fix {
         eprintln!("flint: renovate-deps: regenerating snapshot via lookup");
@@ -555,6 +637,16 @@ async fn run_inner(
     let mut generated =
         generate_snapshot(project_root, &config_path, &cfg.exclude_managers, dry_run).await?;
     if !fix {
+        if version_validation_needs_lookup(
+            &generated,
+            committed.as_ref(),
+            &parsed_rules.rules,
+            &preset_extract_version_deps,
+        ) {
+            generated =
+                generate_snapshot(project_root, &config_path, &cfg.exclude_managers, "lookup")
+                    .await?;
+        }
         maybe_reuse_committed_meta(&mut generated, committed.as_ref());
     }
 
@@ -643,6 +735,69 @@ async fn run_inner(
         stdout,
         stderr: vec![],
         setup_outcome: None,
+    })
+}
+
+fn version_validation_needs_lookup(
+    generated: &Snapshot,
+    committed: Option<&Snapshot>,
+    rules: &[rules::ComparablePackageRule],
+    preset_extract_version_deps: &HashSet<String>,
+) -> bool {
+    let extracted_dep_names: HashSet<_> = generated
+        .files
+        .values()
+        .flat_map(|managers| managers.values())
+        .flatten()
+        .cloned()
+        .collect();
+    let mut relevant = relevant_dep_names(generated, rules);
+    for rule in rules {
+        if let rules::RuleMatcher::PackageNames(package_names) = &rule.matcher {
+            relevant.extend(
+                package_name_rule_dep_candidates(generated, package_names)
+                    .into_iter()
+                    .filter(|dep_name| extracted_dep_names.contains(dep_name)),
+            );
+        }
+    }
+    relevant.extend(
+        preset_extract_version_deps
+            .intersection(&extracted_dep_names)
+            .cloned(),
+    );
+
+    relevant.into_iter().any(|dep_name| {
+        let generated_meta = generated.meta.get(&dep_name);
+        let committed_meta = committed.and_then(|snapshot| snapshot.meta.get(&dep_name));
+        let newly_tracked = committed_meta.is_none();
+        let identity_changed =
+            generated_meta
+                .zip(committed_meta)
+                .is_some_and(|(generated, committed)| {
+                    generated.package_name.as_ref().is_some_and(|package_name| {
+                        Some(package_name) != committed.package_name.as_ref()
+                    }) || generated
+                        .datasource
+                        .as_ref()
+                        .is_some_and(|datasource| Some(datasource) != committed.datasource.as_ref())
+                });
+        let extract_version_rule_applies = preset_extract_version_deps.contains(&dep_name)
+            || rules.iter().any(|rule| {
+                rule.has_extract_version
+                    && match &rule.matcher {
+                        rules::RuleMatcher::DepNames(names) => names.contains(&dep_name),
+                        rules::RuleMatcher::PackageNames(names) => {
+                            package_name_rule_dep_candidates(generated, names).contains(&dep_name)
+                        }
+                    }
+            });
+        let incomplete_version_context = generated_meta.is_some_and(|meta| {
+            (meta.extract_version.is_some() || extract_version_rule_applies)
+                && meta.version_context().is_none()
+        });
+
+        newly_tracked || identity_changed || incomplete_version_context
     })
 }
 
@@ -747,7 +902,7 @@ async fn run_renovate(
 fn extract_failure_snippet(log: &str) -> String {
     const MAX_LINES: usize = 20;
 
-    let high_level: Vec<String> = log
+    let high_level: Vec<(u64, String)> = log
         .lines()
         .filter_map(|line| {
             let value: serde_json::Value = serde_json::from_str(line).ok()?;
@@ -772,7 +927,7 @@ fn extract_failure_snippet(log: &str) -> String {
                 out.push_str(if msg.is_some() { ": " } else { " " });
                 out.push_str(e);
             }
-            Some(out)
+            Some((level, out))
         })
         .collect();
 
@@ -787,7 +942,15 @@ fn extract_failure_snippet(log: &str) -> String {
     if high_level.is_empty() {
         tail(log.lines(), MAX_LINES).join("\n")
     } else {
-        tail(high_level.iter().map(String::as_str), MAX_LINES).join("\n")
+        let highest_level = high_level.iter().map(|(level, _)| *level).max().unwrap();
+        tail(
+            high_level
+                .iter()
+                .filter(|(level, _)| *level == highest_level)
+                .map(|(_, line)| line.as_str()),
+            MAX_LINES,
+        )
+        .join("\n")
     }
 }
 

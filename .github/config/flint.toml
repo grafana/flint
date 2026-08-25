@@ -1,5 +1,5 @@
 [settings]
-exclude = ["CHANGELOG.md", "tests/cases/**"]
+exclude = ["tests/cases/**"]
 
 [checks.renovate-deps]
-exclude_managers = ["github-actions", "github-runners", "cargo"]
+exclude_managers = ["github-runners", "cargo"]

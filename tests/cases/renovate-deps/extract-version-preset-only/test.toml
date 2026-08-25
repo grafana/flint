@@ -6,7 +6,7 @@ exit = 0
 GITHUB_TOKEN = "token"
 
 [expected.files]
-".reno-mode" = "extract\n"
+".reno-mode" = "lookup\n"
 ".reno-preset" = "yes\n"
 ".reno-local-override" = "no\n"
 "renovate-tracked-deps.json" = '''

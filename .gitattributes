@@ -1,1 +1,5 @@
+mise.lock linguist-generated
+CHANGELOG.md linguist-generated
+docs/** linguist-documentation
+
 * text=auto eol=lf

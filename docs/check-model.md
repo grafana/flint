@@ -50,6 +50,26 @@ Some checks are exceptions:
 - **setup checks** such as `flint-setup` are special-purpose and may run even
   though they are not ordinary linter binaries
 
+## File-selection contract
+
+Flint owns file selection. File and files checks receive only eligible tracked
+paths selected by Flint, including in `--full` mode. A check that cannot obey
+this contract is an explicit exception and may inspect files beyond Flint's
+selected list.
+
+The exceptions are:
+
+- `cargo-fmt` and `cargo-clippy`, which need Cargo project context
+- `golangci-lint`, which needs Go package context (and uses `--new-from-rev` to
+  scope reported findings to changed code)
+- `kube-linter`, which recursively selects configured manifests
+- `renovate-deps`, which examines fixed dependency metadata paths
+- `flint-setup`, which checks its fixed setup files (`mise.toml` and
+  `flint.toml`)
+
+These exceptions are intentional and should be called out when adding a new
+check that cannot receive Flint's selected paths.
+
 ## Two execution models
 
 Flint supports two main kinds of checks.

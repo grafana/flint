@@ -55,24 +55,33 @@ page with its behavior, configuration, and examples.
 
 ## Scopes
 
+Flint owns file selection: file and files checks receive only eligible tracked
+paths selected by Flint, including in `--full` mode. Some checks necessarily
+deviate because they need project context or perform their own discovery; see
+[the file-selection contract and authoritative exception list](check-model.md#file-selection-contract).
+
 ### Scope: file
 
 Invoked once per matched file.
 
 ### Scope: files
 
-Invoked once with all matched files as args; only changed files are passed.
+Invoked in one or more batches with Flint-selected files as args. Batches are
+used when the rendered command would be large. In `--full` mode, this includes
+every eligible tracked file.
 
 ### Scope: project
 
-Invoked once with no file args; for checks with patterns set (e.g.
-`cargo-clippy`), skipped entirely if no matching files changed, but runs on the
-whole project when it does run. `golangci-lint` is the exception — it uses
-`--new-from-rev` to scope analysis to changed code even within the project run.
+Invoked once with no file args; for checks with patterns set, skipped entirely
+if no matching files changed, but runs on the whole project when it does run.
+Project-scoped checks are explicit exceptions to Flint's file-selection
+contract; see the authoritative exception list in
+[How Flint runs checks](check-model.md#file-selection-contract).
 
 ### Scope: native
 
-Implemented in-process rather than via a command template. These checks may run
-without file arguments or use custom orchestration logic. See
-[How Flint runs checks](check-model.md) for the higher-level model and when to
-choose native vs template checks.
+Implemented in-process rather than via a command template. Native checks declare
+whether they honor Flint's selected paths. Most do; the explicit exceptions are
+listed in [How Flint runs checks](check-model.md#file-selection-contract).
+See [How Flint runs checks](check-model.md) for the higher-level model and when
+to choose native vs template checks.

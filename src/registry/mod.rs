@@ -12,6 +12,8 @@ pub use mise::{
 };
 pub use obsolete::{find_obsolete_key, find_unsupported_key, obsolete_keys, unsupported_keys};
 pub use resolve::binary_on_path;
+#[cfg(test)]
+pub use types::FileSelection;
 pub use types::{
     AdaptiveRelevanceContext, Category, Check, CheckKind, CheckTypeDef, ConfigBase, ConfigFile,
     ConfigMatch, EditorconfigDirectiveStyle, EditorconfigLineLengthPolicy, FixBehavior,

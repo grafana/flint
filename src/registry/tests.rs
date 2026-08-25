@@ -263,6 +263,62 @@ fn version_ranges_must_not_be_mixed_with_unranged_entries() {
     }
 }
 
+#[test]
+fn ktlint_full_runs_keep_file_list_filtering() {
+    let check = builtin()
+        .into_iter()
+        .find(|check| check.name == "ktlint")
+        .expect("ktlint registry entry");
+    let crate::registry::CheckKind::Template {
+        check_cmd,
+        full_cmd,
+        ..
+    } = &check.kind
+    else {
+        panic!("ktlint must use a command template");
+    };
+
+    assert!(check_cmd.contains("{FILES}"));
+    assert!(full_cmd.is_empty(), "ktlint must not scan the project root");
+}
+
+#[test]
+fn project_wide_checks_are_explicit_file_selection_exceptions() {
+    use crate::registry::FileSelection;
+
+    let expected = [
+        "cargo-clippy",
+        "cargo-fmt",
+        "flint-setup",
+        "golangci-lint",
+        "kube-linter",
+        "renovate-deps",
+    ];
+    let mut exceptions: Vec<&str> = builtin()
+        .iter()
+        .filter(|check| check.file_selection == FileSelection::ProjectWide)
+        .map(|check| check.name)
+        .collect();
+    exceptions.sort_unstable();
+    assert_eq!(exceptions, expected);
+
+    for check in builtin() {
+        if let CheckKind::Template {
+            full_cmd,
+            full_fix_cmd,
+            ..
+        } = check.kind
+        {
+            assert!(
+                (full_cmd.is_empty() && full_fix_cmd.is_empty())
+                    || check.file_selection == FileSelection::ProjectWide,
+                "{} has an unscoped full command without declaring a project-wide exception",
+                check.name
+            );
+        }
+    }
+}
+
 fn normalized_command_prefix(check: &Check) -> Option<String> {
     let command = match &check.kind {
         crate::registry::CheckKind::Template {

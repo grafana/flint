@@ -14,9 +14,9 @@
 <!-- linter-metadata-end -->
 
 `dotnet-format` checks and formats C# code. For a normal changed-files run,
-Flint passes the changed paths to `dotnet format --include`. The paths are
-relative to the project root, as required by the .NET CLI. A full run omits
-`--include` and checks the entire solution or project:
+Flint passes the eligible tracked paths to `dotnet format --include`. The paths
+are relative to the project root, as required by the .NET CLI. A full run still
+passes the complete Flint-selected C# file list:
 
 ```bash
 flint run --full dotnet-format

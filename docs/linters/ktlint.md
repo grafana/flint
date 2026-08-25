@@ -14,8 +14,9 @@
 <!-- linter-metadata-end -->
 
 `ktlint` lints and formats Kotlin source and script files. On a normal run,
-Flint passes only changed files to `ktlint`. A full run passes the project root
-instead, which is useful after changing ktlint rules:
+Flint passes only changed files to `ktlint`; a full run passes all eligible
+tracked Kotlin files. Flint retains ownership of file selection rather than
+asking KtLint to recursively scan the project:
 
 ```bash
 flint run --full ktlint

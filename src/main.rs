@@ -416,11 +416,14 @@ async fn run(
         } else if setup_result_blocks_check(&setup_result) {
             let failed = [setup_result.name.as_str()];
             if args.short {
-                eprintln!("flint: 1 check failed — flint run --fix {}", failed[0]);
+                let command = mise_fix_command(project_root)
+                    .unwrap_or_else(|| format!("flint run --fix {}", failed[0]));
+                eprintln!("flint: 1 check failed — {command}");
             } else {
                 eprintln!("\nflint: 1 check failed ({})", failed[0]);
                 eprintln!(
-                    "💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify."
+                    "💡 Try `{}` to auto-fix lint issues, then re-run `flint run` to verify.",
+                    fix_command(project_root)
                 );
             }
             std::process::exit(1);
@@ -438,7 +441,7 @@ async fn run(
             finish_fix_outcomes(vec![outcome], (&args).into());
         }
         if let Some(setup_result) = setup_check_result {
-            finish_check_results(vec![setup_result], &active, args.short);
+            finish_check_results(vec![setup_result], &active, args.short, project_root);
         }
         return Ok(());
     }
@@ -640,7 +643,7 @@ async fn run(
     if let Some(setup_result) = setup_check_result {
         results.push(setup_result);
     }
-    finish_check_results(results, &active, args.short);
+    finish_check_results(results, &active, args.short, project_root);
 
     Ok(())
 }
@@ -768,7 +771,12 @@ fn finish_fix_outcomes(outcomes: Vec<FixOutcome>, opts: FixSummaryOptions) {
     }
 }
 
-fn finish_check_results(results: Vec<CheckResult>, active: &[&registry::Check], short: bool) {
+fn finish_check_results(
+    results: Vec<CheckResult>,
+    active: &[&registry::Check],
+    short: bool,
+    project_root: &Path,
+) {
     let mut failed: Vec<&str> = results
         .iter()
         .filter(|r| !r.ok)
@@ -791,7 +799,11 @@ fn finish_check_results(results: Vec<CheckResult>, active: &[&registry::Check], 
             .partition(|name| is_fixable(name, active));
         let mut segments = vec![];
         if !fixable.is_empty() {
-            segments.push(format!("flint run --fix {}", fixable.join(" ")));
+            if let Some(command) = mise_fix_command(project_root) {
+                segments.push(command);
+            } else {
+                segments.push(format!("flint run --fix {}", fixable.join(" ")));
+            }
         }
         if !reviewable.is_empty() {
             segments.push(format!("review: {}", reviewable.join(", ")));
@@ -803,10 +815,54 @@ fn finish_check_results(results: Vec<CheckResult>, active: &[&registry::Check], 
             names = failed.join(", ")
         );
         eprintln!(
-            "💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify."
+            "💡 Try `{}` to auto-fix lint issues, then re-run `flint run` to verify.",
+            fix_command(project_root)
         );
     }
     std::process::exit(1);
+}
+
+/// Return the mise task that invokes Flint's fixer, when the consuming
+/// repository declares one. This is deliberately best-effort: a malformed or
+/// absent mise.toml must not turn a lint failure into a different failure.
+fn fix_command(project_root: &Path) -> String {
+    mise_fix_command(project_root).unwrap_or_else(|| "flint run --fix".to_string())
+}
+
+fn mise_fix_command(project_root: &Path) -> Option<String> {
+    let path = project_root.join("mise.toml");
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return None;
+    };
+    let Ok(document) = content.parse::<toml_edit::DocumentMut>() else {
+        return None;
+    };
+    let tasks = document
+        .get("tasks")
+        .and_then(toml_edit::Item::as_table_like)?;
+    tasks.iter().find_map(|(name, task)| {
+        let run = task
+            .as_table_like()
+            .and_then(|task| task.get("run"))
+            .and_then(toml_edit::Item::as_str);
+        (run == Some("flint run --fix")).then(|| format!("mise run {name}"))
+    })
+}
+
+#[cfg(test)]
+mod fix_command_tests {
+    use super::fix_command;
+
+    #[test]
+    fn finds_mise_fix_task() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(
+            root.path().join("mise.toml"),
+            "[tasks.\"lint:fix\"]\nrun = \"flint run --fix\"\n",
+        )
+        .unwrap();
+        assert_eq!(fix_command(root.path()), "mise run lint:fix");
+    }
 }
 
 fn classify_single_pass_fix(result: CheckResult) -> FixOutcome {

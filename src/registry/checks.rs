@@ -685,10 +685,6 @@ fn check_ktlint() -> Check {
         &["*.kt", "*.kts"],
     )
     .fix("ktlint --format --log-level=error {FILES}")
-    .full_cmd(
-        "ktlint --log-level=error {ROOT}",
-        "ktlint --format --log-level=error {ROOT}",
-    )
     .windows_java_jar()
     .formatter()
     .project_url(KTLINT_URL)
@@ -712,7 +708,6 @@ fn check_dotnet_format() -> Check {
         &["*.cs"],
     )
     .fix("dotnet format --include {RELFILES}")
-    .full_cmd("dotnet format --verify-no-changes", "dotnet format")
     .bin("dotnet")
     .mise_tool("dotnet")
     .toolchain()

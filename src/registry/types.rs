@@ -16,6 +16,15 @@ pub enum Scope {
     Project,
 }
 
+/// Whether a check can be constrained to Flint's selected file list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileSelection {
+    /// The check receives only paths selected by Flint.
+    Flint,
+    /// The upstream tool necessarily discovers files or packages itself.
+    ProjectWide,
+}
+
 impl Scope {
     pub fn name(self) -> &'static str {
         match self {
@@ -489,6 +498,8 @@ pub struct Check {
     pub version_range: Option<&'static str>,
     /// Glob patterns for matching files.
     pub patterns: &'static [&'static str],
+    /// Whether execution is constrained to Flint's selected paths.
+    pub file_selection: FileSelection,
     /// When any of these named checks are active, exclude their patterns from
     /// this check's file list. Used to avoid double-checking files that a
     /// dedicated formatter already owns.
@@ -688,6 +699,11 @@ impl Check {
             mise_tool_name: None,
             version_range: None,
             patterns,
+            file_selection: if scope == Scope::Project {
+                FileSelection::ProjectWide
+            } else {
+                FileSelection::Flint
+            },
             excludes_if_active: &[],
             linter_config: None,
             env: &[],
@@ -743,6 +759,7 @@ impl Check {
             mise_tool_name: None,
             version_range: None,
             patterns: &[],
+            file_selection: FileSelection::Flint,
             excludes_if_active: &[],
             linter_config: None,
             env: &[],

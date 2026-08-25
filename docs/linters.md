@@ -61,14 +61,17 @@ Invoked once per matched file.
 
 ### Scope: files
 
-Invoked once with all matched files as args; only changed files are passed.
+Invoked once with all Flint-selected files as args. This includes every
+eligible tracked file in `--full` mode.
 
 ### Scope: project
 
-Invoked once with no file args; for checks with patterns set (e.g.
-`cargo-clippy`), skipped entirely if no matching files changed, but runs on the
-whole project when it does run. `golangci-lint` is the exception — it uses
-`--new-from-rev` to scope analysis to changed code even within the project run.
+Invoked once with no file args; for checks with patterns set, skipped entirely
+if no matching files changed, but runs on the whole project when it does run.
+These are explicit exceptions to Flint's file-selection contract: `cargo-fmt`,
+`cargo-clippy`, and `golangci-lint` need project/package context that their CLIs
+cannot constrain to a path list. `golangci-lint` uses `--new-from-rev` to scope
+reported findings to changed code, but may still inspect the project.
 
 ### Scope: native
 

@@ -930,6 +930,7 @@ mod tests {
             mise_tool_name: None,
             version_range: None,
             patterns,
+            file_selection: crate::registry::FileSelection::ProjectWide,
             excludes_if_active: &[],
             linter_config: None,
             env: &[],

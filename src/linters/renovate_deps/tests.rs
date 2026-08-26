@@ -296,22 +296,24 @@ fn filters_skip_reasons() {
         r#"{"npm":[{"packageFile":"package.json","deps":[{"depName":"keep"},{"depName":"bad1","skipReason":"contains-variable"},{"depName":"bad2","skipReason":"invalid-value"}]}]}"#,
     );
     let result = extract_deps(&log, &[]).unwrap();
-    assert_eq!(result.files["package.json"]["npm"], vec!["keep"]);
+    assert_eq!(result.files["package.json"]["npm"], vec!["bad2", "keep"]);
 }
 
 #[test]
-fn github_action_invalid_value_is_kept() {
-    // Lookup marks GitHub Actions whose ref comes from an expression as
-    // invalid-value, while extract mode keeps the same dependency. Keeping it
-    // in both snapshots makes fix followed by verification idempotent.
-    let log = log(
-        r#"{"github-actions":[{"packageFile":".github/workflows/release.yml","deps":[{"depName":"sigstore/cosign","currentValue":"${{ env.COSIGN_VERSION }}","skipReason":"invalid-value"}]}]}"#,
-    );
-    let result = extract_deps(&log, &[]).unwrap();
-    assert_eq!(
-        result.files[".github/workflows/release.yml"]["github-actions"],
-        vec!["sigstore/cosign"]
-    );
+fn invalid_lookup_skip_reasons_are_kept_for_all_managers() {
+    for manager in ["npm", "mise", "docker", "github-actions"] {
+        for skip_reason in ["invalid-value", "invalid-version"] {
+            let log = log(&format!(
+                r#"{{"{manager}":[{{"packageFile":"deps.txt","deps":[{{"depName":"declared","skipReason":"{skip_reason}"}}]}}]}}"#
+            ));
+            let result = extract_deps(&log, &[]).unwrap();
+            assert_eq!(
+                result.files["deps.txt"][manager],
+                vec!["declared"],
+                "{skip_reason} should remain tracked for {manager}"
+            );
+        }
+    }
 }
 
 #[test]

@@ -4,20 +4,28 @@ mod config;
 mod files;
 mod hook;
 mod init;
+mod linter_output;
 mod linters;
 mod project_root;
 mod regions;
 mod registry;
+#[path = "main_run_policy.rs"]
+mod run_policy;
 mod runner;
 mod setup;
 
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
-use registry::{CheckKind, FixBehavior, LinterConfig, Scope};
+use registry::CheckKind;
 use runner::{CheckResult, RunContext as RunnerRunContext, RunOptions};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+
+#[path = "main_baseline.rs"]
+mod baseline;
+
+use baseline::*;
 
 #[derive(Parser, Debug)]
 #[command(name = "flint", bin_name = "flint", about = "flint — fast lint")]
@@ -197,9 +205,9 @@ async fn main() -> Result<()> {
             let cfg = config::load(&config_dir).unwrap_or_default();
             let mise_tools = registry::read_mise_tools(&project_root);
             if args.json {
-                print_linters_json(&registry, &mise_tools, &cfg);
+                linter_output::print_json(&registry, &mise_tools, &cfg);
             } else {
-                print_linters(&registry, &mise_tools, &cfg);
+                linter_output::print_table(&registry, &mise_tools, &cfg);
             }
         }
         SubCommand::ChangedFiles(args) => {
@@ -452,7 +460,7 @@ async fn run(
         let canonical = check
             .linter_config
             .as_ref()
-            .map(canonical_config_path)
+            .map(run_policy::canonical_config_path)
             .or_else(|| {
                 check
                     .baseline_config
@@ -497,7 +505,7 @@ async fn run(
             active
                 .iter()
                 .copied()
-                .partition(|c| supports_single_pass_fix(c));
+                .partition(|c| run_policy::supports_single_pass_fix(c));
 
         let fix_summary: FixSummaryOptions = (&args).into();
         let mut outcomes = setup_fix_outcome.into_iter().collect::<Vec<_>>();
@@ -529,7 +537,7 @@ async fn run(
             let (fixable, reviewable): (Vec<CheckResult>, Vec<CheckResult>) = check_results
                 .into_iter()
                 .filter(|r| !r.ok)
-                .partition(|r| is_fixable(&r.name, &legacy_checks));
+                .partition(|r| run_policy::is_fixable(&r.name, &legacy_checks));
             outcomes.extend(reviewable.into_iter().map(FixOutcome::Review));
 
             let mut to_verify = vec![];
@@ -679,16 +687,6 @@ impl registry::AdaptiveRelevanceContext for AdaptiveRunContext<'_> {
     }
 }
 
-struct LinterStatusContext<'a> {
-    cfg: &'a config::Config,
-}
-
-impl registry::StatusContext for LinterStatusContext<'_> {
-    fn config(&self) -> &config::Config {
-        self.cfg
-    }
-}
-
 enum FixOutcome {
     Clean(CheckResult),
     Fixed(CheckResult),
@@ -796,7 +794,7 @@ fn finish_check_results(
         let (fixable, reviewable): (Vec<&str>, Vec<&str>) = failed
             .iter()
             .copied()
-            .partition(|name| is_fixable(name, active));
+            .partition(|name| run_policy::is_fixable(name, active));
         let mut segments = vec![];
         if !fixable.is_empty() {
             if let Some(command) = mise_fix_command(project_root) {
@@ -973,491 +971,19 @@ async fn run_checks(
     Ok(results)
 }
 
-fn baseline_check_names(
-    active: &[&registry::Check],
-    file_list: &files::FileList,
-    project_root: &Path,
-    config_dir: &Path,
-    current_tools: &HashMap<String, String>,
-) -> HashSet<String> {
-    if file_list.full {
-        return HashSet::new();
-    }
-    let Some(merge_base) = file_list.merge_base.as_deref() else {
-        return HashSet::new();
-    };
-
-    let changed = changed_rel_paths(file_list, project_root);
-    let previous_tools = registry::read_mise_tools_at_ref(project_root, merge_base);
-    if registry::flint_version_changed(&previous_tools, current_tools)
-        || registry::full_baseline_runtime_changed(active, &previous_tools, current_tools)
-    {
-        return active.iter().map(|check| check.name.to_string()).collect();
-    }
-
-    let flint_config = config_rel_path(project_root, config_dir, "flint.toml");
-    let flint_config_changed = changed.contains(&flint_config);
-    let flint_toml =
-        flint_config_changed.then(|| flint_toml_change(project_root, config_dir, merge_base));
-
-    active
-        .iter()
-        .filter(|check| {
-            let newly_active = !registry::check_active(check, &previous_tools);
-            let tool_version_changed =
-                registry::tool_version_changed(check, &previous_tools, current_tools);
-            let runtime_version_changed =
-                registry::runtime_version_changed(check, &previous_tools, current_tools);
-            let flint_toml_requires_baseline = flint_toml.as_ref().is_some_and(|change| {
-                change.settings_changed
-                    || (check.kind.is_native() && change.check_changed(check.name))
-            });
-            let baseline_config_changed = check.baseline_config.as_ref().is_some_and(|config| {
-                changed.contains(&config_file_rel_path(project_root, config_dir, config))
-            });
-            let baseline_trigger_changed = check.baseline_triggers.iter().any(|config| {
-                changed.contains(&config_file_rel_path(project_root, config_dir, config))
-            });
-
-            newly_active
-                || tool_version_changed
-                || runtime_version_changed
-                || flint_toml_requires_baseline
-                || baseline_config_changed
-                || baseline_trigger_changed
-        })
-        .map(|check| check.name.to_string())
-        .collect()
-}
-
-fn unsupported_config(
-    check: &registry::Check,
-    project_root: &Path,
-    config_dir: &Path,
-) -> Option<String> {
-    let baseline_path = check
-        .baseline_config
-        .as_ref()
-        .map(|config| config_file_abs_path(project_root, config_dir, config));
-
-    check
-        .unsupported_configs
-        .iter()
-        .find(|config| {
-            let path = config_file_abs_path(project_root, config_dir, config);
-            let overlaps_baseline = baseline_path
-                .as_ref()
-                .is_some_and(|baseline| *baseline == path);
-            (!overlaps_baseline || !check.allow_baseline_overlap_in_unsupported_configs)
-                && config_present(project_root, config_dir, config)
-        })
-        .map(|config| config_file_rel_path(project_root, config_dir, config))
-}
-
-struct FlintTomlChange {
-    current: toml::Value,
-    previous: toml::Value,
-    settings_changed: bool,
-}
-
-impl FlintTomlChange {
-    fn check_changed(&self, name: &str) -> bool {
-        self.check_config(&self.current, name) != self.check_config(&self.previous, name)
-    }
-
-    fn check_config<'a>(&self, value: &'a toml::Value, name: &str) -> Option<&'a toml::Value> {
-        let underscore_alias = name.replace('-', "_");
-        toml_section(value, &["checks", name])
-            .or_else(|| toml_section(value, &["checks", &underscore_alias]))
-    }
-}
-
-fn flint_toml_change(project_root: &Path, config_dir: &Path, merge_base: &str) -> FlintTomlChange {
-    let rel = config_rel_path(project_root, config_dir, "flint.toml");
-    let current_path = project_root.join(&rel);
-    let current = read_toml_file(&current_path);
-    let previous = read_toml_at_ref(project_root, merge_base, &rel);
-    let settings_changed =
-        toml_section(&current, &["settings"]) != toml_section(&previous, &["settings"]);
-    FlintTomlChange {
-        current,
-        previous,
-        settings_changed,
-    }
-}
-
-fn read_toml_file(path: &Path) -> toml::Value {
-    std::fs::read_to_string(path)
-        .ok()
-        .and_then(|content| toml::from_str(&content).ok())
-        .unwrap_or(toml::Value::Table(Default::default()))
-}
-
-fn config_present(project_root: &Path, config_dir: &Path, config: &registry::ConfigFile) -> bool {
-    let path = config_file_abs_path(project_root, config_dir, config);
-    match config.presence {
-        registry::ConfigMatch::Exists => path.exists(),
-        registry::ConfigMatch::TomlSection(section) => {
-            toml_section(&read_toml_file(&path), section).is_some()
-        }
-        registry::ConfigMatch::IniSection(section) => ini_section_exists(&path, section),
-    }
-}
-
-fn ini_section_exists(path: &Path, section: &str) -> bool {
-    let Ok(content) = std::fs::read_to_string(path) else {
-        return false;
-    };
-    content.lines().any(|line| {
-        let trimmed = line.trim();
-        trimmed
-            .strip_prefix('[')
-            .and_then(|rest| rest.strip_suffix(']'))
-            .is_some_and(|name| name.trim() == section)
-    })
-}
-
-fn read_toml_at_ref(project_root: &Path, git_ref: &str, rel_path: &str) -> toml::Value {
-    let spec = format!("{git_ref}:{rel_path}");
-    std::process::Command::new("git")
-        .args(["show", &spec])
-        .current_dir(project_root)
-        .output()
-        .ok()
-        .filter(|out| out.status.success())
-        .and_then(|out| String::from_utf8(out.stdout).ok())
-        .and_then(|content| toml::from_str(&content).ok())
-        .unwrap_or(toml::Value::Table(Default::default()))
-}
-
-fn toml_section<'a>(value: &'a toml::Value, path: &[&str]) -> Option<&'a toml::Value> {
-    let mut current = value;
-    for key in path {
-        current = current.get(*key)?;
-    }
-    Some(current)
-}
-
-fn changed_rel_paths(file_list: &files::FileList, project_root: &Path) -> HashSet<String> {
-    if !file_list.changed_paths.is_empty() {
-        return file_list.changed_paths.iter().cloned().collect();
-    }
-
-    file_list
-        .files
-        .iter()
-        .filter_map(|path| path.strip_prefix(project_root).ok())
-        .map(normalize_path)
-        .collect()
-}
-
-fn config_rel_path(project_root: &Path, config_dir: &Path, file: &str) -> String {
-    let path = if config_dir.is_absolute() {
-        config_dir.join(file)
-    } else {
-        project_root.join(config_dir).join(file)
-    };
-    path.strip_prefix(project_root)
-        .map(normalize_path)
-        .unwrap_or_else(|_| normalize_path(&PathBuf::from(file)))
-}
-
-fn config_file_abs_path(
-    project_root: &Path,
-    config_dir: &Path,
-    config: &registry::ConfigFile,
-) -> PathBuf {
-    match config.base {
-        registry::ConfigBase::ProjectRoot => project_root.join(config.path),
-        registry::ConfigBase::ConfigDir => {
-            if config_dir.is_absolute() {
-                config_dir.join(config.path)
-            } else {
-                project_root.join(config_dir).join(config.path)
-            }
-        }
-    }
-}
-
-fn config_file_rel_path(
-    project_root: &Path,
-    config_dir: &Path,
-    config: &registry::ConfigFile,
-) -> String {
-    let path = config_file_abs_path(project_root, config_dir, config);
-    path.strip_prefix(project_root)
-        .map(normalize_path)
-        .unwrap_or_else(|_| normalize_path(&PathBuf::from(config.path)))
-}
-
-fn normalize_path(path: &Path) -> String {
-    path.components()
-        .map(|component| component.as_os_str().to_string_lossy())
-        .collect::<Vec<_>>()
-        .join("/")
-}
-
-fn print_linters_json(
-    registry: &[registry::Check],
-    mise_tools: &HashMap<String, String>,
-    cfg: &config::Config,
-) {
-    let entries: Vec<serde_json::Value> = registry
-        .iter()
-        .map(|check| linter_json_for(check, mise_tools, cfg, registry::binary_on_path))
-        .collect();
-    println!("{}", serde_json::to_string_pretty(&entries).unwrap());
-}
-
-fn linter_json_for<F>(
-    check: &registry::Check,
-    mise_tools: &HashMap<String, String>,
-    cfg: &config::Config,
-    binary_on_path: F,
-) -> serde_json::Value
-where
-    F: Fn(&str) -> bool,
-{
-    let status = linter_status(check, mise_tools, cfg, binary_on_path);
-    let declared_version = registry::declared_tool_version(check, mise_tools);
-    linter_json(check, status, declared_version)
-}
-
+/// Renders one linter's machine-readable metadata.
 pub fn linter_json(
     check: &registry::Check,
     status: &str,
     declared_version: Option<&str>,
 ) -> serde_json::Value {
-    let scope = check.kind.scope_name();
-    let patterns: Vec<&str> = check.patterns.to_vec();
-    let config_file = check
-        .linter_config
-        .as_ref()
-        .map(LinterConfig::canonical_location);
-    let baseline_config = check
-        .baseline_config
-        .map(|config| config_file_location(&config));
-    let baseline_triggers: Vec<String> = check
-        .baseline_triggers
-        .iter()
-        .map(config_file_location)
-        .collect();
-    let fix_behavior = check.has_fix().then(|| match check.fix_behavior() {
-        FixBehavior::Definitive => "definitive",
-        FixBehavior::PartialNeedsVerify => "partial-needs-verify",
-    });
-    serde_json::json!({
-        "name": check.name,
-        "description": check.desc,
-        "binary": if check.uses_binary() { check.bin_name } else { "(built-in)" },
-        "install_key": check.install_key(),
-        "status": status,
-        "declared_version": declared_version,
-        "patterns": patterns,
-        "fix": check.has_fix(),
-        "fix_behavior": fix_behavior,
-        "run_policy": run_policy_label(check),
-        "slow": check.category == registry::Category::Slow,
-        "category": category_label(check.category),
-        "scope": scope,
-        "config_file": config_file,
-        "config_doc_url": check.config_doc_url,
-        "project_url": check.project_url,
-        "formatter": check.is_formatter,
-        "defers_to_formatters": check.defers_to_formatters,
-        "baseline_config": baseline_config,
-        "baseline_triggers": baseline_triggers,
-        "fix_after": check.fix_after,
-    })
-}
-
-fn category_label(category: registry::Category) -> &'static str {
-    match category {
-        registry::Category::Lang => "lang",
-        registry::Category::Style => "style",
-        registry::Category::Default => "default",
-        registry::Category::Slow => "slow",
-    }
-}
-
-fn config_file_location(config: &registry::ConfigFile) -> String {
-    match config.base {
-        registry::ConfigBase::ProjectRoot => config.path.to_string(),
-        registry::ConfigBase::ConfigDir => format!("FLINT_CONFIG_DIR/{}", config.path),
-    }
-}
-
-fn canonical_config_path(config: &LinterConfig) -> String {
-    config.canonical_location()
-}
-
-fn run_policy_label(check: &registry::Check) -> &'static str {
-    if check.adaptive_relevance.is_some() {
-        "adaptive"
-    } else if check.category == registry::Category::Slow {
-        "slow"
-    } else {
-        "fast"
-    }
-}
-
-fn is_fixable(name: &str, active: &[&registry::Check]) -> bool {
-    name == "flint-setup" || active.iter().any(|c| c.name == name && c.has_fix())
-}
-
-fn supports_single_pass_fix(check: &registry::Check) -> bool {
-    check.has_fix()
-        && check.fix_behavior() == FixBehavior::Definitive
-        && matches!(
-            check.kind,
-            CheckKind::Template {
-                scope: Scope::File | Scope::Files,
-                ..
-            }
-        )
-}
-
-fn print_linters(
-    registry: &[registry::Check],
-    mise_tools: &HashMap<String, String>,
-    cfg: &config::Config,
-) {
-    print!(
-        "{}",
-        render_linters_table(registry, mise_tools, cfg, registry::binary_on_path)
-    );
-}
-
-fn render_linters_table<F>(
-    registry: &[registry::Check],
-    mise_tools: &HashMap<String, String>,
-    cfg: &config::Config,
-    binary_on_path: F,
-) -> String
-where
-    F: Fn(&str) -> bool,
-{
-    use std::fmt::Write;
-
-    // Column widths.
-    let name_w = registry
-        .iter()
-        .map(|c| c.name.len())
-        .max()
-        .unwrap_or(4)
-        .max(4);
-    let bin_w = registry
-        .iter()
-        .map(display_binary)
-        .map(str::len)
-        .max()
-        .unwrap_or(6)
-        .max(6);
-    let desc_w = registry
-        .iter()
-        .map(|c| c.desc.len())
-        .max()
-        .unwrap_or(11)
-        .max(11);
-
-    let mut out = String::new();
-    writeln!(
-        out,
-        "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {:<desc_w$}  PATTERNS",
-        "NAME",
-        "BINARY",
-        "STATUS",
-        "SPEED",
-        "FIX",
-        "DESCRIPTION",
-        name_w = name_w,
-        bin_w = bin_w,
-        desc_w = desc_w,
-    )
-    .unwrap();
-    writeln!(out, "{}", "-".repeat(name_w + bin_w + desc_w + 46)).unwrap();
-
-    for check in registry {
-        let status = linter_status(check, mise_tools, cfg, &binary_on_path);
-        let speed = run_policy_label(check);
-        let fix = if check.has_fix() { "yes" } else { "no" };
-        let patterns_str = check.patterns.join(" ");
-        let binary = display_binary(check);
-        if patterns_str.is_empty() {
-            writeln!(
-                out,
-                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {}",
-                check.name,
-                binary,
-                status,
-                speed,
-                fix,
-                check.desc,
-                name_w = name_w,
-                bin_w = bin_w,
-            )
-            .unwrap();
-        } else {
-            writeln!(
-                out,
-                "{:<name_w$}  {:<bin_w$}  {:<13}  {:<8}  {:<3}  {:<desc_w$}  {}",
-                check.name,
-                binary,
-                status,
-                speed,
-                fix,
-                check.desc,
-                patterns_str,
-                name_w = name_w,
-                bin_w = bin_w,
-                desc_w = desc_w,
-            )
-            .unwrap();
-        }
-    }
-
-    out
-}
-
-fn linter_status<F>(
-    check: &registry::Check,
-    mise_tools: &HashMap<String, String>,
-    cfg: &config::Config,
-    binary_on_path: F,
-) -> &'static str
-where
-    F: Fn(&str) -> bool,
-{
-    if registry::check_active(check, mise_tools) {
-        if !check.uses_binary() || binary_on_path(check.bin_name) {
-            let status_ctx = LinterStatusContext { cfg };
-            check
-                .status_hook
-                .and_then(|hook| hook(&status_ctx))
-                .unwrap_or("active")
-        } else {
-            "no binary"
-        }
-    } else if registry::declared_tool_version(check, mise_tools).is_some() {
-        "wrong version"
-    } else {
-        "missing"
-    }
-}
-
-fn display_binary(check: &registry::Check) -> &'static str {
-    if check.uses_binary() {
-        check.bin_name
-    } else {
-        "(built-in)"
-    }
+    linter_output::linter_json(check, status, declared_version)
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        FlintTomlChange, RunArgs, display_binary, linter_status, render_linters_table,
-        unsupported_config, use_filtered_run_policy, write_changed_files,
+        FlintTomlChange, RunArgs, unsupported_config, use_filtered_run_policy, write_changed_files,
     };
     use crate::{config, registry};
     use std::io;
@@ -1561,9 +1087,12 @@ rust = { version = "1.94.1", components = "clippy,rustfmt" }
             "zizmor",
         ];
 
-        let table = render_linters_table(&registry::builtin(), &mise_tools, &cfg, |bin| {
-            installed.contains(&bin)
-        });
+        let table = crate::linter_output::render_linters_table(
+            &registry::builtin(),
+            &mise_tools,
+            &cfg,
+            |bin| installed.contains(&bin),
+        );
 
         assert_eq!(
             table,
@@ -1610,7 +1139,7 @@ license-header        (built-in)          not configured  fast      no   Check s
             .find(|check| check.name == "rumdl")
             .expect("rumdl check");
 
-        let json = super::linter_json(&check, "active", Some("0.2.31"));
+        let json = crate::linter_json(&check, "active", Some("0.2.31"));
 
         assert_eq!(json["status"], "active");
         assert_eq!(json["declared_version"], "0.2.31");
@@ -1629,13 +1158,13 @@ license-header        (built-in)          not configured  fast      no   Check s
         let cfg = config::Config::default();
 
         let active_tools = mise_tools_from("[tools]\nryl = \"1.2.3\"\n");
-        let json = super::linter_json_for(&check, &active_tools, &cfg, |_| true);
+        let json = crate::linter_output::linter_json_for(&check, &active_tools, &cfg, |_| true);
         assert_eq!(json["status"], "active");
         assert_eq!(json["declared_version"], "1.2.3");
 
         let wrong_version_tools = mise_tools_from("[tools]\nryl = \"0.6.0\"\n");
         assert_eq!(
-            linter_status(&check, &wrong_version_tools, &cfg, |_| true),
+            crate::linter_output::linter_status(&check, &wrong_version_tools, &cfg, |_| true),
             "wrong version"
         );
     }
@@ -1650,7 +1179,9 @@ license-header        (built-in)          not configured  fast      no   Check s
 
         let active_without_binary = mise_tools_from("[tools]\nshellcheck = \"v0.11.0\"\n");
         assert_eq!(
-            linter_status(&shellcheck, &active_without_binary, &cfg, |_| false),
+            crate::linter_output::linter_status(&shellcheck, &active_without_binary, &cfg, |_| {
+                false
+            }),
             "no binary"
         );
 
@@ -1659,7 +1190,7 @@ license-header        (built-in)          not configured  fast      no   Check s
             .find(|check| check.name == "license-header")
             .expect("license-header check");
         assert_eq!(
-            linter_status(
+            crate::linter_output::linter_status(
                 &license_header,
                 &std::collections::HashMap::new(),
                 &cfg,
@@ -1675,7 +1206,10 @@ license-header        (built-in)          not configured  fast      no   Check s
             .into_iter()
             .find(|check| check.name == "license-header")
             .expect("license-header check");
-        assert_eq!(display_binary(&license_header), "(built-in)");
+        assert_eq!(
+            crate::linter_output::display_binary(&license_header),
+            "(built-in)"
+        );
     }
 
     #[test]

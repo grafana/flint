@@ -316,17 +316,21 @@ fn valid_remote_component(value: &str) -> bool {
 }
 
 fn github_preset_key(preset: &GithubPreset) -> String {
+    let reference = preset.reference.as_deref().map_or_else(
+        || "default".to_string(),
+        |reference| format!("ref:{reference}"),
+    );
     format!(
         "github>{}/{}//{}#{}",
-        preset.owner,
-        preset.repo,
-        preset.path,
-        preset.reference.as_deref().unwrap_or("<default>")
+        preset.owner, preset.repo, preset.path, reference
     )
 }
 
 fn github_preset_cache_path(project_root: &Path, preset: &GithubPreset) -> std::path::PathBuf {
-    let reference = preset.reference.as_deref().unwrap_or("<default>");
+    let reference = preset.reference.as_deref().map_or_else(
+        || "default".to_string(),
+        |reference| format!("ref-{}", percent_encode(reference)),
+    );
     let path = preset
         .path
         .split('/')
@@ -338,7 +342,7 @@ fn github_preset_cache_path(project_root: &Path, preset: &GithubPreset) -> std::
         .join(PRESET_CACHE_SUBDIR)
         .join(percent_encode(&preset.owner))
         .join(percent_encode(&preset.repo))
-        .join(percent_encode(reference))
+        .join(reference)
         .join(path)
 }
 
@@ -351,6 +355,13 @@ fn read_cached_github_preset(project_root: &Path, preset: &GithubPreset) -> Opti
 }
 
 fn fetch_github_preset(project_root: &Path, preset: &GithubPreset) -> anyhow::Result<()> {
+    if crate::linters::env::env_truthy(
+        &|name| std::env::var(name).ok(),
+        crate::linters::lychee::LOCAL_CACHE_OPT_OUT_ENV,
+    ) {
+        return Ok(());
+    }
+
     let token = std::env::var(crate::linters::env::GITHUB_COM_TOKEN_ENV)
         .ok()
         .filter(|value| !value.trim().is_empty())
@@ -393,7 +404,7 @@ fn fetch_github_preset(project_root: &Path, preset: &GithubPreset) -> anyhow::Re
             "--max-time",
             "10",
             "--header",
-            "Accept: application/vnd.github.raw+json",
+            "Accept: application/vnd.github.raw",
             "--header",
             "User-Agent: flint",
             "--header",
@@ -474,6 +485,19 @@ mod tests {
     }
 
     #[test]
+    fn implicit_default_ref_cannot_collide_with_explicit_ref() {
+        let root = tempfile::tempdir().unwrap();
+        let implicit = parse_github_preset("github>owner/repo").unwrap();
+        let explicit = parse_github_preset("github>owner/repo#<default>").unwrap();
+
+        assert_ne!(github_preset_key(&implicit), github_preset_key(&explicit));
+        assert_ne!(
+            github_preset_cache_path(root.path(), &implicit),
+            github_preset_cache_path(root.path(), &explicit)
+        );
+    }
+
+    #[test]
     fn cached_github_default_and_nested_presets_are_resolved() {
         let root = tempfile::tempdir().unwrap();
         cache_preset(
@@ -548,6 +572,7 @@ mod tests {
         let old_path = std::env::var_os("PATH");
         let old_token = std::env::var_os(crate::linters::env::GITHUB_TOKEN_ENV);
         let old_api_url = std::env::var_os("GITHUB_API_URL");
+        let old_opt_out = std::env::var_os(crate::linters::lychee::LOCAL_CACHE_OPT_OUT_ENV);
         let mut path = bin.path().as_os_str().to_os_string();
         if let Some(old_path) = &old_path {
             path.push(":");
@@ -557,6 +582,7 @@ mod tests {
             std::env::set_var("PATH", path);
             std::env::set_var(crate::linters::env::GITHUB_TOKEN_ENV, "test-token");
             std::env::set_var("GITHUB_API_URL", "https://api.example.test");
+            std::env::remove_var(crate::linters::lychee::LOCAL_CACHE_OPT_OUT_ENV);
         }
 
         let config = r#"{ extends: ["github>owner/repo//presets/base.json#v1"] }"#;
@@ -568,9 +594,20 @@ mod tests {
         assert!(request.contains(
             "https://api.example.test/repos/owner/repo/contents/presets/base.json?ref=v1"
         ));
+        assert!(request.contains("Accept: application/vnd.github.raw\n"));
+        assert!(request.contains("User-Agent: flint\n"));
 
         // A warm cache is sufficient even with a token: no second API call is made.
         warm_github_presets(root.path(), config);
+        assert_eq!(std::fs::read_to_string(&count).unwrap(), "1");
+
+        // Opting out prevents warming but does not alter the cache-read path.
+        std::fs::remove_file(github_preset_cache_path(root.path(), &preset)).unwrap();
+        unsafe {
+            std::env::set_var(crate::linters::lychee::LOCAL_CACHE_OPT_OUT_ENV, "true");
+        }
+        warm_github_presets(root.path(), config);
+        assert!(!github_preset_cache_path(root.path(), &preset).exists());
         assert_eq!(std::fs::read_to_string(&count).unwrap(), "1");
 
         unsafe {
@@ -585,6 +622,12 @@ mod tests {
             match old_api_url {
                 Some(value) => std::env::set_var("GITHUB_API_URL", value),
                 None => std::env::remove_var("GITHUB_API_URL"),
+            }
+            match old_opt_out {
+                Some(value) => {
+                    std::env::set_var(crate::linters::lychee::LOCAL_CACHE_OPT_OUT_ENV, value)
+                }
+                None => std::env::remove_var(crate::linters::lychee::LOCAL_CACHE_OPT_OUT_ENV),
             }
         }
     }

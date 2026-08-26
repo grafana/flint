@@ -751,7 +751,7 @@ const SPARSE_CHECKOUT_REMEDIATION: &str =
 fn ensure_complete_worktree(project_root: &Path) -> anyhow::Result<()> {
     if sparse_checkout_detected(project_root) {
         anyhow::bail!(
-            "renovate-deps requires a complete working tree; a sparse or partial working tree was detected. {SPARSE_CHECKOUT_REMEDIATION}"
+            "renovate-deps requires a complete working tree; a sparse checkout was detected. {SPARSE_CHECKOUT_REMEDIATION}"
         );
     }
     Ok(())
@@ -810,10 +810,11 @@ fn ensure_snapshot_not_truncated(
     let Some(committed) = committed else {
         return Ok(());
     };
-    let missing: HashSet<_> = committed
+    let missing: HashSet<String> = committed
         .files
         .keys()
         .filter(|path| !generated.files.contains_key(*path))
+        .cloned()
         .collect();
     if missing.is_empty() {
         return Ok(());
@@ -836,11 +837,11 @@ fn ensure_snapshot_not_truncated(
         };
         *status == b'S'
             && path.first() == Some(&b' ')
-            && missing.contains(&String::from_utf8_lossy(&path[1..]).into_owned())
+            && missing.contains(String::from_utf8_lossy(&path[1..]).as_ref())
     });
     if sparse_missing {
         anyhow::bail!(
-            "renovate-deps snapshot generation omitted dependencies from sparse or partial paths. {SPARSE_CHECKOUT_REMEDIATION}"
+            "renovate-deps snapshot generation omitted dependencies from sparse checkout paths. {SPARSE_CHECKOUT_REMEDIATION}"
         );
     }
     Ok(())

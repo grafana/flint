@@ -6,7 +6,7 @@ use std::process::Stdio;
 use self::action_validation::validate_lookup_action_warnings;
 use self::install_patch::configure_extract_workaround_env;
 use self::manager_patterns::{
-    bundled_extract_version_dep_names, changed_matches_manager_file_patterns,
+    bundled_extract_version_dep_names, changed_matches_manager_file_patterns, warm_github_presets,
 };
 use self::mise_normalize::patch_semver_equivalent_mise_values;
 use self::rules::{
@@ -109,6 +109,13 @@ pub(crate) fn init(ctx: &dyn InitHookContext) -> anyhow::Result<bool> {
     } else {
         false
     };
+    if let Some(path) = find_renovate_config(ctx.project_root())
+        && let Ok(content) = std::fs::read_to_string(path)
+    {
+        // Warm remote preset cache only during explicit init. Relevance checks
+        // and normal runs remain strictly offline.
+        warm_github_presets(ctx.project_root(), &content);
+    }
     let preset_changed = patch_renovate_preset(ctx.project_root())?;
     Ok(config_changed || preset_changed)
 }

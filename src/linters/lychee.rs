@@ -16,10 +16,10 @@ const GITHUB_BASE_REF_ENV: &str = "GITHUB_BASE_REF";
 const GITHUB_EVENT_NAME_ENV: &str = "GITHUB_EVENT_NAME";
 const GITHUB_HEAD_REF_ENV: &str = "GITHUB_HEAD_REF";
 const GITHUB_REPOSITORY_ENV: &str = "GITHUB_REPOSITORY";
-const LOCAL_CACHE_DIR: &str = ".lychee_cache";
+pub(crate) const LOCAL_CACHE_DIR: &str = ".lychee_cache";
 const LOCAL_CACHE_GITIGNORE: &str = "# Automatically created by flint for lychee local cache.\n*\n";
 const LOCAL_CACHE_OPT_OUT_COMMAND: &str = "mise set --global FLINT_LYCHEE_SKIP_LOCAL_CACHE=true";
-const LOCAL_CACHE_OPT_OUT_ENV: &str = "FLINT_LYCHEE_SKIP_LOCAL_CACHE";
+pub(crate) const LOCAL_CACHE_OPT_OUT_ENV: &str = "FLINT_LYCHEE_SKIP_LOCAL_CACHE";
 const PR_HEAD_REPO_ENV: &str = "PR_HEAD_REPO";
 const PR_LINK_REMAP_ENV_VARS: &[&str] = &[
     GITHUB_REPOSITORY_ENV,
@@ -560,7 +560,12 @@ fn prepare_cache_plan(project_root: &Path, preference: CachePreference) -> Prepa
     }
 }
 
-fn initialize_cache_dir(project_root: &Path) -> anyhow::Result<bool> {
+/// Create Flint's local cache directory and its ignore marker.
+///
+/// Other native checks may share this directory for local-only caches. Keeping
+/// the setup here means those caches get the same gitignore and lifecycle as
+/// lychee's cache.
+pub(crate) fn initialize_cache_dir(project_root: &Path) -> anyhow::Result<bool> {
     let cache_dir = project_root.join(LOCAL_CACHE_DIR);
     let existed = cache_dir.exists();
     std::fs::create_dir_all(&cache_dir)?;

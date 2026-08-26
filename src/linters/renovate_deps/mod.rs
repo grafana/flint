@@ -612,6 +612,8 @@ async fn run_inner(
     verbose: bool,
     project_root: &Path,
 ) -> anyhow::Result<LinterOutput> {
+    ensure_complete_worktree(project_root)?;
+
     let config_path = resolve_renovate_config_path(project_root)?;
     let config_content = std::fs::read_to_string(&config_path)
         .with_context(|| format!("failed to read {}", config_path.display()))?;
@@ -636,6 +638,7 @@ async fn run_inner(
     }
     let mut generated =
         generate_snapshot(project_root, &config_path, &cfg.exclude_managers, dry_run).await?;
+    ensure_snapshot_not_truncated(project_root, committed.as_ref(), &generated)?;
     if !fix {
         if version_validation_needs_lookup(
             &generated,
@@ -736,6 +739,111 @@ async fn run_inner(
         stderr: vec![],
         setup_outcome: None,
     })
+}
+
+const SPARSE_CHECKOUT_REMEDIATION: &str =
+    "Disable sparse checkout with `git sparse-checkout disable`, then rerun renovate-deps.";
+
+/// Renovate discovers dependencies by walking the checkout on disk.  A sparse
+/// checkout therefore produces a valid-looking, but incomplete, snapshot. Do
+/// this check before invoking Renovate so `--fix` cannot replace a complete
+/// snapshot with one generated from only the materialized paths.
+fn ensure_complete_worktree(project_root: &Path) -> anyhow::Result<()> {
+    if sparse_checkout_detected(project_root) {
+        anyhow::bail!(
+            "renovate-deps requires a complete working tree; a sparse or partial working tree was detected. {SPARSE_CHECKOUT_REMEDIATION}"
+        );
+    }
+    Ok(())
+}
+
+/// Returns true when Git's effective sparse-checkout setting or its
+/// worktree-specific sparse-checkout file says that paths are omitted.
+///
+/// `git rev-parse --git-path` is important here: in a linked worktree the
+/// sparse-checkout file lives below `.git/worktrees/<name>`, not the common
+/// repository `.git/info` directory. All Git calls are best effort because a
+/// full run can still be useful in a directory that is not a Git checkout.
+fn sparse_checkout_detected(project_root: &Path) -> bool {
+    let config = std::process::Command::new("git")
+        .args(["config", "--bool", "core.sparseCheckout"])
+        .current_dir(project_root)
+        .output();
+    if let Ok(output) = config
+        && output.status.success()
+    {
+        return String::from_utf8_lossy(&output.stdout).trim() == "true";
+    }
+
+    // The config lookup above is the authoritative signal, including
+    // config.worktree. Keep the git-dir marker as a fallback for older Git
+    // versions and for checkouts whose config was moved between worktrees.
+    let Ok(output) = std::process::Command::new("git")
+        .args(["rev-parse", "--git-path", "info/sparse-checkout"])
+        .current_dir(project_root)
+        .output()
+    else {
+        return false;
+    };
+    if !output.status.success() {
+        return false;
+    }
+    let path = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
+    let path = if path.is_absolute() {
+        path
+    } else {
+        project_root.join(path)
+    };
+    path.is_file()
+}
+
+/// Protect comparison/fix mode if Git's config signal is unavailable or stale.
+/// Only report a mismatch when a path present in the committed snapshot is
+/// absent from Renovate's output *and* Git explicitly marks that path with the
+/// skip-worktree bit. A normal deleted/renamed dependency file cannot satisfy
+/// this guard, avoiding false positives for legitimate snapshot changes.
+fn ensure_snapshot_not_truncated(
+    project_root: &Path,
+    committed: Option<&Snapshot>,
+    generated: &Snapshot,
+) -> anyhow::Result<()> {
+    let Some(committed) = committed else {
+        return Ok(());
+    };
+    let missing: HashSet<_> = committed
+        .files
+        .keys()
+        .filter(|path| !generated.files.contains_key(*path))
+        .collect();
+    if missing.is_empty() {
+        return Ok(());
+    }
+
+    let Ok(output) = std::process::Command::new("git")
+        .args(["ls-files", "-t", "-z"])
+        .current_dir(project_root)
+        .output()
+    else {
+        return Ok(());
+    };
+    if !output.status.success() {
+        return Ok(());
+    }
+
+    let sparse_missing = output.stdout.split(|byte| *byte == 0).any(|entry| {
+        let Some((status, path)) = entry.split_first() else {
+            return false;
+        };
+        *status == b'S'
+            && path.first() == Some(&b' ')
+            && missing.contains(&String::from_utf8_lossy(&path[1..]).into_owned())
+    });
+    if sparse_missing {
+        anyhow::bail!(
+            "renovate-deps snapshot generation omitted dependencies from sparse or partial paths. {SPARSE_CHECKOUT_REMEDIATION}"
+        );
+    }
+    Ok(())
 }
 
 fn version_validation_needs_lookup(

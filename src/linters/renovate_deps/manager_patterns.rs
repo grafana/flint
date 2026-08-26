@@ -27,6 +27,7 @@ const FLINT_PRESET_EXTEND_PREFIX: &str = "github>grafana/flint";
 const GITHUB_PRESET_PREFIX: &str = "github>";
 const PRESET_CACHE_SUBDIR: &str = "renovate-presets";
 const MAX_PRESET_DEPTH: usize = 16;
+const GITHUB_API_VERSION: &str = "2026-03-10";
 
 #[derive(Debug, Clone)]
 struct GithubPreset {
@@ -406,7 +407,9 @@ fn fetch_github_preset(project_root: &Path, preset: &GithubPreset) -> anyhow::Re
             "--header",
             "Accept: application/vnd.github.raw",
             "--header",
-            "User-Agent: flint",
+            &format!("User-Agent: flint/{}", env!("CARGO_PKG_VERSION")),
+            "--header",
+            &format!("X-GitHub-Api-Version: {GITHUB_API_VERSION}"),
             "--header",
             &format!("Authorization: Bearer {token}"),
             &url,
@@ -595,7 +598,11 @@ mod tests {
             "https://api.example.test/repos/owner/repo/contents/presets/base.json?ref=v1"
         ));
         assert!(request.contains("Accept: application/vnd.github.raw\n"));
-        assert!(request.contains("User-Agent: flint\n"));
+        assert!(request.contains(&format!(
+            "User-Agent: flint/{}\n",
+            env!("CARGO_PKG_VERSION")
+        )));
+        assert!(request.contains("X-GitHub-Api-Version: 2026-03-10\n"));
 
         // A warm cache is sufficient even with a token: no second API call is made.
         warm_github_presets(root.path(), config);

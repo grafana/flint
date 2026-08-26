@@ -324,7 +324,7 @@ fn changed_files_empty_output_is_clean_and_excludes_untracked_files() {
 ///
 /// test.toml format:
 ///   [expected]
-///   args   = "--full --fix shellcheck"
+///   args   = "run --full --fix shellcheck"
 ///   exit   = 1                          # optional, default 0
 ///   stderr = """..."""                  # optional, default ""
 ///   stdout = """..."""                  # optional, default ""
@@ -1319,8 +1319,9 @@ fn run_case(case: &Path, name: &str, update: bool) {
     // Some fixes need to be verified by a separate check invocation. Keep
     // this opt-in so ordinary fixtures retain their single-process shape.
     if let Some(followup) = expected.get("followup").and_then(|v| v.as_table()) {
-        let followup_args_str = followup["args"]
-            .as_str()
+        let followup_args_str = followup
+            .get("args")
+            .and_then(|value| value.as_str())
             .unwrap_or_else(|| panic!("{name}: missing expected.followup.args"));
         let followup_args: Vec<&str> = followup_args_str.split_whitespace().collect();
         let followup_exit = followup

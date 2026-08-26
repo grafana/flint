@@ -1,6 +1,6 @@
 //! Presentation for the `flint linters` command.
 
-use crate::registry::{CheckKind, FixBehavior, LinterConfig, Scope};
+use crate::registry::{FixBehavior, LinterConfig};
 use crate::{config, registry};
 use std::collections::HashMap;
 
@@ -40,7 +40,7 @@ where
     linter_json(check, status, declared_version)
 }
 
-pub fn linter_json(
+pub(crate) fn linter_json(
     check: &registry::Check,
     status: &str,
     declared_version: Option<&str>,
@@ -104,10 +104,6 @@ fn config_file_location(config: &registry::ConfigFile) -> String {
     }
 }
 
-pub(crate) fn canonical_config_path(config: &LinterConfig) -> String {
-    config.canonical_location()
-}
-
 fn run_policy_label(check: &registry::Check) -> &'static str {
     if check.adaptive_relevance.is_some() {
         "adaptive"
@@ -116,22 +112,6 @@ fn run_policy_label(check: &registry::Check) -> &'static str {
     } else {
         "fast"
     }
-}
-
-pub(crate) fn is_fixable(name: &str, active: &[&registry::Check]) -> bool {
-    name == "flint-setup" || active.iter().any(|c| c.name == name && c.has_fix())
-}
-
-pub(crate) fn supports_single_pass_fix(check: &registry::Check) -> bool {
-    check.has_fix()
-        && check.fix_behavior() == FixBehavior::Definitive
-        && matches!(
-            check.kind,
-            CheckKind::Template {
-                scope: Scope::File | Scope::Files,
-                ..
-            }
-        )
 }
 
 pub(crate) fn print_table(

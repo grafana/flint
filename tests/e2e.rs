@@ -331,9 +331,9 @@ fn changed_files_empty_output_is_clean_and_excludes_untracked_files() {
 ///   stderr_contains = ["..."]           # optional substring assertions
 ///   stdout_contains = ["..."]           # optional substring assertions
 ///
-///   [expected.followup]                  # optional second invocation
+///   [expected.followup]                 # optional second invocation
 ///   args   = "run --full"               # run after the first invocation
-///   exit   = 0                            # optional, default 0
+///   exit   = 0                          # optional, default 0
 ///
 ///   [expected.files]                    # optional file contents asserted after run
 ///   ".github/renovate-tracked-deps.json" = """..."""

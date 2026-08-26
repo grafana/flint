@@ -161,7 +161,7 @@ pub(crate) fn extract_deps(
                 };
                 for dep in deps {
                     let skip_reason = dep.get("skipReason").and_then(|v| v.as_str());
-                    if should_skip_dep(manager, skip_reason) {
+                    if should_skip_dep(skip_reason) {
                         continue;
                     }
                     let Some(dep_name) = dep.get("depName").and_then(|v| v.as_str()) else {
@@ -241,15 +241,14 @@ pub(crate) fn extract_deps(
     })
 }
 
-fn should_skip_dep(manager: &str, skip_reason: Option<&str>) -> bool {
+fn should_skip_dep(skip_reason: Option<&str>) -> bool {
     match skip_reason {
         Some("contains-variable") => true,
-        // For GitHub Actions, lookup mode marks expression-based refs as
-        // invalid-value while extract mode keeps the dependency. It is still
-        // declared and must remain in both snapshots so fix is idempotent.
-        Some("invalid-value") => manager != "github-actions",
-        // invalid-version is likewise lookup-only and never removes a
-        // declared dependency from the stable snapshot.
+        // Lookup-only validation failures do not make a declared dependency
+        // disappear from the stable snapshot. In particular, mise values such
+        // as `latest` are reported as invalid-value during lookup while
+        // extract mode still returns them.
+        Some("invalid-value" | "invalid-version") => false,
         _ => false,
     }
 }

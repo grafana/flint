@@ -324,12 +324,16 @@ fn changed_files_empty_output_is_clean_and_excludes_untracked_files() {
 ///
 /// test.toml format:
 ///   [expected]
-///   args   = "--full --fix shellcheck"
+///   args   = "run --full --fix shellcheck"
 ///   exit   = 1                          # optional, default 0
 ///   stderr = """..."""                  # optional, default ""
 ///   stdout = """..."""                  # optional, default ""
 ///   stderr_contains = ["..."]           # optional substring assertions
 ///   stdout_contains = ["..."]           # optional substring assertions
+///
+///   [expected.followup]                 # optional second invocation
+///   args   = "run --full"               # run after the first invocation
+///   exit   = 0                          # optional, default 0
 ///
 ///   [expected.files]                    # optional file contents asserted after run
 ///   ".github/renovate-tracked-deps.json" = """..."""
@@ -1310,6 +1314,27 @@ fn run_case(case: &Path, name: &str, update: bool) {
                 .unwrap_or_else(|e| panic!("{name}: expected.files.{rel_path}: {e}"));
             assert_eq!(actual, exp, "{name}: {rel_path} content mismatch");
         }
+    }
+
+    // Some fixes need to be verified by a separate check invocation. Keep
+    // this opt-in so ordinary fixtures retain their single-process shape.
+    if let Some(followup) = expected.get("followup").and_then(|v| v.as_table()) {
+        let followup_args_str = followup
+            .get("args")
+            .and_then(|value| value.as_str())
+            .unwrap_or_else(|| panic!("{name}: missing expected.followup.args"));
+        let followup_args: Vec<&str> = followup_args_str.split_whitespace().collect();
+        let followup_exit = followup
+            .get("exit")
+            .and_then(|v| v.as_integer())
+            .unwrap_or(0) as i32;
+        let followup_out = flint_with_env(&followup_args, repo.path(), &env_refs);
+        assert_eq!(
+            followup_out.status.code(),
+            Some(followup_exit),
+            "{name}: followup exit code mismatch:\n{}",
+            combined_output(&followup_out)
+        );
     }
 }
 

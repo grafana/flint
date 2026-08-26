@@ -62,10 +62,18 @@ linter explicitly bypass the skip.
 
 The new-file check works offline by matching changed paths against
 `managerFilePatterns` regexes/globs from the active config and any
-resolvable `extends` — inline entries, local file presets, and flint's own
-bundled `github>grafana/flint` preset. Remote presets from other sources
-can't be resolved without running Renovate, so those still only surface in
+resolvable `extends` — inline entries, local file presets, Flint's own
+bundled `github>grafana/flint` preset, and cached `github>owner/repo` presets.
+`flint init` warms the GitHub preset cache when `GITHUB_COM_TOKEN` or
+`GITHUB_TOKEN` is available; normal `flint run` never performs a network
+request. Cache-cold GitHub presets and presets from unsupported sources
+(`gitlab>`, npm, and HTTP URLs) are skipped, so those still only surface in
 CI.
+
+GitHub presets support the forms `github>owner/repo`,
+`github>owner/repo//path/to/preset.json`, and an optional `#ref` suffix. A
+preset without a path resolves `default.json`. Presets may extend other
+presets; resolution has a bounded depth and cycle guard.
 
 The "new tool not yet tracked" case (built-in managers, or a custom manager
 pattern flint couldn't resolve offline) is the typical reason a CI failure

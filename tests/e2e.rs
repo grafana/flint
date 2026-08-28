@@ -1717,3 +1717,45 @@ fn normalize_output(s: String, repo_str: &str, repo_canonical: &str) -> String {
     };
     s
 }
+
+#[test]
+fn checker_uses_caller_file_list_from_stdin_without_git_discovery() {
+    use std::io::Write as _;
+    use std::process::Stdio;
+
+    let repo = tempfile::tempdir().expect("temp repo");
+    assert!(!repo.path().join(".git").exists());
+    std::fs::write(repo.path().join("renovate.json5"), "{}\n").unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_flint"))
+        .args(["checker", "renovate-deps", "--files-from", "-"])
+        .env_remove("FLINT_CONFIG_DIR")
+        .env_remove("CI")
+        .current_dir(repo.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn flint checker");
+    child
+        .stdin
+        .take()
+        .expect("checker stdin")
+        .write_all(b"README.md") // hk's join intentionally omits a final newline.
+        .unwrap();
+    let out = child.wait_with_output().expect("wait for flint checker");
+
+    assert!(out.status.success(), "{}", combined_output(&out));
+    let sarif: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(sarif["version"], "2.1.0");
+    assert_eq!(sarif["runs"][0]["tool"]["driver"]["name"], "flint");
+    assert_eq!(sarif["runs"][0]["results"], serde_json::json!([]));
+}
+
+#[test]
+fn checker_accepts_positional_repository_relative_paths() {
+    let repo = tempfile::tempdir().expect("temp repo");
+    std::fs::write(repo.path().join("renovate.json5"), "{}\n").unwrap();
+
+    let out = flint_with_env(&["checker", "renovate-deps", "README.md"], repo.path(), &[]);
+
+    assert!(out.status.success(), "{}", combined_output(&out));
+}

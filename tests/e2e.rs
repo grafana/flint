@@ -1759,3 +1759,35 @@ fn checker_accepts_positional_repository_relative_paths() {
 
     assert!(out.status.success(), "{}", combined_output(&out));
 }
+
+#[test]
+fn checker_lychee_accepts_hk_stdin_selection_and_emits_sarif() {
+    use std::io::Write as _;
+    use std::process::Stdio;
+
+    let repo = git_repo();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_flint"))
+        .args(["checker", "lychee", "--files-from", "-"])
+        .env_remove("FLINT_CONFIG_DIR")
+        .env_remove("CI")
+        .current_dir(repo.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn flint lychee checker");
+    child
+        .stdin
+        .take()
+        .expect("checker stdin")
+        .write_all(b"ignored.bin")
+        .unwrap();
+    let out = child.wait_with_output().expect("wait for flint checker");
+
+    assert!(out.status.success(), "{}", combined_output(&out));
+    let sarif: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(sarif["runs"][0]["results"], serde_json::json!([]));
+    assert_eq!(
+        sarif["runs"][0]["tool"]["driver"]["rules"][0]["id"],
+        "lychee"
+    );
+}

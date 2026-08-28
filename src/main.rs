@@ -144,6 +144,8 @@ struct CheckerArgs {
 enum CheckerCommand {
     /// Verify Renovate's dependency snapshot for the supplied paths.
     RenovateDeps(RenovateDepsCheckerArgs),
+    /// Check links in caller-selected files, plus repository-wide local links in CI.
+    Lychee(LycheeCheckerArgs),
 }
 
 #[derive(Args, Debug)]
@@ -164,6 +166,18 @@ struct RenovateDepsCheckerArgs {
     /// Show Renovate's diagnostic output.
     #[arg(long)]
     verbose: bool,
+}
+
+#[derive(Args, Debug)]
+struct LycheeCheckerArgs {
+    /// Read newline-delimited repository-relative paths from PATH, or stdin for "-".
+    /// The final line does not need a trailing newline.
+    #[arg(long, value_name = "PATH", conflicts_with = "files")]
+    files_from: Option<String>,
+
+    /// Repository-relative paths selected by the caller.
+    #[arg(value_name = "FILE")]
+    files: Vec<PathBuf>,
 }
 
 #[derive(Args, Debug)]
@@ -290,30 +304,51 @@ async fn main() -> Result<()> {
 }
 
 async fn run_checker(args: CheckerArgs, project_root: &Path, config_dir: &Path) -> Result<()> {
-    match args.command {
+    let cfg = config::load(config_dir)?;
+    let (name, out) = match args.command {
         CheckerCommand::RenovateDeps(args) => {
             let selected = read_checker_files(args.files_from.as_deref(), args.files)?;
             let file_list = checker_file_list(project_root, selected)?;
-            let cfg = config::load(config_dir)?;
-            let out = linters::renovate_deps::run_selected(
-                &cfg.checks.renovate_deps,
-                args.fix,
-                args.verbose,
-                project_root,
-                &file_list,
+            (
+                "renovate-deps",
+                linters::renovate_deps::run_selected(
+                    &cfg.checks.renovate_deps,
+                    args.fix,
+                    args.verbose,
+                    project_root,
+                    &file_list,
+                )
+                .await,
             )
-            .await;
-            let mut message = out.stdout;
-            message.extend(out.stderr);
-            let sarif = checker_sarif(out.ok, &message);
-            serde_json::to_writer_pretty(std::io::stdout(), &sarif)?;
-            println!();
-            if !out.ok {
-                std::process::exit(1);
-            }
-            Ok(())
         }
+        CheckerCommand::Lychee(args) => {
+            let selected = read_checker_files(args.files_from.as_deref(), args.files)?;
+            let mut file_list = checker_file_list(project_root, selected)?;
+            // The caller has already made a diff selection. Retain diff mode so
+            // Flint's CI local-link follow-up still runs, without Git discovery.
+            file_list.merge_base = Some("caller-selected".to_string());
+            (
+                "lychee",
+                linters::lychee::run(
+                    &cfg.checks.lychee,
+                    &cfg.settings,
+                    &file_list,
+                    project_root,
+                    config_dir,
+                )
+                .await,
+            )
+        }
+    };
+    let mut message = out.stdout;
+    message.extend(out.stderr);
+    let sarif = checker_sarif(name, out.ok, &message);
+    serde_json::to_writer_pretty(std::io::stdout(), &sarif)?;
+    println!();
+    if !out.ok {
+        std::process::exit(1);
     }
+    Ok(())
 }
 
 fn read_checker_files(files_from: Option<&str>, files: Vec<PathBuf>) -> Result<Vec<PathBuf>> {
@@ -366,12 +401,12 @@ fn checker_file_list(project_root: &Path, selected: Vec<PathBuf>) -> Result<file
     })
 }
 
-fn checker_sarif(ok: bool, message: &[u8]) -> serde_json::Value {
+fn checker_sarif(name: &str, ok: bool, message: &[u8]) -> serde_json::Value {
     let results = if ok {
         vec![]
     } else {
         vec![serde_json::json!({
-            "ruleId": "renovate-deps",
+            "ruleId": name,
             "level": "error",
             "message": { "text": String::from_utf8_lossy(message) },
         })]
@@ -380,7 +415,7 @@ fn checker_sarif(ok: bool, message: &[u8]) -> serde_json::Value {
         "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
         "version": "2.1.0",
         "runs": [{
-            "tool": { "driver": { "name": "flint", "informationUri": "https://github.com/grafana/flint", "rules": [{ "id": "renovate-deps", "name": "renovate-deps" }] } },
+            "tool": { "driver": { "name": "flint", "informationUri": "https://github.com/grafana/flint", "rules": [{ "id": name, "name": name }] } },
             "results": results,
         }],
     })

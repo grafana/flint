@@ -85,6 +85,30 @@ impl PreparedNativeCheck for PreparedRenovateDeps {
     }
 }
 
+/// Runs renovate-deps only when the caller-selected paths are relevant.
+///
+/// This is the runner-agnostic boundary used by `flint checker renovate-deps`:
+/// callers own selection, while Flint owns the check's project-wide Renovate
+/// extraction and snapshot comparison. It deliberately performs no Git file
+/// discovery.
+pub async fn run_selected(
+    cfg: &RenovateDepsConfig,
+    fix: bool,
+    verbose: bool,
+    project_root: &Path,
+    file_list: &FileList,
+) -> LinterOutput {
+    if !is_relevant(file_list, project_root) {
+        return LinterOutput {
+            ok: true,
+            stdout: vec![],
+            stderr: vec![],
+            setup_outcome: None,
+        };
+    }
+    run(cfg, fix, verbose, project_root).await
+}
+
 pub async fn run(
     cfg: &RenovateDepsConfig,
     fix: bool,

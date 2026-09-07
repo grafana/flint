@@ -17,18 +17,18 @@ jobs:
       matrix:
         include:
           - os: ubuntu-24.04
-            mise_version: v2026.8.14
-            mise_sha256: 7cd12d6002d5b3c83a89cad79023712faf2a36f9e8b2ee2061dac5135b3de0ed
+            mise_version: v2026.9.1
+            mise_sha256: c98423c8470d6dc416d9f7036d0646d8ef5ae92ad9186907f8fcc84cbe7db4ea
             aube_node_linker: isolated
             aube_package_import_method: auto
           - os: macos-15
-            mise_version: v2026.8.14
-            mise_sha256: ba93b3fe7e47964e4392d40c8b7bfa5740e8c2a0a575e3e86268e9764082ed3e
+            mise_version: v2026.9.1
+            mise_sha256: 3cfbe3295dba1a7e43bd02653517a8cc21135ba91f0635b45c98f1ebecc5513f
             aube_node_linker: isolated
             aube_package_import_method: auto
           - os: windows-2025
-            mise_version: v2026.8.14
-            mise_sha256: e16cd48db29107388d60558a2389bf246c6c77ea1a78e9af48a5f4994d706659
+            mise_version: v2026.9.1
+            mise_sha256: 86690787f22ccd55034039cb85bae27b5cba375aefbba5c09dd994487e0df554
             # Use a physical npm tree so mise-action can cache it reliably.
             aube_node_linker: hoisted
             aube_package_import_method: copy

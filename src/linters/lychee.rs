@@ -610,9 +610,17 @@ async fn build_remap_args(project_root: &Path) -> Vec<String> {
     }
     let server = github_server_url();
     let raw_base = raw_content_base(&server);
-    let mut args = build_global_github_args(&server, &raw_base);
-    args.extend(build_branch_remap_args(project_root, &server, &raw_base).await);
-    args
+    merge_remap_args(
+        build_branch_remap_args(project_root, &server, &raw_base).await,
+        build_global_github_args(&server, &raw_base),
+    )
+}
+
+/// Combines remaps in lychee's matching order: PR-specific rules must win over
+/// the global GitHub fallbacks for base-branch blob URLs.
+fn merge_remap_args(mut branch_args: Vec<String>, global_args: Vec<String>) -> Vec<String> {
+    branch_args.extend(global_args);
+    branch_args
 }
 
 fn build_global_github_args(server: &str, raw_base: &str) -> Vec<String> {
@@ -834,6 +842,24 @@ mod tests {
         );
         assert!(file_list.len() > 32_767);
         assert_eq!(file_list.split(|byte| *byte == b'\n').count(), 401);
+    }
+
+    #[test]
+    fn pr_remaps_precede_global_github_remaps() {
+        let remaps = merge_remap_args(
+            vec!["--remap".to_string(), "pr-branch-remap".to_string()],
+            vec!["--remap".to_string(), "global-github-remap".to_string()],
+        );
+
+        assert_eq!(
+            remaps,
+            [
+                "--remap",
+                "pr-branch-remap",
+                "--remap",
+                "global-github-remap"
+            ]
+        );
     }
 
     #[test]

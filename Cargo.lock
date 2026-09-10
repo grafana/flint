@@ -686,9 +686,9 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml_bw"
-version = "2.5.7"
+version = "2.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "659d74d982f3ee009c27f34a1fc84d84828095d58ea210ce31705833188c8e27"
+checksum = "05a3e7274c11e80a92d65caffb73d1932718027421f3765a36248dae14356b41"
 dependencies = [
  "base64",
  "granit-parser",

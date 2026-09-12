@@ -1,5 +1,54 @@
 # Changelog
 
+## [0.22.12](https://github.com/grafana/flint/compare/v0.22.11...v0.22.12) - 2026-09-12
+
+### Added
+
+- cache GitHub Renovate presets for offline checks ([#514](https://github.com/grafana/flint/pull/514))
+
+### Fixed
+
+- make renovate-deps fixes converge for latest mise pins ([#512](https://github.com/grafana/flint/pull/512))
+- reject renovate-deps in sparse checkouts ([#513](https://github.com/grafana/flint/pull/513))
+- suggest mise lint fix task ([#510](https://github.com/grafana/flint/pull/510))
+- keep full file checks scoped to tracked files ([#509](https://github.com/grafana/flint/pull/509))
+- baseline config changes and renovate validation ([#507](https://github.com/grafana/flint/pull/507))
+
+### Other
+
+- *(deps)* update taiki-e/install-action action to v2.87.8 ([#538](https://github.com/grafana/flint/pull/538))
+- *(deps)* update rust crate regex to v1.13.1 ([#539](https://github.com/grafana/flint/pull/539))
+- *(deps)* update rust crate serde_yaml_bw to v2.5.8 ([#537](https://github.com/grafana/flint/pull/537))
+- *(deps)* update node.js to v24.21.0 ([#536](https://github.com/grafana/flint/pull/536))
+- *(deps)* update taiki-e/install-action action to v2.87.7 ([#535](https://github.com/grafana/flint/pull/535))
+- *(deps)* update taiki-e/install-action action to v2.87.6 ([#534](https://github.com/grafana/flint/pull/534))
+- *(deps)* update taiki-e/install-action action to v2.87.5 ([#533](https://github.com/grafana/flint/pull/533))
+- *(deps)* update dependency rust to v1.98.1 ([#532](https://github.com/grafana/flint/pull/532))
+- *(deps)* update dependency go to v1.27.1 ([#531](https://github.com/grafana/flint/pull/531))
+- *(deps)* update mise to v2026.9.1 ([#528](https://github.com/grafana/flint/pull/528))
+- *(deps)* lock file maintenance ([#530](https://github.com/grafana/flint/pull/530))
+- *(deps)* update taiki-e/install-action action to v2.87.3 ([#527](https://github.com/grafana/flint/pull/527))
+- *(deps)* update taiki-e/install-action action to v2.87.2 ([#526](https://github.com/grafana/flint/pull/526))
+- *(deps)* update taiki-e/install-action action to v2.87.1 ([#525](https://github.com/grafana/flint/pull/525))
+- *(deps)* update node.js to v24.20.0 ([#523](https://github.com/grafana/flint/pull/523))
+- *(deps)* update taiki-e/install-action action to v2.87.0 ([#524](https://github.com/grafana/flint/pull/524))
+- *(deps)* update linters ([#521](https://github.com/grafana/flint/pull/521))
+- *(deps)* update mise to v2026.8.14 ([#520](https://github.com/grafana/flint/pull/520))
+- *(deps)* lock file maintenance ([#522](https://github.com/grafana/flint/pull/522))
+- *(deps)* update dependency jdx/mise-action to v4.3.0 ([#518](https://github.com/grafana/flint/pull/518))
+- *(deps)* update taiki-e/install-action action to v2.86.7 ([#516](https://github.com/grafana/flint/pull/516))
+- split linter presentation from CLI ([#515](https://github.com/grafana/flint/pull/515))
+- *(deps)* update taiki-e/install-action action to v2.86.6 ([#511](https://github.com/grafana/flint/pull/511))
+- *(deps)* update taiki-e/install-action action to v2.86.5 ([#508](https://github.com/grafana/flint/pull/508))
+- keep PR title check current after rebases ([#506](https://github.com/grafana/flint/pull/506))
+- *(deps)* update dependency rust to v1.98.0 ([#505](https://github.com/grafana/flint/pull/505))
+- *(deps)* update taiki-e/install-action action to v2.86.4 ([#503](https://github.com/grafana/flint/pull/503))
+- *(deps)* update dependency go to v1.27.0 ([#504](https://github.com/grafana/flint/pull/504))
+- *(deps)* lock file maintenance ([#502](https://github.com/grafana/flint/pull/502))
+- *(deps)* update linters ([#500](https://github.com/grafana/flint/pull/500))
+- *(deps)* update mise to v2026.8.10 ([#501](https://github.com/grafana/flint/pull/501))
+- *(deps)* update taiki-e/install-action action to v2.86.3 ([#498](https://github.com/grafana/flint/pull/498))
+
 ## [0.22.11](https://github.com/grafana/flint/compare/v0.22.10...v0.22.11) - 2026-08-20
 
 ### Added

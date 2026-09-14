@@ -4,7 +4,7 @@ exit = 1
 stderr = '''
 [editorconfig-checker]
 hello.txt:
-	2: Trailing whitespace
+	2: trailing whitespace
 
 1 errors found
 

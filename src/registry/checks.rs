@@ -313,7 +313,7 @@ fn check_zizmor() -> Check {
         "zizmor {FILES}",
         &[".github/workflows/*.yml", ".github/workflows/*.yaml"],
     )
-    .fix("zizmor --fix {FILES}")
+    .fix("zizmor --fix=all {FILES}")
     .linter_config("zizmor.yml", "--config")
     .baseline_config(ConfigFile::config_dir("zizmor.yml"))
     .unsupported_configs(ZIZMOR_UNSUPPORTED_CONFIGS)
@@ -415,24 +415,29 @@ fn check_dotenv_linter() -> Check {
 
 fn check_editorconfig_checker() -> Check {
     // Defer to formatters that enforce line length — those are the ones
-    // that conflict with ec's max_line_length editorconfig check.
-    // Note: ec's -config flag controls ec's own JSON config, not .editorconfig itself.
-    Check::files("editorconfig-checker", "ec {FILES}", &["*"])
-        .bin("ec")
-        .mise_tool("editorconfig-checker")
-        .defer_to_formatters()
-        .linter_config(".editorconfig-checker.json", "-config")
-        .baseline_triggers(EDITORCONFIG_CHECKER_BASELINE_TRIGGERS)
-        .unsupported_configs(EDITORCONFIG_CHECKER_UNSUPPORTED_CONFIGS)
-        .project_url(EDITORCONFIG_CHECKER_URL)
-        .config_doc_url(EDITORCONFIG_CHECKER_CONFIG_URL)
-        .overview(
-            OverviewSection::General,
-            "EditorConfig",
-            OverviewRole::Check,
-            Some("EditorConfig compliance"),
-        )
-        .desc("Check files comply with EditorConfig settings")
+    // that conflict with editorconfig-checker's max_line_length check.
+    // Version 4 renamed the binary from `ec` to `editorconfig-checker`.
+    // Note: -config controls the checker's own JSON config, not .editorconfig itself.
+    Check::files(
+        "editorconfig-checker",
+        "editorconfig-checker {FILES}",
+        &["*"],
+    )
+    .bin_aliases(&["ec"])
+    .mise_tool("editorconfig-checker")
+    .defer_to_formatters()
+    .linter_config(".editorconfig-checker.json", "-config")
+    .baseline_triggers(EDITORCONFIG_CHECKER_BASELINE_TRIGGERS)
+    .unsupported_configs(EDITORCONFIG_CHECKER_UNSUPPORTED_CONFIGS)
+    .project_url(EDITORCONFIG_CHECKER_URL)
+    .config_doc_url(EDITORCONFIG_CHECKER_CONFIG_URL)
+    .overview(
+        OverviewSection::General,
+        "EditorConfig",
+        OverviewRole::Check,
+        Some("EditorConfig compliance"),
+    )
+    .desc("Check files comply with EditorConfig settings")
 }
 
 fn check_golangci_lint() -> Check {

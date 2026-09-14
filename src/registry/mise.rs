@@ -197,10 +197,16 @@ pub(crate) fn declared_tool_version<'a>(
     }
     let lookup_key = check.mise_tool_name.unwrap_or(check.bin_name);
     // When mise_tool_name is set (e.g. "aqua:owenlamont/ryl"), also accept
-    // the bare bin_name where that matches the installed binary.
+    // the bare bin_name and legacy binary aliases.
     mise_tools
         .get(lookup_key)
         .or_else(|| check.mise_tool_name.and(mise_tools.get(check.bin_name)))
+        .or_else(|| {
+            check
+                .bin_aliases
+                .iter()
+                .find_map(|alias| mise_tools.get(*alias))
+        })
         .map(String::as_str)
 }
 

@@ -22,6 +22,19 @@ fn ktlint_full_runs_keep_file_list_filtering() {
 }
 
 #[test]
+fn zizmor_fix_applies_safe_and_unsafe_fixes() {
+    let check = builtin()
+        .into_iter()
+        .find(|check| check.name == "zizmor")
+        .expect("zizmor registry entry");
+    let CheckKind::Template { fix_cmd, .. } = check.kind else {
+        panic!("zizmor must use a command template");
+    };
+
+    assert_eq!(fix_cmd, "zizmor --fix=all {FILES}");
+}
+
+#[test]
 fn project_wide_checks_are_explicit_file_selection_exceptions() {
     use crate::registry::FileSelection;
 
@@ -93,18 +106,13 @@ fn normalized_command_prefix(check: &Check) -> Option<String> {
 /// command prefix such as `cargo-fmt` or `dotnet-format` is also acceptable.
 #[test]
 fn names_prefer_binary_or_native_command() {
-    const ALLOWED_ALIASES: &[(&str, &str)] = &[("editorconfig-checker", "ec")];
-
     let violations: Vec<String> = builtin()
         .into_iter()
         .filter(|check| check.uses_binary())
         .filter(|check| !check.kind.is_native())
         .filter_map(|check| {
-            let allowed = ALLOWED_ALIASES
-                .iter()
-                .any(|(name, bin)| check.name == *name && check.bin_name == *bin);
             let matches_command = normalized_command_prefix(&check).as_deref() == Some(check.name);
-            (check.name != check.bin_name && !matches_command && !allowed).then(|| {
+            (check.name != check.bin_name && !matches_command).then(|| {
                 format!(
                     "{} should match binary {} or native command prefix",
                     check.name, check.bin_name
@@ -204,7 +212,7 @@ fn all_registry_binaries_found() {
     let not_found: Vec<&str> = registry
         .iter()
         .filter(|c| c.uses_binary())
-        .filter(|c| !binary_on_path(c.bin_name))
+        .filter(|c| c.available_bin(binary_on_path).is_none())
         .map(|c| c.name)
         .collect();
 
@@ -369,6 +377,8 @@ fn linter_keys_include_mise_and_bare_tool_names() {
     assert!(keys.contains("ryl"));
     assert!(keys.contains("aqua:jonwiggins/xmloxide"));
     assert!(keys.contains("xmllint"));
+    assert!(keys.contains("editorconfig-checker"));
+    assert!(keys.contains("ec"));
     assert!(keys.contains("aqua:grafana/flint"));
     assert!(keys.contains("github:grafana/flint"));
     assert!(keys.contains("cargo:https://github.com/grafana/flint"));

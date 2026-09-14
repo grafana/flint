@@ -145,7 +145,7 @@ where
         .max(4);
     let bin_w = registry
         .iter()
-        .map(display_binary)
+        .map(|check| display_available_binary(check, &binary_on_path))
         .map(str::len)
         .max()
         .unwrap_or(6)
@@ -179,7 +179,7 @@ where
         let speed = run_policy_label(check);
         let fix = if check.has_fix() { "yes" } else { "no" };
         let patterns_str = check.patterns.join(" ");
-        let binary = display_binary(check);
+        let binary = display_available_binary(check, &binary_on_path);
         if patterns_str.is_empty() {
             writeln!(
                 out,
@@ -226,7 +226,7 @@ where
     F: Fn(&str) -> bool,
 {
     if registry::check_active(check, mise_tools) {
-        if !check.uses_binary() || binary_on_path(check.bin_name) {
+        if !check.uses_binary() || check.available_bin(binary_on_path).is_some() {
             let status_ctx = LinterStatusContext { cfg };
             check
                 .status_hook
@@ -242,9 +242,23 @@ where
     }
 }
 
+#[cfg(test)]
 pub(crate) fn display_binary(check: &registry::Check) -> &'static str {
     if check.uses_binary() {
         check.bin_name
+    } else {
+        "(built-in)"
+    }
+}
+
+fn display_available_binary<F>(check: &registry::Check, binary_on_path: &F) -> &'static str
+where
+    F: Fn(&str) -> bool,
+{
+    if check.uses_binary() {
+        check
+            .available_bin(binary_on_path)
+            .unwrap_or(check.bin_name)
     } else {
         "(built-in)"
     }

@@ -22,6 +22,19 @@ fn ktlint_full_runs_keep_file_list_filtering() {
 }
 
 #[test]
+fn zizmor_fix_applies_safe_and_unsafe_fixes() {
+    let check = builtin()
+        .into_iter()
+        .find(|check| check.name == "zizmor")
+        .expect("zizmor registry entry");
+    let CheckKind::Template { fix_cmd, .. } = check.kind else {
+        panic!("zizmor must use a command template");
+    };
+
+    assert_eq!(fix_cmd, "zizmor --fix=all {FILES}");
+}
+
+#[test]
 fn project_wide_checks_are_explicit_file_selection_exceptions() {
     use crate::registry::FileSelection;
 

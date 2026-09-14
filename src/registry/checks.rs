@@ -313,7 +313,7 @@ fn check_zizmor() -> Check {
         "zizmor {FILES}",
         &[".github/workflows/*.yml", ".github/workflows/*.yaml"],
     )
-    .fix("zizmor --fix {FILES}")
+    .fix("zizmor --fix=all {FILES}")
     .linter_config("zizmor.yml", "--config")
     .baseline_config(ConfigFile::config_dir("zizmor.yml"))
     .unsupported_configs(ZIZMOR_UNSUPPORTED_CONFIGS)

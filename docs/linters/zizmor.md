@@ -16,6 +16,9 @@
 
 `zizmor` audits GitHub Actions workflows for security issues.
 
+In fix mode, Flint passes `--fix=all` so zizmor applies both safe and unsafe
+fixes. Review the resulting changes for semantic correctness before committing.
+
 zizmor can drift without file changes: its `ref-version-mismatch`
 audit resolves pinned action hashes against GitHub's tag API at
 run-time. When a maintainer moves a mutable tag (e.g. `v6` advances

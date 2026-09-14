@@ -56,6 +56,7 @@ pub(super) fn prepare(
                 active_checks,
                 config_dir,
             );
+            let argv_list = resolve_binary_alias(check, argv_list, crate::registry::binary_on_path);
             if argv_list.is_empty() {
                 return None;
             }
@@ -84,6 +85,28 @@ pub(super) fn prepare(
             })
             .map(PreparedCheck::Native),
     }
+}
+
+pub(super) fn resolve_binary_alias<F>(
+    check: &Check,
+    mut argv_list: Vec<Vec<String>>,
+    binary_on_path: F,
+) -> Vec<Vec<String>>
+where
+    F: Fn(&str) -> bool,
+{
+    let Some(bin) = check.available_bin(binary_on_path) else {
+        return argv_list;
+    };
+    if bin == check.bin_name {
+        return argv_list;
+    }
+    for argv in &mut argv_list {
+        if argv.first().is_some_and(|arg| arg == check.bin_name) {
+            argv[0] = bin.to_string();
+        }
+    }
+    argv_list
 }
 
 pub(super) fn tracked_files(

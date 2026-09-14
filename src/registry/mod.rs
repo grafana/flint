@@ -36,6 +36,7 @@ pub fn linter_keys() -> std::collections::HashSet<&'static str> {
         .filter(|c| c.uses_binary() && !c.is_toolchain() && !c.activate_unconditionally)
     {
         keys.insert(check.bin_name);
+        keys.extend(check.bin_aliases.iter().copied());
         if let Some(tool) = check.mise_tool_name {
             keys.insert(tool);
         }

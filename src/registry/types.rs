@@ -488,6 +488,8 @@ pub struct Check {
     pub name: &'static str,
     /// Binary name used to invoke the tool.
     pub bin_name: &'static str,
+    /// Older binary names accepted when the primary binary is not available.
+    pub bin_aliases: &'static [&'static str],
     /// mise.toml tool key to look up for availability. When `None`, falls back to
     /// `bin_name`. Use this when the binary comes from a toolchain entry rather than
     /// its own tool entry (e.g. `cargo-fmt` ships with `rust`).
@@ -696,6 +698,7 @@ impl Check {
         Check {
             name,
             bin_name: name,
+            bin_aliases: &[],
             mise_tool_name: None,
             version_range: None,
             patterns,
@@ -756,6 +759,7 @@ impl Check {
         Check {
             name: check_type.name(),
             bin_name: native.bin_name().unwrap_or(""),
+            bin_aliases: &[],
             mise_tool_name: None,
             version_range: None,
             patterns: &[],
@@ -810,6 +814,22 @@ impl Check {
     pub fn bin(mut self, bin_name: &'static str) -> Self {
         self.bin_name = bin_name;
         self
+    }
+
+    /// Accept older binary names when the primary binary is not available.
+    pub fn bin_aliases(mut self, aliases: &'static [&'static str]) -> Self {
+        self.bin_aliases = aliases;
+        self
+    }
+
+    /// Resolve the preferred binary available on `PATH`.
+    pub fn available_bin<F>(&self, binary_on_path: F) -> Option<&'static str>
+    where
+        F: Fn(&str) -> bool,
+    {
+        std::iter::once(self.bin_name)
+            .chain(self.bin_aliases.iter().copied())
+            .find(|bin| binary_on_path(bin))
     }
 
     /// Set the mise.toml tool key when the binary ships as part of a toolchain

@@ -603,6 +603,7 @@ mod tests {
             name: "test",
             bin_name: "test-bin",
             bin_aliases: &[],
+            fix_requires_primary_bin: false,
             mise_tool_name: None,
             version_range: None,
             patterns,

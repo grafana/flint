@@ -6,7 +6,7 @@
 |          |                                                                                                                               |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | Project  | [editorconfig-checker](https://github.com/editorconfig-checker/editorconfig-checker)                                          |
-| Fix      | no                                                                                                                            |
+| Fix      | yes                                                                                                                           |
 | Binary   | `editorconfig-checker`                                                                                                        |
 | Scope    | [files](../linters.md#scope-files)                                                                                            |
 | Patterns | `*`                                                                                                                           |
@@ -20,7 +20,13 @@ automatically skips file types owned by an active formatter. If none of those
 formatters are installed, `editorconfig-checker` checks those files itself.
 
 Flint also supports the legacy `ec` binary name used before
-editorconfig-checker 4.
+editorconfig-checker 4. That binary remains check-only; autofix requires
+editorconfig-checker 4 or later.
+
+Use `flint run --fix editorconfig-checker` to apply the safe fixes exposed by
+editorconfig-checker 4: trailing whitespace, supported line endings, and final
+newlines. Indentation, maximum line length, and character encoding remain
+review-only.
 
 Flint writes shared `.editorconfig` carve-outs for known
 formatter-owned line length: today that means `rumdl` for `*.md`,

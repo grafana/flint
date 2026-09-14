@@ -249,6 +249,21 @@ fn editorconfig_checker_json_is_optional_not_generated_baseline() {
 }
 
 #[test]
+fn editorconfig_checker_fix_requires_version_four_binary() {
+    let check = builtin()
+        .into_iter()
+        .find(|check| check.name == "editorconfig-checker")
+        .expect("editorconfig-checker exists");
+
+    let CheckKind::Template { fix_cmd, .. } = check.kind else {
+        panic!("editorconfig-checker must use a command template");
+    };
+    assert_eq!(fix_cmd, "editorconfig-checker --fix {FILES}");
+    assert!(check.fix_available(|bin| bin == "editorconfig-checker"));
+    assert!(!check.fix_available(|bin| bin == "ec"));
+}
+
+#[test]
 fn default_renovate_preset_covers_all_linter_tools_weekly() {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let default_json_path = manifest_dir.join("default.json");

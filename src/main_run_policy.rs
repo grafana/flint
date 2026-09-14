@@ -8,11 +8,14 @@ pub(crate) fn canonical_config_path(config: &LinterConfig) -> String {
 }
 
 pub(crate) fn is_fixable(name: &str, active: &[&registry::Check]) -> bool {
-    name == "flint-setup" || active.iter().any(|c| c.name == name && c.has_fix())
+    name == "flint-setup"
+        || active
+            .iter()
+            .any(|c| c.name == name && c.fix_available(registry::binary_on_path))
 }
 
 pub(crate) fn supports_single_pass_fix(check: &registry::Check) -> bool {
-    check.has_fix()
+    check.fix_available(registry::binary_on_path)
         && check.fix_behavior() == FixBehavior::Definitive
         && matches!(
             check.kind,

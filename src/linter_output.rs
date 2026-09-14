@@ -35,15 +35,29 @@ pub(crate) fn linter_json_for<F>(
 where
     F: Fn(&str) -> bool,
 {
-    let status = linter_status(check, mise_tools, cfg, binary_on_path);
+    let status = linter_status(check, mise_tools, cfg, &binary_on_path);
     let declared_version = registry::declared_tool_version(check, mise_tools);
-    linter_json(check, status, declared_version)
+    linter_json_with_fix(
+        check,
+        status,
+        declared_version,
+        check.fix_available(binary_on_path),
+    )
 }
 
 pub(crate) fn linter_json(
     check: &registry::Check,
     status: &str,
     declared_version: Option<&str>,
+) -> serde_json::Value {
+    linter_json_with_fix(check, status, declared_version, check.has_fix())
+}
+
+fn linter_json_with_fix(
+    check: &registry::Check,
+    status: &str,
+    declared_version: Option<&str>,
+    fix_available: bool,
 ) -> serde_json::Value {
     let scope = check.kind.scope_name();
     let patterns: Vec<&str> = check.patterns.to_vec();
@@ -59,7 +73,7 @@ pub(crate) fn linter_json(
         .iter()
         .map(config_file_location)
         .collect();
-    let fix_behavior = check.has_fix().then(|| match check.fix_behavior() {
+    let fix_behavior = fix_available.then(|| match check.fix_behavior() {
         FixBehavior::Definitive => "definitive",
         FixBehavior::PartialNeedsVerify => "partial-needs-verify",
     });
@@ -71,7 +85,7 @@ pub(crate) fn linter_json(
         "status": status,
         "declared_version": declared_version,
         "patterns": patterns,
-        "fix": check.has_fix(),
+        "fix": fix_available,
         "fix_behavior": fix_behavior,
         "run_policy": run_policy_label(check),
         "slow": check.category == registry::Category::Slow,
@@ -177,7 +191,11 @@ where
     for check in registry {
         let status = linter_status(check, mise_tools, cfg, &binary_on_path);
         let speed = run_policy_label(check);
-        let fix = if check.has_fix() { "yes" } else { "no" };
+        let fix = if check.fix_available(&binary_on_path) {
+            "yes"
+        } else {
+            "no"
+        };
         let patterns_str = check.patterns.join(" ");
         let binary = display_available_binary(check, &binary_on_path);
         if patterns_str.is_empty() {

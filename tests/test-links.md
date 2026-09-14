@@ -28,8 +28,8 @@ these links verify that each remap rule works correctly during CI.
 
 ## Branch-only blob URL — remapped to the PR working tree
 
-This target does not exist on `main`. In a PR, this link must resolve to the
-working-tree copy rather than the global raw-content remap for `main`.
+In a PR, this link must resolve to the working-tree copy through the PR-specific
+remap rather than the global raw-content fallback for `main`.
 
 - [PR-only link target](https://github.com/grafana/flint/blob/main/tests/lychee-pr-branch-only.md)
 

@@ -853,11 +853,11 @@ mod tests {
 
         assert_eq!(
             remaps,
-            [
-                "--remap",
-                "pr-branch-remap",
-                "--remap",
-                "global-github-remap"
+            vec![
+                "--remap".to_string(),
+                "pr-branch-remap".to_string(),
+                "--remap".to_string(),
+                "global-github-remap".to_string(),
             ]
         );
     }

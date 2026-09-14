@@ -552,6 +552,30 @@ mod tests {
     }
 
     #[test]
+    fn resolve_binary_alias_prefers_primary_binary() {
+        let check = Check::file("tool", "tool file", &["*"]).bin_aliases(&["old-tool"]);
+        let argv = vec![vec!["tool".to_string(), "file".to_string()]];
+
+        assert_eq!(
+            resolve_binary_alias(&check, argv.clone(), |bin| {
+                bin == "tool" || bin == "old-tool"
+            }),
+            argv
+        );
+    }
+
+    #[test]
+    fn resolve_binary_alias_falls_back_to_legacy_binary() {
+        let check = Check::file("tool", "tool file", &["*"]).bin_aliases(&["old-tool"]);
+        let argv = vec![vec!["tool".to_string(), "file".to_string()]];
+
+        assert_eq!(
+            resolve_binary_alias(&check, argv, |bin| bin == "old-tool"),
+            vec![vec!["old-tool".to_string(), "file".to_string()]]
+        );
+    }
+
+    #[test]
     fn render_config_args_shell_quotes_all_args() {
         let rendered =
             render_config_args(&["--config-path".to_string(), "/tmp/my cfg".to_string()]);
@@ -578,6 +602,7 @@ mod tests {
         Check {
             name: "test",
             bin_name: "test-bin",
+            bin_aliases: &[],
             mise_tool_name: None,
             version_range: None,
             patterns,

@@ -1201,6 +1201,19 @@ license-header        (built-in)          not configured  fast      no   Check s
     }
 
     #[test]
+    fn linter_status_accepts_legacy_binary_alias() {
+        let cfg = config::Config::default();
+        let check =
+            registry::Check::files("tool", "tool {FILES}", &["*"]).bin_aliases(&["old-tool"]);
+        let tools = mise_tools_from("[tools]\ntool = \"1.0.0\"\n");
+
+        assert_eq!(
+            crate::linter_output::linter_status(&check, &tools, &cfg, |bin| bin == "old-tool"),
+            "active"
+        );
+    }
+
+    #[test]
     fn display_binary_marks_builtins() {
         let license_header = registry::builtin()
             .into_iter()

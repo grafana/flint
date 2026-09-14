@@ -93,18 +93,13 @@ fn normalized_command_prefix(check: &Check) -> Option<String> {
 /// command prefix such as `cargo-fmt` or `dotnet-format` is also acceptable.
 #[test]
 fn names_prefer_binary_or_native_command() {
-    const ALLOWED_ALIASES: &[(&str, &str)] = &[("editorconfig-checker", "ec")];
-
     let violations: Vec<String> = builtin()
         .into_iter()
         .filter(|check| check.uses_binary())
         .filter(|check| !check.kind.is_native())
         .filter_map(|check| {
-            let allowed = ALLOWED_ALIASES
-                .iter()
-                .any(|(name, bin)| check.name == *name && check.bin_name == *bin);
             let matches_command = normalized_command_prefix(&check).as_deref() == Some(check.name);
-            (check.name != check.bin_name && !matches_command && !allowed).then(|| {
+            (check.name != check.bin_name && !matches_command).then(|| {
                 format!(
                     "{} should match binary {} or native command prefix",
                     check.name, check.bin_name
@@ -204,7 +199,7 @@ fn all_registry_binaries_found() {
     let not_found: Vec<&str> = registry
         .iter()
         .filter(|c| c.uses_binary())
-        .filter(|c| !binary_on_path(c.bin_name))
+        .filter(|c| c.available_bin(binary_on_path).is_none())
         .map(|c| c.name)
         .collect();
 

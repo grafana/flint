@@ -26,6 +26,13 @@ these links verify that each remap rule works correctly during CI.
 
 - [LICENSE](https://github.com/grafana/flint/blob/main/LICENSE)
 
+## Branch-only blob URL — remapped to the PR working tree
+
+In a PR, this link must resolve to the working-tree copy through the PR-specific
+remap rather than the global raw-content fallback for `main`.
+
+- [PR-only link target](https://github.com/grafana/flint/blob/main/tests/lychee-pr-branch-only.md)
+
 ## Tree URLs — remapped to PR branch
 
 - [tasks/lint directory](https://github.com/grafana/flint/tree/main/tasks/lint)

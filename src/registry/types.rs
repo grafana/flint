@@ -490,6 +490,8 @@ pub struct Check {
     pub bin_name: &'static str,
     /// Older binary names accepted when the primary binary is not available.
     pub bin_aliases: &'static [&'static str],
+    /// Whether fix mode requires the primary binary rather than a legacy alias.
+    pub fix_requires_primary_bin: bool,
     /// mise.toml tool key to look up for availability. When `None`, falls back to
     /// `bin_name`. Use this when the binary comes from a toolchain entry rather than
     /// its own tool entry (e.g. `cargo-fmt` ships with `rust`).
@@ -699,6 +701,7 @@ impl Check {
             name,
             bin_name: name,
             bin_aliases: &[],
+            fix_requires_primary_bin: false,
             mise_tool_name: None,
             version_range: None,
             patterns,
@@ -760,6 +763,7 @@ impl Check {
             name: check_type.name(),
             bin_name: native.bin_name().unwrap_or(""),
             bin_aliases: &[],
+            fix_requires_primary_bin: false,
             mise_tool_name: None,
             version_range: None,
             patterns: &[],
@@ -830,6 +834,20 @@ impl Check {
         std::iter::once(self.bin_name)
             .chain(self.bin_aliases.iter().copied())
             .find(|bin| binary_on_path(bin))
+    }
+
+    /// Require the primary binary for fix mode while retaining aliases for checks.
+    pub fn fix_requires_primary_bin(mut self) -> Self {
+        self.fix_requires_primary_bin = true;
+        self
+    }
+
+    /// Return whether this check's fixer is available in the current environment.
+    pub fn fix_available<F>(&self, binary_on_path: F) -> bool
+    where
+        F: Fn(&str) -> bool,
+    {
+        self.has_fix() && (!self.fix_requires_primary_bin || binary_on_path(self.bin_name))
     }
 
     /// Set the mise.toml tool key when the binary ships as part of a toolchain

@@ -47,6 +47,7 @@ pub(super) fn prepare(
     let name = check.name.to_string();
     match &check.kind {
         CheckKind::Template { .. } => {
+            let fix = fix && check.fix_available(crate::registry::binary_on_path);
             let tracked_files = tracked_files(check, file_list, project_root, active_checks);
             let argv_list = build_invocations(
                 check,

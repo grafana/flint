@@ -423,7 +423,10 @@ fn check_editorconfig_checker() -> Check {
         "editorconfig-checker {FILES}",
         &["*"],
     )
+    .fix("editorconfig-checker --fix {FILES}")
     .bin_aliases(&["ec"])
+    .fix_requires_primary_bin()
+    .fix_after("typos")
     .mise_tool("editorconfig-checker")
     .defer_to_formatters()
     .linter_config(".editorconfig-checker.json", "-config")

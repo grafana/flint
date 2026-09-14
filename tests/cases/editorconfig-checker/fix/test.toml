@@ -1,0 +1,12 @@
+[expected]
+args = "run --full --fix editorconfig-checker"
+exit = 1
+stderr = '''
+flint: fixed: editorconfig-checker — commit before pushing
+'''
+
+[expected.files]
+"hello.txt" = '''
+hello
+world
+'''

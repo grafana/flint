@@ -364,6 +364,8 @@ fn linter_keys_include_mise_and_bare_tool_names() {
     assert!(keys.contains("ryl"));
     assert!(keys.contains("aqua:jonwiggins/xmloxide"));
     assert!(keys.contains("xmllint"));
+    assert!(keys.contains("editorconfig-checker"));
+    assert!(keys.contains("ec"));
     assert!(keys.contains("aqua:grafana/flint"));
     assert!(keys.contains("github:grafana/flint"));
     assert!(keys.contains("cargo:https://github.com/grafana/flint"));

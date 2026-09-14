@@ -1205,7 +1205,7 @@ license-header        (built-in)          not configured  fast      no   Check s
         let cfg = config::Config::default();
         let check =
             registry::Check::files("tool", "tool {FILES}", &["*"]).bin_aliases(&["old-tool"]);
-        let tools = mise_tools_from("[tools]\ntool = \"1.0.0\"\n");
+        let tools = mise_tools_from("[tools]\nold-tool = \"1.0.0\"\n");
 
         assert_eq!(
             crate::linter_output::linter_status(&check, &tools, &cfg, |bin| bin == "old-tool"),

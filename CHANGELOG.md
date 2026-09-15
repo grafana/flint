@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.22.13](https://github.com/grafana/flint/compare/v0.22.12...v0.22.13) - 2026-09-15
+
+### Added
+
+- *(editorconfig-checker)* support autofix ([#545](https://github.com/grafana/flint/pull/545))
+
+### Other
+
+- *(deps)* update taiki-e/install-action action to v2.87.12 ([#547](https://github.com/grafana/flint/pull/547))
+- *(deps)* update taiki-e/install-action action to v2.87.11 ([#546](https://github.com/grafana/flint/pull/546))
+
 ## [0.22.12](https://github.com/grafana/flint/compare/v0.22.11...v0.22.12) - 2026-09-14
 
 ### Added

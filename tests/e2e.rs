@@ -4,8 +4,8 @@ use std::process::{Command, Output};
 use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
-/// Runs the flint binary with additional environment variables.
-fn flint_with_env(args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Output {
+/// Builds a flint command isolated from the outer runner environment.
+fn flint_command(args: &[&str], cwd: &Path) -> Command {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_flint"));
     cmd.args(args)
         .env_remove("MISE_CONFIG_ROOT")
@@ -24,6 +24,12 @@ fn flint_with_env(args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Output {
         .env_remove("GITHUB_HEAD_REF")
         .env_remove("PR_HEAD_REPO")
         .current_dir(cwd);
+    cmd
+}
+
+/// Runs the flint binary with additional environment variables.
+fn flint_with_env(args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Output {
+    let mut cmd = flint_command(args, cwd);
     for (k, v) in env {
         cmd.env(k, v);
     }
@@ -1726,15 +1732,14 @@ fn checker_uses_caller_file_list_from_stdin_without_git_discovery() {
     let repo = tempfile::tempdir().expect("temp repo");
     assert!(!repo.path().join(".git").exists());
     std::fs::write(repo.path().join("renovate.json5"), "{}\n").unwrap();
-    let mut child = Command::new(env!("CARGO_BIN_EXE_flint"))
-        .args(["checker", "renovate-deps", "--files-from", "-"])
-        .env_remove("FLINT_CONFIG_DIR")
-        .env_remove("CI")
-        .current_dir(repo.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect("spawn flint checker");
+    let mut child = flint_command(
+        &["checker", "renovate-deps", "--files-from", "-"],
+        repo.path(),
+    )
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .spawn()
+    .expect("spawn flint checker");
     child
         .stdin
         .take()
@@ -1766,11 +1771,7 @@ fn checker_lychee_accepts_hk_stdin_selection_and_emits_sarif() {
     use std::process::Stdio;
 
     let repo = git_repo();
-    let mut child = Command::new(env!("CARGO_BIN_EXE_flint"))
-        .args(["checker", "lychee", "--files-from", "-"])
-        .env_remove("FLINT_CONFIG_DIR")
-        .env_remove("CI")
-        .current_dir(repo.path())
+    let mut child = flint_command(&["checker", "lychee", "--files-from", "-"], repo.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()

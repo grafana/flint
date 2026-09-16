@@ -357,13 +357,13 @@ fn read_checker_files(files_from: Option<&str>, files: Vec<PathBuf>) -> Result<V
             let mut input = String::new();
             std::io::stdin().read_to_string(&mut input)?;
             Ok(input
-                .split('\n')
+                .lines()
                 .filter(|line| !line.is_empty())
                 .map(PathBuf::from)
                 .collect())
         }
         Some(path) => Ok(std::fs::read_to_string(path)?
-            .split('\n')
+            .lines()
             .filter(|line| !line.is_empty())
             .map(PathBuf::from)
             .collect()),
@@ -375,6 +375,12 @@ fn checker_file_list(project_root: &Path, selected: Vec<PathBuf>) -> Result<file
     let mut files = Vec::with_capacity(selected.len());
     let mut changed_paths = Vec::with_capacity(selected.len());
     for path in selected {
+        if path
+            .components()
+            .any(|component| component == std::path::Component::ParentDir)
+        {
+            anyhow::bail!("checker file escapes the project root: {}", path.display());
+        }
         let path = if path.is_absolute() {
             path
         } else {
@@ -1152,7 +1158,8 @@ pub fn linter_json(
 #[cfg(test)]
 mod tests {
     use super::{
-        FlintTomlChange, RunArgs, unsupported_config, use_filtered_run_policy, write_changed_files,
+        FlintTomlChange, RunArgs, checker_file_list, read_checker_files, unsupported_config,
+        use_filtered_run_policy, write_changed_files,
     };
     use crate::{config, registry};
     use std::io;
@@ -1191,6 +1198,37 @@ mod tests {
         let files = [root.join("file.txt")];
         let mut stdout = ClosedPipe;
         assert!(write_changed_files(&mut stdout, root, &files, false).is_ok());
+    }
+
+    #[test]
+    fn checker_file_lists_parse_crlf() {
+        let root = tempfile::tempdir().unwrap();
+        let list = root.path().join("files.txt");
+        std::fs::write(&list, "README.md\r\nsubdir/config.yml\r\n").unwrap();
+
+        let files = read_checker_files(Some(list.to_str().unwrap()), Vec::new()).unwrap();
+
+        assert_eq!(
+            files,
+            [Path::new("README.md"), Path::new("subdir/config.yml")]
+        );
+    }
+
+    #[test]
+    fn checker_file_lists_reject_parent_directory_escape() {
+        let root = Path::new("/tmp/project");
+
+        let error =
+            checker_file_list(root, vec![Path::new("../outside.md").to_path_buf()]).unwrap_err();
+
+        assert!(error.to_string().contains("escapes the project root"));
+
+        let error = checker_file_list(
+            root,
+            vec![Path::new("/tmp/project/../outside.md").to_path_buf()],
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("escapes the project root"));
     }
 
     #[test]

@@ -130,6 +130,8 @@
       "github-actions": [
         "actions/attest-build-provenance",
         "actions/checkout",
+        "actions/download-artifact",
+        "actions/upload-artifact",
         "jdx/mise",
         "jdx/mise-action",
         "taiki-e/install-action",
@@ -160,6 +162,7 @@
         "dotenv-linter",
         "dotnet",
         "editorconfig-checker",
+        "github:jdx/packslip",
         "go",
         "golangci-lint",
         "google-java-format",
@@ -200,6 +203,14 @@
     },
     "actions/checkout": {
       "packageName": "actions/checkout",
+      "refKind": "version-tag"
+    },
+    "actions/download-artifact": {
+      "packageName": "actions/download-artifact",
+      "refKind": "version-tag"
+    },
+    "actions/upload-artifact": {
+      "packageName": "actions/upload-artifact",
       "refKind": "version-tag"
     },
     "grafana/shared-workflows/actions/lint-pr-title": {

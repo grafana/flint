@@ -214,6 +214,7 @@ jobs:
             --issuer https://token.actions.githubusercontent.com "${verify_args[@]}"
 
       - name: Upload manifest to draft release
+        id: upload-manifest
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -223,6 +224,7 @@ jobs:
           RELEASE_ID=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
             --jq ".[] | select(.tag_name == \"$TAG\") | .id" | head -1)
           test -n "$RELEASE_ID"
+          echo "release-id=$RELEASE_ID" >> "$GITHUB_OUTPUT"
           UPLOAD_URL=$(gh api "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" \
             --jq '.upload_url' | sed 's/{?name,label}//')
           gh api "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID/assets" \
@@ -237,4 +239,5 @@ jobs:
       - name: Publish draft release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: gh release edit "$TAG" --draft=false --repo "${GITHUB_REPOSITORY}"
+          RELEASE_ID: ${{ steps.upload-manifest.outputs.release-id }}
+        run: gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --method PATCH -F draft=false

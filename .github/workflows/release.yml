@@ -161,7 +161,7 @@ jobs:
       id-token: write
     env:
       TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-      MISE_ENABLE_TOOLS: github:jdx/packslip
+      MISE_ENABLE_TOOLS: packslip
     steps:
       - name: Checkout release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -174,7 +174,7 @@ jobs:
         with:
           version: v2026.9.5
           sha256: 32f644d8c291bb182f702c6d2b0dda9f8b01441e940d74d328aad5f08446b2fd
-          install_args: github:jdx/packslip
+          install_args: packslip
           cache: false
 
       - name: Collect release archives
@@ -188,30 +188,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          # Resolve the checked-out tag, not github.sha (which can be the
-          # workflow branch on workflow_dispatch).
-          COMMIT=$(git rev-parse HEAD)
-          args=()
-          verify_args=()
-          for archive in dist/flint-*.tar.gz dist/flint-*.zip; do
-            verify_args+=(--artifact "$archive")
-            digest=$(sha256sum "$archive" | cut -d' ' -f1)
-            args+=(--provenance "${archive##*/}=${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/attestations/sha256:${digest}")
-          done
-          mise exec github:jdx/packslip -- packslip create \
-            --project "github.com/${GITHUB_REPOSITORY}" \
-            --version "${TAG#v}" --tag "$TAG" --commit "$COMMIT" \
-            --source-repo "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
-            --url-base "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}" \
-            --bin flint \
-            --resource 'cli-spec/usage/flint=exec:flint usage' \
-            --resource 'skill/flint=repo:skills/flint' \
-            --out dist "${args[@]}" dist/flint-*.tar.gz dist/flint-*.zip
-          mise exec github:jdx/packslip -- packslip verify dist/packslip.sigstore.json \
-            --identity-prefix "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/" \
-            --issuer https://token.actions.githubusercontent.com "${verify_args[@]}"
+        run: mise run release:packslip
 
       - name: Upload manifest to draft release
         id: upload-manifest

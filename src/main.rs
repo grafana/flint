@@ -19,7 +19,7 @@ use clap::{Args, Parser, Subcommand};
 use registry::CheckKind;
 use runner::{CheckResult, RunContext as RunnerRunContext, RunOptions};
 use std::collections::HashSet;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 #[path = "main_baseline.rs"]
@@ -41,6 +41,8 @@ enum SubCommand {
     Run(RunArgs),
     /// Print the repository files selected by Flint's changed-file discovery.
     ChangedFiles(ChangedFilesArgs),
+    /// Run a Flint-owned check against caller-selected files.
+    Checker(CheckerArgs),
     /// List available linters and their status.
     Linters(LintersArgs),
     /// Set up linters in mise.toml for this project.
@@ -130,6 +132,52 @@ struct RunArgs {
     /// Linters to run (default: all discovered).
     /// Explicit names bypass the local relevance gate.
     linters: Vec<String>,
+}
+
+#[derive(Args, Debug)]
+struct CheckerArgs {
+    #[command(subcommand)]
+    command: CheckerCommand,
+}
+
+#[derive(Subcommand, Debug)]
+enum CheckerCommand {
+    /// Verify Renovate's dependency snapshot for the supplied paths.
+    RenovateDeps(RenovateDepsCheckerArgs),
+    /// Check links in caller-selected files, plus repository-wide local links in CI.
+    Lychee(LycheeCheckerArgs),
+}
+
+#[derive(Args, Debug)]
+struct RenovateDepsCheckerArgs {
+    /// Read newline-delimited repository-relative paths from PATH, or stdin for "-".
+    /// The final line does not need a trailing newline.
+    #[arg(long, value_name = "PATH", conflicts_with = "files")]
+    files_from: Option<String>,
+
+    /// Repository-relative paths selected by the caller.
+    #[arg(value_name = "FILE")]
+    files: Vec<PathBuf>,
+
+    /// Update the tracked dependency snapshot when it is stale.
+    #[arg(long)]
+    fix: bool,
+
+    /// Show Renovate's diagnostic output.
+    #[arg(long)]
+    verbose: bool,
+}
+
+#[derive(Args, Debug)]
+struct LycheeCheckerArgs {
+    /// Read newline-delimited repository-relative paths from PATH, or stdin for "-".
+    /// The final line does not need a trailing newline.
+    #[arg(long, value_name = "PATH", conflicts_with = "files")]
+    files_from: Option<String>,
+
+    /// Repository-relative paths selected by the caller.
+    #[arg(value_name = "FILE")]
+    files: Vec<PathBuf>,
 }
 
 #[derive(Args, Debug)]
@@ -223,6 +271,9 @@ async fn main() -> Result<()> {
                 files::apply_filters(&project_root, file_list, &args.include, &args.exclude)?;
             print_changed_files(&project_root, &file_list.files, args.null)?;
         }
+        SubCommand::Checker(args) => {
+            run_checker(args, &project_root, &config_dir).await?;
+        }
         SubCommand::Init(args) => {
             if args.only.is_empty() {
                 init::run(
@@ -250,6 +301,130 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+async fn run_checker(args: CheckerArgs, project_root: &Path, config_dir: &Path) -> Result<()> {
+    let cfg = config::load(config_dir)?;
+    let (name, out) = match args.command {
+        CheckerCommand::RenovateDeps(args) => {
+            let selected = read_checker_files(args.files_from.as_deref(), args.files)?;
+            let file_list = checker_file_list(project_root, selected)?;
+            (
+                "renovate-deps",
+                linters::renovate_deps::run_selected(
+                    &cfg.checks.renovate_deps,
+                    args.fix,
+                    args.verbose,
+                    project_root,
+                    &file_list,
+                )
+                .await,
+            )
+        }
+        CheckerCommand::Lychee(args) => {
+            let selected = read_checker_files(args.files_from.as_deref(), args.files)?;
+            let mut file_list = checker_file_list(project_root, selected)?;
+            // The caller has already made a diff selection. Retain diff mode so
+            // Flint's CI local-link follow-up still runs, without Git discovery.
+            file_list.merge_base = Some("caller-selected".to_string());
+            (
+                "lychee",
+                linters::lychee::run(
+                    &cfg.checks.lychee,
+                    &cfg.settings,
+                    &file_list,
+                    project_root,
+                    config_dir,
+                )
+                .await,
+            )
+        }
+    };
+    let mut message = out.stdout;
+    message.extend(out.stderr);
+    let sarif = checker_sarif(name, out.ok, &message);
+    serde_json::to_writer_pretty(std::io::stdout(), &sarif)?;
+    println!();
+    if !out.ok {
+        std::process::exit(1);
+    }
+    Ok(())
+}
+
+fn read_checker_files(files_from: Option<&str>, files: Vec<PathBuf>) -> Result<Vec<PathBuf>> {
+    match files_from {
+        Some("-") => {
+            let mut input = String::new();
+            std::io::stdin().read_to_string(&mut input)?;
+            Ok(input
+                .lines()
+                .filter(|line| !line.is_empty())
+                .map(PathBuf::from)
+                .collect())
+        }
+        Some(path) => Ok(std::fs::read_to_string(path)?
+            .lines()
+            .filter(|line| !line.is_empty())
+            .map(PathBuf::from)
+            .collect()),
+        None => Ok(files),
+    }
+}
+
+fn checker_file_list(project_root: &Path, selected: Vec<PathBuf>) -> Result<files::FileList> {
+    let mut files = Vec::with_capacity(selected.len());
+    let mut changed_paths = Vec::with_capacity(selected.len());
+    for path in selected {
+        if path
+            .components()
+            .any(|component| component == std::path::Component::ParentDir)
+        {
+            anyhow::bail!("checker file escapes the project root: {}", path.display());
+        }
+        let path = if path.is_absolute() {
+            path
+        } else {
+            project_root.join(path)
+        };
+        let relative = path.strip_prefix(project_root).with_context(|| {
+            format!(
+                "checker file is outside the project root: {}",
+                path.display()
+            )
+        })?;
+        changed_paths.push(
+            relative
+                .to_string_lossy()
+                .replace(std::path::MAIN_SEPARATOR, "/"),
+        );
+        files.push(path);
+    }
+    Ok(files::FileList {
+        files,
+        changed_paths,
+        merge_base: None,
+        full: false,
+    })
+}
+
+fn checker_sarif(name: &str, ok: bool, message: &[u8]) -> serde_json::Value {
+    let results = if ok {
+        vec![]
+    } else {
+        vec![serde_json::json!({
+            "ruleId": name,
+            "level": "error",
+            "message": { "text": String::from_utf8_lossy(message) },
+        })]
+    };
+    serde_json::json!({
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [{
+            "tool": { "driver": { "name": "flint", "informationUri": "https://github.com/grafana/flint", "rules": [{ "id": name, "name": name }] } },
+            "results": results,
+        }],
+    })
 }
 
 fn print_changed_files(project_root: &Path, files: &[PathBuf], nul: bool) -> Result<()> {
@@ -983,7 +1158,8 @@ pub fn linter_json(
 #[cfg(test)]
 mod tests {
     use super::{
-        FlintTomlChange, RunArgs, unsupported_config, use_filtered_run_policy, write_changed_files,
+        FlintTomlChange, RunArgs, checker_file_list, read_checker_files, unsupported_config,
+        use_filtered_run_policy, write_changed_files,
     };
     use crate::{config, registry};
     use std::io;
@@ -1022,6 +1198,37 @@ mod tests {
         let files = [root.join("file.txt")];
         let mut stdout = ClosedPipe;
         assert!(write_changed_files(&mut stdout, root, &files, false).is_ok());
+    }
+
+    #[test]
+    fn checker_file_lists_parse_crlf() {
+        let root = tempfile::tempdir().unwrap();
+        let list = root.path().join("files.txt");
+        std::fs::write(&list, "README.md\r\nsubdir/config.yml\r\n").unwrap();
+
+        let files = read_checker_files(Some(list.to_str().unwrap()), Vec::new()).unwrap();
+
+        assert_eq!(
+            files,
+            [Path::new("README.md"), Path::new("subdir/config.yml")]
+        );
+    }
+
+    #[test]
+    fn checker_file_lists_reject_parent_directory_escape() {
+        let root = Path::new("/tmp/project");
+
+        let error =
+            checker_file_list(root, vec![Path::new("../outside.md").to_path_buf()]).unwrap_err();
+
+        assert!(error.to_string().contains("escapes the project root"));
+
+        let error = checker_file_list(
+            root,
+            vec![Path::new("/tmp/project/../outside.md").to_path_buf()],
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("escapes the project root"));
     }
 
     #[test]

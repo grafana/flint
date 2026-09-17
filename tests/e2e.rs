@@ -4,8 +4,8 @@ use std::process::{Command, Output};
 use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
-/// Runs the flint binary with additional environment variables.
-fn flint_with_env(args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Output {
+/// Builds a flint command isolated from the outer runner environment.
+fn flint_command(args: &[&str], cwd: &Path) -> Command {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_flint"));
     cmd.args(args)
         .env_remove("MISE_CONFIG_ROOT")
@@ -24,6 +24,12 @@ fn flint_with_env(args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Output {
         .env_remove("GITHUB_HEAD_REF")
         .env_remove("PR_HEAD_REPO")
         .current_dir(cwd);
+    cmd
+}
+
+/// Runs the flint binary with additional environment variables.
+fn flint_with_env(args: &[&str], cwd: &Path, env: &[(&str, &str)]) -> Output {
+    let mut cmd = flint_command(args, cwd);
     for (k, v) in env {
         cmd.env(k, v);
     }
@@ -1716,4 +1722,73 @@ fn normalize_output(s: String, repo_str: &str, repo_canonical: &str) -> String {
         out.replace("file:///<REPO>", "file://<REPO>")
     };
     s
+}
+
+#[test]
+fn checker_uses_caller_file_list_from_stdin_without_git_discovery() {
+    use std::io::Write as _;
+    use std::process::Stdio;
+
+    let repo = tempfile::tempdir().expect("temp repo");
+    assert!(!repo.path().join(".git").exists());
+    std::fs::write(repo.path().join("renovate.json5"), "{}\n").unwrap();
+    let mut child = flint_command(
+        &["checker", "renovate-deps", "--files-from", "-"],
+        repo.path(),
+    )
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .spawn()
+    .expect("spawn flint checker");
+    child
+        .stdin
+        .take()
+        .expect("checker stdin")
+        .write_all(b"README.md") // hk's join intentionally omits a final newline.
+        .unwrap();
+    let out = child.wait_with_output().expect("wait for flint checker");
+
+    assert!(out.status.success(), "{}", combined_output(&out));
+    let sarif: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(sarif["version"], "2.1.0");
+    assert_eq!(sarif["runs"][0]["tool"]["driver"]["name"], "flint");
+    assert_eq!(sarif["runs"][0]["results"], serde_json::json!([]));
+}
+
+#[test]
+fn checker_accepts_positional_repository_relative_paths() {
+    let repo = tempfile::tempdir().expect("temp repo");
+    std::fs::write(repo.path().join("renovate.json5"), "{}\n").unwrap();
+
+    let out = flint_with_env(&["checker", "renovate-deps", "README.md"], repo.path(), &[]);
+
+    assert!(out.status.success(), "{}", combined_output(&out));
+}
+
+#[test]
+fn checker_lychee_accepts_hk_stdin_selection_and_emits_sarif() {
+    use std::io::Write as _;
+    use std::process::Stdio;
+
+    let repo = git_repo();
+    let mut child = flint_command(&["checker", "lychee", "--files-from", "-"], repo.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn flint lychee checker");
+    child
+        .stdin
+        .take()
+        .expect("checker stdin")
+        .write_all(b"ignored.bin")
+        .unwrap();
+    let out = child.wait_with_output().expect("wait for flint checker");
+
+    assert!(out.status.success(), "{}", combined_output(&out));
+    let sarif: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(sarif["runs"][0]["results"], serde_json::json!([]));
+    assert_eq!(
+        sarif["runs"][0]["tool"]["driver"]["rules"][0]["id"],
+        "lychee"
+    );
 }

@@ -292,6 +292,29 @@ checksum = "sha256:a5f1eb57b62a3499b920f6ddb1561c7f8b0276289ff0c4fefc03a5225d721
 url = "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v4.0.1/editorconfig-checker-windows-amd64.zip"
 url_api = "https://api.github.com/repos/editorconfig-checker/editorconfig-checker/releases/assets/543952342"
 
+[[tools."github:jdx/packslip"]]
+version = "1.2.0"
+backend = "github:jdx/packslip"
+specifiers = ["1.2.0"]
+
+[tools."github:jdx/packslip"."platforms.linux-x64"]
+checksum = "sha256:7564aaabb34121d6eae65191711fa52a9c88e763e60b0a0e3585833b7a0830b1"
+url = "https://github.com/jdx/packslip/releases/download/v1.2.0/packslip-v1.2.0-linux-x64.tar.xz"
+url_api = "https://api.github.com/repos/jdx/packslip/releases/assets/552972051"
+provenance = "github-attestations"
+
+[tools."github:jdx/packslip"."platforms.macos-arm64"]
+checksum = "sha256:1dbe331f79039c64c6b0726fa4db188a4c8bb79627bdd979723bfd2be0e111d0"
+url = "https://github.com/jdx/packslip/releases/download/v1.2.0/packslip-v1.2.0-darwin-arm64.tar.xz"
+url_api = "https://api.github.com/repos/jdx/packslip/releases/assets/552972055"
+provenance = "github-attestations"
+
+[tools."github:jdx/packslip"."platforms.windows-x64"]
+checksum = "sha256:3078cb66c261e3ea7e70df22362a25b70249e1f93fba3b65de97a8067b5c727e"
+url = "https://github.com/jdx/packslip/releases/download/v1.2.0/packslip-v1.2.0-windows-x64.zip"
+url_api = "https://api.github.com/repos/jdx/packslip/releases/assets/552972053"
+provenance = "github-attestations"
+
 [[tools.go]]
 version = "1.27.1"
 backend = "core:go"

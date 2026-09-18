@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.22.13](https://github.com/grafana/flint/compare/v0.22.12...v0.22.13) - 2026-09-18
+
+### Added
+
+- *(checker)* expose runner-agnostic dependency and link checks ([#519](https://github.com/grafana/flint/pull/519))
+- *(editorconfig-checker)* support autofix ([#545](https://github.com/grafana/flint/pull/545))
+
+### Other
+
+- *(deps)* update taiki-e/install-action action to v2.87.13 ([#550](https://github.com/grafana/flint/pull/550))
+- *(deps)* update rust crate clap to v4.6.7 ([#549](https://github.com/grafana/flint/pull/549))
+- *(deps)* update taiki-e/install-action action to v2.87.12 ([#547](https://github.com/grafana/flint/pull/547))
+- *(deps)* update taiki-e/install-action action to v2.87.11 ([#546](https://github.com/grafana/flint/pull/546))
+
 ## [0.22.12](https://github.com/grafana/flint/compare/v0.22.11...v0.22.12) - 2026-09-14
 
 ### Added

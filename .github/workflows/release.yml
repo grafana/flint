@@ -161,20 +161,12 @@ jobs:
       id-token: write
     env:
       TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-      MISE_ENABLE_TOOLS: packslip
     steps:
       - name: Checkout release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
           persist-credentials: false
-
-      - name: Setup packslip
-        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
-        with:
-          version: v2026.9.5
-          sha256: 32f644d8c291bb182f702c6d2b0dda9f8b01441e940d74d328aad5f08446b2fd
-          cache: false
 
       - name: Collect release archives
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -183,11 +175,25 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Sign and verify release manifest
+      - name: Resolve release source commit
+        id: source
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: mise run release:packslip
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Sign and verify release manifest
+        # Trial the reviewed source-commit support from jdx/packslip#116.
+        uses: zeitlinger/packslip@8377464eb3f7035467ed8b41d5e738cc4959db27
+        with:
+          tag: ${{ env.TAG }}
+          commit: ${{ steps.source.outputs.commit }}
+          artifacts: dist/flint-*.tar.gz dist/flint-*.zip
+          bin: flint
+          attest: link
+          resources: |
+            cli-spec/usage/flint=exec:flint usage
+            skill/flint=repo:skills/flint
+          out: dist
+          upload: false
 
       - name: Upload manifest to draft release
         id: upload-manifest

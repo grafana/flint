@@ -135,7 +135,8 @@
         "jdx/mise",
         "jdx/mise-action",
         "taiki-e/install-action",
-        "ubuntu"
+        "ubuntu",
+        "zeitlinger/packslip"
       ],
       "regex": [
         "mise"
@@ -171,7 +172,6 @@
         "lychee",
         "node",
         "npm:renovate",
-        "packslip",
         "release-plz",
         "ruff",
         "rumdl",

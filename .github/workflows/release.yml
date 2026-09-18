@@ -182,7 +182,7 @@ jobs:
 
       - name: Sign and verify release manifest
         # Trial the reviewed source-commit support from jdx/packslip#116.
-        uses: zeitlinger/packslip@8377464eb3f7035467ed8b41d5e738cc4959db27
+        uses: zeitlinger/packslip@6ee9ce94da616c20cdcb1b10c4146ea3b2a564b5
         with:
           tag: ${{ env.TAG }}
           commit: ${{ steps.source.outputs.commit }}

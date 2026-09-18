@@ -7,11 +7,25 @@ flint init [OPTIONS]
 flint hook install
 flint linters
 flint version
+flint usage
 ```
 
 Commands and flags follow
 [golangci-lint](https://golangci-lint.run/) conventions. Teams already using
 it do not need to re-learn the interface.
+
+## `flint usage`
+
+Print the machine-readable [Usage](https://usage.jdx.dev/) specification to stdout:
+
+```bash
+flint usage > flint.usage.kdl
+```
+
+The spec is generated from the same Clap definitions used to parse commands,
+not a separately maintained CLI description. This command needs no repository,
+linter tools, or valid Flint configuration. Release Packslip manifests advertise
+it as a CLI-spec resource; generating this resource executes the installed binary.
 
 ## Output
 

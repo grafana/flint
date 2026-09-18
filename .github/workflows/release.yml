@@ -115,6 +115,14 @@ jobs:
         with:
           subject-path: ${{ env.ARCHIVE }}
 
+      - name: Stage archive for release manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-${{ matrix.target }}
+          path: ${{ env.ARCHIVE }}
+          if-no-files-found: error
+          overwrite: true
+
       - name: Upload to draft release
         shell: bash
         env:
@@ -150,10 +158,68 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      id-token: write
     env:
       TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
+      - name: Checkout release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+          persist-credentials: false
+
+      - name: Collect release archives
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Resolve release source commit
+        id: source
+        shell: bash
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Sign and verify release manifest
+        # Trial the reviewed source-commit support from jdx/packslip#116.
+        uses: zeitlinger/packslip@6ee9ce94da616c20cdcb1b10c4146ea3b2a564b5
+        with:
+          tag: ${{ env.TAG }}
+          commit: ${{ steps.source.outputs.commit }}
+          artifacts: dist/flint-*.tar.gz dist/flint-*.zip
+          bin: flint
+          attest: link
+          resources: |
+            cli-spec/usage/flint=exec:flint usage
+            skill/flint=repo:skills/flint
+          out: dist
+          upload: false
+
+      - name: Upload manifest to draft release
+        id: upload-manifest
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Use the list API: tag lookup may not find a draft release.
+          RELEASE_ID=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"$TAG\") | .id" | head -1)
+          test -n "$RELEASE_ID"
+          echo "release-id=$RELEASE_ID" >> "$GITHUB_OUTPUT"
+          UPLOAD_URL=$(gh api "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" \
+            --jq '.upload_url' | sed 's/{?name,label}//')
+          gh api "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID/assets" \
+            --jq '.[] | select(.name == "packslip.sigstore.json") | .id' \
+            | xargs -r -I{} gh api "repos/${GITHUB_REPOSITORY}/releases/assets/{}" -X DELETE
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            "${UPLOAD_URL}?name=packslip.sigstore.json" \
+            --data-binary @dist/packslip.sigstore.json
+
       - name: Publish draft release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: gh release edit "$TAG" --draft=false --repo "${GITHUB_REPOSITORY}"
+          RELEASE_ID: ${{ steps.upload-manifest.outputs.release-id }}
+        run: gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --method PATCH -F draft=false

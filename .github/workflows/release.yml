@@ -181,7 +181,6 @@ jobs:
         run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Sign and verify release manifest
-        # Use the merged source-commit support from jdx/packslip#116.
         uses: jdx/packslip@90680a844569de8bfb2b191002ce96e3ade97c15
         with:
           tag: ${{ env.TAG }}

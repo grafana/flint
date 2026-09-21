@@ -136,7 +136,7 @@
         "jdx/mise-action",
         "taiki-e/install-action",
         "ubuntu",
-        "zeitlinger/packslip"
+        "jdx/packslip"
       ],
       "regex": [
         "mise"

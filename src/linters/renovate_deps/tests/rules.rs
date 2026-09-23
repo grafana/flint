@@ -345,7 +345,17 @@ fn validate_extract_version_consistency_flags_no_match() {
 
 #[test]
 fn validate_extract_version_consistency_ignores_floating_mise_selectors() {
-    for selector in ["latest", "lts"] {
+    for selector in [
+        "latest",
+        "lts",
+        "25",
+        "25.1",
+        "temurin-25",
+        "temurin-25.1",
+        "ref:main",
+        "path:./jdk",
+        "sub-1:tool",
+    ] {
         let snap = Snapshot {
             meta: [(
                 "actionlint".to_string(),
@@ -365,9 +375,53 @@ fn validate_extract_version_consistency_ignores_floating_mise_selectors() {
 
         assert!(
             extract_version_mismatches(&snap).unwrap().is_empty(),
-            "selector {selector:?} should not be checked as a concrete version"
+            "mise selector {selector:?} should not be checked as a concrete version"
         );
     }
+}
+
+#[test]
+fn validate_extract_version_consistency_does_not_ignore_selectors_for_other_managers() {
+    let snap = Snapshot {
+        meta: [(
+            "actionlint".to_string(),
+            DepMeta {
+                package_name: Some("rhysd/actionlint".to_string()),
+                datasource: Some("github-releases".to_string()),
+                current_value: Some("latest".to_string()),
+                current_version: Some("1.7.12".to_string()),
+                extract_version: Some("not a valid regex [".to_string()),
+            },
+        )]
+        .into_iter()
+        .collect(),
+        action_meta: BTreeMap::new(),
+        files: dep_files(&[("package.json", &[("npm", &["actionlint"])])]),
+    };
+
+    assert!(extract_version_mismatches(&snap).is_err());
+}
+
+#[test]
+fn validate_extract_version_consistency_does_not_ignore_non_selector_mise_values() {
+    let snap = Snapshot {
+        meta: [(
+            "actionlint".to_string(),
+            DepMeta {
+                package_name: Some("rhysd/actionlint".to_string()),
+                datasource: Some("github-releases".to_string()),
+                current_value: Some("latest-channel".to_string()),
+                current_version: Some("1.7.12".to_string()),
+                extract_version: Some("not a valid regex [".to_string()),
+            },
+        )]
+        .into_iter()
+        .collect(),
+        action_meta: BTreeMap::new(),
+        files: dep_files(&[("mise.toml", &[("mise", &["actionlint"])])]),
+    };
+
+    assert!(extract_version_mismatches(&snap).is_err());
 }
 
 #[test]
@@ -399,7 +453,15 @@ fn patch_semver_equivalent_mise_values_rewrites_to_preferred_shape() {
         action_meta: BTreeMap::new(),
         files: dep_files(&[("mise.toml", &[("mise", &["protoc"])])]),
     };
-    let mismatches = extract_version_mismatches(&snap).unwrap();
+    let mismatches = vec![ExtractVersionMismatch {
+        dep_name: "protoc".to_string(),
+        package_name: Some("protocolbuffers/protobuf".to_string()),
+        current_value: "35.0".to_string(),
+        current_version: "v35".to_string(),
+        extract_version: "^v(?<version>\\S+)".to_string(),
+        extracted_value: Some("35".to_string()),
+        suggested_extract_version: None,
+    }];
 
     let changed = patch_semver_equivalent_mise_values(dir.path(), &snap, &mismatches).unwrap();
 

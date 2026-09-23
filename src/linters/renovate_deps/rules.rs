@@ -156,11 +156,11 @@ pub(crate) fn extract_version_mismatches(
             continue;
         };
 
-        // Floating mise selectors are intentional requests, not release tags.
-        // Renovate can still report the resolved currentVersion alongside
-        // `latest`/`lts`, but there is no concrete currentValue for
-        // extractVersion to normalize and compare against it.
-        if matches!(current_value, "latest" | "lts") {
+        // Renovate's mise manager supports selectors (latest/lts, partial
+        // versions, and ref/path selectors) whose currentValue is not a
+        // concrete release tag. Its extractVersion rule cannot be validated
+        // against those values, even when lookup reports a resolved version.
+        if is_mise_selector(snapshot, &dep_name, current_value) {
             continue;
         }
 
@@ -191,6 +191,23 @@ pub(crate) fn extract_version_mismatches(
     }
 
     Ok(mismatches)
+}
+
+fn is_mise_selector(snapshot: &Snapshot, dep_name: &str, value: &str) -> bool {
+    let is_mise_dep = snapshot.files.values().any(|managers| {
+        managers
+            .get("mise")
+            .is_some_and(|deps| deps.iter().any(|dep| dep == dep_name))
+    });
+    is_mise_dep && mise_selector_regex().is_match(value)
+}
+
+fn mise_selector_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(r"^(?:latest$|lts$|ref:|path:|sub-\d+(?::|$)|[^\d]*\d+(?:\.\d+)?$)")
+            .expect("valid mise selector regex")
+    })
 }
 
 fn extract_version_is_consistent(

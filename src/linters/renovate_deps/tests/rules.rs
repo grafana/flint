@@ -344,6 +344,33 @@ fn validate_extract_version_consistency_flags_no_match() {
 }
 
 #[test]
+fn validate_extract_version_consistency_ignores_floating_mise_selectors() {
+    for selector in ["latest", "lts"] {
+        let snap = Snapshot {
+            meta: [(
+                "actionlint".to_string(),
+                DepMeta {
+                    package_name: Some("rhysd/actionlint".to_string()),
+                    datasource: Some("github-releases".to_string()),
+                    current_value: Some(selector.to_string()),
+                    current_version: Some("1.7.12".to_string()),
+                    extract_version: Some("not a valid regex [".to_string()),
+                },
+            )]
+            .into_iter()
+            .collect(),
+            action_meta: BTreeMap::new(),
+            files: dep_files(&[("mise.toml", &[("mise", &["actionlint"])])]),
+        };
+
+        assert!(
+            extract_version_mismatches(&snap).unwrap().is_empty(),
+            "selector {selector:?} should not be checked as a concrete version"
+        );
+    }
+}
+
+#[test]
 fn equivalent_version_shapes_accepts_four_part_versions() {
     assert!(equivalent_version_shapes("1.2.3.4", "v1.2.3.4"));
     assert!(equivalent_version_shapes("1.2.3", "1.2.3.0"));

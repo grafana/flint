@@ -156,6 +156,14 @@ pub(crate) fn extract_version_mismatches(
             continue;
         };
 
+        // Floating mise selectors are intentional requests, not release tags.
+        // Renovate can still report the resolved currentVersion alongside
+        // `latest`/`lts`, but there is no concrete currentValue for
+        // extractVersion to normalize and compare against it.
+        if matches!(current_value, "latest" | "lts") {
+            continue;
+        }
+
         let extract_version_regex = compile_extract_version(extract_version)
             .with_context(|| format!("failed to compile extractVersion for dep {dep_name:?}"))?;
         let extracted = extract_version_value(&extract_version_regex, current_version);

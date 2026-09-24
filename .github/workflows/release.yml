@@ -181,7 +181,7 @@ jobs:
         run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Sign and verify release manifest
-        uses: jdx/packslip@90680a844569de8bfb2b191002ce96e3ade97c15
+        uses: jdx/packslip@4920350c39c234c7a969f9775040bd02829f1923 # v1.3.0
         with:
           tag: ${{ env.TAG }}
           commit: ${{ steps.source.outputs.commit }}

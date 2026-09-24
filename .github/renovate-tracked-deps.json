@@ -134,9 +134,9 @@
         "actions/upload-artifact",
         "jdx/mise",
         "jdx/mise-action",
+        "jdx/packslip",
         "taiki-e/install-action",
-        "ubuntu",
-        "jdx/packslip"
+        "ubuntu"
       ],
       "regex": [
         "mise"
@@ -220,6 +220,10 @@
     },
     "jdx/mise-action": {
       "packageName": "jdx/mise-action",
+      "refKind": "version-tag"
+    },
+    "jdx/packslip": {
+      "packageName": "jdx/packslip",
       "refKind": "version-tag"
     },
     "taiki-e/install-action": {

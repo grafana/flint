@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.22.13](https://github.com/grafana/flint/compare/v0.22.12...v0.22.13) - 2026-09-24
+
+### Added
+
+- publish Packslip metadata with Usage spec and agent skill ([#548](https://github.com/grafana/flint/pull/548))
+- *(checker)* expose runner-agnostic dependency and link checks ([#519](https://github.com/grafana/flint/pull/519))
+- *(editorconfig-checker)* support autofix ([#545](https://github.com/grafana/flint/pull/545))
+
+### Fixed
+
+- *(renovate-deps)* accept floating selectors ([#558](https://github.com/grafana/flint/pull/558))
+
+### Other
+
+- *(deps)* update github artifact actions ([#559](https://github.com/grafana/flint/pull/559))
+- *(deps)* update taiki-e/install-action action to v2.87.17 ([#557](https://github.com/grafana/flint/pull/557))
+- *(deps)* update taiki-e/install-action action to v2.87.16 ([#556](https://github.com/grafana/flint/pull/556))
+- *(deps)* update taiki-e/install-action action to v2.87.15 ([#555](https://github.com/grafana/flint/pull/555))
+- *(deps)* update taiki-e/install-action action to v2.87.14 ([#554](https://github.com/grafana/flint/pull/554))
+- *(deps)* update mise to v2026.9.11 ([#552](https://github.com/grafana/flint/pull/552))
+- *(deps)* update linters ([#551](https://github.com/grafana/flint/pull/551))
+- *(deps)* lock file maintenance ([#553](https://github.com/grafana/flint/pull/553))
+- *(deps)* update taiki-e/install-action action to v2.87.13 ([#550](https://github.com/grafana/flint/pull/550))
+- *(deps)* update rust crate clap to v4.6.7 ([#549](https://github.com/grafana/flint/pull/549))
+- *(deps)* update taiki-e/install-action action to v2.87.12 ([#547](https://github.com/grafana/flint/pull/547))
+- *(deps)* update taiki-e/install-action action to v2.87.11 ([#546](https://github.com/grafana/flint/pull/546))
+
 ## [0.22.12](https://github.com/grafana/flint/compare/v0.22.11...v0.22.12) - 2026-09-14
 
 ### Added

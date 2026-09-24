@@ -11,13 +11,13 @@ GITHUB_TOKEN = "token"
 
 [expected.files]
 ".reno-mode" = "lookup\n"
-".reno-modes" = "extract\nlookup\nlookup\n"
-".reno-count" = "3\n"
+".reno-modes" = "extract\nlookup\n"
+".reno-count" = "2\n"
 ".reno-local-override" = "no\n"
 "mise.toml" = '''
 [tools]
 "npm:renovate" = "43.136.3"
-protoc = "35"
+protoc = "35.0"
 '''
 "renovate-tracked-deps.json" = '''
 {

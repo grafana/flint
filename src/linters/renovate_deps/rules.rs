@@ -156,6 +156,14 @@ pub(crate) fn extract_version_mismatches(
             continue;
         };
 
+        // Renovate's mise manager supports selectors (latest/lts, partial
+        // versions, and ref/path selectors) whose currentValue is not a
+        // concrete release tag. Its extractVersion rule cannot be validated
+        // against those values, even when lookup reports a resolved version.
+        if is_mise_selector(snapshot, &dep_name, current_value) {
+            continue;
+        }
+
         let extract_version_regex = compile_extract_version(extract_version)
             .with_context(|| format!("failed to compile extractVersion for dep {dep_name:?}"))?;
         let extracted = extract_version_value(&extract_version_regex, current_version);
@@ -183,6 +191,23 @@ pub(crate) fn extract_version_mismatches(
     }
 
     Ok(mismatches)
+}
+
+fn is_mise_selector(snapshot: &Snapshot, dep_name: &str, value: &str) -> bool {
+    let is_mise_dep = snapshot.files.values().any(|managers| {
+        managers
+            .get("mise")
+            .is_some_and(|deps| deps.iter().any(|dep| dep == dep_name))
+    });
+    is_mise_dep && mise_selector_regex().is_match(value)
+}
+
+fn mise_selector_regex() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| {
+        Regex::new(r"^(?:latest$|lts$|ref:|path:|sub-\d+(?::|$)|[^\d]*\d+(?:\.\d+)?$)")
+            .expect("valid mise selector regex")
+    })
 }
 
 fn extract_version_is_consistent(

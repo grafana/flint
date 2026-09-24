@@ -74,8 +74,8 @@ fn ensure_node_for_npm_with(
 }
 
 /// Pins `aqua:grafana/flint` in mise.toml at the calling binary's version so
-/// contributors all run the same flint release. Skips when the key already
-/// exists (any pin — never overwrite the user's explicit choice). Pre-release
+/// contributors all run the same flint release. Preserves an existing
+/// Packslip release pin as the user's explicit backend choice. Pre-release
 /// suffixes are stripped to match the Renovate preset tag format.
 ///
 /// Returns `true` if a flint entry was added.
@@ -110,6 +110,8 @@ fn ensure_flint_self_pin_with(
     runner: impl FnMut(&Path, &str, &str),
 ) -> Result<bool> {
     const RELEASE_KEY: &str = "aqua:grafana/flint";
+    const PACKSLIP_KEY: &str = "packslip:github.com/grafana/flint";
+    const PACKSLIP_SHORT_KEY: &str = "packslip:grafana/flint";
     const CARGO_KEY: &str = "cargo:https://github.com/grafana/flint";
     let mise_path = project_root.join("mise.toml");
     let content = std::fs::read_to_string(&mise_path).unwrap_or_default();
@@ -123,6 +125,21 @@ fn ensure_flint_self_pin_with(
     if doc.get("tools").is_none() {
         doc["tools"] = toml_edit::table();
     }
+    let release_key = doc
+        .get("tools")
+        .and_then(|tools| tools.as_table())
+        .and_then(|tools| {
+            if tools.contains_key(RELEASE_KEY) {
+                Some(RELEASE_KEY)
+            } else if tools.contains_key(PACKSLIP_KEY) {
+                Some(PACKSLIP_KEY)
+            } else if tools.contains_key(PACKSLIP_SHORT_KEY) {
+                Some(PACKSLIP_SHORT_KEY)
+            } else {
+                None
+            }
+        })
+        .unwrap_or(RELEASE_KEY);
     let keys_to_remove = doc
         .get("tools")
         .and_then(|t| t.as_table())
@@ -130,7 +147,7 @@ fn ensure_flint_self_pin_with(
             tools
                 .iter()
                 .filter_map(|(key, _)| {
-                    should_remove_existing_flint_pin(key, flint_rev, RELEASE_KEY, CARGO_KEY)
+                    should_remove_existing_flint_pin(key, flint_rev, release_key, CARGO_KEY)
                         .then_some(key.to_string())
                 })
                 .collect::<Vec<_>>()
@@ -158,13 +175,13 @@ fn ensure_flint_self_pin_with(
             }
         }
         None => {
-            if !tools.contains_key(RELEASE_KEY) {
+            if !tools.contains_key(release_key) {
                 if !removing_flint_key
-                    && pin_tool_via_mise_with(project_root, RELEASE_KEY, ver, runner)
+                    && pin_tool_via_mise_with(project_root, release_key, ver, runner)
                 {
                     return Ok(true);
                 } else {
-                    tools.insert(RELEASE_KEY, toml_edit::value(ver));
+                    tools.insert(release_key, toml_edit::value(ver));
                     changed = true;
                 }
             }
@@ -196,6 +213,8 @@ fn should_remove_existing_flint_pin(
 fn is_flint_tool_key(key: &str) -> bool {
     key == "aqua:grafana/flint"
         || key == "github:grafana/flint"
+        || key == "packslip:grafana/flint"
+        || key == "packslip:github.com/grafana/flint"
         || key.starts_with("cargo:https://github.com/grafana/flint")
         || key.starts_with("cargo:https://github.com/grafana/flint.git")
 }
@@ -540,9 +559,10 @@ fn sort_and_group_tools(tools: &mut toml_edit::Table, original: &str) {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_changes_with, ensure_flint_self_pin, ensure_flint_self_pin_with, ensure_node_for_npm,
-        ensure_node_for_npm_with, needs_node_for_npm, pin_tool_via_mise_with, remove_tool_keys,
-        replace_obsolete_keys, replace_obsolete_keys_with,
+        apply_changes_with, ensure_flint_self_pin, ensure_flint_self_pin_additive,
+        ensure_flint_self_pin_with, ensure_node_for_npm, ensure_node_for_npm_with,
+        needs_node_for_npm, pin_tool_via_mise_with, remove_tool_keys, replace_obsolete_keys,
+        replace_obsolete_keys_with,
     };
 
     #[test]
@@ -646,6 +666,57 @@ mod tests {
         assert!(result.contains("\"cargo:https://github.com/grafana/flint\" = \"rev:deadbeef\""));
         assert!(!result.contains("\"aqua:grafana/flint\""));
         assert!(result.contains("FLINT_CONFIG_DIR = \".github/config\""));
+    }
+
+    #[test]
+    fn flint_self_pin_preserves_packslip_release_backend() {
+        for key in [
+            "packslip:github.com/grafana/flint",
+            "packslip:grafana/flint",
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("mise.toml");
+            let original = format!("[tools]\n\"{key}\" = \"0.22.13\"\n");
+            std::fs::write(&path, &original).unwrap();
+
+            let changed = ensure_flint_self_pin(dir.path(), None).unwrap();
+            let result = std::fs::read_to_string(&path).unwrap();
+
+            assert!(!changed, "{key} should be preserved");
+            assert_eq!(result, original);
+        }
+    }
+
+    #[test]
+    fn additive_flint_self_pin_skips_existing_packslip_pin() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        let original = "[tools]\n\"packslip:github.com/grafana/flint\" = \"0.22.13\"\n";
+        std::fs::write(&path, original).unwrap();
+
+        let changed = ensure_flint_self_pin_additive(dir.path(), None).unwrap();
+        let result = std::fs::read_to_string(&path).unwrap();
+
+        assert!(!changed);
+        assert_eq!(result, original);
+    }
+
+    #[test]
+    fn flint_self_pin_migrates_packslip_release_to_cargo_for_prerelease() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mise.toml");
+        std::fs::write(
+            &path,
+            "[tools]\n\"packslip:github.com/grafana/flint\" = \"0.22.13\"\n",
+        )
+        .unwrap();
+
+        let changed = ensure_flint_self_pin(dir.path(), Some("rev:deadbeef")).unwrap();
+        let result = std::fs::read_to_string(&path).unwrap();
+
+        assert!(changed);
+        assert!(result.contains("\"cargo:https://github.com/grafana/flint\" = \"rev:deadbeef\""));
+        assert!(!result.contains("packslip:github.com/grafana/flint"));
     }
 
     #[test]

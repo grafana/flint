@@ -136,8 +136,8 @@ A check runs against all matching files when:
 - the check is newly active because its tool was added to `mise.toml`
 - the check's tool version changed in `mise.toml`
 - the pinned Flint tool changed in `mise.toml`, either released
-  `aqua:grafana/flint` or a cargo-backed prerelease revision, which expands
-  all active checks
+  `aqua:grafana/flint`, a Packslip release pin, or a cargo-backed prerelease
+  revision, which expands all active checks
 - the check's flint-managed config file changed, such as `.shellcheckrc` or
   `.yamllint.yml` in `FLINT_CONFIG_DIR`
 - another supported baseline config for the check changed, such as

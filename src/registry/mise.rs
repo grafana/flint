@@ -167,7 +167,11 @@ fn flint_tool_identity(tools: &HashMap<String, String>) -> Option<String> {
 }
 
 pub(crate) fn is_flint_tool_key(key: &str) -> bool {
-    key == "aqua:grafana/flint" || github_backend_flint_key(key) || cargo_github_flint_key(key)
+    matches!(
+        key,
+        "aqua:grafana/flint" | "packslip:grafana/flint" | "packslip:github.com/grafana/flint"
+    ) || github_backend_flint_key(key)
+        || cargo_github_flint_key(key)
 }
 
 fn github_backend_flint_key(key: &str) -> bool {

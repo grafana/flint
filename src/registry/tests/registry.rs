@@ -396,6 +396,8 @@ fn linter_keys_include_mise_and_bare_tool_names() {
     assert!(keys.contains("ec"));
     assert!(keys.contains("aqua:grafana/flint"));
     assert!(keys.contains("github:grafana/flint"));
+    assert!(keys.contains("packslip:grafana/flint"));
+    assert!(keys.contains("packslip:github.com/grafana/flint"));
     assert!(keys.contains("cargo:https://github.com/grafana/flint"));
     assert!(keys.contains("cargo:https://github.com/grafana/flint.git"));
 }
@@ -420,6 +422,31 @@ fn flint_version_changed_detects_release_to_cargo_backend_switch() {
     let current = HashMap::from([(
         "cargo:https://github.com/grafana/flint".to_string(),
         "rev:bbbb".to_string(),
+    )]);
+
+    assert!(flint_version_changed(&previous, &current));
+}
+
+#[test]
+fn flint_version_changed_detects_packslip_release_updates() {
+    let previous = HashMap::from([(
+        "packslip:github.com/grafana/flint".to_string(),
+        "0.22.12".to_string(),
+    )]);
+    let current = HashMap::from([(
+        "packslip:github.com/grafana/flint".to_string(),
+        "0.22.13".to_string(),
+    )]);
+
+    assert!(flint_version_changed(&previous, &current));
+}
+
+#[test]
+fn flint_version_changed_detects_packslip_backend_switch() {
+    let previous = HashMap::from([("aqua:grafana/flint".to_string(), "0.22.12".to_string())]);
+    let current = HashMap::from([(
+        "packslip:github.com/grafana/flint".to_string(),
+        "0.22.13".to_string(),
     )]);
 
     assert!(flint_version_changed(&previous, &current));

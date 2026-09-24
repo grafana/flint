@@ -50,6 +50,21 @@ Read the [background and principles](docs/why.md) and
 
 ## Getting Started
 
+### Release metadata and agent support
+
+Releases include a signed [Packslip](https://packslip.dev/) manifest alongside
+platform archives and their existing build provenance. It describes the binaries,
+a versioned [Flint agent skill](skills/flint/SKILL.md), and the Usage spec available
+through `flint usage`. Packslip-aware consumers can discover these resources;
+installing the binary alone does not automatically install the skill.
+
+The Usage spec is generated from Flint's Clap command definitions, including its
+subcommands and arguments, rather than maintained separately:
+
+```bash
+flint usage > flint.usage.kdl
+```
+
 ### Install
 
 1. Install [mise](https://mise.jdx.dev/).

@@ -15,7 +15,7 @@ mod runner;
 mod setup;
 
 use anyhow::{Context, Result};
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, CommandFactory, Parser, Subcommand};
 use registry::CheckKind;
 use runner::{CheckResult, RunContext as RunnerRunContext, RunOptions};
 use std::collections::HashSet;
@@ -49,6 +49,8 @@ enum SubCommand {
     Init(InitArgs),
     /// Manage git hooks.
     Hook(HookArgs),
+    /// Print the Usage specification generated from the CLI definitions.
+    Usage,
     /// Display the flint version.
     Version,
 }
@@ -231,6 +233,13 @@ fn use_filtered_run_policy(args: &RunArgs, explicit: bool, is_ci: bool) -> bool 
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    if matches!(cli.command, SubCommand::Usage) {
+        let mut spec = Vec::new();
+        clap_usage::generate(&mut Cli::command(), "flint", &mut spec);
+        std::io::stdout().write_all(&spec)?;
+        return Ok(());
+    }
+
     let project_root = project_root::detect();
     // Canonicalize to resolve symlinks (e.g. /private/... on macOS).
     // dunce::canonicalize strips the \\?\ verbatim prefix on Windows that
@@ -246,6 +255,7 @@ async fn main() -> Result<()> {
     let registry = registry::builtin();
 
     match cli.command {
+        SubCommand::Usage => unreachable!("usage is handled before repository discovery"),
         SubCommand::Version => {
             println!("flint {}", env!("CARGO_PKG_VERSION"));
         }

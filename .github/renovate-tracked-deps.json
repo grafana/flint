@@ -130,8 +130,11 @@
       "github-actions": [
         "actions/attest-build-provenance",
         "actions/checkout",
+        "actions/download-artifact",
+        "actions/upload-artifact",
         "jdx/mise",
         "jdx/mise-action",
+        "jdx/packslip",
         "taiki-e/install-action",
         "ubuntu"
       ],
@@ -202,6 +205,14 @@
       "packageName": "actions/checkout",
       "refKind": "version-tag"
     },
+    "actions/download-artifact": {
+      "packageName": "actions/download-artifact",
+      "refKind": "version-tag"
+    },
+    "actions/upload-artifact": {
+      "packageName": "actions/upload-artifact",
+      "refKind": "version-tag"
+    },
     "grafana/shared-workflows/actions/lint-pr-title": {
       "packageName": "grafana/shared-workflows",
       "refKind": "version-tag",
@@ -209,6 +220,10 @@
     },
     "jdx/mise-action": {
       "packageName": "jdx/mise-action",
+      "refKind": "version-tag"
+    },
+    "jdx/packslip": {
+      "packageName": "jdx/packslip",
       "refKind": "version-tag"
     },
     "taiki-e/install-action": {

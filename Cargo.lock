@@ -355,7 +355,7 @@ dependencies = [
 
 [[package]]
 name = "flint"
-version = "0.22.13"
+version = "0.22.14"
 dependencies = [
  "anyhow",
  "clap",

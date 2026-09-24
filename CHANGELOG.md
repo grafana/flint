@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.22.14](https://github.com/grafana/flint/compare/v0.22.13...v0.22.14) - 2026-09-24
+
+### Added
+
+- support Packslip Flint pins ([#562](https://github.com/grafana/flint/pull/562))
+
+### Fixed
+
+- *(completion)* suggest linter names for flint run ([#561](https://github.com/grafana/flint/pull/561))
+
 ## [0.22.13](https://github.com/grafana/flint/compare/v0.22.12...v0.22.13) - 2026-09-24
 
 ### Added

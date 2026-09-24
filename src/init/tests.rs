@@ -385,6 +385,37 @@ taplo = "0.10.0"
 }
 
 #[test]
+fn normalize_tools_section_sorts_packslip_flint_pin_with_linters() {
+    let content = r#"[tools]
+node = "24.21.0"
+"packslip:github.com/grafana/flint" = "0.22.13"
+
+# Linters
+actionlint = "1.7.12"
+taplo = "0.10.0"
+"#;
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(tmp.path(), content).unwrap();
+    let changed = normalize_tools_section(tmp.path()).unwrap();
+    assert!(changed);
+    let result = std::fs::read_to_string(tmp.path()).unwrap();
+    let header_pos = result.find("# Linters").expect("linter header present");
+    let node_pos = result.find("node =").expect("node present");
+    let actionlint_pos = result.find("actionlint =").expect("actionlint present");
+    let flint_pos = result
+        .find("packslip:github.com/grafana/flint")
+        .expect("Packslip Flint pin present");
+    let taplo_pos = result.find("taplo =").expect("taplo present");
+    assert!(
+        node_pos < header_pos
+            && header_pos < actionlint_pos
+            && actionlint_pos < flint_pos
+            && flint_pos < taplo_pos,
+        "Packslip Flint pin should sort alphabetically with linters:\n{result}"
+    );
+}
+
+#[test]
 fn apply_changes_upgrade_preserves_version() {
     let content = "[tools]\nrust = \"1.80.0\"\n";
     let tmp = tempfile::NamedTempFile::new().unwrap();

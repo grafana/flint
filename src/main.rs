@@ -235,7 +235,21 @@ async fn main() -> Result<()> {
 
     if matches!(cli.command, SubCommand::Usage) {
         let mut spec = Vec::new();
-        clap_usage::generate(&mut Cli::command(), "flint", &mut spec);
+        // Flint's linter names are positional values, but they are resolved from
+        // the static registry at runtime rather than declared as enum choices in
+        // RunArgs. Add those values only to the command used to generate the
+        // Usage spec, so shell completions can suggest them without changing
+        // normal argument validation.
+        let linter_names = registry::builtin()
+            .into_iter()
+            .map(|check| check.name)
+            .collect::<Vec<_>>();
+        let mut command = Cli::command().mut_subcommand("run", |run| {
+            run.mut_arg("linters", |arg| {
+                arg.value_parser(clap::builder::PossibleValuesParser::new(linter_names))
+            })
+        });
+        clap_usage::generate(&mut command, "flint", &mut spec);
         std::io::stdout().write_all(&spec)?;
         return Ok(());
     }

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.22.15](https://github.com/grafana/flint/compare/v0.22.14...v0.22.15) - 2026-09-25
+
+### Other
+
+- *(deps)* update taiki-e/install-action action to v2.87.18 ([#564](https://github.com/grafana/flint/pull/564))
+
 ## [0.22.14](https://github.com/grafana/flint/compare/v0.22.13...v0.22.14) - 2026-09-24
 
 ### Added

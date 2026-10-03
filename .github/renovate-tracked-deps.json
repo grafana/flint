@@ -128,7 +128,7 @@
     },
     ".github/workflows/release.yml": {
       "github-actions": [
-        "actions/attest-build-provenance",
+        "actions/attest",
         "actions/checkout",
         "actions/download-artifact",
         "actions/upload-artifact",
@@ -197,8 +197,8 @@
       "packageName": "Swatinem/rust-cache",
       "refKind": "version-tag"
     },
-    "actions/attest-build-provenance": {
-      "packageName": "actions/attest-build-provenance",
+    "actions/attest": {
+      "packageName": "actions/attest",
       "refKind": "version-tag"
     },
     "actions/checkout": {

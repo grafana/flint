@@ -142,3 +142,5 @@ flint: fixed: gofmt — commit before pushing
 flint: fixed: cargo-fmt — commit before pushing | review: shellcheck
 flint: fixed: gofmt — commit before pushing | partial: cargo-clippy
 ```
+
+- Security issues should be reported via [Grafana's security issue reporting page](https://grafana.com/legal/report-a-security-issue/) and not directly in this repository.

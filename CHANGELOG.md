@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.22.15](https://github.com/grafana/flint/compare/v0.22.14...v0.22.15) - 2026-10-09
+
+### Other
+
+- *(deps)* update taiki-e/install-action action to v2.87.26 ([#585](https://github.com/grafana/flint/pull/585))
+- *(deps)* update dependency jdx/mise-action to v5.1.1 ([#582](https://github.com/grafana/flint/pull/582))
+- *(deps)* update taiki-e/install-action action to v2.87.25 ([#583](https://github.com/grafana/flint/pull/583))
+- *(deps)* update taiki-e/install-action action to v2.87.24 ([#578](https://github.com/grafana/flint/pull/578))
+- *(deps)* update jdx/packslip action to v1.5.1 ([#580](https://github.com/grafana/flint/pull/580))
+- *(deps)* update dependency jdx/mise-action to v5.1.0 ([#579](https://github.com/grafana/flint/pull/579))
+- *(deps)* update dependency jdx/mise-action to v5.0.1 ([#576](https://github.com/grafana/flint/pull/576))
+- *(deps)* update dependency rust to v1.99.0 ([#577](https://github.com/grafana/flint/pull/577))
+- *(deps)* replace actions/attest-build-provenance action with actions/attest v4.2.2 ([#569](https://github.com/grafana/flint/pull/569))
+- *(deps)* lock file maintenance ([#575](https://github.com/grafana/flint/pull/575))
+- *(deps)* update mise to v2026.10.0 ([#574](https://github.com/grafana/flint/pull/574))
+- *(deps)* update taiki-e/install-action action to v2.87.22 ([#573](https://github.com/grafana/flint/pull/573))
+- *(deps)* update dependency jdx/mise-action to v5 ([#572](https://github.com/grafana/flint/pull/572))
+- *(deps)* update jdx/packslip action to v1.4.0 ([#571](https://github.com/grafana/flint/pull/571))
+- *(deps)* update taiki-e/install-action action to v2.87.21 ([#570](https://github.com/grafana/flint/pull/570))
+- *(deps)* update taiki-e/install-action action to v2.87.20 ([#568](https://github.com/grafana/flint/pull/568))
+- *(deps)* update mise to v2026.9.13 ([#566](https://github.com/grafana/flint/pull/566))
+- *(deps)* lock file maintenance ([#567](https://github.com/grafana/flint/pull/567))
+- *(deps)* update taiki-e/install-action action to v2.87.18 ([#564](https://github.com/grafana/flint/pull/564))
+
 ## [0.22.14](https://github.com/grafana/flint/compare/v0.22.13...v0.22.14) - 2026-09-24
 
 ### Added

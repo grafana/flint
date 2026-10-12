@@ -50,6 +50,7 @@ fn snapshot(meta: &[(&str, Option<&str>, Option<&str>)], files: &FileManagers<'_
                         current_value: None,
                         current_version: None,
                         extract_version: None,
+                        dep_type: None,
                     },
                 )
             })

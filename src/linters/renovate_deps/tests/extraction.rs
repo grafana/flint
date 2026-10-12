@@ -119,6 +119,19 @@ fn extracts_extended_dep_metadata_from_lookup_logs() {
 }
 
 #[test]
+fn extracts_dep_type_from_lookup_logs() {
+    let log = log_current(
+        r#"{"terraform":[{"packageFile":"versions.tf","deps":[{"depName":"hashicorp/terraform","depType":"required_version","currentValue":">= 1.7, < 2.0","currentVersion":"1.16.5","extractVersion":"v(?<version>.*)$"}]}]}"#,
+    );
+    let result = extract_deps(&log, &[]).unwrap();
+
+    assert_eq!(
+        result.meta["hashicorp/terraform"].dep_type.as_deref(),
+        Some("required_version")
+    );
+}
+
+#[test]
 fn extracts_action_metadata_per_monorepo_target() {
     let log = log_current(
         r#"{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[
@@ -238,6 +251,14 @@ fn lookup_deterministic_digest_warning_is_invalid() {
 fn lookup_no_result_warning_is_inconclusive() {
     let log = log_current(
         r#"{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[{"depName":"grafana/shared-workflows","warnings":[{"message":"Failed to look up github-tags package grafana/shared-workflows: no-result"}]}]}],"docker":[{"packageFile":"Dockerfile","deps":[{"depName":"grafana/shared-workflows","warnings":[{"message":"Could not determine new digest for update (docker package grafana/shared-workflows)"}]}]}]}"#,
+    );
+    assert!(validate_lookup_action_warnings(&log, &[]).is_ok());
+}
+
+#[test]
+fn lookup_github_tags_digest_warning_is_inconclusive() {
+    let log = log_current(
+        r#"{"github-actions":[{"packageFile":".github/workflows/issue-labeler.yml","deps":[{"depName":"github/issue-labeler","warnings":[{"message":"Could not determine new digest for update (github-tags package github/issue-labeler)"}]}]}]}"#,
     );
     assert!(validate_lookup_action_warnings(&log, &[]).is_ok());
 }

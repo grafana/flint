@@ -256,6 +256,14 @@ fn lookup_no_result_warning_is_inconclusive() {
 }
 
 #[test]
+fn lookup_github_tags_digest_warning_is_inconclusive() {
+    let log = log_current(
+        r#"{"github-actions":[{"packageFile":".github/workflows/issue-labeler.yml","deps":[{"depName":"github/issue-labeler","warnings":[{"message":"Could not determine new digest for update (github-tags package github/issue-labeler)"}]}]}]}"#,
+    );
+    assert!(validate_lookup_action_warnings(&log, &[]).is_ok());
+}
+
+#[test]
 fn lookup_action_warning_respects_manager_exclusion() {
     let log = log_current(
         r#"{"github-actions":[{"packageFile":".github/workflows/ci.yml","deps":[{"depName":"grafana/shared-workflows","warnings":[{"message":"Could not determine new digest for update (github-digest package grafana/shared-workflows)"}]}]}]}"#,

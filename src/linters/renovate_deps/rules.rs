@@ -164,6 +164,14 @@ pub(crate) fn extract_version_mismatches(
             continue;
         }
 
+        // Terraform's required_version may be a range constraint, not a
+        // literal release string that extractVersion can transform.
+        if meta.dep_type.as_deref() == Some("required_version")
+            && semverish_shape(current_value).is_none()
+        {
+            continue;
+        }
+
         let extract_version_regex = compile_extract_version(extract_version)
             .with_context(|| format!("failed to compile extractVersion for dep {dep_name:?}"))?;
         let extracted = extract_version_value(&extract_version_regex, current_version);

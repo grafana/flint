@@ -32,35 +32,35 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-24.04
-            mise_version: v2026.10.0
-            mise_sha256: 57ced973f968b8fbab07aa8e32bd7077d4a357e200a22356d98963c723c6de0a
+            mise_version: v2026.10.5
+            mise_sha256: 8a223b5f8ca71100220a3e5bef259614c348e7b1d80e6b15c2a9c9aa3affe5e4
           - target: x86_64-unknown-linux-musl
             runner: ubuntu-24.04
             build-tool: cross
-            mise_version: v2026.10.0
-            mise_sha256: 57ced973f968b8fbab07aa8e32bd7077d4a357e200a22356d98963c723c6de0a
+            mise_version: v2026.10.5
+            mise_sha256: 8a223b5f8ca71100220a3e5bef259614c348e7b1d80e6b15c2a9c9aa3affe5e4
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04
             build-tool: cross
-            mise_version: v2026.10.0
-            mise_sha256: 57ced973f968b8fbab07aa8e32bd7077d4a357e200a22356d98963c723c6de0a
+            mise_version: v2026.10.5
+            mise_sha256: 8a223b5f8ca71100220a3e5bef259614c348e7b1d80e6b15c2a9c9aa3affe5e4
           - target: aarch64-unknown-linux-musl
             runner: ubuntu-24.04
             build-tool: cross
-            mise_version: v2026.10.0
-            mise_sha256: 57ced973f968b8fbab07aa8e32bd7077d4a357e200a22356d98963c723c6de0a
+            mise_version: v2026.10.5
+            mise_sha256: 8a223b5f8ca71100220a3e5bef259614c348e7b1d80e6b15c2a9c9aa3affe5e4
           - target: x86_64-apple-darwin
             runner: macos-15-intel
-            mise_version: v2026.10.0
-            mise_sha256: 815eb7872e453dcd30ed5e2e478978d2947e34106b6cd4f9cc4d4e51f7761332
+            mise_version: v2026.10.5
+            mise_sha256: 204c7d64e8b0b62c0a95847ab6442bf23bf88247d52967e99c5cad53f56eaa0c
           - target: aarch64-apple-darwin
             runner: macos-latest
-            mise_version: v2026.10.0
-            mise_sha256: 8d2007efdae0c2b64e3955257533e6ec17197bc2fdcbc5dd8f6847f92881deea
+            mise_version: v2026.10.5
+            mise_sha256: 41c4028257d30f5f5742c99247c461f417143d6c7301f167a0c185247c8f206e
           - target: x86_64-pc-windows-msvc
             runner: windows-latest
-            mise_version: v2026.10.0
-            mise_sha256: d09c099e6d5fb580fb42590a995a9432d448d63d66dc7521e90f28785bf86ad2
+            mise_version: v2026.10.5
+            mise_sha256: b71ccbab449d28dcecaef5b33423d4a000e4c963785509653cc904301e3b2376
 
     steps:
       - name: Checkout code

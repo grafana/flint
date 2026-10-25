@@ -14,6 +14,8 @@ const ACTIONLINT_URL: &str = "https://github.com/rhysd/actionlint";
 const ACTIONLINT_CONFIG_URL: &str = "https://github.com/rhysd/actionlint/blob/main/docs/config.md";
 const ZIZMOR_URL: &str = "https://github.com/zizmorcore/zizmor";
 const ZIZMOR_CONFIG_URL: &str = "https://docs.zizmor.sh/configuration/";
+const GLSEC_URL: &str = "https://github.com/glsec/glsec";
+const GLSEC_CONFIG_URL: &str = "https://github.com/glsec/glsec#exit-codes";
 const BIOME_URL: &str = "https://biomejs.dev/";
 const BIOME_CONFIG_URL: &str = "https://biomejs.dev/guides/configure-biome/";
 const CLIPPY_URL: &str = "https://doc.rust-lang.org/clippy/configuration.html";
@@ -104,6 +106,7 @@ const ZIZMOR_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::project(".github/zizmor.yml"),
     ConfigFile::project(".github/zizmor.yaml"),
 ];
+const GLSEC_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[ConfigFile::project(".glsec.yml")];
 const HADOLINT_UNSUPPORTED_CONFIGS: &[ConfigFile] = &[
     ConfigFile::config_dir(".hadolint.yml"),
     ConfigFile::project(".hadolint.yml"),
@@ -333,6 +336,28 @@ fn check_zizmor() -> Check {
         None,
     )
     .desc("Audit GitHub Actions workflows for security issues")
+    .style()
+}
+
+fn check_glsec() -> Check {
+    Check::files(
+        "glsec",
+        "glsec {FILES}",
+        &[".gitlab-ci.yml", "*.gitlab-ci.yml"],
+    )
+    .mise_tool("github:glsec/glsec")
+    .linter_config(".glsec.yml", "--config")
+    .baseline_config(ConfigFile::config_dir(".glsec.yml"))
+    .unsupported_configs(GLSEC_UNSUPPORTED_CONFIGS)
+    .project_url(GLSEC_URL)
+    .config_doc_url(GLSEC_CONFIG_URL)
+    .overview(
+        OverviewSection::ToolingCi,
+        "GitLab CI",
+        OverviewRole::Check,
+        None,
+    )
+    .desc("Audit GitLab CI/CD pipelines for security issues")
     .style()
 }
 
@@ -800,6 +825,7 @@ pub fn builtin() -> Vec<Check> {
         check_taplo(),
         check_actionlint(),
         check_zizmor(),
+        check_glsec(),
         check_hadolint(),
         check_xmllint(),
         check_typos(),

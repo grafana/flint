@@ -193,6 +193,7 @@ For Flint contributor workflow and local testing tips, see
 | -------------------- | ------------------------------------------------------------------------------- |
 | Dockerfile           | [`hadolint`](docs/linters/hadolint.md)                                          |
 | GitHub Actions       | [`actionlint`](docs/linters/actionlint.md) / [`zizmor`](docs/linters/zizmor.md) |
+| GitLab CI            | [`glsec`](docs/linters/glsec.md)                                                |
 | Kubernetes manifests | [`kube-linter`](docs/linters/kube-linter.md)                                    |
 
 ### General

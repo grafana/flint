@@ -38,6 +38,7 @@ page with its behavior, configuration, and examples.
 | -------------------- | --------------------------------------------------------------------- |
 | Dockerfile           | [`hadolint`](linters/hadolint.md)                                     |
 | GitHub Actions       | [`actionlint`](linters/actionlint.md) / [`zizmor`](linters/zizmor.md) |
+| GitLab CI            | [`glsec`](linters/glsec.md)                                           |
 | Kubernetes manifests | [`kube-linter`](linters/kube-linter.md)                               |
 
 ### General

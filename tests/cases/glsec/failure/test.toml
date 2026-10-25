@@ -1,0 +1,29 @@
+[expected]
+args = "run --full glsec"
+exit = 1
+stderr = '''
+[glsec]
+error[GL001]: image "alpine:latest" uses mutable tag "latest" — pin to a specific version or digest
+  --> <REPO>/.gitlab-ci.yml:6:10 (job: deploy)
+  |
+6 |   image: alpine:latest
+  |          ^
+
+error[GL011]: script line downloads and executes remote code without integrity verification: "curl -sSL https://example.com/install.sh | sh"
+  --> <REPO>/.gitlab-ci.yml:8:7 (job: deploy)
+  |
+8 |     - curl -sSL https://example.com/install.sh | sh
+  |       ^
+
+warn[GL024]: script uses a pipe without set -o pipefail — failures in all but the last command are silently ignored
+  --> <REPO>/.gitlab-ci.yml:8:7 (job: deploy)
+  |
+8 |     - curl -sSL https://example.com/install.sh | sh
+  |       ^
+
+flint: 1 check failed (glsec)
+💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.
+'''
+
+[env]
+FLINT_CONFIG_DIR = ".github/config"

@@ -11,6 +11,7 @@
         "checkstyle",
         "dotenv-linter",
         "editorconfig-checker",
+        "github:glsec/glsec",
         "golangci-lint",
         "google-java-format",
         "hadolint",

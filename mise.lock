@@ -292,6 +292,53 @@ checksum = "sha256:a5f1eb57b62a3499b920f6ddb1561c7f8b0276289ff0c4fefc03a5225d721
 url = "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v4.0.1/editorconfig-checker-windows-amd64.zip"
 url_api = "https://api.github.com/repos/editorconfig-checker/editorconfig-checker/releases/assets/543952342"
 
+[[tools."github:glsec/glsec"]]
+version = "1.23.0"
+backend = "github:glsec/glsec"
+specifiers = ["1.23.0"]
+
+[tools."github:glsec/glsec"."platforms.linux-arm64"]
+checksum = "sha256:ff07d690135afaa0a658e497604bb3a304558c4e8f752595f639e17710abeb36"
+url = "https://github.com/glsec/glsec/releases/download/v1.23.0/glsec_1.23.0_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/glsec/glsec/releases/assets/672607734"
+provenance = "github-attestations"
+
+[tools."github:glsec/glsec"."platforms.linux-arm64-musl"]
+checksum = "sha256:ff07d690135afaa0a658e497604bb3a304558c4e8f752595f639e17710abeb36"
+url = "https://github.com/glsec/glsec/releases/download/v1.23.0/glsec_1.23.0_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/glsec/glsec/releases/assets/672607734"
+provenance = "github-attestations"
+
+[tools."github:glsec/glsec"."platforms.linux-x64"]
+checksum = "sha256:513be1af9c95b8a06a8d6862ac6a4edf4ffdabf2cc1ac233600d73b32d710999"
+url = "https://github.com/glsec/glsec/releases/download/v1.23.0/glsec_1.23.0_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/glsec/glsec/releases/assets/672607680"
+provenance = "github-attestations"
+
+[tools."github:glsec/glsec"."platforms.linux-x64-musl"]
+checksum = "sha256:513be1af9c95b8a06a8d6862ac6a4edf4ffdabf2cc1ac233600d73b32d710999"
+url = "https://github.com/glsec/glsec/releases/download/v1.23.0/glsec_1.23.0_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/glsec/glsec/releases/assets/672607680"
+provenance = "github-attestations"
+
+[tools."github:glsec/glsec"."platforms.macos-arm64"]
+checksum = "sha256:8629f8aa27f84e5b6feace80da02f26ddd877f3f65e7965a20e5d306b65e2a2b"
+url = "https://github.com/glsec/glsec/releases/download/v1.23.0/glsec_1.23.0_darwin_arm64.tar.gz"
+url_api = "https://api.github.com/repos/glsec/glsec/releases/assets/672607736"
+provenance = "github-attestations"
+
+[tools."github:glsec/glsec"."platforms.macos-x64"]
+checksum = "sha256:ac8799197dfe6014544341fdc683c25fea60d91993b7f28bd13866e9e871390a"
+url = "https://github.com/glsec/glsec/releases/download/v1.23.0/glsec_1.23.0_darwin_amd64.tar.gz"
+url_api = "https://api.github.com/repos/glsec/glsec/releases/assets/672607676"
+provenance = "github-attestations"
+
+[tools."github:glsec/glsec"."platforms.windows-x64"]
+checksum = "sha256:a27e89a9523786eada209c63ea518ee21d492032674d1239c2d5a32a0f427da8"
+url = "https://github.com/glsec/glsec/releases/download/v1.23.0/glsec_1.23.0_windows_amd64.zip"
+url_api = "https://api.github.com/repos/glsec/glsec/releases/assets/672607686"
+provenance = "github-attestations"
+
 [[tools.go]]
 version = "1.27.3"
 backend = "core:go"

@@ -38,9 +38,12 @@ exclude_managers = ["github-actions", "github-runners"]
 ```
 
 `renovate-deps` uses `GITHUB_COM_TOKEN` first, then `GITHUB_TOKEN`, then an
-authenticated GitHub CLI session (`gh auth token --hostname github.com`) so
-Renovate can authenticate GitHub requests. Flint forwards the selected token to
-Renovate as `GITHUB_COM_TOKEN`. In CI, the check fails when none is available.
+authenticated GitHub CLI session so Renovate can authenticate GitHub requests.
+The `gh` hostname comes from `GITHUB_API_URL`: it defaults to `github.com`,
+maps `api.github.com` to `github.com`, and uses the host (including any port)
+for GitHub Enterprise Server URLs. Flint forwards the selected token to
+Renovate as `GITHUB_COM_TOKEN`. In CI, the check fails when none is available;
+local runs warn.
 
 When `flint init` writes a new `flint.toml`, it includes the
 `[checks.renovate-deps]` section when this check is selected.

@@ -2,6 +2,7 @@ pub(crate) const CI_ENV_VARS: &[&str] =
     &["CI", "GITHUB_ACTIONS", "GITHUB_ACTION", "GITHUB_WORKFLOW"];
 pub(crate) const GITHUB_COM_TOKEN_ENV: &str = "GITHUB_COM_TOKEN";
 pub(crate) const GITHUB_TOKEN_ENV: &str = "GITHUB_TOKEN";
+const GITHUB_API_URL_ENV: &str = "GITHUB_API_URL";
 
 /// Returns an explicitly configured token, falling back to the user's GitHub CLI
 /// credentials without ever exposing command output in diagnostics.
@@ -20,21 +21,83 @@ where
 }
 
 pub(crate) fn gh_auth_token() -> Option<String> {
-    static GH_TOKEN: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
-    GH_TOKEN
-        .get_or_init(|| {
-            gh_auth_token_with(|command, args| {
-                std::process::Command::new(command).args(args).output()
-            })
-        })
-        .clone()
+    let hostname = github_hostname_from(|name| std::env::var(name).ok())?;
+    static GH_TOKENS: std::sync::OnceLock<
+        std::sync::Mutex<std::collections::HashMap<String, Option<String>>>,
+    > = std::sync::OnceLock::new();
+    let cache = GH_TOKENS.get_or_init(Default::default);
+    let mut cache = cache.lock().ok()?;
+    if let Some(token) = cache.get(&hostname) {
+        return token.clone();
+    }
+    let token = gh_auth_token_with(&hostname, |command, args| {
+        std::process::Command::new(command).args(args).output()
+    });
+    cache.insert(hostname, token.clone());
+    token
 }
 
-fn gh_auth_token_with<F, E>(run: F) -> Option<String>
+/// Resolve the GitHub host corresponding to GITHUB_API_URL. `gh` expects the
+/// web hostname (not the API hostname) for github.com, but GHES uses its API host.
+pub(crate) fn github_hostname_from<F>(env: F) -> Option<String>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let Some(api_url) = env(GITHUB_API_URL_ENV) else {
+        return Some("github.com".into());
+    };
+    let api_url = api_url.trim();
+    let (scheme, authority) = api_url.split_once("://")?;
+    if !scheme.eq_ignore_ascii_case("https") && !scheme.eq_ignore_ascii_case("http") {
+        return None;
+    }
+    let authority = authority.split(['/', '?', '#']).next()?;
+    if authority.is_empty() || authority.contains('@') || authority.chars().any(char::is_whitespace)
+    {
+        return None;
+    }
+    let (host, port) = if authority.starts_with('[') {
+        let (literal, suffix) = authority.split_once(']')?;
+        let address = literal.strip_prefix('[')?;
+        address.parse::<std::net::Ipv6Addr>().ok()?;
+        let port = if suffix.is_empty() {
+            String::new()
+        } else {
+            format!(":{}", suffix.strip_prefix(':')?.parse::<u16>().ok()?)
+        };
+        (format!("[{address}]"), port)
+    } else {
+        let (name, port) = match authority.split_once(':') {
+            Some((name, suffix)) => (name, format!(":{}", suffix.parse::<u16>().ok()?)),
+            None => (authority, String::new()),
+        };
+        if name.is_empty()
+            || name.split('.').any(|label| {
+                label.is_empty()
+                    || label.starts_with('-')
+                    || label.ends_with('-')
+                    || !label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+            })
+        {
+            return None;
+        }
+        (name.to_ascii_lowercase(), port)
+    };
+    if host.is_empty() {
+        return None;
+    }
+    Some(if host == "api.github.com" {
+        format!("github.com{port}")
+    } else {
+        format!("{host}{port}")
+    })
+}
+
+fn gh_auth_token_with<F, E>(hostname: &str, run: F) -> Option<String>
 where
     F: FnOnce(&str, &[&str]) -> Result<std::process::Output, E>,
 {
-    let output = run("gh", &["auth", "token", "--hostname", "github.com"]).ok()?;
+    let output = run("gh", &["auth", "token", "--hostname", hostname]).ok()?;
     if !output.status.success() {
         return None;
     }
@@ -149,13 +212,69 @@ mod tests {
             }
         };
         assert_eq!(
-            gh_auth_token_with(run(true, b"secret\n")),
+            gh_auth_token_with("github.com", run(true, b"secret\n")),
             Some("secret".into())
         );
-        assert_eq!(gh_auth_token_with(run(false, b"secret\n")), None);
-        assert_eq!(gh_auth_token_with(run(true, b"  \n")), None);
         assert_eq!(
-            gh_auth_token_with(|_, _| Err::<std::process::Output, _>(std::io::ErrorKind::NotFound)),
+            gh_auth_token_with("github.com", run(false, b"secret\n")),
+            None
+        );
+        assert_eq!(gh_auth_token_with("github.com", run(true, b"  \n")), None);
+        assert_eq!(
+            gh_auth_token_with("github.com", |_, _| Err::<std::process::Output, _>(
+                std::io::ErrorKind::NotFound
+            )),
+            None
+        );
+        let output = std::process::Output {
+            status: test_exit_status(true),
+            stdout: b"secret\n".to_vec(),
+            stderr: Vec::new(),
+        };
+        assert_eq!(
+            gh_auth_token_with("ghe.example.test", |command, args| {
+                assert_eq!(command, "gh");
+                assert_eq!(args, ["auth", "token", "--hostname", "ghe.example.test"]);
+                Ok::<_, std::io::Error>(output)
+            }),
+            Some("secret".into())
+        );
+    }
+
+    #[test]
+    fn resolves_gh_hostname_from_api_url() {
+        assert_eq!(
+            github_hostname_from(|_| None).as_deref(),
+            Some("github.com")
+        );
+        assert_eq!(
+            github_hostname_from(|_| Some("https://api.github.com/".into())).as_deref(),
+            Some("github.com")
+        );
+        assert_eq!(
+            github_hostname_from(|_| Some("https://ghe.example.test/api/v3".into())).as_deref(),
+            Some("ghe.example.test")
+        );
+        assert_eq!(
+            github_hostname_from(|_| Some("https://GHE.Example.test:8443/api".into())).as_deref(),
+            Some("ghe.example.test:8443")
+        );
+        assert_eq!(
+            github_hostname_from(|_| Some("https://[2001:db8::1]:8443/api".into())).as_deref(),
+            Some("[2001:db8::1]:8443")
+        );
+        assert_eq!(github_hostname_from(|_| Some("wat".into())), None);
+        assert_eq!(github_hostname_from(|_| Some("file:///tmp".into())), None);
+        assert_eq!(
+            github_hostname_from(|_| Some("https://ghe.example.test:bad/api".into())),
+            None
+        );
+        assert_eq!(
+            github_hostname_from(|_| Some("https://ghe.example.test:65536/api".into())),
+            None
+        );
+        assert_eq!(
+            github_hostname_from(|_| Some("https://[not-ipv6]/api".into())),
             None
         );
     }

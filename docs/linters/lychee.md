@@ -40,6 +40,12 @@ make changed-file runs reliable locally and in CI:
   running link remaps, instead of allowing unauthenticated GitHub requests to
   fail ambiguously.
 
+When `GITHUB_TOKEN` is unset, Flint can use the authenticated `gh` session. Its
+hostname comes from `GITHUB_API_URL`: it defaults to `github.com`, maps
+`api.github.com` to `github.com`, and uses the host (including any port) for
+GitHub Enterprise Server URLs. Without a token or authenticated `gh` session,
+local runs warn and CI fails as shown below.
+
 ## Local vs CI
 
 CI [activates the full linter set](../cli.md#adaptive-runs), but still keeps

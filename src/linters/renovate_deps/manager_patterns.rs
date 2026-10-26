@@ -594,6 +594,7 @@ mod tests {
             "https://api.example.test/repos/owner/repo/contents/presets/base.json?ref=v1"
         ));
         assert!(request.contains("Accept: application/vnd.github.raw\n"));
+        assert!(request.contains("Authorization: Bearer test-token\n"));
         assert!(request.contains(&format!(
             "User-Agent: flint/{}\n",
             env!("CARGO_PKG_VERSION")

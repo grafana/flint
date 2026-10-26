@@ -366,11 +366,7 @@ fn fetch_github_preset(project_root: &Path, preset: &GithubPreset) -> anyhow::Re
     let token = std::env::var(crate::linters::env::GITHUB_COM_TOKEN_ENV)
         .ok()
         .filter(|value| !value.trim().is_empty())
-        .or_else(|| {
-            std::env::var(crate::linters::env::GITHUB_TOKEN_ENV)
-                .ok()
-                .filter(|value| !value.trim().is_empty())
-        });
+        .or_else(crate::linters::env::github_token);
     let Some(token) = token else {
         return Ok(());
     };

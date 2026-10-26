@@ -274,8 +274,23 @@ fn validate_runtime_env_from<F>(
 where
     F: Fn(&str) -> Option<String>,
 {
+    validate_runtime_env_from_with_gh(full, github_remaps_enabled, env, || {
+        env::gh_auth_token().is_some()
+    })
+}
+
+fn validate_runtime_env_from_with_gh<F, G>(
+    full: bool,
+    github_remaps_enabled: bool,
+    env: F,
+    gh_available: G,
+) -> Result<Option<String>, String>
+where
+    F: Fn(&str) -> Option<String>,
+    G: FnOnce() -> bool,
+{
     let is_ci = env::is_ci_from(&env);
-    let has_github_token = env::github_token_available(&env);
+    let has_github_token = env::github_token_available_with(&env, gh_available);
 
     let mut missing = Vec::new();
     if is_ci && !has_github_token {
@@ -391,6 +406,9 @@ async fn run_lychee_cmd(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    if let Some(token) = env::github_token() {
+        command.env(env::GITHUB_TOKEN_ENV, token);
+    }
 
     let result = match command.spawn() {
         Ok(mut child) => {
@@ -819,11 +837,25 @@ mod tests {
         github_remaps_enabled: bool,
         vars: &[(&str, &str)],
     ) -> Result<Option<String>, String> {
+        validate_env_with_gh(full, github_remaps_enabled, vars, false)
+    }
+
+    fn validate_env_with_gh(
+        full: bool,
+        github_remaps_enabled: bool,
+        vars: &[(&str, &str)],
+        gh_available: bool,
+    ) -> Result<Option<String>, String> {
         let vars: HashMap<String, String> = vars
             .iter()
             .map(|(name, value)| (name.to_string(), value.to_string()))
             .collect();
-        validate_runtime_env_from(full, github_remaps_enabled, |name| vars.get(name).cloned())
+        validate_runtime_env_from_with_gh(
+            full,
+            github_remaps_enabled,
+            |name| vars.get(name).cloned(),
+            || gh_available,
+        )
     }
 
     #[test]
@@ -867,6 +899,25 @@ mod tests {
         let err = validate_env(true, true, &[("CI", "true")]).unwrap_err();
 
         assert!(err.contains("GITHUB_TOKEN"), "unexpected error:\n{err}");
+    }
+
+    #[test]
+    fn gh_token_satisfies_ci_and_local_validation() {
+        assert!(validate_env_with_gh(true, true, &[("CI", "true")], true).is_ok());
+        assert_eq!(validate_env_with_gh(true, true, &[], true).unwrap(), None);
+    }
+
+    #[test]
+    fn gh_token_does_not_bypass_pr_metadata_guard() {
+        let err = validate_env_with_gh(
+            false,
+            true,
+            &[("CI", "true"), ("GITHUB_EVENT_NAME", "pull_request")],
+            true,
+        )
+        .unwrap_err();
+        assert!(err.contains("PR_HEAD_REPO"), "unexpected error:\n{err}");
+        assert!(!err.contains("GITHUB_TOKEN"), "unexpected error:\n{err}");
     }
 
     #[test]

@@ -35,9 +35,10 @@ make changed-file runs reliable locally and in CI:
   rather than only the base branch.
 - **Managed local cache:** repeated local runs reuse responses without enabling
   CI caching; see [Local cache](#local-cache).
-- **CI authentication guardrails:** Flint requires `GITHUB_TOKEN` in CI and
-  reports missing PR metadata before running link remaps, instead of allowing
-  unauthenticated GitHub requests to fail ambiguously.
+- **CI authentication guardrails:** Flint accepts `GITHUB_TOKEN` or an
+  authenticated GitHub CLI session in CI and reports missing PR metadata before
+  running link remaps, instead of allowing unauthenticated GitHub requests to
+  fail ambiguously.
 
 ## Local vs CI
 
@@ -52,7 +53,7 @@ CI rather than checking every remote link in the repository on every PR.
 | Remote links in unchanged files            | only with `--full` or a config change | only with `--full` or a config change |
 | GitHub URL and PR-branch remapping         | ✅ when Git context is available      | ✅ with required PR metadata          |
 | Flint-managed request cache                | ✅ unless disabled or configured      | ❌                                    |
-| Missing `GITHUB_TOKEN`                     | warning                               | error                                 |
+| No `GITHUB_TOKEN` or authenticated `gh`    | warning                               | error                                 |
 
 ### GitHub URL remapping
 
@@ -119,7 +120,8 @@ check_all_local = true
 
 ## CI environment
 
-In CI, `lychee` requires `GITHUB_TOKEN` so GitHub link checks can authenticate.
+In CI, `lychee` uses `GITHUB_TOKEN` when set, otherwise it uses the token from
+`gh auth token --hostname github.com`. If neither is available, the check fails.
 On GitHub Actions PR runs in changed-file mode, link remaps also require
 `GITHUB_REPOSITORY`, `GITHUB_BASE_REF`, `GITHUB_HEAD_REF`, and `PR_HEAD_REPO`.
 GitHub Actions provides the first three; set `PR_HEAD_REPO` from

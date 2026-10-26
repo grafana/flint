@@ -18,11 +18,18 @@ fn flint_command(args: &[&str], cwd: &Path) -> Command {
         .env_remove("GITHUB_WORKFLOW")
         .env_remove("GITHUB_COM_TOKEN")
         .env_remove("GITHUB_TOKEN")
+        .env_remove("GH_TOKEN")
+        .env_remove("GH_ENTERPRISE_TOKEN")
+        .env_remove("GITHUB_ENTERPRISE_TOKEN")
+        .env_remove("GH_HOST")
+        .env_remove("GITHUB_API_URL")
         .env_remove("GITHUB_EVENT_NAME")
         .env_remove("GITHUB_REPOSITORY")
         .env_remove("GITHUB_BASE_REF")
         .env_remove("GITHUB_HEAD_REF")
         .env_remove("PR_HEAD_REPO")
+        // Prevent a developer's real gh login from changing token fallback tests.
+        .env("GH_CONFIG_DIR", cwd.join(".gh-config-do-not-use"))
         .current_dir(cwd);
     cmd
 }

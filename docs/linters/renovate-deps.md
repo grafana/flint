@@ -37,9 +37,10 @@ snapshot and consistency checks, configure:
 exclude_managers = ["github-actions", "github-runners"]
 ```
 
-In CI, `renovate-deps` requires `GITHUB_COM_TOKEN` or `GITHUB_TOKEN` so
-Renovate can authenticate GitHub requests. When only `GITHUB_TOKEN` is set,
-Flint forwards it to Renovate as `GITHUB_COM_TOKEN`.
+`renovate-deps` uses `GITHUB_COM_TOKEN` first, then `GITHUB_TOKEN`, then an
+authenticated GitHub CLI session (`gh auth token --hostname github.com`) so
+Renovate can authenticate GitHub requests. Flint forwards the selected token to
+Renovate as `GITHUB_COM_TOKEN`. In CI, the check fails when none is available.
 
 When `flint init` writes a new `flint.toml`, it includes the
 `[checks.renovate-deps]` section when this check is selected.
@@ -64,9 +65,10 @@ The new-file check works offline by matching changed paths against
 `managerFilePatterns` regexes/globs from the active config and any
 resolvable `extends` — inline entries, local file presets, Flint's own
 bundled `github>grafana/flint` preset, and cached `github>owner/repo` presets.
-`flint init` warms the GitHub preset cache when `GITHUB_COM_TOKEN` or
-`GITHUB_TOKEN` is available; normal `flint run` never performs a network
-request. Cache-cold GitHub presets and presets from unsupported sources
+`flint init` warms the GitHub preset cache when a `GITHUB_COM_TOKEN`,
+`GITHUB_TOKEN`, or authenticated GitHub CLI session is available; normal
+`flint run` never performs a network request. Cache-cold GitHub presets and
+presets from unsupported sources
 (`gitlab>`, npm, and HTTP URLs) are skipped, so those still only surface in
 CI.
 

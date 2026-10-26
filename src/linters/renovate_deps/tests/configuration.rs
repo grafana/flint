@@ -168,6 +168,33 @@ fn ci_accepts_github_com_token() {
 }
 
 #[test]
+fn gh_token_satisfies_ci_and_local_validation() {
+    assert!(validate_env_with_gh(&[("CI", "true")], true).is_ok());
+    assert_eq!(validate_env_with_gh(&[], true).unwrap(), None);
+}
+
+#[test]
+fn explicit_github_com_token_is_preserved_over_fallback() {
+    let mut child_env = vec![("GITHUB_COM_TOKEN".into(), "explicit".into())];
+    forward_renovate_github_token(&mut child_env, || {
+        panic!("gh fallback must not run when GITHUB_COM_TOKEN is configured")
+    });
+    assert_eq!(child_env, [("GITHUB_COM_TOKEN".into(), "explicit".into())]);
+}
+
+#[test]
+fn empty_github_com_token_is_replaced_by_fallback_for_child_only() {
+    let mut child_env = vec![("GITHUB_COM_TOKEN".into(), "  ".into())];
+    let parent_env = child_env.clone();
+    forward_renovate_github_token(&mut child_env, || Some("gh-fallback".into()));
+    assert_eq!(
+        child_env,
+        [("GITHUB_COM_TOKEN".into(), "gh-fallback".into())]
+    );
+    assert_eq!(parent_env, [("GITHUB_COM_TOKEN".into(), "  ".into())]);
+}
+
+#[test]
 fn non_ci_missing_github_token_warns_without_failing() {
     let warning = validate_env(&[]).unwrap().unwrap();
 

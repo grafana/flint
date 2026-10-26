@@ -234,6 +234,7 @@ fn validate_extract_version_consistency_accepts_matching_extraction() {
                 current_value: Some("1.7.7".to_string()),
                 current_version: Some("v1.7.7".to_string()),
                 extract_version: Some("^v(?<version>\\S+)".to_string()),
+                dep_type: None,
             },
         )]
         .into_iter()
@@ -256,6 +257,7 @@ fn validate_extract_version_consistency_accepts_normalized_current_version() {
                 current_value: Some("1.7.12".to_string()),
                 current_version: Some("1.7.12".to_string()),
                 extract_version: Some("^v(?<version>\\S+)".to_string()),
+                dep_type: None,
             },
         )]
         .into_iter()
@@ -278,6 +280,7 @@ fn validate_extract_version_consistency_accepts_normalized_prefixed_current_valu
                 current_value: Some("v0.11.0".to_string()),
                 current_version: Some("0.11.0".to_string()),
                 extract_version: Some("^v(?<version>\\S+)".to_string()),
+                dep_type: None,
             },
         )]
         .into_iter()
@@ -300,6 +303,7 @@ fn validate_extract_version_consistency_flags_mismatch() {
                 current_value: Some("2.4.12".to_string()),
                 current_version: Some("@biomejs/biome@2.4.12".to_string()),
                 extract_version: Some("^v?(?<version>.+)".to_string()),
+                dep_type: None,
             },
         )]
         .into_iter()
@@ -328,6 +332,7 @@ fn validate_extract_version_consistency_flags_no_match() {
                 current_value: Some("2.4.12".to_string()),
                 current_version: Some("@biomejs/biome@2.4.12".to_string()),
                 extract_version: Some("^v(?<version>.+)$".to_string()),
+                dep_type: None,
             },
         )]
         .into_iter()
@@ -365,6 +370,7 @@ fn validate_extract_version_consistency_ignores_floating_mise_selectors() {
                     current_value: Some(selector.to_string()),
                     current_version: Some("1.7.12".to_string()),
                     extract_version: Some("not a valid regex [".to_string()),
+                    dep_type: None,
                 },
             )]
             .into_iter()
@@ -391,6 +397,7 @@ fn validate_extract_version_consistency_does_not_ignore_selectors_for_other_mana
                 current_value: Some("latest".to_string()),
                 current_version: Some("1.7.12".to_string()),
                 extract_version: Some("not a valid regex [".to_string()),
+                dep_type: None,
             },
         )]
         .into_iter()
@@ -413,6 +420,7 @@ fn validate_extract_version_consistency_does_not_ignore_non_selector_mise_values
                 current_value: Some("latest-channel".to_string()),
                 current_version: Some("1.7.12".to_string()),
                 extract_version: Some("not a valid regex [".to_string()),
+                dep_type: None,
             },
         )]
         .into_iter()
@@ -422,6 +430,32 @@ fn validate_extract_version_consistency_does_not_ignore_non_selector_mise_values
     };
 
     assert!(extract_version_mismatches(&snap).is_err());
+}
+
+#[test]
+fn validate_extract_version_consistency_ignores_terraform_required_version_ranges() {
+    let snap = Snapshot {
+        meta: [(
+            "hashicorp/terraform".to_string(),
+            DepMeta {
+                package_name: Some("hashicorp/terraform".to_string()),
+                datasource: Some("github-releases".to_string()),
+                current_value: Some(">= 1.7, < 2.0".to_string()),
+                current_version: Some("1.16.5".to_string()),
+                extract_version: Some("v(?<version>.*)$".to_string()),
+                dep_type: Some("required_version".to_string()),
+            },
+        )]
+        .into_iter()
+        .collect(),
+        action_meta: BTreeMap::new(),
+        files: dep_files(&[(
+            "examples/cloud/aws/versions.tf",
+            &[("terraform", &["hashicorp/terraform"])],
+        )]),
+    };
+
+    assert!(validate_extract_version_consistency(&snap).is_ok());
 }
 
 #[test]
@@ -446,6 +480,7 @@ fn patch_semver_equivalent_mise_values_rewrites_to_preferred_shape() {
                 current_value: Some("35.0".to_string()),
                 current_version: Some("v35".to_string()),
                 extract_version: Some("^v(?<version>\\S+)".to_string()),
+                dep_type: None,
             },
         )]
         .into_iter()

@@ -47,6 +47,8 @@ pub(crate) struct DepMeta {
     pub(crate) current_version: Option<String>,
     #[serde(rename = "extractVersion", skip_serializing_if = "Option::is_none")]
     pub(crate) extract_version: Option<String>,
+    #[serde(rename = "depType", skip_serializing)]
+    pub(crate) dep_type: Option<String>,
 }
 
 impl DepMeta {
@@ -62,6 +64,7 @@ impl DepMeta {
         self.current_value = None;
         self.current_version = None;
         self.extract_version = None;
+        self.dep_type = None;
     }
 }
 
@@ -186,6 +189,10 @@ pub(crate) fn extract_deps(
                             .map(ToOwned::to_owned),
                         extract_version: dep
                             .get("extractVersion")
+                            .and_then(|v| v.as_str())
+                            .map(ToOwned::to_owned),
+                        dep_type: dep
+                            .get("depType")
                             .and_then(|v| v.as_str())
                             .map(ToOwned::to_owned),
                     };
@@ -407,6 +414,7 @@ struct DepMetaAccumulator {
     current_values: BTreeSet<String>,
     current_versions: BTreeSet<String>,
     extract_versions: BTreeSet<String>,
+    dep_types: BTreeSet<String>,
 }
 
 impl DepMetaAccumulator {
@@ -416,6 +424,7 @@ impl DepMetaAccumulator {
         insert_if_some(&mut self.current_values, next.current_value.as_ref());
         insert_if_some(&mut self.current_versions, next.current_version.as_ref());
         insert_if_some(&mut self.extract_versions, next.extract_version.as_ref());
+        insert_if_some(&mut self.dep_types, next.dep_type.as_ref());
     }
 
     fn finish(self) -> DepMeta {
@@ -425,6 +434,7 @@ impl DepMetaAccumulator {
             current_value: collapse_unique(self.current_values),
             current_version: collapse_unique(self.current_versions),
             extract_version: collapse_unique(self.extract_versions),
+            dep_type: collapse_unique(self.dep_types),
         }
     }
 }

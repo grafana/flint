@@ -1,7 +1,7 @@
 use super::snapshot::canonical_manager_name;
 
-/// Reject deterministic GitHub Action digest lookup failures while leaving
-/// transient lookup failures inconclusive.
+/// Reject GitHub Action digest lookup failures while leaving tag lookup
+/// failures inconclusive.
 pub(crate) fn validate_lookup_action_warnings(
     log_bytes: &[u8],
     exclude_managers: &[String],
@@ -48,7 +48,12 @@ pub(crate) fn validate_lookup_action_warnings(
                     else {
                         continue;
                     };
-                    if !message.starts_with(DETERMINISTIC) {
+                    // A github-tags lookup can fail even when the current
+                    // action ref is valid. Only a failed github-digest lookup
+                    // is evidence that the pinned ref cannot be resolved.
+                    if !message.starts_with(DETERMINISTIC)
+                        || !message.contains("(github-digest package ")
+                    {
                         continue;
                     }
                     let dep_name = dep

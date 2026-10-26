@@ -24,7 +24,7 @@ pub(super) fn generate_lint_workflow(
         ""
     };
     let rust_steps = if needs_rust_components {
-        "\n      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2\n\n      - name: Install Rust lint components\n        run: rustup component add clippy rustfmt\n"
+        "\n      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3\n\n      - name: Install Rust lint components\n        run: rustup component add clippy rustfmt\n"
     } else {
         ""
     };
@@ -53,10 +53,10 @@ jobs:
           fetch-depth: 0
 
       - name: Setup mise
-        uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
+        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
         with:
-          version: v2026.10.0
-          sha256: 57ced973f968b8fbab07aa8e32bd7077d4a357e200a22356d98963c723c6de0a
+          version: v2026.10.17
+          sha256: fe6dd17e68e09682b31d2e7bb7bb755d22636ac1af5d94621e300f2ca9e9fe8a
 {rust_steps}
       - name: Lint
         env:

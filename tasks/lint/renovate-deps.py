@@ -29,12 +29,12 @@ _exclude_env = os.environ.get("RENOVATE_TRACKED_DEPS_EXCLUDE", "")
 EXCLUDED_MANAGERS = {m.strip() for m in _exclude_env.split(",") if m.strip()}
 
 
-def github_hostname(api_url):
-    """Return the gh hostname matching GITHUB_API_URL, or None if invalid."""
-    if api_url is None:
+def github_hostname(server_url):
+    """Return the gh hostname matching GITHUB_SERVER_URL, or None if invalid."""
+    if server_url is None:
         return "github.com"
     try:
-        parsed = urlsplit(api_url.strip())
+        parsed = urlsplit(server_url.strip())
         if parsed.scheme.lower() not in ("http", "https") or not parsed.netloc:
             return None
         if parsed.username is not None or parsed.password is not None:
@@ -45,8 +45,6 @@ def github_hostname(api_url):
         return None
     if not hostname:
         return None
-    if hostname.lower() == "api.github.com":
-        return "github.com"
     if ":" in hostname:
         hostname = f"[{hostname.lower()}]"
     elif any(
@@ -68,7 +66,7 @@ def github_token(env, runner=subprocess.run):
         value = env.get(name, "")
         if value.strip():
             return value
-    hostname = github_hostname(env.get("GITHUB_API_URL"))
+    hostname = github_hostname(env.get("GITHUB_SERVER_URL"))
     if hostname is None:
         return None
     try:

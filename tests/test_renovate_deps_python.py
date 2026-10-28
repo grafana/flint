@@ -32,7 +32,7 @@ class GithubTokenTests(unittest.TestCase):
         runner.assert_not_called()
 
     def test_cli_fallback_uses_matching_host_and_does_not_mutate_env(self):
-        env = {"GITHUB_API_URL": "https://git.example.test:8443/api/v3"}
+        env = {"GITHUB_SERVER_URL": "https://git.example.test:8443"}
         runner = Mock(
             return_value=subprocess.CompletedProcess([], 0, " gh-token\n", "")
         )
@@ -41,21 +41,23 @@ class GithubTokenTests(unittest.TestCase):
             runner.call_args.args[0],
             ["gh", "auth", "token", "--hostname", "git.example.test:8443"],
         )
-        self.assertEqual(
-            env, {"GITHUB_API_URL": "https://git.example.test:8443/api/v3"}
-        )
+        self.assertEqual(env, {"GITHUB_SERVER_URL": "https://git.example.test:8443"})
 
-    def test_github_api_host_is_mapped_to_web_host(self):
+    def test_server_url_is_used_instead_of_api_url(self):
         runner = Mock(return_value=subprocess.CompletedProcess([], 0, "token", ""))
         renovate_deps.github_token(
-            {"GITHUB_API_URL": "https://api.github.com/"}, runner
+            {
+                "GITHUB_SERVER_URL": "https://github.com/",
+                "GITHUB_API_URL": "https://api.other.test/",
+            },
+            runner,
         )
         self.assertEqual(runner.call_args.args[0][-1], "github.com")
 
     def test_invalid_url_and_missing_cli_are_graceful(self):
         runner = Mock()
         self.assertIsNone(
-            renovate_deps.github_token({"GITHUB_API_URL": "not a url"}, runner)
+            renovate_deps.github_token({"GITHUB_SERVER_URL": "not a url"}, runner)
         )
         runner.assert_not_called()
         self.assertIsNone(

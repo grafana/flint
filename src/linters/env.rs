@@ -2,7 +2,7 @@ pub(crate) const CI_ENV_VARS: &[&str] =
     &["CI", "GITHUB_ACTIONS", "GITHUB_ACTION", "GITHUB_WORKFLOW"];
 pub(crate) const GITHUB_COM_TOKEN_ENV: &str = "GITHUB_COM_TOKEN";
 pub(crate) const GITHUB_TOKEN_ENV: &str = "GITHUB_TOKEN";
-const GITHUB_API_URL_ENV: &str = "GITHUB_API_URL";
+const GITHUB_SERVER_URL_ENV: &str = "GITHUB_SERVER_URL";
 
 /// Returns an explicitly configured token, falling back to the user's GitHub CLI
 /// credentials without ever exposing command output in diagnostics.
@@ -21,7 +21,7 @@ where
 }
 
 pub(crate) fn gh_auth_token() -> Option<String> {
-    let hostname = github_hostname_from(|name| std::env::var(name).ok())?;
+    let hostname = github_server_hostname_from(|name| std::env::var(name).ok())?;
     static GH_TOKENS: std::sync::OnceLock<
         std::sync::Mutex<std::collections::HashMap<String, Option<String>>>,
     > = std::sync::OnceLock::new();
@@ -37,17 +37,16 @@ pub(crate) fn gh_auth_token() -> Option<String> {
     token
 }
 
-/// Resolve the GitHub host corresponding to GITHUB_API_URL. `gh` expects the
-/// web hostname (not the API hostname) for github.com, but GHES uses its API host.
-pub(crate) fn github_hostname_from<F>(env: F) -> Option<String>
+/// Resolve the GitHub server host corresponding to GITHUB_SERVER_URL.
+pub(crate) fn github_server_hostname_from<F>(env: F) -> Option<String>
 where
     F: Fn(&str) -> Option<String>,
 {
-    let Some(api_url) = env(GITHUB_API_URL_ENV) else {
+    let Some(server_url) = env(GITHUB_SERVER_URL_ENV) else {
         return Some("github.com".into());
     };
-    let api_url = api_url.trim();
-    let (scheme, authority) = api_url.split_once("://")?;
+    let server_url = server_url.trim();
+    let (scheme, authority) = server_url.split_once("://")?;
     if !scheme.eq_ignore_ascii_case("https") && !scheme.eq_ignore_ascii_case("http") {
         return None;
     }
@@ -86,11 +85,7 @@ where
     if host.is_empty() {
         return None;
     }
-    Some(if host == "api.github.com" {
-        format!("github.com{port}")
-    } else {
-        format!("{host}{port}")
-    })
+    Some(format!("{host}{port}"))
 }
 
 fn gh_auth_token_with<F, E>(hostname: &str, run: F) -> Option<String>
@@ -242,40 +237,62 @@ mod tests {
     }
 
     #[test]
-    fn resolves_gh_hostname_from_api_url() {
+    fn resolves_gh_hostname_from_server_url() {
         assert_eq!(
-            github_hostname_from(|_| None).as_deref(),
+            github_server_hostname_from(|_| None).as_deref(),
             Some("github.com")
         );
         assert_eq!(
-            github_hostname_from(|_| Some("https://api.github.com/".into())).as_deref(),
+            github_server_hostname_from(|_| Some("https://github.com/".into())).as_deref(),
             Some("github.com")
         );
         assert_eq!(
-            github_hostname_from(|_| Some("https://ghe.example.test/api/v3".into())).as_deref(),
+            github_server_hostname_from(|_| Some("https://ghe.example.test/".into())).as_deref(),
             Some("ghe.example.test")
         );
         assert_eq!(
-            github_hostname_from(|_| Some("https://GHE.Example.test:8443/api".into())).as_deref(),
+            github_server_hostname_from(|_| Some("https://GHE.Example.test:8443/".into()))
+                .as_deref(),
             Some("ghe.example.test:8443")
         );
         assert_eq!(
-            github_hostname_from(|_| Some("https://[2001:db8::1]:8443/api".into())).as_deref(),
+            github_server_hostname_from(|_| Some("https://[2001:db8::1]:8443/".into())).as_deref(),
             Some("[2001:db8::1]:8443")
         );
-        assert_eq!(github_hostname_from(|_| Some("wat".into())), None);
-        assert_eq!(github_hostname_from(|_| Some("file:///tmp".into())), None);
+        assert_eq!(github_server_hostname_from(|_| Some("wat".into())), None);
         assert_eq!(
-            github_hostname_from(|_| Some("https://ghe.example.test:bad/api".into())),
+            github_server_hostname_from(|_| Some("file:///tmp".into())),
             None
         );
         assert_eq!(
-            github_hostname_from(|_| Some("https://ghe.example.test:65536/api".into())),
+            github_server_hostname_from(|_| Some("https://ghe.example.test:bad/".into())),
             None
         );
         assert_eq!(
-            github_hostname_from(|_| Some("https://[not-ipv6]/api".into())),
+            github_server_hostname_from(|_| Some("https://ghe.example.test:65536/".into())),
             None
+        );
+        assert_eq!(
+            github_server_hostname_from(|_| Some("https://[not-ipv6]/".into())),
+            None
+        );
+    }
+
+    #[test]
+    fn gh_server_hostname_ignores_conflicting_api_url() {
+        let vars = HashMap::from([
+            (
+                GITHUB_SERVER_URL_ENV.to_string(),
+                "https://ghe.example.test".to_string(),
+            ),
+            (
+                "GITHUB_API_URL".to_string(),
+                "https://api.other.test".to_string(),
+            ),
+        ]);
+        assert_eq!(
+            github_server_hostname_from(|name| vars.get(name).cloned()).as_deref(),
+            Some("ghe.example.test")
         );
     }
 

@@ -366,11 +366,7 @@ fn fetch_github_preset(project_root: &Path, preset: &GithubPreset) -> anyhow::Re
     let token = std::env::var(crate::linters::env::GITHUB_COM_TOKEN_ENV)
         .ok()
         .filter(|value| !value.trim().is_empty())
-        .or_else(|| {
-            std::env::var(crate::linters::env::GITHUB_TOKEN_ENV)
-                .ok()
-                .filter(|value| !value.trim().is_empty())
-        });
+        .or_else(crate::linters::env::github_token);
     let Some(token) = token else {
         return Ok(());
     };
@@ -598,6 +594,7 @@ mod tests {
             "https://api.example.test/repos/owner/repo/contents/presets/base.json?ref=v1"
         ));
         assert!(request.contains("Accept: application/vnd.github.raw\n"));
+        assert!(request.contains("Authorization: Bearer test-token\n"));
         assert!(request.contains(&format!(
             "User-Agent: flint/{}\n",
             env!("CARGO_PKG_VERSION")

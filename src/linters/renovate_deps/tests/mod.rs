@@ -61,11 +61,18 @@ fn snapshot(meta: &[(&str, Option<&str>, Option<&str>)], files: &FileManagers<'_
 }
 
 fn validate_env(vars: &[(&str, &str)]) -> Result<Option<String>, String> {
+    validate_env_with_gh(vars, false)
+}
+
+fn validate_env_with_gh(
+    vars: &[(&str, &str)],
+    gh_available: bool,
+) -> Result<Option<String>, String> {
     let vars: std::collections::HashMap<String, String> = vars
         .iter()
         .map(|(name, value)| (name.to_string(), value.to_string()))
         .collect();
-    validate_runtime_env_from(|name| vars.get(name).cloned())
+    validate_runtime_env_from_with_gh(|name| vars.get(name).cloned(), || gh_available)
 }
 
 fn write_tmp(content: &str) -> tempfile::NamedTempFile {

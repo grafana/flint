@@ -7,11 +7,13 @@
 import difflib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
 from collections import defaultdict
 from pathlib import Path
+from urllib.parse import urlsplit
 
 _repo_root_env = os.environ.get("MISE_PROJECT_ROOT")
 if _repo_root_env is None:
@@ -27,6 +29,59 @@ _exclude_env = os.environ.get("RENOVATE_TRACKED_DEPS_EXCLUDE", "")
 EXCLUDED_MANAGERS = {m.strip() for m in _exclude_env.split(",") if m.strip()}
 
 
+def github_hostname(server_url):
+    """Return the gh hostname matching GITHUB_SERVER_URL, or None if invalid."""
+    if server_url is None:
+        return "github.com"
+    try:
+        parsed = urlsplit(server_url.strip())
+        if parsed.scheme.lower() not in ("http", "https") or not parsed.netloc:
+            return None
+        if parsed.username is not None or parsed.password is not None:
+            return None
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError:
+        return None
+    if not hostname:
+        return None
+    if ":" in hostname:
+        hostname = f"[{hostname.lower()}]"
+    elif any(
+        not label
+        or label.startswith("-")
+        or label.endswith("-")
+        or not re.fullmatch(r"[A-Za-z0-9-]+", label)
+        for label in hostname.split(".")
+    ):
+        return None
+    else:
+        hostname = hostname.lower()
+    return f"{hostname}{':' + str(port) if port is not None else ''}"
+
+
+def github_token(env, runner=subprocess.run):
+    """Choose the Renovate GitHub token without modifying the parent env."""
+    for name in ("GITHUB_COM_TOKEN", "GITHUB_TOKEN"):
+        value = env.get(name, "")
+        if value.strip():
+            return value
+    hostname = github_hostname(env.get("GITHUB_SERVER_URL"))
+    if hostname is None:
+        return None
+    try:
+        result = runner(
+            ["gh", "auth", "token", "--hostname", hostname],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    token = result.stdout.strip()
+    return token or None
+
+
 def run_renovate(tmpdir):
     """Run Renovate locally and return the log path."""
     config_path = str(REPO_ROOT / ".github" / "renovate.json5")
@@ -37,11 +92,11 @@ def run_renovate(tmpdir):
         "LOG_FORMAT": "json",
         "RENOVATE_CONFIG_FILE": config_path,
     }
-    # Renovate uses GITHUB_COM_TOKEN for github.com API calls (preset fetching,
-    # release lookups). In CI, only GITHUB_TOKEN is typically set — forward it
-    # so Renovate doesn't fall back to unauthenticated requests and hit rate limits.
-    if "GITHUB_COM_TOKEN" not in env and env.get("GITHUB_TOKEN"):
-        env["GITHUB_COM_TOKEN"] = env["GITHUB_TOKEN"]
+    # Renovate uses GITHUB_COM_TOKEN for GitHub API calls. Preserve explicit
+    # values, otherwise use the CI token or the user's authenticated gh session.
+    token = github_token(env)
+    if token:
+        env["GITHUB_COM_TOKEN"] = token
     with open(log_path, "w", encoding="utf-8") as log_file:
         result = subprocess.run(
             [

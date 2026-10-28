@@ -152,7 +152,18 @@ fn validate_runtime_env_from<F>(env: F) -> Result<Option<String>, String>
 where
     F: Fn(&str) -> Option<String>,
 {
-    if env::renovate_github_token_available(&env) {
+    validate_runtime_env_from_with_gh(env, || env::gh_auth_token().is_some())
+}
+
+fn validate_runtime_env_from_with_gh<F, G>(
+    env: F,
+    gh_available: G,
+) -> Result<Option<String>, String>
+where
+    F: Fn(&str) -> Option<String>,
+    G: FnOnce() -> bool,
+{
+    if env::renovate_github_token_available_with(&env, gh_available) {
         return Ok(None);
     }
     if env::is_ci_from(&env) {
@@ -989,16 +1000,9 @@ async fn run_renovate(
         "RENOVATE_CONFIG_FILE".into(),
         config_path.to_string_lossy().into_owned(),
     ));
-    // Renovate uses GITHUB_COM_TOKEN for github.com API calls; fall back to GITHUB_TOKEN.
-    let has_com_token = std::env::var(env::GITHUB_COM_TOKEN_ENV)
-        .map(|v| !v.is_empty())
-        .unwrap_or(false);
-    if !has_com_token
-        && let Ok(token) = std::env::var(env::GITHUB_TOKEN_ENV)
-        && !token.is_empty()
-    {
-        env.push((env::GITHUB_COM_TOKEN_ENV.into(), token));
-    }
+    // Renovate uses GITHUB_COM_TOKEN; keep a configured value or forward the
+    // explicit GitHub token / gh-auth fallback for this child process only.
+    forward_renovate_github_token(&mut env, env::github_token);
 
     let out = super::spawn_command(
         &[
@@ -1032,6 +1036,22 @@ async fn run_renovate(
     }
 
     Ok(combined)
+}
+
+fn forward_renovate_github_token<F>(env: &mut Vec<(String, String)>, fallback: F)
+where
+    F: FnOnce() -> Option<String>,
+{
+    if env
+        .iter()
+        .any(|(name, value)| name == env::GITHUB_COM_TOKEN_ENV && !value.trim().is_empty())
+    {
+        return;
+    }
+    env.retain(|(name, _)| name != env::GITHUB_COM_TOKEN_ENV);
+    if let Some(token) = fallback().filter(|token| !token.trim().is_empty()) {
+        env.push((env::GITHUB_COM_TOKEN_ENV.into(), token));
+    }
 }
 /// Extracts the most informative slice of a Renovate log for an error message.
 ///

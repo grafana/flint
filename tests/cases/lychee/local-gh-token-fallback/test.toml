@@ -1,0 +1,20 @@
+[expected]
+args = "run --full lychee"
+exit = 1
+stderr_contains = ["TOKEN:mock-gh-token"]
+
+[env]
+FLINT_LYCHEE_SKIP_LOCAL_CACHE = "true"
+GITHUB_TOKEN = ""
+LYCHEE_SKIP_GITHUB_REMAPS = "true"
+
+[fake_bins]
+gh = '''
+#!/bin/sh
+printf 'mock-gh-token\n'
+'''
+lychee = '''
+#!/bin/sh
+printf 'TOKEN:%s\n' "$GITHUB_TOKEN" >&2
+exit 1
+'''

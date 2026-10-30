@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.22.16](https://github.com/grafana/flint/compare/v0.22.15...v0.22.16) - 2026-10-30
+
+### Other
+
+- *(deps)* update dependency jdx/mise-action to v5.2.4 ([#627](https://github.com/grafana/flint/pull/627))
+- *(deps)* update node.js to v24.22.2 ([#626](https://github.com/grafana/flint/pull/626))
+- *(deps)* update taiki-e/install-action action to v2.87.32 ([#625](https://github.com/grafana/flint/pull/625))
+
 ## [0.22.15](https://github.com/grafana/flint/compare/v0.22.14...v0.22.15) - 2026-10-28
 
 ### Fixed

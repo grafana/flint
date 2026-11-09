@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.22.16](https://github.com/grafana/flint/compare/v0.22.15...v0.22.16) - 2026-11-09
+
+### Other
+
+- *(deps)* update taiki-e/install-action action to v2.90.1 ([#644](https://github.com/grafana/flint/pull/644))
+- *(deps)* lock file maintenance ([#642](https://github.com/grafana/flint/pull/642))
+- *(deps)* update taiki-e/install-action action to v2.90.0 ([#640](https://github.com/grafana/flint/pull/640))
+- *(deps)* update dependency jdx/mise-action to v5.2.6 ([#638](https://github.com/grafana/flint/pull/638))
+- *(deps)* update taiki-e/install-action action to v2.89.1 ([#639](https://github.com/grafana/flint/pull/639))
+- *(deps)* update taiki-e/install-action action to v2.89.0 ([#637](https://github.com/grafana/flint/pull/637))
+- *(deps)* update dependency jdx/mise-action to v5.2.5 ([#635](https://github.com/grafana/flint/pull/635))
+- *(deps)* update jdx/packslip action to v1.11.3 ([#636](https://github.com/grafana/flint/pull/636))
+- *(deps)* update taiki-e/install-action action to v2.88.1 ([#634](https://github.com/grafana/flint/pull/634))
+- *(deps)* update taiki-e/install-action action to v2.88.0 ([#632](https://github.com/grafana/flint/pull/632))
+- *(deps)* update jdx/packslip action to v1.11.2 ([#631](https://github.com/grafana/flint/pull/631))
+- *(deps)* lock file maintenance ([#630](https://github.com/grafana/flint/pull/630))
+- *(deps)* update mise to v2026.10.23 ([#628](https://github.com/grafana/flint/pull/628))
+- *(deps)* update dependency jdx/mise-action to v5.2.4 ([#627](https://github.com/grafana/flint/pull/627))
+- *(deps)* update node.js to v24.22.2 ([#626](https://github.com/grafana/flint/pull/626))
+- *(deps)* update taiki-e/install-action action to v2.87.32 ([#625](https://github.com/grafana/flint/pull/625))
+
 ## [0.22.15](https://github.com/grafana/flint/compare/v0.22.14...v0.22.15) - 2026-10-28
 
 ### Fixed

@@ -3,10 +3,13 @@ args = "run --full --fix ryl"
 exit = 1
 stderr = '''
 [ryl]
-<REPO>/config.yml
-  2:11      error    too many spaces after colon  (colons)
+warning: bare `ryl <paths>` is deprecated; use `ryl check <paths>` instead
+warning: .github/config/.yamllint.yml: yamllint YAML config is deprecated; run `ryl --migrate-configs --migrate-write --migrate-delete-old --migrate-root <REPO>/.github/config/.yamllint.yml` with ryl 0.29.0 or later and pass the TOML it writes to `-c`
+<REPO>/broken.yml:1:8 skipped by --fix: syntax error: unclosed bracket '[' (syntax)
+<REPO>/broken.yml
+  1:8       error    syntax error: unclosed bracket '[' (syntax)
 
-Found 2 problems (1 fixed, 1 remaining).
+Found 3 problems (2 fixed, 1 remaining).
 flint: partial: ryl
 '''
 
@@ -16,6 +19,6 @@ FLINT_CONFIG_DIR = ".github/config"
 [expected.files]
 "config.yml" = """
 name: "test"
-value:     42
+value: 42
 items: ["a", "b"]
 """

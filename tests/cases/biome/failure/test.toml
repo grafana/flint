@@ -3,8 +3,6 @@ args = "run --full biome"
 exit = 1
 stderr = '''
 [biome]
-Checked N file(s) in Xµs. No fixes applied.
-Found 1 error.
 main.js:1:1 lint/suspicious/noDebugger  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   × This is an unexpected use of the debugger statement.
@@ -14,11 +12,15 @@ main.js:1:1 lint/suspicious/noDebugger  FIXABLE  ━━━━━━━━━━�
     2 │ console.log("hello");
     3 │ 
   
+  i A debugger statement pauses the program when a debugger is open. It is meant for debugging only, and it should not be left in code that is shipped.
+  
   i Unsafe fix: Remove debugger statement
   
     1 │ debugger;
       │ ---------
 
+Checked N file(s) in Xµs. No fixes applied.
+Found 1 error.
 check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   × Some errors were emitted while running checks.

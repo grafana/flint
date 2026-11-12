@@ -18,7 +18,7 @@ help: Remove unused import: `os`
   |
 
 Found 1 error.
-[*] 1 fixable with the `--fix` option.
+[*] 1 fixable with `--fix`.
 
 flint: 1 check failed (ruff)
 💡 Try `flint run --fix` to auto-fix lint issues, then re-run `flint run` to verify.

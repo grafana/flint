@@ -3,8 +3,6 @@ args = "run --full biome-format"
 exit = 1
 stderr = '''
 [biome-format]
-Checked N file(s) in Xµs. No fixes applied.
-Found 1 error.
 data.json format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   × Formatter would have printed the following content:
@@ -12,6 +10,8 @@ data.json format ━━━━━━━━━━━━━━━━━━━━━
     1 │ {·"foo":·"bar",·"baz":·1·}
       │  +      +      +      + + 
 
+Checked N file(s) in Xµs. No fixes applied.
+Found 1 error.
 format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   × Some errors were emitted while running checks.

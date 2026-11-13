@@ -3,6 +3,8 @@ args = "run --full ryl"
 exit = 1
 stderr = '''
 [ryl]
+warning: bare `ryl <paths>` is deprecated; use `ryl check <paths>` instead
+warning: .github/config/.yamllint.yml: yamllint YAML config is deprecated; run `ryl --migrate-configs --migrate-write --migrate-delete-old --migrate-root <REPO>/.github/config/.yamllint.yml` with ryl 0.29.0 or later and pass the TOML it writes to `-c`
 <REPO>/config.yml
   1:6       error    syntax error: unclosed bracket '[' (syntax)
 

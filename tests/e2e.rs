@@ -1799,3 +1799,116 @@ fn checker_lychee_accepts_hk_stdin_selection_and_emits_sarif() {
         "lychee"
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn verbose_lychee_streams_output_before_exit_without_replaying_it() {
+    use std::io::{BufRead, BufReader};
+    use std::os::unix::fs::PermissionsExt;
+    use std::process::Stdio;
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    let repo = git_repo();
+    std::fs::write(
+        repo.path().join("mise.toml"),
+        "[tools]\nlychee = \"latest\"\n",
+    )
+    .unwrap();
+    let fake_bin = tempfile::tempdir().expect("fake bin dir");
+    let release_file = repo.path().join("release-lychee");
+    let lychee = fake_bin.path().join("lychee");
+    std::fs::write(
+        &lychee,
+        "#!/bin/sh\nprintf 'STREAM_STDOUT_MARKER\\n'\nprintf 'STREAM_STDERR_MARKER\\n' >&2\nfor attempt in $(seq 1 100); do\n  [ -f \"$LYCHEE_RELEASE_FILE\" ] && exit 1\n  sleep 0.05\ndone\nexit 9\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&lychee, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let path = format!(
+        "{}:{}",
+        fake_bin.path().display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let mut child = flint_command(
+        &["run", "--full", "--fix", "--verbose", "lychee"],
+        repo.path(),
+    )
+    .env("PATH", path)
+    .env("GITHUB_TOKEN", "test-token")
+    .env("FLINT_LYCHEE_SKIP_LOCAL_CACHE", "true")
+    .env("LYCHEE_SKIP_GITHUB_REMAPS", "true")
+    .env("LYCHEE_RELEASE_FILE", &release_file)
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .spawn()
+    .expect("spawn flint with fake lychee");
+
+    let (tx, rx) = mpsc::channel();
+    let child_stdout = child.stdout.take().unwrap();
+    let child_stderr = child.stderr.take().unwrap();
+    let stdout_tx = tx.clone();
+    let stdout_reader = std::thread::spawn(move || {
+        for line in BufReader::new(child_stdout).lines() {
+            let _ = stdout_tx.send(("stdout", line.unwrap()));
+        }
+    });
+    let stderr_tx = tx.clone();
+    let stderr_reader = std::thread::spawn(move || {
+        for line in BufReader::new(child_stderr).lines() {
+            let _ = stderr_tx.send(("stderr", line.unwrap()));
+        }
+    });
+    drop(tx);
+
+    let mut lines = Vec::new();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let marker_seen = loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            break false;
+        }
+        match rx.recv_timeout(remaining.min(Duration::from_millis(200))) {
+            Ok((stream, line)) => {
+                let seen = line == "STREAM_STDOUT_MARKER" || line == "STREAM_STDERR_MARKER";
+                lines.push((stream, line));
+                if seen {
+                    break true;
+                }
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => break false,
+        }
+    };
+    assert!(marker_seen, "no live lychee marker received: {lines:?}");
+    assert!(
+        child.try_wait().unwrap().is_none(),
+        "lychee exited before release"
+    );
+
+    std::fs::write(&release_file, "continue\n").unwrap();
+    let status = child.wait().expect("wait for flint");
+    while let Ok(line) = rx.recv() {
+        lines.push(line);
+    }
+    stdout_reader.join().unwrap();
+    stderr_reader.join().unwrap();
+
+    assert_eq!(status.code(), Some(1), "flint must preserve lychee failure");
+    assert_eq!(
+        lines
+            .iter()
+            .filter(|(_, line)| line == "STREAM_STDOUT_MARKER")
+            .count(),
+        1,
+        "stdout was missing or replayed: {lines:?}"
+    );
+    assert_eq!(
+        lines
+            .iter()
+            .filter(|(_, line)| line == "STREAM_STDERR_MARKER")
+            .count(),
+        1,
+        "stderr was missing or replayed: {lines:?}"
+    );
+}

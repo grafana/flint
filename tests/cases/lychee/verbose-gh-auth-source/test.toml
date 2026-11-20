@@ -1,0 +1,24 @@
+[expected]
+args = "run --full --fix --verbose lychee"
+exit = 0
+stderr_contains = [
+  "flint: links: resolving GitHub authentication via gh (up to 3s)",
+  "flint: links: GitHub authentication source: GitHub CLI (gh)",
+  "flint: links: starting Checking all links in all files",
+]
+stdout_contains = ["==> Checking all links in all files"]
+
+[env]
+FLINT_LYCHEE_SKIP_LOCAL_CACHE = "true"
+GITHUB_TOKEN = ""
+LYCHEE_SKIP_GITHUB_REMAPS = "true"
+
+[fake_bins]
+gh = '''
+#!/bin/sh
+printf 'private-test-token\n'
+'''
+lychee = '''
+#!/bin/sh
+exit 0
+'''

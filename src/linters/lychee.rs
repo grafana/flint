@@ -1,6 +1,7 @@
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::process::Command;
 
 use crate::config::{Config, LycheeConfig, Settings};
@@ -45,6 +46,12 @@ struct CachePreference {
     allowed: bool,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct RunOptions {
+    cache: CachePreference,
+    verbose: bool,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FollowUpMode {
     LocalOnly,
@@ -76,12 +83,13 @@ impl PreparedNativeCheck for PreparedLychee {
 
     fn run(self: Box<Self>, ctx: NativeRunContext) -> NativeRunFuture {
         Box::pin(async move {
-            crate::linters::lychee::run(
+            crate::linters::lychee::run_with_verbose(
                 &self.cfg,
                 &self.settings,
                 &self.file_list,
                 &ctx.project_root,
                 &self.config_dir,
+                ctx.verbose,
             )
             .await
         })
@@ -95,10 +103,37 @@ pub async fn run(
     project_root: &Path,
     config_dir: &Path,
 ) -> LinterOutput {
+    run_with_verbose(cfg, settings, file_list, project_root, config_dir, false).await
+}
+
+pub(crate) async fn run_with_verbose(
+    cfg: &LycheeConfig,
+    settings: &Settings,
+    file_list: &FileList,
+    project_root: &Path,
+    config_dir: &Path,
+    verbose: bool,
+) -> LinterOutput {
+    if verbose {
+        if std::env::var(env::GITHUB_TOKEN_ENV)
+            .ok()
+            .is_none_or(|token| token.trim().is_empty())
+        {
+            eprintln!("flint: links: resolving GitHub authentication via gh (up to 3s)");
+        }
+        let (_, source) = env::github_token_with_source();
+        eprintln!(
+            "flint: links: GitHub authentication source: {}",
+            source.label()
+        );
+    }
     match validate_runtime_env(file_list) {
         Ok(Some(warning)) => eprintln!("{warning}"),
         Ok(None) => {}
         Err(stderr) => {
+            if verbose {
+                eprint!("{stderr}");
+            }
             return LinterOutput {
                 ok: false,
                 stdout: Vec::new(),
@@ -110,22 +145,32 @@ pub async fn run(
 
     let lychee_cfg_raw = cfg.config.as_deref().unwrap_or("lychee.toml");
     let lychee_cfg = resolve_lychee_config_path(project_root, config_dir, lychee_cfg_raw);
-    let cache_preference = cache_preference(&lychee_cfg);
+    let run_options = RunOptions {
+        cache: cache_preference(&lychee_cfg),
+        verbose,
+    };
 
     let remap_args = build_remap_args(project_root).await;
     let checkable_all_files = match lychee_checkable_files(project_root, settings) {
         Ok(files) => files,
         Err(e) => {
+            let message = format!("flint: links: failed to collect files: {e}\n");
+            if verbose {
+                eprint!("{message}");
+            }
             return LinterOutput {
                 ok: false,
                 stdout: Vec::new(),
-                stderr: format!("flint: links: failed to collect files: {e}\n").into_bytes(),
+                stderr: message.into_bytes(),
                 setup_outcome: None,
             };
         }
     };
-    let checkable_all_file_inputs =
-        lychee_input_paths(&checkable_all_files, project_root, cache_preference.allowed);
+    let checkable_all_file_inputs = lychee_input_paths(
+        &checkable_all_files,
+        project_root,
+        run_options.cache.allowed,
+    );
     let checkable_all_file_refs: Vec<&str> = checkable_all_file_inputs
         .iter()
         .map(String::as_str)
@@ -140,7 +185,7 @@ pub async fn run(
             &checkable_all_file_refs,
             false,
             project_root,
-            cache_preference,
+            run_options,
         )
         .await;
     }
@@ -152,6 +197,9 @@ pub async fn run(
         .any(|f| f.as_path() == Path::new(&lychee_cfg));
 
     if config_changed {
+        if verbose {
+            eprintln!("Config changes detected, falling back to full check.");
+        }
         let mut out = run_lychee_cmd(
             "Checking all links in all files",
             &lychee_cfg,
@@ -159,7 +207,7 @@ pub async fn run(
             &checkable_all_file_refs,
             false,
             project_root,
-            cache_preference,
+            run_options,
         )
         .await;
         let mut stderr = b"Config changes detected, falling back to full check.\n".to_vec();
@@ -180,7 +228,7 @@ pub async fn run(
                 .into_owned()
         })
         .collect();
-    let checkable_inputs = lychee_input_paths(&checkable, project_root, cache_preference.allowed);
+    let checkable_inputs = lychee_input_paths(&checkable, project_root, run_options.cache.allowed);
 
     let mut all_ok = true;
     let mut combined_stdout = Vec::new();
@@ -197,13 +245,17 @@ pub async fn run(
             &file_refs,
             false,
             project_root,
-            cache_preference,
+            run_options,
         )
         .await;
         all_ok &= out.ok;
         combined_stdout.extend_from_slice(&out.stdout);
         combined_stderr.extend_from_slice(&out.stderr);
     } else if follow_up_mode.is_none() {
+        if verbose {
+            println!("No modified files to check for all links.");
+            let _ = std::io::stdout().flush();
+        }
         combined_stdout.extend_from_slice(b"No modified files to check for all links.\n");
     }
 
@@ -215,7 +267,7 @@ pub async fn run(
             &checkable_all_file_refs,
             local_only,
             project_root,
-            cache_preference,
+            run_options,
         )
         .await;
         all_ok &= out.ok;
@@ -388,18 +440,26 @@ async fn run_lychee_cmd(
     files: &[&str],
     local_only: bool,
     project_root: &Path,
-    cache_preference: CachePreference,
+    options: RunOptions,
 ) -> LinterOutput {
-    let cache_plan = prepare_cache_plan(project_root, cache_preference);
+    if options.verbose {
+        eprintln!("flint: links: starting {description}");
+    }
+    let cache_plan = prepare_cache_plan(project_root, options.cache);
     let argv = build_lychee_argv(
         lychee_cfg,
         remap_args,
         local_only,
         cache_plan.plan.add_cache_flag,
+        options.verbose,
     );
     let file_list = build_lychee_file_list(files);
 
     let mut stdout = format!("==> {description}\n").into_bytes();
+    if options.verbose {
+        println!("==> {description}");
+        let _ = std::io::stdout().flush();
+    }
     let mut command = super::spawn_command(&argv, false);
     command
         .current_dir(&cache_plan.plan.working_dir)
@@ -420,7 +480,32 @@ async fn run_lychee_cmd(
                 stdin.write_all(&file_list).await?;
                 stdin.shutdown().await
             });
-            let output_result = child.wait_with_output().await;
+            let output_result = if options.verbose {
+                let child_stdout = child
+                    .stdout
+                    .take()
+                    .expect("stdout is available because it was configured as piped");
+                let child_stderr = child
+                    .stderr
+                    .take()
+                    .expect("stderr is available because it was configured as piped");
+                let wait = child.wait();
+                let (stdout_result, stderr_result, status_result) = tokio::join!(
+                    stream_child_output(child_stdout, tokio::io::stdout()),
+                    stream_child_output(child_stderr, tokio::io::stderr()),
+                    wait,
+                );
+                match (stdout_result, stderr_result, status_result) {
+                    (Ok(stdout), Ok(stderr), Ok(status)) => Ok(std::process::Output {
+                        status,
+                        stdout,
+                        stderr,
+                    }),
+                    (Err(error), _, _) | (_, Err(error), _) | (_, _, Err(error)) => Err(error),
+                }
+            } else {
+                child.wait_with_output().await
+            };
             let writer_result = writer.await;
 
             match (output_result, writer_result) {
@@ -446,13 +531,43 @@ async fn run_lychee_cmd(
                 setup_outcome: None,
             }
         }
-        Err(e) => LinterOutput {
-            ok: false,
-            stdout,
-            stderr: format!("flint: links: failed to spawn lychee: {e}\n").into_bytes(),
-            setup_outcome: None,
-        },
+        Err(e) => {
+            let message = format!("flint: links: failed to spawn lychee: {e}\n");
+            if options.verbose {
+                eprint!("{message}");
+            }
+            LinterOutput {
+                ok: false,
+                stdout: if options.verbose { Vec::new() } else { stdout },
+                stderr: message.into_bytes(),
+                setup_outcome: None,
+            }
+        }
     }
+}
+
+async fn stream_child_output<R, W>(mut reader: R, mut writer: W) -> std::io::Result<Vec<u8>>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
+    let mut captured = Vec::new();
+    let mut buffer = [0; 8192];
+    let mut forward = true;
+    loop {
+        let read = reader.read(&mut buffer).await?;
+        if read == 0 {
+            break;
+        }
+        captured.extend_from_slice(&buffer[..read]);
+        if forward && writer.write_all(&buffer[..read]).await.is_err() {
+            forward = false;
+        }
+        if forward {
+            let _ = writer.flush().await;
+        }
+    }
+    Ok(captured)
 }
 
 fn build_lychee_argv(
@@ -460,12 +575,17 @@ fn build_lychee_argv(
     remap_args: &[String],
     local_only: bool,
     add_cache_flag: bool,
+    verbose: bool,
 ) -> Vec<String> {
     let mut argv: Vec<String> = vec![
         "lychee".to_string(),
         "--config".to_string(),
         lychee_cfg.to_string(),
     ];
+
+    if verbose {
+        argv.push("--verbose".to_string());
+    }
 
     if add_cache_flag {
         argv.push("--cache".to_string());
@@ -865,7 +985,7 @@ mod tests {
             .collect();
         let file_refs: Vec<&str> = files.iter().map(String::as_str).collect();
 
-        let argv = build_lychee_argv("lychee.toml", &[], false, false);
+        let argv = build_lychee_argv("lychee.toml", &[], false, false, false);
         let file_list = build_lychee_file_list(&file_refs);
 
         assert_eq!(
@@ -874,6 +994,15 @@ mod tests {
         );
         assert!(file_list.len() > 32_767);
         assert_eq!(file_list.split(|byte| *byte == b'\n').count(), 401);
+    }
+
+    #[test]
+    fn lychee_verbose_flag_is_forwarded_only_when_requested() {
+        let quiet = build_lychee_argv("lychee.toml", &[], false, false, false);
+        let verbose = build_lychee_argv("lychee.toml", &[], false, false, true);
+
+        assert!(!quiet.iter().any(|arg| arg == "--verbose"));
+        assert!(verbose.iter().any(|arg| arg == "--verbose"));
     }
 
     #[test]

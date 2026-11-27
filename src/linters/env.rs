@@ -3,14 +3,51 @@ pub(crate) const CI_ENV_VARS: &[&str] =
 pub(crate) const GITHUB_COM_TOKEN_ENV: &str = "GITHUB_COM_TOKEN";
 pub(crate) const GITHUB_TOKEN_ENV: &str = "GITHUB_TOKEN";
 const GITHUB_SERVER_URL_ENV: &str = "GITHUB_SERVER_URL";
+const GH_AUTH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum GithubTokenSource {
+    Environment,
+    GithubCli,
+    None,
+}
+
+impl GithubTokenSource {
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Environment => "GITHUB_TOKEN",
+            Self::GithubCli => "GitHub CLI (gh)",
+            Self::None => "none",
+        }
+    }
+}
 
 /// Returns an explicitly configured token, falling back to the user's GitHub CLI
 /// credentials without ever exposing command output in diagnostics.
 pub(crate) fn github_token() -> Option<String> {
-    github_token_from(|name| std::env::var(name).ok(), gh_auth_token)
+    github_token_with_source().0
 }
 
-pub(crate) fn github_token_from<F, G>(env: F, gh_token: G) -> Option<String>
+pub(crate) fn github_token_with_source() -> (Option<String>, GithubTokenSource) {
+    github_token_with_source_from(|name| std::env::var(name).ok(), gh_auth_token)
+}
+
+fn github_token_with_source_from<F, G>(env: F, gh_token: G) -> (Option<String>, GithubTokenSource)
+where
+    F: Fn(&str) -> Option<String>,
+    G: FnOnce() -> Option<String>,
+{
+    if let Some(token) = env(GITHUB_TOKEN_ENV).filter(|token| !token.trim().is_empty()) {
+        return (Some(token), GithubTokenSource::Environment);
+    }
+    match gh_token() {
+        Some(token) => (Some(token), GithubTokenSource::GithubCli),
+        None => (None, GithubTokenSource::None),
+    }
+}
+
+#[cfg(test)]
+fn github_token_from<F, G>(env: F, gh_token: G) -> Option<String>
 where
     F: Fn(&str) -> Option<String>,
     G: FnOnce() -> Option<String>,
@@ -30,11 +67,70 @@ pub(crate) fn gh_auth_token() -> Option<String> {
     if let Some(token) = cache.get(&hostname) {
         return token.clone();
     }
-    let token = gh_auth_token_with(&hostname, |command, args| {
-        std::process::Command::new(command).args(args).output()
-    });
+    let token = gh_auth_token_with(&hostname, run_gh_auth_command);
     cache.insert(hostname, token.clone());
     token
+}
+
+fn run_gh_auth_command(command: &str, args: &[&str]) -> std::io::Result<std::process::Output> {
+    let result = run_gh_auth_command_with_timeout(command, args, GH_AUTH_TIMEOUT);
+    if result
+        .as_ref()
+        .is_err_and(|error| error.kind() == std::io::ErrorKind::TimedOut)
+    {
+        eprintln!(
+            "flint: warning: gh auth token lookup timed out after {}s; continuing without GitHub CLI token",
+            GH_AUTH_TIMEOUT.as_secs()
+        );
+    }
+    result
+}
+
+fn run_gh_auth_command_with_timeout(
+    command: &str,
+    args: &[&str],
+    timeout: std::time::Duration,
+) -> std::io::Result<std::process::Output> {
+    use std::io::{Read, Seek, SeekFrom};
+    use std::process::Stdio;
+    use std::time::Instant;
+
+    let mut stdout = tempfile::tempfile()?;
+    let mut child = std::process::Command::new(command)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(stdout.try_clone()?))
+        .stderr(Stdio::null())
+        .spawn()?;
+    let deadline = Instant::now() + timeout;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {}
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(error);
+            }
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "gh auth token timed out",
+            ));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    };
+    stdout.seek(SeekFrom::Start(0))?;
+    let mut output = Vec::new();
+    stdout.read_to_end(&mut output)?;
+    Ok(std::process::Output {
+        status,
+        stdout: output,
+        stderr: Vec::new(),
+    })
 }
 
 /// Resolve the GitHub server host corresponding to GITHUB_SERVER_URL.
@@ -190,6 +286,52 @@ mod tests {
             &|name| vars.get(name).cloned(),
             || false
         ));
+    }
+
+    #[test]
+    fn token_source_prefers_environment_and_labels_fallbacks_without_values() {
+        let (token, source) = github_token_with_source_from(
+            |name| (name == GITHUB_TOKEN_ENV).then(|| "private-token".to_string()),
+            || panic!("gh must not be queried when GITHUB_TOKEN is set"),
+        );
+        assert_eq!(token.as_deref(), Some("private-token"));
+        assert_eq!(source, GithubTokenSource::Environment);
+        assert_eq!(source.label(), "GITHUB_TOKEN");
+
+        let (_, source) = github_token_with_source_from(|_| None, || Some("private-token".into()));
+        assert_eq!(source, GithubTokenSource::GithubCli);
+        assert_eq!(source.label(), "GitHub CLI (gh)");
+
+        let (_, source) = github_token_with_source_from(|_| None, || None);
+        assert_eq!(source, GithubTokenSource::None);
+        assert_eq!(source.label(), "none");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn gh_auth_command_times_out_and_kills_hung_child() {
+        let started = std::time::Instant::now();
+        let error = run_gh_auth_command_with_timeout(
+            "sh",
+            &["-c", "exec sleep 30"],
+            std::time::Duration::from_millis(100),
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
+        assert!(started.elapsed() < std::time::Duration::from_secs(2));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn gh_auth_command_captures_token_output() {
+        let output = run_gh_auth_command_with_timeout(
+            "sh",
+            &["-c", "printf 'private-token\\n'"],
+            std::time::Duration::from_secs(1),
+        )
+        .unwrap();
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"private-token\n");
     }
 
     #[test]

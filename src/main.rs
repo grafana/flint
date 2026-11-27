@@ -589,6 +589,7 @@ async fn run(
             RunOptions {
                 fix: args.fix,
                 verbose: args.verbose,
+                verbose_lychee: false,
                 short: args.short,
                 time: args.time,
             },
@@ -718,6 +719,7 @@ async fn run(
                 RunOptions {
                     fix: false,
                     verbose: false,
+                    verbose_lychee: args.verbose,
                     short: true,
                     time: false,
                 },
@@ -755,6 +757,7 @@ async fn run(
                     RunOptions {
                         fix: true,
                         verbose: false,
+                        verbose_lychee: false,
                         short: true,
                         time: false,
                     },
@@ -792,6 +795,7 @@ async fn run(
                     RunOptions {
                         fix: false,
                         verbose: false,
+                        verbose_lychee: false,
                         short: true,
                         time: false,
                     },
@@ -817,6 +821,7 @@ async fn run(
                 RunOptions {
                     fix: true,
                     verbose: false,
+                    verbose_lychee: false,
                     short: true,
                     time: false,
                 },
@@ -840,6 +845,7 @@ async fn run(
         RunOptions {
             fix: false,
             verbose: args.verbose,
+            verbose_lychee: false,
             short: args.short,
             time: args.time,
         },
@@ -920,7 +926,7 @@ fn finish_fix_outcomes(outcomes: Vec<FixOutcome>, opts: FixSummaryOptions) {
                     runner::format_duration_suffix(time, r.duration)
                 );
             }
-            if verbose || !r.ok {
+            if (verbose || !r.ok) && !r.output_streamed {
                 if !r.stdout.is_empty() {
                     eprint!("{}", String::from_utf8_lossy(&r.stdout));
                 }

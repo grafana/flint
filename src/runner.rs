@@ -19,6 +19,7 @@ use preparation::*;
 pub struct RunOptions {
     pub fix: bool,
     pub verbose: bool,
+    pub verbose_lychee: bool,
     pub short: bool,
     pub time: bool,
 }
@@ -40,6 +41,7 @@ pub struct CheckResult {
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
     pub setup_outcome: Option<crate::registry::SetupOutcome>,
+    pub output_streamed: bool,
     pub duration: Duration,
 }
 
@@ -80,6 +82,7 @@ impl PreparedCheck {
 
     async fn execute(self, fix: bool, verbose: bool, project_root: &Path) -> CheckResult {
         let name = self.name().to_string();
+        let output_streamed = verbose && name == "lychee";
         let start = Instant::now();
         let (out, changed): (LinterOutput, bool) = match self {
             Self::Invocations {
@@ -149,6 +152,7 @@ impl PreparedCheck {
             stdout: out.stdout,
             stderr: out.stderr,
             setup_outcome: out.setup_outcome,
+            output_streamed,
             duration: start.elapsed(),
         }
     }
@@ -162,6 +166,7 @@ pub async fn run(
     let RunOptions {
         fix,
         verbose,
+        verbose_lychee,
         short,
         time,
     } = opts;
@@ -189,10 +194,13 @@ pub async fn run(
     if fix {
         let mut results = vec![];
         for task in prepared {
-            let r = task.execute(fix, verbose, ctx.project_root).await;
+            let task_verbose = verbose || (verbose_lychee && task.name() == "lychee");
+            let r = task.execute(fix, task_verbose, ctx.project_root).await;
             if !short && (verbose || !r.ok) {
                 eprintln!("[{}]{}", r.name, format_duration_suffix(time, r.duration));
-                flush_output(&r.stdout, &r.stderr);
+                if !r.output_streamed {
+                    flush_output(&r.stdout, &r.stderr);
+                }
             }
             results.push(r);
         }
@@ -202,7 +210,8 @@ pub async fn run(
     let mut set: JoinSet<CheckResult> = JoinSet::new();
     for task in prepared {
         let root = ctx.project_root.to_path_buf();
-        set.spawn(async move { task.execute(false, verbose, &root).await });
+        let task_verbose = verbose || (verbose_lychee && task.name() == "lychee");
+        set.spawn(async move { task.execute(false, task_verbose, &root).await });
     }
 
     // Collect all results before printing to avoid interleaved output.
@@ -218,7 +227,7 @@ pub async fn run(
             if verbose || !r.ok || time {
                 eprintln!("[{}]{}", r.name, format_duration_suffix(time, r.duration));
             }
-            if verbose || !r.ok {
+            if (verbose || !r.ok) && !r.output_streamed {
                 flush_output(&r.stdout, &r.stderr);
             }
         }
